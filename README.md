@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🧾 Proxey App
 
 A full-stack booking platform that allows users to find, book, and manage services from local providers. Built with **React**, **Node.js**, and **Supabase** (or Firebase / your backend of choice).
@@ -24,3 +25,7 @@ A full-stack booking platform that allows users to find, book, and manage servic
 ---
 
 ## 📂 Folder Structure
+=======
+# proxey-app
+this is a booking app where people can book the services of various service providers of their choice
+>>>>>>> e35ed06c86657b54c90de7496aecc0bdf9040657
