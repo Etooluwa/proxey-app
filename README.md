@@ -24,3 +24,6 @@ A full-stack booking platform that allows users to find, book, and manage servic
 ---
 
 ## 📂 Folder Structure
+
+# proxey-app
+this is a booking app where people can book the services of various service providers of their choice
