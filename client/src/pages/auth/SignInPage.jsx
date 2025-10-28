@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import Button from "../../components/ui/Button";
-import Input from "../../components/ui/Input";
 import { useSession } from "../../auth/authContext";
 import { useToast } from "../../components/ui/ToastProvider";
-import "../../App.css";
+import AuthTabs from "../../components/auth/AuthTabs";
+import "../../styles/login.css";
 
 const ROLE_TABS = [
   { id: "client", label: "Client" },
@@ -107,97 +106,91 @@ function SignInPage() {
     }
   };
 
+
   return (
-    <div className="page page--centered page--gradient">
-      <div className="auth">
-        <section className="auth__intro">
-          <span className="eyebrow">Welcome back</span>
-          <h1 className="auth__title">
-            {role === "provider" ? "Run your service business" : "Book trusted pros"}
-          </h1>
-          <p className="auth__support">
+    <main className="login-page">
+      <div className="login-container">
+        <section className="login-hero">
+          <p className="login-eyebrow">WELCOME BACK</p>
+          <h1>{role === "provider" ? "Run your service business" : "Book trusted pros"}</h1>
+          <p className="login-sub">
             {role === "provider"
-              ? "Manage your bookings, update availability, and get paid faster."
+              ? "Manage your bookings, update availability, and track earnings with ease."
               : "Discover top-rated providers across the GTA and manage every booking in one place."}
           </p>
         </section>
-
-        <section className="card auth__card">
-          <div className="tabs" role="tablist" aria-label="Select account type">
-            {ROLE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                className={`tab ${role === tab.id ? "tab--active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={role === tab.id}
-                onClick={() => setRole(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <form className="form form--stacked" onSubmit={handleSubmit}>
-            <Input
-              id="sign-in-email"
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-            />
-            <Input
-              id="sign-in-password"
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-            />
-            <div className="auth__options">
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(event) => setRemember(event.target.checked)}
-                />
-                <span>Keep me signed in</span>
-              </label>
-              <button
-                type="button"
-                className="link"
-                onClick={() =>
-                  toast.push({
-                    title: "Password reset",
-                    description:
-                      "Password reset emails are handled by Supabase when configured. TODO: integrate reset endpoint.",
-                    variant: "info",
-                  })
-                }
-              >
-                Forgot password?
-              </button>
-            </div>
+        <section className="login-card-wrap">
+          <div className="login-card">
+            <AuthTabs value={role} onChange={setRole} />
             {(formError || authError) && (
-              <div className="alert alert--error">{formError || authError}</div>
+              <div className="login-alert" role="alert">
+                {formError || authError}
+              </div>
             )}
-            <Button type="submit" className="button--full" loading={submitting}>
-              Sign in
-            </Button>
-          </form>
+            <form className="login-form" onSubmit={handleSubmit} autoComplete="on">
+              <label htmlFor="sign-in-email">Email</label>
+              <input
+                id="sign-in-email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
 
-          <p className="auth__hint">
-            New here?{" "}
-            <Link className="link" to="/auth/sign-up" state={{ role }}>
-              Create an account
-            </Link>
-          </p>
+              <label htmlFor="sign-in-password">Password</label>
+              <input
+                id="sign-in-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+
+              <div className="login-row">
+                <label className="login-checkbox" htmlFor="remember-me">
+                  <input
+                    id="remember-me"
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(event) => setRemember(event.target.checked)}
+                  />
+                  <span>Keep me signed in</span>
+                </label>
+                <button
+                  type="button"
+                  className="login-link"
+                  onClick={() =>
+                    toast.push({
+                      title: "Password reset",
+                      description:
+                        "Password reset emails are handled by Supabase when configured. TODO: integrate reset endpoint.",
+                      variant: "info",
+                    })
+                  }
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              <button className="login-submit" type="submit" disabled={submitting}>
+                {submitting ? "Signing in…" : "Sign in"}
+              </button>
+
+              <p className="login-footnote">
+                New here? {" "}
+                <Link className="login-link" to="/auth/sign-up" state={{ role, email }}>
+                  Create an account
+                </Link>
+              </p>
+            </form>
+          </div>
         </section>
       </div>
-    </div>
+    </main>
   );
 }
 
