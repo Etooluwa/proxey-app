@@ -1,0 +1,28 @@
+.bookings {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.bookings__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bookings__title {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  color: #0f172a;
+}
+
+.bookings__subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 1rem;
+}
+
+.bookings__list {
+  display: grid;
+  gap: 1.25rem;
+}

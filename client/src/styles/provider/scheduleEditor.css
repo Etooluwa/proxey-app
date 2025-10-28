@@ -1,0 +1,45 @@
+.provider-schedule-editor {
+  background: rgba(17, 24, 39, 0.85);
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.provider-schedule-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #e2e8f0;
+}
+
+.provider-schedule-editor th,
+.provider-schedule-editor td {
+  padding: 0.85rem 0.65rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.provider-schedule-editor input[type="time"] {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  padding: 0.4rem 0.65rem;
+  color: #f8fafc;
+}
+
+.provider-schedule-editor__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.provider-schedule-editor__toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #4ade80;
+}

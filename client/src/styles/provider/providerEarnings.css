@@ -1,0 +1,71 @@
+.provider-earnings {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.provider-earnings__grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 720px) {
+  .provider-earnings__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.provider-earnings__history {
+  gap: 1.25rem;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.provider-earnings__history h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.provider-earnings__transactions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.provider-earnings__transactions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.provider-earnings__transactions li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.provider-earnings__txn-title {
+  margin: 0;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.provider-earnings__txn-meta {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.provider-earnings__txn-amount {
+  font-weight: 600;
+  color: #4ade80;
+}
+
+.provider-earnings__empty {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.7);
+}

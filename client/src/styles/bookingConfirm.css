@@ -1,0 +1,54 @@
+.booking-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.booking-confirm__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.booking-confirm__title {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  color: #0f172a;
+}
+
+.booking-confirm__subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 1rem;
+}
+
+.booking-confirm__card {
+  gap: 1.5rem;
+}
+
+.booking-confirm__details {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.booking-confirm__details dt {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin: 0 0 0.3rem;
+}
+
+.booking-confirm__details dd {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.booking-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: flex-end;
+}

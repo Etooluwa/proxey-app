@@ -1,0 +1,36 @@
+.booking-card {
+  gap: 1.1rem;
+}
+
+.booking-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.booking-card__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.booking-card__provider {
+  margin: 0.35rem 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.booking-card__details {
+  display: grid;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.booking-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

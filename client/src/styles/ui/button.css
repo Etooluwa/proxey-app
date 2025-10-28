@@ -1,0 +1,81 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.ui-button--primary {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  box-shadow: 0 12px 24px rgba(22, 163, 74, 0.35);
+}
+
+.ui-button--primary:hover {
+  transform: translateY(-1px);
+}
+
+.ui-button--secondary {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1e3a8a;
+}
+
+.ui-button--ghost {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  color: #0f172a;
+}
+
+.ui-button--danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.ui-button--sm {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.ui-button--md {
+  padding: 0.65rem 1.4rem;
+  font-size: 0.95rem;
+}
+
+.ui-button--lg {
+  padding: 0.85rem 1.8rem;
+  font-size: 1.05rem;
+}
+
+.ui-button--loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.ui-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.ui-button__icon {
+  display: inline-flex;
+}
+
+.ui-button__label {
+  display: inline-flex;
+  align-items: center;
+}

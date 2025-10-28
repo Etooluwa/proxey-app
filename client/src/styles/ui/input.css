@@ -1,0 +1,42 @@
+.ui-input__root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ui-input__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ui-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #ffffff;
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.ui-input--error {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.ui-input__helper {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.ui-input__error {
+  font-size: 0.82rem;
+  color: #b91c1c;
+}

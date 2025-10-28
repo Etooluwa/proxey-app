@@ -1,0 +1,26 @@
+.provider-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.provider-jobs__tabs {
+  display: inline-flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.provider-jobs__list {
+  display: grid;
+  gap: 1rem;
+}
+
+.provider-jobs__empty {
+  color: #6366f1;
+  font-size: 0.95rem;
+}
+
+.provider-jobs__updating {
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.8);
+}

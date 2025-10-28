@@ -1,0 +1,66 @@
+.provider-card {
+  gap: 1.25rem;
+}
+
+.provider-card__header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.provider-card__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.provider-card__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.provider-card__name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.provider-card__headline {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.provider-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.provider-card__rate {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.provider-card__rate-unit {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-left: 0.25rem;
+}
+
+.provider-card__location {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.provider-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}

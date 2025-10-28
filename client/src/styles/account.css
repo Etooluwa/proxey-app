@@ -1,0 +1,56 @@
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.account__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.account__title {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  color: #0f172a;
+}
+
+.account__subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 1rem;
+}
+
+.account__grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .account__grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.account__card {
+  gap: 1.25rem;
+}
+
+.account__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.account__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.account__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}

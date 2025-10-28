@@ -1,0 +1,31 @@
+.ui-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.ui-rating--sm .ui-rating__icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ui-rating--md .ui-rating__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.ui-rating--lg .ui-rating__icon {
+  width: 22px;
+  height: 22px;
+}
+
+.ui-rating__icon {
+  display: inline-flex;
+}
+
+.ui-rating__count {
+  font-size: 0.8rem;
+  color: #64748b;
+}
