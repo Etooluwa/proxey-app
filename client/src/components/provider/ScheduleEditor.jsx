@@ -60,49 +60,45 @@ function ScheduleEditor({ initialSchedule = [], onSave, saving }) {
 
   return (
     <div className="provider-schedule-editor">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Day</th>
-            <th scope="col">Availability</th>
-            <th scope="col">Start</th>
-            <th scope="col">End</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.day}>
-              <th scope="row">{row.day}</th>
-              <td>
-                <label className="provider-schedule-editor__toggle">
-                  <input
-                    type="checkbox"
-                    checked={row.available}
-                    onChange={() => toggleDay(index)}
-                  />
-                  <span>{row.available ? "Available" : "Away"}</span>
-                </label>
-              </td>
-              <td>
+      <div className="provider-schedule-grid">
+        <div className="provider-schedule-header">Day</div>
+        <div className="provider-schedule-header">Availability</div>
+        <div className="provider-schedule-header">Start</div>
+        <div className="provider-schedule-header">End</div>
+        {rows.map((row, index) => (
+          <div className="provider-schedule-row" key={row.day}>
+            <div className="provider-schedule-cell day">{row.day}</div>
+            <div className="provider-schedule-cell availability">
+              <label className="provider-schedule-toggle">
                 <input
-                  type="time"
-                  value={row.startTime}
-                  disabled={!row.available}
-                  onChange={(event) => updateTime(index, "startTime", event.target.value)}
+                  type="checkbox"
+                  checked={row.available}
+                  onChange={() => toggleDay(index)}
                 />
-              </td>
-              <td>
-                <input
-                  type="time"
-                  value={row.endTime}
-                  disabled={!row.available}
-                  onChange={(event) => updateTime(index, "endTime", event.target.value)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <span>{row.available ? "Available" : "Away"}</span>
+              </label>
+            </div>
+            <div className="provider-schedule-cell start">
+              <input
+                className="provider-schedule-time"
+                type="time"
+                value={row.startTime}
+                disabled={!row.available}
+                onChange={(event) => updateTime(index, "startTime", event.target.value)}
+              />
+            </div>
+            <div className="provider-schedule-cell end">
+              <input
+                className="provider-schedule-time"
+                type="time"
+                value={row.endTime}
+                disabled={!row.available}
+                onChange={(event) => updateTime(index, "endTime", event.target.value)}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
       <Button onClick={handleSave} loading={saving}>
         Save availability
       </Button>
