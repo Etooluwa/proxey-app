@@ -4,7 +4,7 @@ import LoginSignup from "../pages/LoginSignup";
 
 function RoleRedirect() {
   const navigate = useNavigate();
-  const { session, loading } = useSession();
+  const { session, loading, login, register } = useSession();
 
   if (loading) {
     return (
@@ -17,12 +17,16 @@ function RoleRedirect() {
   if (!session?.user) {
     return (
       <LoginSignup
-        onContinue={({ role, email }) =>
-          navigate("/auth/sign-in", {
-            replace: false,
-            state: { role, email },
-          })
-        }
+        onLogin={async ({ role, email, password }) => {
+          await login({ email, password, role });
+          navigate(role === "provider" ? "/provider" : "/app", { replace: true });
+        }}
+        onSignup={async ({ role, email, password }) => {
+          await register({ email, password, role });
+          navigate(role === "provider" ? "/provider" : "/onboarding", {
+            replace: true,
+          });
+        }}
       />
     );
   }

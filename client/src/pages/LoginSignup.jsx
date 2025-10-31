@@ -84,6 +84,15 @@ export default function LoginSignup({ onLogin, onSignup }) {
         // eslint-disable-next-line no-console
         console.log("Login", payload);
       }
+      setPasswordError("");
+      setEmailError("");
+    } catch (error) {
+      const message = error?.message || "Something went wrong. Please try again.";
+      if (message.toLowerCase().includes("email")) {
+        setEmailError(message);
+      } else {
+        setPasswordError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
