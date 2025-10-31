@@ -1,7 +1,9 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
+import LoginSignup from "../pages/LoginSignup";
 
 function RoleRedirect() {
+  const navigate = useNavigate();
   const { session, loading } = useSession();
 
   if (loading) {
@@ -13,7 +15,16 @@ function RoleRedirect() {
   }
 
   if (!session?.user) {
-    return <Navigate to="/auth/sign-in" replace />;
+    return (
+      <LoginSignup
+        onContinue={({ role, email }) =>
+          navigate("/auth/sign-in", {
+            replace: false,
+            state: { role, email },
+          })
+        }
+      />
+    );
   }
 
   return (
