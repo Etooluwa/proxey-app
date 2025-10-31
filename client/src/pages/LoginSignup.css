@@ -81,6 +81,33 @@ body {
   gap: 18px;
 }
 
+.login-signup__mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(220, 229, 229, 0.35);
+  padding: 6px;
+  border-radius: calc(var(--radius) + 10px);
+}
+
+.login-signup__mode-btn {
+  border: none;
+  border-radius: calc(var(--radius) + 6px);
+  height: 44px;
+  padding: 0 18px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.login-signup__mode-btn--active {
+  background: rgba(16, 231, 225, 0.14);
+  color: var(--text);
+}
+
 .login-signup__label {
   text-align: left;
   font-size: 14px;
