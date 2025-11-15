@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -9,6 +10,7 @@ import "../styles/account.css";
 
 function AccountPage() {
   const { session, profile, updateProfile, logout } = useSession();
+  const navigate = useNavigate();
   const toast = useToast();
   const [form, setForm] = useState({
     name: profile?.name || "",
@@ -17,6 +19,13 @@ function AccountPage() {
   });
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Redirect providers to their dedicated profile page
+  useEffect(() => {
+    if (session?.user?.role === "provider") {
+      navigate("/provider/profile", { replace: true });
+    }
+  }, [session?.user?.role, navigate]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
