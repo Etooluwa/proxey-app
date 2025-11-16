@@ -7,6 +7,7 @@ import BrowsePage from "./pages/BrowsePage";
 import BookingFlowPage from "./pages/BookingFlowPage";
 import BookingConfirmPage from "./pages/BookingConfirmPage";
 import BookingsPage from "./pages/BookingsPage";
+import MessagesPage from "./pages/MessagesPage";
 import AccountPage from "./pages/AccountPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import SignInPage from "./pages/auth/SignInPage";
@@ -43,6 +44,7 @@ function App() {
             <Route path="/app/book" element={<BookingFlowPage />} />
             <Route path="/app/book/confirm" element={<BookingConfirmPage />} />
             <Route path="/app/bookings" element={<BookingsPage />} />
+            <Route path="/app/messages" element={<MessagesPage />} />
             <Route path="/app/account" element={<AccountPage />} />
           </Route>
         </Route>
