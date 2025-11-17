@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import supabase from "../utils/supabase";
+import { uploadProfilePhoto } from "../utils/photoUpload";
 
 const SESSION_STORAGE_KEY = "proxey.auth.session";
 const PROFILE_STORAGE_KEY = "proxey.profile";
@@ -286,13 +287,28 @@ export function AuthProvider({ children }) {
     persistSession(null);
   };
 
-  const updateProfile = async (partialProfile) => {
+  const updateProfile = async (partialProfile, photoFile = null) => {
     if (!session?.user) {
       throw new Error("No authenticated user.");
     }
+
+    let photoUrl = partialProfile.photo || profile?.photo;
+
+    // Handle photo upload if a file is provided
+    if (photoFile) {
+      try {
+        photoUrl = await uploadProfilePhoto(photoFile, session.user.id);
+        console.log("[auth] Photo uploaded successfully:", photoUrl);
+      } catch (error) {
+        console.error("[auth] Failed to upload photo", error);
+        // Continue without photo if upload fails
+      }
+    }
+
     const nextProfile = {
       ...profile,
       ...partialProfile,
+      photo: photoUrl,
     };
 
     if (supabase) {

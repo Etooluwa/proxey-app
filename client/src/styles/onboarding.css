@@ -1,0 +1,366 @@
+.onboarding {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f9f9f9;
+}
+
+/* Header */
+.onboarding__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: #f9f9f9;
+}
+
+.onboarding__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  color: #0f172a;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.onboarding__back:hover {
+  background: #e2e8f0;
+}
+
+.onboarding__back svg {
+  width: 24px;
+  height: 24px;
+}
+
+.onboarding__title {
+  flex: 1;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: center;
+  margin: 0;
+  padding-right: 48px; /* Balance the back button */
+}
+
+.onboarding__header-spacer {
+  width: 48px; /* Invisible spacer for centering */
+}
+
+/* Main Content */
+.onboarding__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.onboarding__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1rem 0;
+}
+
+/* Photo Upload Section */
+.onboarding__photo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.onboarding__photo-button {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.onboarding__photo-circle {
+  width: 144px;
+  height: 144px;
+  border-radius: 50%;
+  border: 2px dashed #e5e7eb;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.onboarding__photo-button:hover .onboarding__photo-circle {
+  border-color: #14b8a6;
+}
+
+.onboarding__photo-icon {
+  width: 48px;
+  height: 48px;
+  color: #94a3b8;
+  transition: color 0.3s ease;
+}
+
+.onboarding__photo-button:hover .onboarding__photo-icon {
+  color: #14b8a6;
+}
+
+.onboarding__photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.onboarding__photo-edit {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #14b8a6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.onboarding__photo-edit svg {
+  width: 20px;
+  height: 20px;
+}
+
+.onboarding__photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onboarding__photo-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0;
+  text-align: center;
+}
+
+/* Step 2 Specific Styles */
+.onboarding__content--step2 {
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+}
+
+.onboarding__step-header {
+  padding: 0 1rem;
+}
+
+.onboarding__step-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 0.5rem;
+  line-height: 1.2;
+}
+
+.onboarding__step-subtitle {
+  font-size: 1rem;
+  color: rgba(45, 55, 72, 0.8);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.onboarding__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0 1rem;
+}
+
+/* Form Fields */
+.onboarding__field-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.onboarding__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.onboarding__field-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.onboarding__input {
+  width: 100%;
+  height: 56px;
+  padding: 0 1rem;
+  font-size: 1rem;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.onboarding__input:focus {
+  outline: none;
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.onboarding__input::placeholder {
+  color: #94a3b8;
+}
+
+/* Footer with Next Button */
+.onboarding__footer {
+  margin-top: auto;
+  padding: 1rem;
+}
+
+.onboarding__button {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  height: 56px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #14b8a6 !important;
+  box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.2),
+    0 4px 6px -2px rgba(20, 184, 166, 0.1);
+}
+
+.onboarding__button:hover {
+  background: #0f9d8e !important;
+  box-shadow: 0 20px 25px -5px rgba(20, 184, 166, 0.25),
+    0 10px 10px -5px rgba(20, 184, 166, 0.1);
+}
+
+.onboarding__button:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.3);
+}
+
+.onboarding__button--save {
+  background: #111818 !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    0 4px 6px -2px rgba(0, 0, 0, 0.1);
+}
+
+.onboarding__button--save:hover {
+  background: #1f2937 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Step 3 Specific Styles */
+.onboarding__content--step3 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.onboarding__payment-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+  gap: 1.5rem;
+}
+
+.onboarding__payment-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(20, 184, 166, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #14b8a6;
+  margin-bottom: 0.5rem;
+}
+
+.onboarding__payment-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.onboarding__payment-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111818;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.onboarding__payment-subtitle {
+  font-size: 1rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+  max-width: 400px;
+}
+
+.onboarding__add-payment-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 400px;
+  height: 56px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #14b8a6 !important;
+  border-radius: 9999px;
+  box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
+  margin-top: 1rem;
+}
+
+.onboarding__add-payment-button:hover {
+  background: #0f9d8e !important;
+  box-shadow: 0 15px 30px rgba(20, 184, 166, 0.4);
+}
+
+.onboarding__button-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Responsive adjustments */
+@media (min-width: 640px) {
+  .onboarding__main {
+    padding: 2rem;
+  }
+
+  .onboarding__content {
+    padding: 2rem 0;
+  }
+
+  .onboarding__footer {
+    padding: 2rem;
+  }
+}

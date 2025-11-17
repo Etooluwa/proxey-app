@@ -1,0 +1,34 @@
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 2rem;
+}
+
+.step-indicator__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0;
+}
+
+.step-indicator__bars {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+}
+
+.step-indicator__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 9999px;
+  background: #e2e8f0;
+  transition: background-color 0.3s ease;
+}
+
+.step-indicator__bar--active {
+  background: #14b8a6;
+}

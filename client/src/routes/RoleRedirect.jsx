@@ -4,7 +4,7 @@ import LoginSignup from "../pages/LoginSignup";
 
 function RoleRedirect() {
   const navigate = useNavigate();
-  const { session, loading, login, register } = useSession();
+  const { session, loading, login, register, isProfileComplete } = useSession();
 
   if (loading) {
     return (
@@ -29,6 +29,11 @@ function RoleRedirect() {
         }}
       />
     );
+  }
+
+  // Check if client profile is incomplete and redirect to onboarding
+  if (session.user.role === "client" && !isProfileComplete) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return (
