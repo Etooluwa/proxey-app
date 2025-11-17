@@ -18,14 +18,13 @@ function RoleRedirect() {
     return (
       <LoginSignup
         onLogin={async ({ role, email, password }) => {
-          await login({ email, password, role });
-          navigate(role === "provider" ? "/provider" : "/app", { replace: true });
+          const result = await login({ email, password, role });
+          // After login, the state will update and RoleRedirect will re-render
+          // The new render will check isProfileComplete and redirect appropriately
         }}
         onSignup={async ({ role, email, password }) => {
-          await register({ email, password, role });
-          navigate(role === "provider" ? "/provider" : "/onboarding", {
-            replace: true,
-          });
+          const result = await register({ email, password, role });
+          // After signup, SignUpPage now redirects to the correct onboarding path
         }}
       />
     );

@@ -53,7 +53,8 @@ function SignUpPage() {
         variant: "success",
       });
       if (result?.session) {
-        navigate("/onboarding", { replace: true });
+        const onboardingPath = role === "provider" ? "/provider/onboarding" : "/onboarding";
+        navigate(onboardingPath, { replace: true });
       } else {
         navigate("/auth/sign-in", {
           replace: true,

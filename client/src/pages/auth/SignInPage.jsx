@@ -81,9 +81,7 @@ function SignInPage() {
         window.localStorage.setItem(loginFlagKey, "true");
       }
       const profileCompleteNow =
-        role === "provider"
-          ? true
-          : isProfileCompleteShape(result?.profile) || isProfileComplete;
+        isProfileCompleteShape(result?.profile) || isProfileComplete;
       if (profileCompleteNow) {
         const destination = redirectPath
           ? redirectPath
@@ -92,7 +90,8 @@ function SignInPage() {
           : "/app";
         navigate(destination, { replace: true });
       } else {
-        navigate("/onboarding", { replace: true });
+        const onboardingPath = role === "provider" ? "/provider/onboarding" : "/onboarding";
+        navigate(onboardingPath, { replace: true });
       }
     } catch (error) {
       setFormError(error.message || "Failed to sign in.");
