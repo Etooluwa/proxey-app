@@ -36,6 +36,11 @@ function RoleRedirect() {
     return <Navigate to="/onboarding" replace />;
   }
 
+  // Check if provider profile is incomplete and redirect to provider onboarding
+  if (session.user.role === "provider" && !isProfileComplete) {
+    return <Navigate to="/provider/onboarding" replace />;
+  }
+
   return (
     <Navigate
       to={session.user.role === "provider" ? "/provider" : "/app"}

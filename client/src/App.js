@@ -10,6 +10,7 @@ import BookingsPage from "./pages/BookingsPage";
 import MessagesPage from "./pages/MessagesPage";
 import AccountPage from "./pages/AccountPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import ProviderOnboardingPage from "./pages/ProviderOnboardingPage";
 import SignInPage from "./pages/auth/SignInPage";
 import SignUpPage from "./pages/auth/SignUpPage";
 import BookingCheckoutPage from "./pages/BookingCheckoutPage";
@@ -35,6 +36,7 @@ function App() {
 
         <Route element={<ProtectedRoute requireProfile={false} />}>
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/provider/onboarding" element={<ProviderOnboardingPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>

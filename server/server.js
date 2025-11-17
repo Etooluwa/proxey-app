@@ -47,6 +47,24 @@ app.get("/", (req, res) => {
   res.send("Booking App Backend Running 🚀");
 });
 
+// Service categories endpoint
+const SERVICE_CATEGORIES = [
+  { id: "home-cleaning", label: "Home & Cleaning" },
+  { id: "beauty-personal-care", label: "Beauty & Personal Care" },
+  { id: "health-wellness", label: "Health & Wellness" },
+  { id: "events-entertainment", label: "Events & Entertainment" },
+  { id: "trades-repair", label: "Trades & Repair" },
+  { id: "auto-services", label: "Auto Services" },
+  { id: "business-services", label: "Business Services" },
+  { id: "child-pet-care", label: "Child & Pet Care" },
+  { id: "delivery-errands", label: "Delivery & Errands" },
+  { id: "creative-specialty", label: "Creative & Specialty" },
+];
+
+app.get("/api/categories", (req, res) => {
+  res.status(200).json({ categories: SERVICE_CATEGORIES });
+});
+
 const memoryStore = {
   services: [
     {
