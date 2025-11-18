@@ -151,8 +151,10 @@ function OnboardingPage() {
         setSubmitting(true);
 
         try {
+          const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
           const response = await fetch(
-            "http://localhost:3001/api/client/setup-intent",
+            `${apiUrl}/api/client/setup-intent`,
             {
               method: "POST",
               headers: {
