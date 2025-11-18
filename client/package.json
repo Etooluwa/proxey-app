@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@stripe/react-stripe-js": "^2.8.0",
     "@stripe/stripe-js": "^8.1.0",
     "@supabase/supabase-js": "^2.76.1",
     "@testing-library/dom": "^10.4.1",

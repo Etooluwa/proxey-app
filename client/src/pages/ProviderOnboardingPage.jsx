@@ -302,9 +302,20 @@ function ProviderOnboardingPage() {
     setSubmitting(true);
 
     try {
+      // Validate required fields
+      if (!session?.user?.id || !session?.user?.email) {
+        throw new Error("User information is missing. Please log in again.");
+      }
+
+      if (!form.name) {
+        throw new Error("Business name is required. Please fill in your business name in Step 1.");
+      }
+
       // Create Stripe Connected Account
+      const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
       const accountResponse = await fetch(
-        "http://localhost:3001/api/provider/connected-account",
+        `${apiUrl}/api/provider/connected-account`,
         {
           method: "POST",
           headers: {
@@ -319,14 +330,21 @@ function ProviderOnboardingPage() {
       );
 
       if (!accountResponse.ok) {
-        throw new Error("Failed to create Stripe account");
+        const errorData = await accountResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to create Stripe account (Status: ${accountResponse.status})`
+        );
       }
 
       const { accountId } = await accountResponse.json();
 
+      if (!accountId) {
+        throw new Error("No account ID received from server");
+      }
+
       // Get onboarding link
       const linkResponse = await fetch(
-        "http://localhost:3001/api/provider/onboarding-link",
+        `${apiUrl}/api/provider/onboarding-link`,
         {
           method: "POST",
           headers: {
@@ -341,10 +359,17 @@ function ProviderOnboardingPage() {
       );
 
       if (!linkResponse.ok) {
-        throw new Error("Failed to get onboarding link");
+        const errorData = await linkResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to get onboarding link (Status: ${linkResponse.status})`
+        );
       }
 
       const { onboardingLink } = await linkResponse.json();
+
+      if (!onboardingLink) {
+        throw new Error("No onboarding link received from server");
+      }
 
       // Save account ID to profile
       await updateProfile({
@@ -357,18 +382,22 @@ function ProviderOnboardingPage() {
       }));
 
       // Open Stripe onboarding form in new window
-      window.open(onboardingLink, "_blank");
+      const stripeWindow = window.open(onboardingLink, "_blank");
+
+      if (!stripeWindow) {
+        throw new Error("Pop-up window blocked. Please allow pop-ups and try again.");
+      }
 
       toast.push({
         title: "Opening Stripe",
-        description: "Please complete your profile verification",
+        description: "Please complete your profile verification in the opened window",
         variant: "info",
       });
     } catch (error) {
       console.error("Bank setup error:", error);
       toast.push({
         title: "Setup failed",
-        description: error.message,
+        description: error.message || "An unexpected error occurred",
         variant: "error",
       });
     } finally {
