@@ -230,75 +230,7 @@ function ProviderOnboardingPage() {
     }
   };
 
-  const handleStripeConnect = () => {
-    // TODO: Implement Stripe Connect integration
-    // For now, just show a toast
-    toast.push({
-      title: "Stripe Connect",
-      description: "Stripe Connect integration will be implemented here.",
-      variant: "info",
-    });
-  };
-
-  const handleNext = async () => {
-    // Validate step 1
-    if (currentStep === 1) {
-      if (!form.name.trim()) {
-        toast.push({
-          title: "Name required",
-          description: "Please enter your full name to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      if (!form.category) {
-        toast.push({
-          title: "Category required",
-          description: "Please select a service category to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      if (!form.city.trim()) {
-        toast.push({
-          title: "City required",
-          description: "Please enter your city to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      setCurrentStep(2);
-      return;
-    }
-
-    // Step 2 - Photo (optional, can skip)
-    if (currentStep === 2) {
-      setCurrentStep(3);
-      return;
-    }
-
-    // Step 3 - Services (optional, can skip)
-    if (currentStep === 3) {
-      setCurrentStep(4);
-      return;
-    }
-
-    // Step 4 - Availability (optional, can skip)
-    if (currentStep === 4) {
-      setCurrentStep(5);
-      return;
-    }
-
-    // Step 5 - Stripe Connect
-    if (currentStep === 5) {
-      await handleConnectStripe();
-    }
-  };
-
-  const handleConnectStripe = async () => {
+  const handleStripeConnect = async () => {
     setSubmitting(true);
 
     try {
@@ -402,6 +334,64 @@ function ProviderOnboardingPage() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleNext = async () => {
+    // Validate step 1
+    if (currentStep === 1) {
+      if (!form.name.trim()) {
+        toast.push({
+          title: "Name required",
+          description: "Please enter your full name to continue.",
+          variant: "error",
+        });
+        return;
+      }
+
+      if (!form.category) {
+        toast.push({
+          title: "Category required",
+          description: "Please select a service category to continue.",
+          variant: "error",
+        });
+        return;
+      }
+
+      if (!form.city.trim()) {
+        toast.push({
+          title: "City required",
+          description: "Please enter your city to continue.",
+          variant: "error",
+        });
+        return;
+      }
+
+      setCurrentStep(2);
+      return;
+    }
+
+    // Step 2 - Photo (optional, can skip)
+    if (currentStep === 2) {
+      setCurrentStep(3);
+      return;
+    }
+
+    // Step 3 - Services (optional, can skip)
+    if (currentStep === 3) {
+      setCurrentStep(4);
+      return;
+    }
+
+    // Step 4 - Availability (optional, can skip)
+    if (currentStep === 4) {
+      setCurrentStep(5);
+      return;
+    }
+
+    // Step 5 - Stripe Connect
+    if (currentStep === 5) {
+      await handleStripeConnect();
     }
   };
 
