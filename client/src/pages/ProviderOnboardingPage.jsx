@@ -313,18 +313,17 @@ function ProviderOnboardingPage() {
         stripeAccountId: accountId,
       }));
 
-      // Open Stripe onboarding form in new window
-      const stripeWindow = window.open(onboardingLink, "_blank");
-
-      if (!stripeWindow) {
-        throw new Error("Pop-up window blocked. Please allow pop-ups and try again.");
-      }
-
+      // Open Stripe onboarding form in the same window
       toast.push({
-        title: "Opening Stripe",
-        description: "Please complete your profile verification in the opened window",
+        title: "Redirecting to Stripe",
+        description: "Please complete your profile verification",
         variant: "info",
       });
+
+      // Redirect to Stripe after a brief delay to show the toast
+      setTimeout(() => {
+        window.location.href = onboardingLink;
+      }, 500);
     } catch (error) {
       console.error("Bank setup error:", error);
       toast.push({
@@ -332,7 +331,6 @@ function ProviderOnboardingPage() {
         description: error.message || "An unexpected error occurred",
         variant: "error",
       });
-    } finally {
       setSubmitting(false);
     }
   };
