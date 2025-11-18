@@ -5,6 +5,7 @@ import StepIndicator from "../components/ui/StepIndicator";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
+import PaymentMethodScreen from "../components/payment/PaymentMethodScreen";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
@@ -146,53 +147,11 @@ function OnboardingPage() {
     // Step 3 - Payment setup
     if (currentStep === 3) {
       if (paymentStep === 0) {
-        // Initialize payment method setup
         setPaymentStep(1);
-        setSubmitting(true);
-
-        try {
-          const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
-          const response = await fetch(
-            `${apiUrl}/api/client/setup-intent`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                userId: session.user.id,
-                email: session.user.email,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Failed to create setup intent");
-          }
-
-          const { clientSecret, customerId } = await response.json();
-
-          setForm((prev) => ({
-            ...prev,
-            stripeClientSecret: clientSecret,
-            stripeCustomerId: customerId,
-          }));
-        } catch (error) {
-          console.error("Payment setup error:", error);
-          toast.push({
-            title: "Payment setup failed",
-            description: error.message,
-            variant: "error",
-          });
-          setPaymentStep(0);
-        } finally {
-          setSubmitting(false);
-        }
       } else if (paymentStep === 2) {
-        // Payment method saved, complete onboarding
         handleCompleteOnboarding();
       }
+      return;
     }
   };
 
@@ -205,6 +164,15 @@ function OnboardingPage() {
   };
 
   const renderStepContent = () => {
+    if (paymentStep === 1) {
+      return (
+        <PaymentMethodScreen
+          onBack={() => setPaymentStep(0)}
+          onSuccess={() => setPaymentStep(2)}
+        />
+      );
+    }
+
     if (currentStep === 1) {
       return (
         <div className="onboarding__content">
@@ -317,11 +285,11 @@ function OnboardingPage() {
       // Step 3a: Initial payment method prompt
       if (paymentStep === 0) {
         return (
-          <div className="onboarding__content onboarding__content--step3">
-            <div className="onboarding__payment-section">
-              {/* Icon */}
-              <div className="onboarding__payment-icon-large">
-                <svg viewBox="0 0 24 24" fill="currentColor">
+        <div className="onboarding__content onboarding__content--step3">
+          <div className="onboarding__payment-section">
+            {/* Icon */}
+            <div className="onboarding__payment-icon-large">
+              <svg viewBox="0 0 24 24" fill="currentColor">
                   <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
                 </svg>
               </div>
@@ -337,7 +305,7 @@ function OnboardingPage() {
               {/* Add Payment Button - will trigger handleNext */}
               <div className="onboarding__payment-action">
                 <button
-                  onClick={handleNext}
+                  onClick={() => setPaymentStep(1)}
                   className="onboarding__payment-add-button"
                   type="button"
                 >
@@ -449,25 +417,27 @@ function OnboardingPage() {
         {renderStepContent()}
 
         {/* Next/Save Button */}
-        <div className="onboarding__footer">
-          {currentStep === 3 && paymentStep === 2 ? (
-            <Button
-              onClick={handleCompleteOnboarding}
-              loading={submitting}
-              className="onboarding__button onboarding__button--save"
-            >
-              Save & Continue
-            </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              loading={submitting}
-              className={currentStep === 3 ? "onboarding__button onboarding__button--save" : "onboarding__button"}
-            >
-              {currentStep === 3 && paymentStep === 1 ? "Next" : currentStep === 3 ? "Add Payment Method" : "Next"}
-            </Button>
-          )}
-        </div>
+        {paymentStep !== 1 && (
+          <div className="onboarding__footer">
+            {currentStep === 3 && paymentStep === 2 ? (
+              <Button
+                onClick={handleCompleteOnboarding}
+                loading={submitting}
+                className="onboarding__button onboarding__button--save"
+              >
+                Save & Continue
+              </Button>
+            ) : (
+              <Button
+                onClick={handleNext}
+                loading={submitting}
+                className={currentStep === 3 ? "onboarding__button onboarding__button--save" : "onboarding__button"}
+              >
+                {currentStep === 3 ? "Add Payment Method" : "Next"}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

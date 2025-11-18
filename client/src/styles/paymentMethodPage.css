@@ -1,0 +1,105 @@
+.payment-page {
+  min-height: 100vh;
+  background: #f5faf9;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+.payment-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+.payment-page__back {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.payment-page__back:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.payment-page__back svg {
+  width: 22px;
+  height: 22px;
+}
+
+.payment-page__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.payment-page__body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0 1.5rem;
+}
+
+.payment-page__card {
+  width: 100%;
+  max-width: 520px;
+  padding: 1rem 0.5rem;
+}
+
+.payment-page__loading {
+  width: 100%;
+  text-align: center;
+  color: #0f172a;
+  padding: 1.25rem;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5eaf0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.payment-page__error {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.payment-page__retry {
+  align-self: center;
+}
+
+@media (max-width: 640px) {
+  .payment-page {
+    padding: 0.75rem;
+  }
+
+  .payment-page__title {
+    font-size: 1.1rem;
+  }
+
+  .payment-page__card {
+    padding: 0.5rem 0;
+  }
+}
