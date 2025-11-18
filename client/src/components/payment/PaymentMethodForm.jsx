@@ -166,11 +166,8 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
           className="payment-form__card payment-form__card--with-icon"
           role="group"
           aria-label="Card number"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            focusStripeElement(cardNumberRef);
-          }}
+          onClick={() => focusStripeElement(cardNumberRef)}
+          onFocus={() => focusStripeElement(cardNumberRef)}
           style={{ cursor: "text" }}
         >
           <div className="payment-form__stripe-field">
@@ -198,11 +195,8 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="Expiry date"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              focusStripeElement(cardExpiryRef);
-            }}
+            onClick={() => focusStripeElement(cardExpiryRef)}
+            onFocus={() => focusStripeElement(cardExpiryRef)}
             style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
@@ -227,11 +221,8 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="CVC"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              focusStripeElement(cardCvcRef);
-            }}
+            onClick={() => focusStripeElement(cardCvcRef)}
+            onFocus={() => focusStripeElement(cardCvcRef)}
             style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
