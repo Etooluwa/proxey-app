@@ -158,7 +158,13 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
           className="payment-form__card payment-form__card--with-icon"
           role="group"
           aria-label="Card number"
+          tabIndex={0}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            elements?.getElement(CardNumberElement)?.focus();
+          }}
           onClick={() => elements?.getElement(CardNumberElement)?.focus()}
+          style={{ cursor: "text" }}
         >
           <div className="payment-form__stripe-field">
             <CardNumberElement options={elementOptions} />
@@ -180,7 +186,13 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="Expiry date"
+            tabIndex={0}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              elements?.getElement(CardExpiryElement)?.focus();
+            }}
             onClick={() => elements?.getElement(CardExpiryElement)?.focus()}
+            style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
               <CardExpiryElement options={elementOptions} />
@@ -199,7 +211,13 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="CVC"
+            tabIndex={0}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              elements?.getElement(CardCvcElement)?.focus();
+            }}
             onClick={() => elements?.getElement(CardCvcElement)?.focus()}
+            style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
               <CardCvcElement options={elementOptions} />
