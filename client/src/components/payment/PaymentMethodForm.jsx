@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -83,6 +83,9 @@ const SvgIcon = ({ name }) => {
 function PaymentForm({ clientSecret, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
+  const cardNumberRef = useRef(null);
+  const cardExpiryRef = useRef(null);
+  const cardCvcRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState(null);
   const [cardholderName, setCardholderName] = useState("");
@@ -129,6 +132,11 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
     }
   };
 
+  const focusStripeElement = (ref) => {
+    // Defer to ensure the iframe is ready to receive focus
+    requestAnimationFrame(() => ref?.current?.focus());
+  };
+
   const elementOptions = {
     style: {
       base: {
@@ -159,15 +167,19 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
           role="group"
           aria-label="Card number"
           tabIndex={0}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            elements?.getElement(CardNumberElement)?.focus();
+          onClick={(e) => {
+            e.stopPropagation();
+            focusStripeElement(cardNumberRef);
           }}
-          onClick={() => elements?.getElement(CardNumberElement)?.focus()}
           style={{ cursor: "text" }}
         >
           <div className="payment-form__stripe-field">
-            <CardNumberElement options={elementOptions} />
+            <CardNumberElement
+              options={elementOptions}
+              onReady={(el) => {
+                cardNumberRef.current = el;
+              }}
+            />
           </div>
           <span className="payment-form__input-icon" aria-hidden="true">
             <SvgIcon name="card" />
@@ -187,15 +199,19 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             role="group"
             aria-label="Expiry date"
             tabIndex={0}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              elements?.getElement(CardExpiryElement)?.focus();
+            onClick={(e) => {
+              e.stopPropagation();
+              focusStripeElement(cardExpiryRef);
             }}
-            onClick={() => elements?.getElement(CardExpiryElement)?.focus()}
             style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
-              <CardExpiryElement options={elementOptions} />
+              <CardExpiryElement
+                options={elementOptions}
+                onReady={(el) => {
+                  cardExpiryRef.current = el;
+                }}
+              />
             </div>
             <span className="payment-form__input-icon" aria-hidden="true">
               <SvgIcon name="calendar" />
@@ -212,15 +228,19 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             role="group"
             aria-label="CVC"
             tabIndex={0}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              elements?.getElement(CardCvcElement)?.focus();
+            onClick={(e) => {
+              e.stopPropagation();
+              focusStripeElement(cardCvcRef);
             }}
-            onClick={() => elements?.getElement(CardCvcElement)?.focus()}
             style={{ cursor: "text" }}
           >
             <div className="payment-form__stripe-field">
-              <CardCvcElement options={elementOptions} />
+              <CardCvcElement
+                options={elementOptions}
+                onReady={(el) => {
+                  cardCvcRef.current = el;
+                }}
+              />
             </div>
             <span className="payment-form__input-icon" aria-hidden="true">
               <SvgIcon name="info" />

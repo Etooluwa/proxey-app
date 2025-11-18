@@ -76,6 +76,7 @@
   overflow: hidden;
   z-index: 1;
   cursor: text;
+  isolation: isolate;
 }
 
 .payment-form__card--with-icon {
