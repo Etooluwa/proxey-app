@@ -158,6 +158,7 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
           className="payment-form__card payment-form__card--with-icon"
           role="group"
           aria-label="Card number"
+          onClick={() => elements?.getElement(CardNumberElement)?.focus()}
         >
           <div className="payment-form__stripe-field">
             <CardNumberElement options={elementOptions} />
@@ -179,6 +180,7 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="Expiry date"
+            onClick={() => elements?.getElement(CardExpiryElement)?.focus()}
           >
             <div className="payment-form__stripe-field">
               <CardExpiryElement options={elementOptions} />
@@ -197,6 +199,7 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
             className="payment-form__card payment-form__card--with-icon"
             role="group"
             aria-label="CVC"
+            onClick={() => elements?.getElement(CardCvcElement)?.focus()}
           >
             <div className="payment-form__stripe-field">
               <CardCvcElement options={elementOptions} />
