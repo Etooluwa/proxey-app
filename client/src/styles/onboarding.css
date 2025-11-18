@@ -350,6 +350,73 @@
   height: 20px;
 }
 
+/* Payment Step Specific Styles */
+.onboarding__payment-icon-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(20, 184, 166, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #14b8a6;
+  margin-bottom: 1rem;
+}
+
+.onboarding__payment-icon-large svg {
+  width: 56px;
+  height: 56px;
+}
+
+.onboarding__payment-action {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 1.5rem;
+}
+
+.onboarding__payment-add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 56px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #14b8a6 !important;
+  color: #ffffff !important;
+  border: none;
+  border-radius: 9999px;
+  box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.onboarding__payment-add-button:hover {
+  background: #0f9d8e !important;
+  box-shadow: 0 15px 30px rgba(20, 184, 166, 0.4);
+}
+
+.onboarding__payment-add-button:active {
+  transform: scale(0.98);
+}
+
+.onboarding__payment-add-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.onboarding__payment-success-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(20, 184, 166, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
 /* Responsive adjustments */
 @media (min-width: 640px) {
   .onboarding__main {

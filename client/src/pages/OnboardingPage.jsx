@@ -314,18 +314,49 @@ function OnboardingPage() {
     }
 
     if (currentStep === 3) {
-      return (
-        <div className="onboarding__content onboarding__content--step3">
-          {/* Step 3 - Payment */}
-          <div className="onboarding__payment-section">
-            {/* Title and Description */}
-            <h2 className="onboarding__payment-title">Save a Payment Method</h2>
-            <p className="onboarding__payment-subtitle">
-              Add a card to make bookings faster in the future.
-            </p>
+      // Step 3a: Initial payment method prompt
+      if (paymentStep === 0) {
+        return (
+          <div className="onboarding__content onboarding__content--step3">
+            <div className="onboarding__payment-section">
+              {/* Icon */}
+              <div className="onboarding__payment-icon-large">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+                </svg>
+              </div>
 
-            {/* Payment Form or Initial Button */}
-            {paymentStep === 1 && form.stripeClientSecret ? (
+              {/* Title */}
+              <h2 className="onboarding__payment-title">Add a Payment Method</h2>
+
+              {/* Description */}
+              <p className="onboarding__payment-subtitle">
+                Adding a payment method now will allow for quick and seamless bookings in the future.
+              </p>
+
+              {/* Add Payment Button - will trigger handleNext */}
+              <div className="onboarding__payment-action">
+                <button
+                  onClick={handleNext}
+                  className="onboarding__payment-add-button"
+                  type="button"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                  </svg>
+                  Add Payment Method
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Step 3b: Payment form
+      if (paymentStep === 1 && form.stripeClientSecret) {
+        return (
+          <div className="onboarding__content onboarding__content--step3">
+            <div className="onboarding__payment-section">
               <PaymentMethodFormWrapper
                 clientSecret={form.stripeClientSecret}
                 onSuccess={async (result) => {
@@ -335,8 +366,6 @@ function OnboardingPage() {
                     variant: "success",
                   });
                   setPaymentStep(2);
-                  // Auto-continue after 2 seconds
-                  setTimeout(() => setCurrentStep(3), 2000);
                 }}
                 onError={(error) => {
                   console.error("Payment error:", error);
@@ -347,30 +376,31 @@ function OnboardingPage() {
                   });
                 }}
               />
-            ) : paymentStep === 0 ? (
-              <div className="onboarding__payment-placeholder">
-                <div className="onboarding__payment-icon">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
-                  </svg>
-                </div>
-                <p style={{ marginTop: "1rem", color: "#666", textAlign: "center" }}>
-                  Click "Next" to add your card
-                </p>
-              </div>
-            ) : (
-              <div className="onboarding__payment-success">
-                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#4caf50", width: "48px", height: "48px" }}>
+            </div>
+          </div>
+        );
+      }
+
+      // Step 3c: Success state
+      if (paymentStep === 2) {
+        return (
+          <div className="onboarding__content onboarding__content--step3">
+            <div className="onboarding__payment-section">
+              {/* Success Icon */}
+              <div className="onboarding__payment-success-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#14b8a6", width: "48px", height: "48px" }}>
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                 </svg>
-                <p style={{ marginTop: "1rem", color: "#4caf50", fontWeight: "500" }}>
-                  Card saved successfully!
-                </p>
               </div>
-            )}
+
+              {/* Success Message */}
+              <p style={{ marginTop: "1rem", color: "#14b8a6", fontWeight: "500", fontSize: "1rem", textAlign: "center" }}>
+                Card saved successfully!
+              </p>
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
     }
 
     return null;
@@ -405,13 +435,23 @@ function OnboardingPage() {
 
         {/* Next/Save Button */}
         <div className="onboarding__footer">
-          <Button
-            onClick={handleNext}
-            loading={submitting}
-            className={currentStep === 3 ? "onboarding__button onboarding__button--save" : "onboarding__button"}
-          >
-            {currentStep === 3 ? "Save & Continue" : "Next"}
-          </Button>
+          {currentStep === 3 && paymentStep === 2 ? (
+            <Button
+              onClick={handleCompleteOnboarding}
+              loading={submitting}
+              className="onboarding__button onboarding__button--save"
+            >
+              Save & Continue
+            </Button>
+          ) : (
+            <Button
+              onClick={handleNext}
+              loading={submitting}
+              className={currentStep === 3 ? "onboarding__button onboarding__button--save" : "onboarding__button"}
+            >
+              {currentStep === 3 && paymentStep === 1 ? "Next" : currentStep === 3 ? "Add Payment Method" : "Next"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
