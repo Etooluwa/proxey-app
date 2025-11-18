@@ -2,7 +2,9 @@ import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
-  CardElement,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
@@ -36,7 +38,7 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
         clientSecret,
         {
           payment_method: {
-            card: elements.getElement(CardElement),
+            card: elements.getElement(CardNumberElement),
             billing_details: {
               name: cardholderName,
               address: {
@@ -63,24 +65,46 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
     }
   };
 
+  const elementOptions = {
+    style: {
+      base: {
+        fontSize: "16px",
+        color: "#424770",
+        backgroundColor: "#ffffff",
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+        "::placeholder": {
+          color: "#9ca3af",
+        },
+      },
+      invalid: {
+        color: "#fa755a",
+      },
+    },
+  };
+
   return (
     <form onSubmit={handleSubmit} className="payment-form">
       {/* Card Number */}
       <div className="payment-form__field">
         <label className="payment-form__label">Card Number</label>
         <div className="payment-form__card">
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: "#424770",
-                  backgroundColor: "#ffffff",
-                  fontFamily: "Plus Jakarta Sans, sans-serif",
-                },
-              },
-            }}
-          />
+          <CardNumberElement options={elementOptions} />
+        </div>
+      </div>
+
+      {/* Expiry and CVC Row */}
+      <div className="payment-form__row">
+        <div className="payment-form__field payment-form__field--half">
+          <label className="payment-form__label">Expiry Date</label>
+          <div className="payment-form__card">
+            <CardExpiryElement options={elementOptions} />
+          </div>
+        </div>
+        <div className="payment-form__field payment-form__field--half">
+          <label className="payment-form__label">CVV</label>
+          <div className="payment-form__card">
+            <CardCvcElement options={elementOptions} />
+          </div>
         </div>
       </div>
 

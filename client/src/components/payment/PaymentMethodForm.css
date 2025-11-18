@@ -12,6 +12,16 @@
   gap: 0.5rem;
 }
 
+.payment-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.payment-form__field--half {
+  grid-column: span 1;
+}
+
 .payment-form__label {
   font-size: 1rem;
   font-weight: 600;
@@ -30,6 +40,7 @@
   min-height: 56px;
   display: flex;
   align-items: center;
+  pointer-events: auto;
 }
 
 .payment-form__card:focus-within {
