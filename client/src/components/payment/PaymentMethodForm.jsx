@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -14,6 +14,70 @@ import "./PaymentMethodForm.css";
 const stripePromise = loadStripe(
   process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY
 );
+
+const SvgIcon = ({ name }) => {
+  const paths = useMemo(
+    () => ({
+      card: (
+        <>
+          <rect x="3" y="6" width="18" height="12" rx="2" ry="2" />
+          <rect x="3" y="9" width="18" height="2" />
+          <rect x="6" y="13" width="5" height="2" rx="0.5" />
+        </>
+      ),
+      calendar: (
+        <>
+          <rect x="4" y="6" width="16" height="14" rx="2" />
+          <path d="M9 3v3M15 3v3M4 11h16" />
+        </>
+      ),
+      lock: (
+        <>
+          <rect x="5" y="10" width="14" height="10" rx="2" />
+          <path d="M8 10V8a4 4 0 1 1 8 0v2" />
+          <circle cx="12" cy="15" r="1.25" />
+        </>
+      ),
+      info: (
+        <>
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="7.5" r="0.8" />
+          <path d="M12 11.5V17" />
+        </>
+      ),
+      user: (
+        <>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5 19a7 7 0 0 1 14 0" />
+        </>
+      ),
+      home: (
+        <>
+          <path d="M4 12.5 12 5l8 7.5" />
+          <path d="M6 11.5V19h12v-7.5" />
+        </>
+      ),
+      shield: (
+        <>
+          <path d="M12 3 5 6v6c0 4.225 2.95 8.175 7 9 4.05-.825 7-4.775 7-9V6l-7-3z" />
+          <path d="M10.5 12.5 12 14l3-3" />
+        </>
+      ),
+    }),
+    []
+  );
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="payment-form__svg-icon"
+      focusable="false"
+    >
+      {paths[name]}
+    </svg>
+  );
+};
 
 // Inner component that uses Stripe hooks
 function PaymentForm({ clientSecret, onSuccess, onError }) {
@@ -86,52 +150,104 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
     <form onSubmit={handleSubmit} className="payment-form">
       {/* Card Number */}
       <div className="payment-form__field">
-        <label className="payment-form__label">Card Number</label>
-        <div className="payment-form__card">
-          <CardNumberElement options={elementOptions} />
+        <div className="payment-form__label-row">
+          <SvgIcon name="card" />
+          <span className="payment-form__label">Card Number</span>
+        </div>
+        <div
+          className="payment-form__card payment-form__card--with-icon"
+          role="group"
+          aria-label="Card number"
+        >
+          <div className="payment-form__stripe-field">
+            <CardNumberElement options={elementOptions} />
+          </div>
+          <span className="payment-form__input-icon" aria-hidden="true">
+            <SvgIcon name="card" />
+          </span>
         </div>
       </div>
 
       {/* Expiry and CVC Row */}
       <div className="payment-form__row">
         <div className="payment-form__field payment-form__field--half">
-          <label className="payment-form__label">Expiry Date</label>
-          <div className="payment-form__card">
-            <CardExpiryElement options={elementOptions} />
+          <div className="payment-form__label-row">
+            <SvgIcon name="calendar" />
+            <span className="payment-form__label">Expiry Date</span>
+          </div>
+          <div
+            className="payment-form__card payment-form__card--with-icon"
+            role="group"
+            aria-label="Expiry date"
+          >
+            <div className="payment-form__stripe-field">
+              <CardExpiryElement options={elementOptions} />
+            </div>
+            <span className="payment-form__input-icon" aria-hidden="true">
+              <SvgIcon name="calendar" />
+            </span>
           </div>
         </div>
         <div className="payment-form__field payment-form__field--half">
-          <label className="payment-form__label">CVV</label>
-          <div className="payment-form__card">
-            <CardCvcElement options={elementOptions} />
+          <div className="payment-form__label-row">
+            <SvgIcon name="lock" />
+            <span className="payment-form__label">CVV</span>
+          </div>
+          <div
+            className="payment-form__card payment-form__card--with-icon"
+            role="group"
+            aria-label="CVC"
+          >
+            <div className="payment-form__stripe-field">
+              <CardCvcElement options={elementOptions} />
+            </div>
+            <span className="payment-form__input-icon" aria-hidden="true">
+              <SvgIcon name="info" />
+            </span>
           </div>
         </div>
       </div>
 
       {/* Cardholder Name */}
       <div className="payment-form__field">
-        <label className="payment-form__label">Cardholder Name</label>
-        <input
-          type="text"
-          className="payment-form__input"
-          placeholder="Enter name on card"
-          value={cardholderName}
-          onChange={(e) => setCardholderName(e.target.value)}
-          required
-        />
+        <div className="payment-form__label-row">
+          <SvgIcon name="user" />
+          <label className="payment-form__label" htmlFor="cardholder-name">
+            Cardholder Name
+          </label>
+        </div>
+        <div className="payment-form__input-wrapper">
+          <input
+            id="cardholder-name"
+            type="text"
+            className="payment-form__input"
+            placeholder="Enter name on card"
+            value={cardholderName}
+            onChange={(e) => setCardholderName(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
       {/* Billing Address */}
       <div className="payment-form__field">
-        <label className="payment-form__label">Billing Address</label>
-        <input
-          type="text"
-          className="payment-form__input"
-          placeholder="Enter your billing address"
-          value={billingAddress}
-          onChange={(e) => setBillingAddress(e.target.value)}
-          required
-        />
+        <div className="payment-form__label-row">
+          <SvgIcon name="home" />
+          <label className="payment-form__label" htmlFor="billing-address">
+            Billing Address
+          </label>
+        </div>
+        <div className="payment-form__input-wrapper">
+          <input
+            id="billing-address"
+            type="text"
+            className="payment-form__input"
+            placeholder="Enter your billing address"
+            value={billingAddress}
+            onChange={(e) => setBillingAddress(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
       {/* Set as Default */}
@@ -155,9 +271,7 @@ function PaymentForm({ clientSecret, onSuccess, onError }) {
 
       <div className="payment-form__footer">
         <div className="payment-form__security-info">
-          <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: "16px", height: "16px" }}>
-            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-          </svg>
+          <SvgIcon name="shield" />
           <span>Your payment info is stored securely</span>
         </div>
 
