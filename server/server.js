@@ -1108,5 +1108,228 @@ async function reportWebhookError(event, error) {
   }
 }
 
+// ============================================================================
+// PAYMENT ENDPOINTS - CLIENT PAYMENT METHODS
+// ============================================================================
+
+// POST /api/client/setup-intent
+// Creates a SetupIntent for client to save their card
+app.post("/api/client/setup-intent", async (req, res) => {
+  const { userId, email } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId required" });
+  }
+
+  try {
+    // Create or retrieve Stripe customer
+    const customers = await stripe.customers.list({
+      limit: 100,
+    });
+
+    let customerId;
+    const existingCustomer = customers.data.find(
+      (c) => c.metadata?.userId === userId
+    );
+
+    if (existingCustomer) {
+      customerId = existingCustomer.id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: email,
+        metadata: {
+          userId: userId,
+          userType: "client",
+        },
+      });
+      customerId = customer.id;
+    }
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      usage: "on_session",
+    });
+
+    res.json({
+      clientSecret: setupIntent.client_secret,
+      customerId: customerId,
+    });
+  } catch (error) {
+    console.error("Setup intent error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/client/payment-methods
+// Retrieve all payment methods for a customer
+app.post("/api/client/payment-methods", async (req, res) => {
+  const { customerId } = req.body;
+
+  if (!customerId) {
+    return res.status(400).json({ error: "customerId required" });
+  }
+
+  try {
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: "card",
+    });
+
+    res.json({
+      paymentMethods: paymentMethods.data.map((pm) => ({
+        id: pm.id,
+        brand: pm.card.brand,
+        last4: pm.card.last4,
+        expMonth: pm.card.exp_month,
+        expYear: pm.card.exp_year,
+      })),
+    });
+  } catch (error) {
+    console.error("Payment methods error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/client/payment-methods/:paymentMethodId
+// Remove a saved payment method
+app.delete("/api/client/payment-methods/:paymentMethodId", async (req, res) => {
+  const { paymentMethodId } = req.params;
+
+  try {
+    await stripe.paymentMethods.detach(paymentMethodId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Payment method deletion error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/charge
+// Charge an existing payment method
+app.post("/api/charge", async (req, res) => {
+  const { amount, paymentMethodId, customerId, bookingId, providerId } = req.body;
+
+  if (!amount || !paymentMethodId || !customerId) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    const charge = await stripe.charges.create({
+      amount: Math.round(amount),
+      currency: "cad",
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        bookingId: bookingId || "unknown",
+        providerId: providerId || "unknown",
+      },
+    });
+
+    res.json({
+      chargeId: charge.id,
+      status: charge.status,
+      amount: charge.amount,
+    });
+  } catch (error) {
+    console.error("Charge error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// PAYMENT ENDPOINTS - PROVIDER STRIPE CONNECT
+// ============================================================================
+
+// POST /api/provider/connected-account
+// Create a Connected Account for provider
+app.post("/api/provider/connected-account", async (req, res) => {
+  const { userId, email, businessName } = req.body;
+
+  if (!userId || !email) {
+    return res.status(400).json({ error: "userId and email required" });
+  }
+
+  try {
+    const account = await stripe.accounts.create({
+      type: "express",
+      country: "CA",
+      email: email,
+      business_type: "individual",
+      individual: {
+        email: email,
+      },
+      business_profile: {
+        name: businessName || email,
+        support_email: email,
+        url: "https://proxey.app",
+      },
+      metadata: {
+        userId: userId,
+        userType: "provider",
+      },
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+    });
+
+    res.json({
+      accountId: account.id,
+    });
+  } catch (error) {
+    console.error("Connected account error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/provider/onboarding-link
+// Generate onboarding link for provider to complete Stripe setup
+app.post("/api/provider/onboarding-link", async (req, res) => {
+  const { accountId, refreshUrl, returnUrl } = req.body;
+
+  if (!accountId) {
+    return res.status(400).json({ error: "accountId required" });
+  }
+
+  try {
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      type: "account_onboarding",
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+    });
+
+    res.json({
+      onboardingLink: link.url,
+    });
+  } catch (error) {
+    console.error("Onboarding link error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/provider/account/:accountId
+// Check provider's Stripe account status
+app.get("/api/provider/account/:accountId", async (req, res) => {
+  const { accountId } = req.params;
+
+  try {
+    const account = await stripe.accounts.retrieve(accountId);
+
+    res.json({
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      detailsSubmitted: account.details_submitted,
+      requirements: account.requirements || {},
+    });
+  } catch (error) {
+    console.error("Account retrieval error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

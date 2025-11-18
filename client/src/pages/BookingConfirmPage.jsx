@@ -4,6 +4,7 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Skeleton from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
+import { useSession } from "../auth/authContext";
 import useBookings from "../data/useBookings";
 import useProviders from "../data/useProviders";
 import useServices from "../data/useServices";
@@ -13,6 +14,7 @@ import "../styles/bookingConfirm.css";
 function BookingConfirmPage() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { profile } = useSession();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get("bookingId");
   const { bookings, loading: bookingsLoading, refresh } = useBookings();
@@ -20,6 +22,9 @@ function BookingConfirmPage() {
   const { services } = useServices();
   const [booking, setBooking] = useState(null);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState([]);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState(null);
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
 
   useEffect(() => {
     const match = bookings.find((item) => item.id === bookingId);
@@ -34,6 +39,37 @@ function BookingConfirmPage() {
     }
   }, [bookingId, bookingsLoading, refresh]);
 
+  // Fetch saved payment methods when component loads
+  useEffect(() => {
+    if (profile?.stripeCustomerId) {
+      setLoadingPaymentMethods(true);
+      fetch("http://localhost:3001/api/client/payment-methods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: profile.stripeCustomerId,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setSavedPaymentMethods(data.paymentMethods || []);
+          // Auto-select first payment method if available
+          if (data.paymentMethods && data.paymentMethods.length > 0) {
+            setSelectedPaymentMethodId(data.paymentMethods[0].id);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching payment methods:", err);
+          toast.push({
+            title: "Could not load saved payment methods",
+            description: "You can still use a new card at checkout",
+            variant: "warning",
+          });
+        })
+        .finally(() => setLoadingPaymentMethods(false));
+    }
+  }, [profile?.stripeCustomerId, toast]);
+
   const provider = providers.find((item) => item.id === booking?.providerId);
   const service = services.find((item) => item.id === booking?.serviceId);
 
@@ -41,17 +77,56 @@ function BookingConfirmPage() {
     if (!booking) return;
     setLoadingCheckout(true);
     try {
-      const data = await requestCheckout(booking.id);
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      } else if (data.sessionId) {
+      // If user has a saved payment method selected, use it
+      if (selectedPaymentMethodId && profile?.stripeCustomerId) {
+        const chargeResponse = await fetch(
+          "http://localhost:3001/api/charge",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              amount: booking.price,
+              paymentMethodId: selectedPaymentMethodId,
+              customerId: profile.stripeCustomerId,
+              bookingId: booking.id,
+              providerId: booking.providerId,
+            }),
+          }
+        );
+
+        if (!chargeResponse.ok) {
+          const error = await chargeResponse.json();
+          throw new Error(error.error || "Payment failed");
+        }
+
+        const chargeData = await chargeResponse.json();
+
         toast.push({
-          title: "Checkout session ready",
-          description: "Redirecting to Stripe…",
-          variant: "info",
+          title: "Payment successful!",
+          description: "Your booking has been confirmed",
+          variant: "success",
         });
+
+        // Navigate to bookings page after a short delay
+        setTimeout(() => {
+          navigate("/app/bookings");
+        }, 2000);
       } else {
-        throw new Error("Checkout session not available.");
+        // Fall back to Stripe Checkout (new card)
+        const data = await requestCheckout(booking.id);
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else if (data.sessionId) {
+          toast.push({
+            title: "Checkout session ready",
+            description: "Redirecting to Stripe…",
+            variant: "info",
+          });
+        } else {
+          throw new Error("Checkout session not available.");
+        }
       }
     } catch (error) {
       toast.push({
@@ -111,6 +186,62 @@ function BookingConfirmPage() {
               </dd>
             </div>
           </dl>
+
+          {/* Payment Method Selector */}
+          {!loadingPaymentMethods && savedPaymentMethods.length > 0 && (
+            <div
+              style={{
+                marginTop: "2rem",
+                paddingTop: "2rem",
+                borderTop: "1px solid #e0e0e0",
+              }}
+            >
+              <h3 style={{ marginBottom: "1rem", fontSize: "16px", fontWeight: "600" }}>
+                Select Payment Method
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {savedPaymentMethods.map((method) => (
+                  <label
+                    key={method.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.75rem",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      backgroundColor:
+                        selectedPaymentMethodId === method.id
+                          ? "#f5f5f5"
+                          : "transparent",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value={method.id}
+                      checked={selectedPaymentMethodId === method.id}
+                      onChange={(e) => setSelectedPaymentMethodId(e.target.value)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <span style={{ flex: 1 }}>
+                      <strong>{method.brand.toUpperCase()}</strong> ending in{" "}
+                      {method.last4}
+                      <br />
+                      <span style={{ fontSize: "12px", color: "#999" }}>
+                        Expires {method.expMonth}/{method.expYear}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p style={{ marginTop: "0.75rem", fontSize: "12px", color: "#999" }}>
+                Or proceed to checkout to use a new card
+              </p>
+            </div>
+          )}
+
           <div className="booking-confirm__actions">
             <Button variant="secondary" onClick={() => navigate("/app/bookings")}>
               Go to my bookings

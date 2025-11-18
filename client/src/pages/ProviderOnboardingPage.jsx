@@ -8,7 +8,7 @@ import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
 import "../styles/providerOnboarding.css";
 
 function ProviderOnboardingPage() {
-  const { updateProfile } = useSession();
+  const { updateProfile, session } = useSession();
   const toast = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -30,6 +30,7 @@ function ProviderOnboardingPage() {
       saturday: { enabled: false, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
       sunday: { enabled: false, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
     },
+    stripeAccountId: null,
   });
   const [submitting, setSubmitting] = useState(false);
   const [cityInputFocused, setCityInputFocused] = useState(false);
@@ -239,7 +240,7 @@ function ProviderOnboardingPage() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Validate step 1
     if (currentStep === 1) {
       if (!form.name.trim()) {
@@ -289,6 +290,89 @@ function ProviderOnboardingPage() {
     if (currentStep === 4) {
       setCurrentStep(5);
       return;
+    }
+
+    // Step 5 - Stripe Connect
+    if (currentStep === 5) {
+      await handleConnectStripe();
+    }
+  };
+
+  const handleConnectStripe = async () => {
+    setSubmitting(true);
+
+    try {
+      // Create Stripe Connected Account
+      const accountResponse = await fetch(
+        "http://localhost:3001/api/provider/connected-account",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: session.user.id,
+            email: session.user.email,
+            businessName: form.name,
+          }),
+        }
+      );
+
+      if (!accountResponse.ok) {
+        throw new Error("Failed to create Stripe account");
+      }
+
+      const { accountId } = await accountResponse.json();
+
+      // Get onboarding link
+      const linkResponse = await fetch(
+        "http://localhost:3001/api/provider/onboarding-link",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            accountId,
+            refreshUrl: `${window.location.origin}/provider/onboarding?step=5`,
+            returnUrl: `${window.location.origin}/provider/onboarding?completed=true`,
+          }),
+        }
+      );
+
+      if (!linkResponse.ok) {
+        throw new Error("Failed to get onboarding link");
+      }
+
+      const { onboardingLink } = await linkResponse.json();
+
+      // Save account ID to profile
+      await updateProfile({
+        stripeAccountId: accountId,
+      });
+
+      setForm((prev) => ({
+        ...prev,
+        stripeAccountId: accountId,
+      }));
+
+      // Open Stripe onboarding form in new window
+      window.open(onboardingLink, "_blank");
+
+      toast.push({
+        title: "Opening Stripe",
+        description: "Please complete your profile verification",
+        variant: "info",
+      });
+    } catch (error) {
+      console.error("Bank setup error:", error);
+      toast.push({
+        title: "Setup failed",
+        description: error.message,
+        variant: "error",
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -754,6 +838,11 @@ function ProviderOnboardingPage() {
             {/* Subtitle */}
             <p className="provider-onboarding__stripe-subtitle">
               Proxey uses Stripe for fast, secure payouts. Connect your account to receive payments directly from clients.
+            </p>
+
+            {/* Info Text */}
+            <p style={{ marginTop: "1rem", color: "#666", textAlign: "center", fontSize: "14px" }}>
+              You'll be redirected to Stripe to complete your profile securely.
             </p>
           </div>
         </div>

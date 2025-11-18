@@ -4,6 +4,7 @@ import Button from "../components/ui/Button";
 import StepIndicator from "../components/ui/StepIndicator";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
+import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
@@ -12,6 +13,7 @@ function OnboardingPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  const { session } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState({
     name: "",
@@ -20,7 +22,10 @@ function OnboardingPage() {
     email: "",
     phone: "",
     defaultLocation: "",
+    stripeClientSecret: null,
+    stripeCustomerId: null,
   });
+  const [paymentStep, setPaymentStep] = useState(0); // 0: not started, 1: form shown, 2: complete
   const [submitting, setSubmitting] = useState(false);
 
   const handlePhotoClick = () => {
@@ -55,13 +60,15 @@ function OnboardingPage() {
   const handleCompleteOnboarding = async () => {
     setSubmitting(true);
     try {
-      // Save profile data with photo upload
+      // Save profile data with photo upload and payment info
       await updateProfile(
         {
           name: form.name,
           phone: form.phone,
           email: form.email,
           defaultLocation: form.email, // Using email as placeholder for location
+          stripeCustomerId: form.stripeCustomerId,
+          paymentMethodSetupComplete: true,
           isComplete: true,
         },
         form.photo // Pass the photo file for upload
@@ -69,7 +76,7 @@ function OnboardingPage() {
 
       toast.push({
         title: "Profile created!",
-        description: "Welcome to Kliques! Let's get started.",
+        description: "Welcome to Proxey! Let's get started.",
         variant: "success",
       });
 
@@ -86,7 +93,7 @@ function OnboardingPage() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Validate step 1
     if (currentStep === 1) {
       if (!form.name.trim()) {
@@ -136,9 +143,54 @@ function OnboardingPage() {
       return;
     }
 
-    // Step 3 - Complete onboarding
+    // Step 3 - Payment setup
     if (currentStep === 3) {
-      handleCompleteOnboarding();
+      if (paymentStep === 0) {
+        // Initialize payment method setup
+        setPaymentStep(1);
+        setSubmitting(true);
+
+        try {
+          const response = await fetch(
+            "http://localhost:3001/api/client/setup-intent",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                userId: session.user.id,
+                email: session.user.email,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Failed to create setup intent");
+          }
+
+          const { clientSecret, customerId } = await response.json();
+
+          setForm((prev) => ({
+            ...prev,
+            stripeClientSecret: clientSecret,
+            stripeCustomerId: customerId,
+          }));
+        } catch (error) {
+          console.error("Payment setup error:", error);
+          toast.push({
+            title: "Payment setup failed",
+            description: error.message,
+            variant: "error",
+          });
+          setPaymentStep(0);
+        } finally {
+          setSubmitting(false);
+        }
+      } else if (paymentStep === 2) {
+        // Payment method saved, complete onboarding
+        handleCompleteOnboarding();
+      }
     }
   };
 
@@ -264,36 +316,56 @@ function OnboardingPage() {
         <div className="onboarding__content onboarding__content--step3">
           {/* Step 3 - Payment */}
           <div className="onboarding__payment-section">
-            {/* Credit Card Icon */}
-            <div className="onboarding__payment-icon">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
-              </svg>
-            </div>
-
             {/* Title and Description */}
-            <h2 className="onboarding__payment-title">Add a Payment Method</h2>
+            <h2 className="onboarding__payment-title">Save a Payment Method</h2>
             <p className="onboarding__payment-subtitle">
-              Adding a payment method now will allow for quick and seamless bookings in the future.
+              Add a card to make bookings faster in the future.
             </p>
 
-            {/* Add Payment Button */}
-            <Button
-              variant="secondary"
-              className="onboarding__add-payment-button"
-              onClick={() => {
-                toast.push({
-                  title: "Coming soon",
-                  description: "Payment method setup will be available soon.",
-                  variant: "info",
-                });
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="onboarding__button-icon">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-              </svg>
-              Add Payment Method
-            </Button>
+            {/* Payment Form or Initial Button */}
+            {paymentStep === 1 && form.stripeClientSecret ? (
+              <PaymentMethodFormWrapper
+                clientSecret={form.stripeClientSecret}
+                onSuccess={async (result) => {
+                  toast.push({
+                    title: "Card saved",
+                    description: "Your payment method is ready to use",
+                    variant: "success",
+                  });
+                  setPaymentStep(2);
+                  // Auto-continue after 2 seconds
+                  setTimeout(() => setCurrentStep(3), 2000);
+                }}
+                onError={(error) => {
+                  console.error("Payment error:", error);
+                  toast.push({
+                    title: "Payment error",
+                    description: error?.message || "Failed to save card",
+                    variant: "error",
+                  });
+                }}
+              />
+            ) : paymentStep === 0 ? (
+              <div className="onboarding__payment-placeholder">
+                <div className="onboarding__payment-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+                  </svg>
+                </div>
+                <p style={{ marginTop: "1rem", color: "#666", textAlign: "center" }}>
+                  Click "Next" to add your card
+                </p>
+              </div>
+            ) : (
+              <div className="onboarding__payment-success">
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#4caf50", width: "48px", height: "48px" }}>
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                </svg>
+                <p style={{ marginTop: "1rem", color: "#4caf50", fontWeight: "500" }}>
+                  Card saved successfully!
+                </p>
+              </div>
+            )}
           </div>
         </div>
       );
