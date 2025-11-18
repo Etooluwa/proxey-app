@@ -360,12 +360,27 @@ function OnboardingPage() {
               <PaymentMethodFormWrapper
                 clientSecret={form.stripeClientSecret}
                 onSuccess={async (result) => {
-                  toast.push({
-                    title: "Card saved",
-                    description: "Your payment method is ready to use",
-                    variant: "success",
-                  });
-                  setPaymentStep(2);
+                  try {
+                    // Save the payment method ID to user's profile
+                    await updateProfile({
+                      stripePaymentMethodId: result.paymentMethodId,
+                      paymentMethodSetupComplete: true,
+                    });
+
+                    toast.push({
+                      title: "Card saved",
+                      description: "Your payment method is ready to use",
+                      variant: "success",
+                    });
+                    setPaymentStep(2);
+                  } catch (error) {
+                    console.error("Error saving payment method:", error);
+                    toast.push({
+                      title: "Error saving card",
+                      description: "Card was saved to Stripe but couldn't update your profile. Please try again.",
+                      variant: "error",
+                    });
+                  }
                 }}
                 onError={(error) => {
                   console.error("Payment error:", error);
