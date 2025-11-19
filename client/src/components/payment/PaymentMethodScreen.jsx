@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import PaymentMethodPlain from "./PaymentMethodPlain";
+import SimpleCardForm from "./SimpleCardForm";
 import { useSession } from "../../auth/authContext";
 import { useToast } from "../ui/ToastProvider";
 import Button from "../ui/Button";
@@ -109,7 +109,7 @@ function PaymentMethodScreen({ onBack, onSuccess }) {
             </div>
           )}
           {!loading && !error && clientSecret && (
-            <PaymentMethodPlain
+            <SimpleCardForm
               clientSecret={clientSecret}
               onSuccess={handleSuccess}
               onError={(err) =>
