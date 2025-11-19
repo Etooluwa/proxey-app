@@ -1,73 +1,66 @@
+// Ultra-minimal Stripe card form to avoid any CSS/pointer interference
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
 import Button from "../ui/Button";
-import { useSession } from "../../auth/authContext";
-import { useToast } from "../ui/ToastProvider";
 import "./SimpleCardForm.css";
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-// Form content component
-function CardFormContent({ clientSecret, onSuccess, onError }) {
+const elementOptions = {
+  style: {
+    base: {
+      fontSize: "16px",
+      color: "#0f172a",
+      fontFamily: "Plus Jakarta Sans, sans-serif",
+      "::placeholder": { color: "#9ca3af" },
+    },
+    invalid: {
+      color: "#dc2626",
+    },
+  },
+};
+
+function SimpleForm({ clientSecret, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState(null);
   const [cardholderName, setCardholderName] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
+  const [cardError, setCardError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!stripe || !elements) {
-      setError("Payment system not ready");
-      return;
-    }
-
-    // Basic validation
-    if (!cardholderName.trim()) {
-      setError("Cardholder name is required");
-      return;
-    }
-
-    if (!billingAddress.trim()) {
-      setError("Billing address is required");
-      return;
-    }
-
+    if (!stripe || !elements) return;
     setProcessing(true);
-    setError(null);
-
+    setCardError(null);
     try {
-      const cardElement = elements.getElement(CardElement);
-
-      const { error: stripeError, setupIntent } = await stripe.confirmCardSetup(
-        clientSecret,
-        {
-          payment_method: {
-            card: cardElement,
-            billing_details: {
-              name: cardholderName,
-              address: {
-                line1: billingAddress,
-              },
-            },
+      const { error, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardNumberElement),
+          billing_details: {
+            name: cardholderName,
+            address: { line1: billingAddress },
           },
-        }
-      );
-
-      if (stripeError) {
-        setError(stripeError.message);
-        onError?.(stripeError);
-      } else if (setupIntent?.status === "succeeded") {
-        onSuccess?.({
-          paymentMethodId: setupIntent.payment_method,
-        });
+        },
+      });
+      if (error) {
+        setCardError(error.message);
+        onError?.(error);
+        return;
+      }
+      if (setupIntent?.status === "succeeded") {
+        onSuccess?.({ paymentMethodId: setupIntent.payment_method });
       }
     } catch (err) {
-      console.error("Payment error:", err);
-      setError("An error occurred while processing your card");
+      setCardError("An error occurred");
       onError?.(err);
     } finally {
       setProcessing(false);
@@ -75,112 +68,68 @@ function CardFormContent({ clientSecret, onSuccess, onError }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="simple-card-form">
-      <div className="simple-card-form__header">
-        <h2>Add Your Card</h2>
-        <p>Your payment information is secure and encrypted</p>
+    <form className="simple-card-form" onSubmit={handleSubmit}>
+      <label className="simple-label">Card Number</label>
+      <div className="simple-stripe-field">
+        <CardNumberElement options={elementOptions} />
       </div>
 
-      <div className="simple-card-form__body">
-        {/* Card Element */}
-        <div className="simple-card-form__field">
-          <label className="simple-card-form__label">Card Details</label>
-          <div className="simple-card-form__card-element">
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: "16px",
-                    color: "#0f172a",
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    "::placeholder": {
-                      color: "#9ca3af",
-                    },
-                  },
-                  invalid: {
-                    color: "#dc2626",
-                  },
-                },
-              }}
-            />
+      <div className="simple-row">
+        <div className="simple-col">
+          <label className="simple-label">Expiry Date</label>
+          <div className="simple-stripe-field">
+            <CardExpiryElement options={elementOptions} />
           </div>
         </div>
-
-        {/* Cardholder Name */}
-        <div className="simple-card-form__field">
-          <label htmlFor="name" className="simple-card-form__label">
-            Cardholder Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            className="simple-card-form__input"
-            placeholder="John Doe"
-            value={cardholderName}
-            onChange={(e) => setCardholderName(e.target.value)}
-            required
-          />
-        </div>
-
-        {/* Billing Address */}
-        <div className="simple-card-form__field">
-          <label htmlFor="address" className="simple-card-form__label">
-            Billing Address
-          </label>
-          <input
-            id="address"
-            type="text"
-            className="simple-card-form__input"
-            placeholder="123 Main Street, City, State 12345"
-            value={billingAddress}
-            onChange={(e) => setBillingAddress(e.target.value)}
-            required
-          />
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="simple-card-form__error">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-            </svg>
-            {error}
+        <div className="simple-col">
+          <label className="simple-label">CVC</label>
+          <div className="simple-stripe-field">
+            <CardCvcElement options={elementOptions} />
           </div>
-        )}
+        </div>
       </div>
 
-      <div className="simple-card-form__footer">
-        <Button
-          type="submit"
-          disabled={!stripe || processing || !cardholderName.trim() || !billingAddress.trim()}
-          loading={processing}
-          className="simple-card-form__submit"
-        >
-          {processing ? "Saving..." : "Save Card"}
-        </Button>
-        <p className="simple-card-form__secure-note">
-          🔒 Your card is secure and encrypted by Stripe
-        </p>
-      </div>
+      <label className="simple-label" htmlFor="cardholder">Cardholder Name</label>
+      <input
+        id="cardholder"
+        className="simple-input"
+        placeholder="Enter name on card"
+        value={cardholderName}
+        onChange={(e) => setCardholderName(e.target.value)}
+        required
+      />
+
+      <label className="simple-label" htmlFor="billing">Billing Address</label>
+      <input
+        id="billing"
+        className="simple-input"
+        placeholder="Enter your billing address"
+        value={billingAddress}
+        onChange={(e) => setBillingAddress(e.target.value)}
+        required
+      />
+
+      {cardError && <div className="simple-error">{cardError}</div>}
+
+      <div className="simple-secure">🔒 Your payment info is stored securely</div>
+
+      <Button
+        type="submit"
+        disabled={!stripe || processing}
+        loading={processing}
+        className="simple-submit"
+      >
+        {processing ? "Saving card..." : "Save Payment Method"}
+      </Button>
     </form>
   );
 }
 
-// Wrapper component with Stripe Elements provider
-function SimpleCardForm({ clientSecret, onSuccess, onError }) {
-  if (!clientSecret) {
-    return <div className="simple-card-form__loading">Loading payment form...</div>;
-  }
-
+export default function SimpleCardForm({ clientSecret, onSuccess, onError }) {
+  if (!clientSecret) return null;
   return (
     <Elements stripe={stripePromise}>
-      <CardFormContent
-        clientSecret={clientSecret}
-        onSuccess={onSuccess}
-        onError={onError}
-      />
+      <SimpleForm clientSecret={clientSecret} onSuccess={onSuccess} onError={onError} />
     </Elements>
   );
 }
-
-export default SimpleCardForm;
