@@ -104,13 +104,16 @@ function InnerForm({ clientSecret, onSuccess, onError }) {
           onClick={() => focusStripeElement(cardNumberRef)}
           role="group"
           aria-label="Card number input"
+          style={{ pointerEvents: "auto" }}
         >
-          <CardNumberElement
-            options={elementOptions}
-            onReady={(el) => {
-              cardNumberRef.current = el;
-            }}
-          />
+          <div style={{ flex: 1, width: "100%", pointerEvents: "auto" }}>
+            <CardNumberElement
+              options={elementOptions}
+              onReady={(el) => {
+                cardNumberRef.current = el;
+              }}
+            />
+          </div>
           <svg className="plain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="3" y="6" width="18" height="12" rx="2" ry="2" />
             <rect x="3" y="9" width="18" height="2" />
@@ -128,13 +131,16 @@ function InnerForm({ clientSecret, onSuccess, onError }) {
             onClick={() => focusStripeElement(cardExpiryRef)}
             role="group"
             aria-label="Expiry date input"
+            style={{ pointerEvents: "auto" }}
           >
-            <CardExpiryElement
-              options={elementOptions}
-              onReady={(el) => {
-                cardExpiryRef.current = el;
-              }}
-            />
+            <div style={{ flex: 1, width: "100%", pointerEvents: "auto" }}>
+              <CardExpiryElement
+                options={elementOptions}
+                onReady={(el) => {
+                  cardExpiryRef.current = el;
+                }}
+              />
+            </div>
             <svg className="plain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <rect x="4" y="6" width="16" height="14" rx="2" />
               <path d="M9 3v3M15 3v3M4 11h16" />
@@ -148,13 +154,16 @@ function InnerForm({ clientSecret, onSuccess, onError }) {
             onClick={() => focusStripeElement(cardCvcRef)}
             role="group"
             aria-label="CVV input"
+            style={{ pointerEvents: "auto" }}
           >
-            <CardCvcElement
-              options={elementOptions}
-              onReady={(el) => {
-                cardCvcRef.current = el;
-              }}
-            />
+            <div style={{ flex: 1, width: "100%", pointerEvents: "auto" }}>
+              <CardCvcElement
+                options={elementOptions}
+                onReady={(el) => {
+                  cardCvcRef.current = el;
+                }}
+              />
+            </div>
             <svg className="plain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="10" />
               <circle cx="12" cy="7.5" r="0.8" />

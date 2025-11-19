@@ -69,8 +69,8 @@ function PaymentMethodScreen({ onBack, onSuccess }) {
         description: "Your payment method is stored securely.",
         variant: "success",
       });
+      // Call parent callback first - this updates onboarding state
       onSuccess?.();
-      navigate(-1);
     } catch (error) {
       console.error("Error saving payment method to profile:", error);
       toast.push({

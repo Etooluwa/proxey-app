@@ -53,12 +53,15 @@
   background: transparent !important;
   display: flex;
   align-items: center;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10;
 }
 
 .plain-field .StripeElement > div {
   width: 100%;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  z-index: 10;
 }
 
 .plain-field .StripeElement iframe {
@@ -66,6 +69,8 @@
   width: 100% !important;
   height: 100% !important;
   touch-action: manipulation;
+  z-index: 10;
+  position: relative;
 }
 
 .plain-icon {
