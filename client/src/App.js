@@ -11,6 +11,7 @@ import MessagesPage from "./pages/MessagesPage";
 import AccountPage from "./pages/AccountPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import ProviderOnboardingPage from "./pages/ProviderOnboardingPage";
+import ProviderProfilePage from "./pages/ProviderProfilePage";
 import SignInPage from "./pages/auth/SignInPage";
 import SignUpPage from "./pages/auth/SignUpPage";
 import BookingCheckoutPage from "./pages/BookingCheckoutPage";
@@ -43,6 +44,7 @@ function App() {
           <Route element={<AppShell />}>
             <Route path="/app" element={<AppDashboard />} />
             <Route path="/app/browse" element={<BrowsePage />} />
+            <Route path="/app/provider/:providerId" element={<ProviderProfilePage />} />
             <Route path="/app/book" element={<BookingFlowPage />} />
             <Route path="/app/book/confirm" element={<BookingConfirmPage />} />
             <Route path="/app/bookings" element={<BookingsPage />} />

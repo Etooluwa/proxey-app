@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
@@ -5,7 +6,14 @@ import Rating from "../ui/Rating";
 import "../../styles/ui/providerCard.css";
 
 function ProviderCard({ provider, onBook }) {
+  const navigate = useNavigate();
+
   if (!provider) return null;
+
+  const handleViewProfile = () => {
+    navigate(`/app/provider/${provider.id}`);
+  };
+
   return (
     <Card className="provider-card">
       <div className="provider-card__header">
@@ -32,8 +40,8 @@ function ProviderCard({ provider, onBook }) {
           <Badge key={category}>{category}</Badge>
         ))}
       </div>
-      <Button variant="primary" onClick={() => onBook?.(provider)}>
-        Book with {provider.name.split(" ")[0]}
+      <Button variant="primary" onClick={handleViewProfile}>
+        View Profile
       </Button>
     </Card>
   );
