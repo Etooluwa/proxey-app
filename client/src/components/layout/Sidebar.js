@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icons } from '../Icons';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/authContext';
 
 export const Sidebar = ({ role }) => {
     const location = useLocation();
@@ -58,8 +58,8 @@ export const Sidebar = ({ role }) => {
                             key={link.id}
                             onClick={() => navigate(link.path)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-                                    ? 'bg-brand-50 text-brand-600 font-semibold shadow-sm'
-                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                                ? 'bg-brand-50 text-brand-600 font-semibold shadow-sm'
+                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                 }`}
                         >
                             <Icon size={20} className={isActive ? 'text-brand-500' : 'text-gray-400'} />
