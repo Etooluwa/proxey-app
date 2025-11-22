@@ -374,4 +374,6 @@ export function useSession() {
   return ctx;
 }
 
+export const useAuth = useSession;
+
 export default AuthContext;
