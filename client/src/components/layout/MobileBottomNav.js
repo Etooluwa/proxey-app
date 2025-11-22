@@ -18,7 +18,7 @@ export const MobileBottomNav = ({ role }) => {
         { id: 'schedule', path: '/provider/schedule', label: 'Schedule', icon: Icons.Calendar },
         { id: 'earnings', path: '/provider/earnings', label: 'Earn', icon: Icons.Wallet },
         { id: 'messages', path: '/provider/messages', label: 'Chat', icon: Icons.Message },
-        { id: 'services', path: '/provider/jobs', label: 'Services', icon: Icons.Wrench },
+        { id: 'services', path: '/provider/services', label: 'Services', icon: Icons.Wrench },
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
     ];
 

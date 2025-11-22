@@ -20,7 +20,7 @@ export const Sidebar = ({ role }) => {
         { id: 'schedule', path: '/provider/schedule', label: 'Schedule', icon: Icons.Calendar },
         { id: 'earnings', path: '/provider/earnings', label: 'Earnings', icon: Icons.Wallet },
         { id: 'messages', path: '/provider/messages', label: 'Messages', icon: Icons.Message },
-        { id: 'services', path: '/provider/jobs', label: 'My Services', icon: Icons.Wrench },
+        { id: 'services', path: '/provider/services', label: 'My Services', icon: Icons.Wrench },
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
     ];
 
