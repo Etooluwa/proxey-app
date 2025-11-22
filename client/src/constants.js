@@ -1,3 +1,10 @@
+export const BookingStatus = {
+    PENDING: 'pending',
+    CONFIRMED: 'confirmed',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+};
+
 export const CATEGORIES = [
     { id: '1', name: 'Cleaning', icon: 'Sparkles', color: 'bg-blue-100 text-blue-600' },
     { id: '2', name: 'Repair', icon: 'Wrench', color: 'bg-orange-100 text-orange-600' },
@@ -226,10 +233,3 @@ export const EARNINGS_DATA = [
     { name: 'Sat', value: 0 },
     { name: 'Sun', value: 0 },
 ];
-
-export const BookingStatus = {
-    PENDING: 'pending',
-    CONFIRMED: 'confirmed',
-    COMPLETED: 'completed',
-    CANCELLED: 'cancelled',
-};
