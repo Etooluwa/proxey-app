@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Button from "../components/ui/Button";
 import StepIndicator from "../components/ui/StepIndicator";
 import { useSession } from "../auth/authContext";
@@ -11,9 +11,44 @@ function ProviderOnboardingPage() {
   const { updateProfile, session } = useSession();
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
 
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Handle return from Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("completed") === "true") {
+      completeOnboarding();
+    }
+  }, [location]);
+
+  const completeOnboarding = async () => {
+    try {
+      // In a real app, we might verify the stripe status here
+      // For now, we update the profile as complete
+      await updateProfile({
+        isProfileComplete: true,
+        onboardingCompletedAt: new Date().toISOString()
+      });
+
+      toast.push({
+        title: "Setup Complete!",
+        description: "Your provider profile is now active.",
+        variant: "success",
+      });
+
+      navigate("/provider/profile");
+    } catch (error) {
+      console.error("Failed to complete onboarding", error);
+      toast.push({
+        title: "Error",
+        description: "Failed to finalize profile setup.",
+        variant: "error",
+      });
+    }
+  };
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -753,9 +788,8 @@ function ProviderOnboardingPage() {
                   {/* Day Header */}
                   <div className="provider-onboarding__day-header">
                     <span
-                      className={`provider-onboarding__day-name ${
-                        !dayData.enabled ? "provider-onboarding__day-name--disabled" : ""
-                      }`}
+                      className={`provider-onboarding__day-name ${!dayData.enabled ? "provider-onboarding__day-name--disabled" : ""
+                        }`}
                     >
                       {day.label}
                     </span>
@@ -924,6 +958,16 @@ function ProviderOnboardingPage() {
             >
               {currentStep === 3 || currentStep === 4 ? "Continue" : "Next"}
             </Button>
+          )}
+          {currentStep === 5 && (
+            <button
+              type="button"
+              onClick={completeOnboarding}
+              className="provider-onboarding__skip-button"
+              style={{ marginTop: '1rem' }}
+            >
+              Skip for now (Demo)
+            </button>
           )}
           {currentStep === 2 && (
             <button

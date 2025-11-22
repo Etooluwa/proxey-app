@@ -11,6 +11,7 @@ import ProviderShell from './components/layout/ProviderShell';
 // Auth Pages
 import SignIn from './pages/auth/SignInPage';
 import SignUp from './pages/auth/SignUpPage';
+import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
 
 // Client Pages
 import AppDashboard from './pages/AppDashboard';
@@ -56,6 +57,14 @@ function App() {
           </Route>
 
           {/* Provider Routes */}
+          <Route
+            path="/provider/onboarding"
+            element={
+              <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
+                <ProviderOnboardingPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/provider"
             element={

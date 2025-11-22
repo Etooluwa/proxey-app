@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
 
 const AppShell = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
+    const navigate = useNavigate();
 
     return (
         <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative">
@@ -47,7 +48,10 @@ const AppShell = () => {
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-100">
+                        <button
+                            onClick={() => navigate('/app/account')}
+                            className="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-100 hover:bg-gray-50 rounded-xl transition-colors p-1"
+                        >
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-gray-900">Alex Johnson</p>
                                 <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Member</p>
@@ -57,7 +61,7 @@ const AppShell = () => {
                                 alt="Profile"
                                 className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm object-cover"
                             />
-                        </div>
+                        </button>
                     </div>
                 </header>
 
