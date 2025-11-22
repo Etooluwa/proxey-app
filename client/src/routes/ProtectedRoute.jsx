@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 
-function ProtectedRoute({ requireProfile = true }) {
+function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
   const { session, loading, isProfileComplete } = useSession();
   const location = useLocation();
 
@@ -23,11 +23,16 @@ function ProtectedRoute({ requireProfile = true }) {
     );
   }
 
+  if (allowedRoles && !allowedRoles.includes(session.user.role)) {
+    // Redirect to the correct dashboard based on their actual role
+    return <Navigate to={session.user.role === 'client' ? '/app' : '/provider'} replace />;
+  }
+
   if (requireProfile && !isProfileComplete && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 
-  return <Outlet />;
+  return children ? children : <Outlet />;
 }
 
 export default ProtectedRoute;

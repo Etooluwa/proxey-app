@@ -17,6 +17,7 @@ import AppDashboard from './pages/AppDashboard';
 import BookingsPage from './pages/BookingsPage';
 import MessagesPage from './pages/MessagesPage';
 import AccountPage from './pages/AccountPage';
+import ProviderPublicProfile from './pages/ProviderPublicProfile';
 
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -51,6 +52,7 @@ function App() {
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="account" element={<AccountPage />} />
+            <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
           </Route>
 
           {/* Provider Routes */}

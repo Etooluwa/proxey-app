@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/authContext';
 export const Sidebar = ({ role }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { signOut } = useAuth();
+    const { logout } = useAuth();
 
     const clientLinks = [
         { id: 'home', path: '/app', label: 'Home', icon: Icons.Dashboard },
@@ -27,7 +27,7 @@ export const Sidebar = ({ role }) => {
     const links = role === 'client' ? clientLinks : providerLinks;
 
     const handleLogout = async () => {
-        await signOut();
+        await logout();
         navigate('/auth/sign-in');
     };
 
