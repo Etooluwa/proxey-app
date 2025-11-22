@@ -1,5 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
+import { useSession } from '../../auth/authContext';
+import { SERVICE_CATEGORIES } from '../../utils/categories';
 
 const REVIEWS = [
     {
@@ -36,6 +39,16 @@ const PORTFOLIO_IMAGES = [
 ];
 
 const ProviderProfile = () => {
+    const { profile, session, logout } = useSession();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/auth/sign-in');
+    };
+
+    const categoryLabel = SERVICE_CATEGORIES.find(c => c.id === profile?.category)?.label || profile?.category || 'Service Provider';
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-10">
 
@@ -53,9 +66,9 @@ const ProviderProfile = () => {
                         <div className="flex items-end gap-6">
                             <div className="relative">
                                 <img
-                                    src="https://picsum.photos/seed/jane/200/200"
+                                    src={profile?.photo || "https://picsum.photos/seed/jane/200/200"}
                                     alt="Provider"
-                                    className="w-32 h-32 rounded-2xl border-4 border-white shadow-lg object-cover"
+                                    className="w-32 h-32 rounded-2xl border-4 border-white shadow-lg object-cover bg-gray-100"
                                 />
                                 <button className="absolute bottom-2 right-2 p-2 bg-white rounded-lg shadow-md text-gray-600 hover:text-brand-600 transition-colors">
                                     <Icons.Camera size={14} />
@@ -63,11 +76,11 @@ const ProviderProfile = () => {
                             </div>
                             <div className="mb-2">
                                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    Jane Doe <Icons.Check size={20} className="text-blue-500 fill-current" />
+                                    {profile?.name || 'Provider Name'} <Icons.Check size={20} className="text-blue-500 fill-current" />
                                 </h1>
-                                <p className="text-brand-600 font-medium">Professional Home Cleaner</p>
+                                <p className="text-brand-600 font-medium">{categoryLabel}</p>
                                 <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                                    <span className="flex items-center gap-1"><Icons.MapPin size={14} /> San Francisco, CA</span>
+                                    <span className="flex items-center gap-1"><Icons.MapPin size={14} /> {profile?.city || 'Location'}</span>
                                     <span className="flex items-center gap-1"><Icons.Star size={14} className="text-yellow-400 fill-current" /> 4.9 (128 reviews)</span>
                                 </div>
                             </div>
@@ -109,15 +122,15 @@ const ProviderProfile = () => {
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
                                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                    <span className="text-sm text-gray-700">jane.doe@example.com</span>
+                                    <span className="text-sm text-gray-700">{session?.user?.email}</span>
                                     <Icons.Check size={14} className="text-green-500" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone</label>
                                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                    <span className="text-sm text-gray-700">+1 (555) 012-3456</span>
-                                    <Icons.Check size={14} className="text-green-500" />
+                                    <span className="text-sm text-gray-700">{profile?.phone || 'Not provided'}</span>
+                                    {profile?.phone && <Icons.Check size={14} className="text-green-500" />}
                                 </div>
                             </div>
                         </div>
@@ -136,7 +149,7 @@ const ProviderProfile = () => {
                             </div>
                             <div className="relative z-10 flex flex-col items-center text-gray-500 group-hover:text-brand-600 transition-colors">
                                 <Icons.Map size={32} />
-                                <span className="text-xs font-bold mt-2">San Francisco + 10 miles</span>
+                                <span className="text-xs font-bold mt-2">{profile?.city || 'City'} + 10 miles</span>
                             </div>
                         </div>
                     </div>
@@ -167,7 +180,7 @@ const ProviderProfile = () => {
                         </div>
                         <textarea
                             className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 leading-relaxed focus:ring-2 focus:ring-brand-100 focus:border-brand-300 outline-none resize-none"
-                            defaultValue="Hi, I'm Jane! I have over 5 years of experience in professional home cleaning. I specialize in deep cleaning, move-in/move-out services, and eco-friendly cleaning solutions. I take pride in my attention to detail and treating your home with the utmost respect."
+                            defaultValue="Hi! I have over 5 years of experience. I take pride in my attention to detail and treating your home with the utmost respect."
                         />
                     </div>
 
@@ -234,7 +247,10 @@ const ProviderProfile = () => {
                     {/* Account Actions - Moved to bottom */}
                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
                         <h3 className="font-bold text-gray-900 mb-4">Account</h3>
-                        <button className="w-full flex items-center justify-center gap-2 text-red-600 font-bold bg-red-50 py-3 rounded-xl hover:bg-red-100 transition-colors">
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-center gap-2 text-red-600 font-bold bg-red-50 py-3 rounded-xl hover:bg-red-100 transition-colors"
+                        >
                             <Icons.LogOut size={20} />
                             Log Out
                         </button>

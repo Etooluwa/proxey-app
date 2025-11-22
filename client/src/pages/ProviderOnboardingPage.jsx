@@ -27,11 +27,16 @@ function ProviderOnboardingPage() {
   const completeOnboarding = async () => {
     try {
       // In a real app, we might verify the stripe status here
-      // For now, we update the profile as complete
+      // For now, we update the profile as complete with all form data
       await updateProfile({
+        name: form.name,
+        category: form.category,
+        city: form.city,
+        services: form.services,
+        availability: form.availability,
         isProfileComplete: true,
         onboardingCompletedAt: new Date().toISOString()
-      });
+      }, form.photo); // Pass photo file for upload
 
       toast.push({
         title: "Setup Complete!",
