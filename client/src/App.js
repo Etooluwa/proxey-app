@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/authContext';
 import { ToastProvider } from './components/ui/ToastProvider';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRedirect from './routes/RoleRedirect';
 
@@ -18,6 +19,7 @@ import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
 import AppDashboard from './pages/AppDashboard';
 import BookingsPage from './pages/BookingsPage';
 import MessagesPage from './pages/MessagesPage';
+import NotificationsPage from './pages/NotificationsPage';
 import AccountPage from './pages/AccountPage';
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
@@ -35,68 +37,73 @@ function App() {
     <Router>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/auth/sign-in" element={<SignIn />} />
-            <Route path="/auth/sign-up" element={<SignUp />} />
+          <NotificationProvider>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/auth/sign-in" element={<SignIn />} />
+              <Route path="/auth/sign-up" element={<SignUp />} />
 
-            {/* Root Redirect */}
-            <Route path="/" element={<RoleRedirect />} />
+              {/* Root Redirect */}
+              <Route path="/" element={<RoleRedirect />} />
 
-            {/* Client Onboarding Route */}
-            <Route
-              path="/onboarding"
-              element={
-                <ProtectedRoute allowedRoles={['client']} requireProfile={false}>
-                  <OnboardingPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Client Onboarding */}
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute allowedRoles={['client']} requireProfile={false}>
+                    <OnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Client Routes */}
-            <Route
-              path="/app"
-              element={
-                <ProtectedRoute allowedRoles={['client']}>
-                  <AppShell />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<AppDashboard />} />
-              <Route path="bookings" element={<BookingsPage />} />
-              <Route path="messages" element={<MessagesPage />} />
-              <Route path="account" element={<AccountPage />} />
-              <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
-            </Route>
+              {/* Client Routes */}
+              <Route
+                path="/app"
+                element={
+                  <ProtectedRoute allowedRoles={['client']}>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AppDashboard />} />
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="messages" element={<MessagesPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="account" element={<AccountPage />} />
+                <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
+              </Route>
 
-            {/* Provider Routes */}
-            <Route
-              path="/provider/onboarding"
-              element={
-                <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
-                  <ProviderOnboardingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider"
-              element={
-                <ProtectedRoute allowedRoles={['provider']}>
-                  <ProviderShell />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<ProviderDashboard />} />
-              <Route path="schedule" element={<ProviderSchedule />} />
-              <Route path="earnings" element={<ProviderEarnings />} />
-              <Route path="messages" element={<ProviderMessages />} />
-              <Route path="services" element={<ProviderServices />} />
-              <Route path="profile" element={<ProviderProfile />} />
-            </Route>
+              {/* Provider Onboarding */}
+              <Route
+                path="/provider/onboarding"
+                element={
+                  <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
+                    <ProviderOnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Catch all - Redirect to root which handles role redirection */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Provider Routes */}
+              <Route
+                path="/provider"
+                element={
+                  <ProtectedRoute allowedRoles={['provider']}>
+                    <ProviderShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<ProviderDashboard />} />
+                <Route path="schedule" element={<ProviderSchedule />} />
+                <Route path="earnings" element={<ProviderEarnings />} />
+                <Route path="messages" element={<ProviderMessages />} />
+                <Route path="services" element={<ProviderServices />} />
+                <Route path="profile" element={<ProviderProfile />} />
+              </Route>
+
+              {/* Catch all - Redirect to root which handles role redirection */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </NotificationProvider>
         </ToastProvider>
       </AuthProvider>
     </Router>

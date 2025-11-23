@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/ui/Button";
 import StepIndicator from "../components/ui/StepIndicator";
 import { useSession } from "../auth/authContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import { useToast } from "../components/ui/ToastProvider";
 import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
 import PaymentMethodScreen from "../components/payment/PaymentMethodScreen";
@@ -10,12 +11,12 @@ import { SERVICE_CATEGORIES } from "../utils/categories";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
-  const { updateProfile } = useSession();
+  const { updateProfile, session } = useSession();
+  const { addNotification } = useNotifications();
   const toast = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  const { session } = useSession();
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState({
     name: "",
@@ -82,6 +83,13 @@ function OnboardingPage() {
         title: "Profile created!",
         description: "Welcome to Proxey! Let's get started.",
         variant: "success",
+      });
+
+      // Add Welcome Notification
+      addNotification({
+        title: "Welcome to Kliques!",
+        message: "We're excited to have you on board. Explore services and book your first appointment today!",
+        type: "welcome"
       });
 
       // Navigate to app
@@ -280,8 +288,8 @@ function OnboardingPage() {
                     }));
                   }}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${isSelected
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-gray-100 bg-white hover:border-gray-200'
+                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                    : 'border-gray-100 bg-white hover:border-gray-200'
                     }`}
                 >
                   <div className="font-bold text-sm">{cat.label}</div>
@@ -338,6 +346,7 @@ function OnboardingPage() {
                       description: "Your payment method is ready to use",
                       variant: "success",
                     });
+
                     setPaymentStep(2);
                   } catch (error) {
                     console.error("Error saving payment method:", error);
