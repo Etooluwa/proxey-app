@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../components/Icons';
+import { useSession } from '../auth/authContext';
+import { useToast } from '../components/ui/ToastProvider';
 
 const TRANSACTIONS = [
     { id: 't1', date: 'Oct 24, 2023', service: 'Deep Home Cleaning', provider: 'Sarah Jenkins', amount: 120.00, status: 'PAID', method: 'Visa ••4242' },
@@ -13,16 +15,23 @@ const TRANSACTIONS = [
     { id: 't9', date: 'Mar 02, 2023', service: 'Carpet Cleaning', provider: 'Clean Pro', amount: 80.00, status: 'PAID', method: 'Visa ••4242' },
 ];
 
-const MOCK_PROFILE = {
-    firstName: 'Alex',
-    lastName: 'Johnson',
-    email: 'alex.johnson@example.com',
-    phone: '(555) 123-4567',
-    bio: 'Just a regular person looking for great services.',
-};
+
 
 const AccountPage = () => {
-    const [profileData, setProfileData] = useState(MOCK_PROFILE);
+    const { session, profile, updateProfile } = useSession();
+    const toast = useToast();
+
+    // Initialize state with profile data or defaults
+    const [profileData, setProfileData] = useState({
+        firstName: profile?.name?.split(' ')[0] || '',
+        lastName: profile?.name?.split(' ').slice(1).join(' ') || '',
+        email: profile?.email || session?.user?.email || '',
+        phone: profile?.phone || '',
+        bio: profile?.bio || 'Just a regular person looking for great services.',
+        photo: profile?.photo || null,
+        stripePaymentMethodId: profile?.stripePaymentMethodId || null
+    });
+
     const [viewMode, setViewMode] = useState('MAIN');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
@@ -30,6 +39,22 @@ const AccountPage = () => {
     // Profile Edit State
     const [isEditing, setIsEditing] = useState(false);
     const [tempProfileData, setTempProfileData] = useState(profileData);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Update local state when profile changes (e.g. initial load)
+    useEffect(() => {
+        if (profile) {
+            setProfileData({
+                firstName: profile.name?.split(' ')[0] || '',
+                lastName: profile.name?.split(' ').slice(1).join(' ') || '',
+                email: profile.email || session?.user?.email || '',
+                phone: profile.phone || '',
+                bio: profile.bio || 'Just a regular person looking for great services.',
+                photo: profile.photo || null,
+                stripePaymentMethodId: profile.stripePaymentMethodId || null
+            });
+        }
+    }, [profile, session]);
 
     useEffect(() => {
         if (!isEditing) {
@@ -42,9 +67,35 @@ const AccountPage = () => {
         setIsEditing(true);
     };
 
-    const handleSaveClick = () => {
-        setProfileData(tempProfileData);
-        setIsEditing(false);
+    const handleSaveClick = async () => {
+        setIsSaving(true);
+        try {
+            const fullName = `${tempProfileData.firstName} ${tempProfileData.lastName}`.trim();
+
+            await updateProfile({
+                name: fullName,
+                email: tempProfileData.email,
+                phone: tempProfileData.phone,
+                bio: tempProfileData.bio
+            });
+
+            setProfileData(tempProfileData);
+            setIsEditing(false);
+            toast.push({
+                title: "Profile updated",
+                description: "Your changes have been saved successfully.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error("Failed to update profile:", error);
+            toast.push({
+                title: "Update failed",
+                description: "Could not save changes. Please try again.",
+                variant: "error"
+            });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleCancelClick = () => {
@@ -99,8 +150,8 @@ const AccountPage = () => {
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
                                 className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${statusFilter === status
-                                        ? 'bg-white text-gray-900 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 {status.charAt(0) + status.slice(1).toLowerCase()}
@@ -140,7 +191,7 @@ const AccountPage = () => {
                                             </td>
                                             <td className="p-6">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${tx.status === 'PAID' ? 'bg-green-50 text-green-600 border-green-100' :
-                                                        'bg-red-50 text-red-500 border-red-100'
+                                                    'bg-red-50 text-red-500 border-red-100'
                                                     }`}>
                                                     {tx.status}
                                                 </span>
@@ -191,7 +242,7 @@ const AccountPage = () => {
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
                         <div className="relative inline-block mb-4">
                             <img
-                                src="https://picsum.photos/seed/alex/150/150"
+                                src={profileData.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.firstName + ' ' + profileData.lastName)}&background=random`}
                                 alt="Profile"
                                 className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
                             />
@@ -254,7 +305,9 @@ const AccountPage = () => {
                             {isEditing ? (
                                 <div className="flex gap-2">
                                     <button onClick={handleCancelClick} className="px-3 py-1 rounded-lg text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
-                                    <button onClick={handleSaveClick} className="px-4 py-1 rounded-lg text-sm font-bold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-sm">Save</button>
+                                    <button onClick={handleSaveClick} disabled={isSaving} className="px-4 py-1 rounded-lg text-sm font-bold bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-sm disabled:opacity-50">
+                                        {isSaving ? 'Saving...' : 'Save'}
+                                    </button>
                                 </div>
                             ) : (
                                 <button onClick={handleEditClick} className="text-sm text-brand-600 font-bold hover:underline">Edit</button>
@@ -328,18 +381,24 @@ const AccountPage = () => {
                                 + Add New
                             </button>
                         </div>
-                        <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-8 bg-gray-900 rounded text-white flex items-center justify-center text-[10px] font-bold tracking-widest">
-                                    VISA
+                        {profileData.stripePaymentMethodId ? (
+                            <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-8 bg-gray-900 rounded text-white flex items-center justify-center text-[10px] font-bold tracking-widest">
+                                        CARD
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-800 text-sm">Payment Method Saved</p>
+                                        <p className="text-xs text-gray-500">Ready for bookings</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-gray-800 text-sm">•••• •••• •••• 4242</p>
-                                    <p className="text-xs text-gray-500">Expires 12/25</p>
-                                </div>
+                                <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">DEFAULT</span>
                             </div>
-                            <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">DEFAULT</span>
-                        </div>
+                        ) : (
+                            <div className="text-center py-6 text-gray-500 text-sm">
+                                No payment methods added yet.
+                            </div>
+                        )}
                     </div>
 
                     {/* Transaction History Preview */}

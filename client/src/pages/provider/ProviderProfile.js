@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { useSession } from '../../auth/authContext';
 import { SERVICE_CATEGORIES } from '../../utils/categories';
+import { useToast } from '../../components/ui/ToastProvider';
 
 const REVIEWS = [
     {
@@ -39,12 +40,45 @@ const PORTFOLIO_IMAGES = [
 ];
 
 const ProviderProfile = () => {
-    const { profile, session, logout } = useSession();
+    const { profile, session, logout, updateProfile } = useSession();
     const navigate = useNavigate();
+    const toast = useToast();
+
+    const [bio, setBio] = useState(profile?.bio || "Hi! I have over 5 years of experience. I take pride in my attention to detail and treating your home with the utmost respect.");
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (profile?.bio) {
+            setBio(profile.bio);
+        }
+    }, [profile]);
 
     const handleLogout = async () => {
         await logout();
         navigate('/auth/sign-in');
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateProfile({
+                bio: bio
+            });
+            toast.push({
+                title: "Profile updated",
+                description: "Your changes have been saved.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error("Failed to update profile:", error);
+            toast.push({
+                title: "Update failed",
+                description: "Could not save changes.",
+                variant: "error"
+            });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const categoryLabel = SERVICE_CATEGORIES.find(c => c.id === profile?.category)?.label || profile?.category || 'Service Provider';
@@ -90,8 +124,12 @@ const ProviderProfile = () => {
                             <button className="px-6 py-2.5 border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors">
                                 Preview Public View
                             </button>
-                            <button className="px-6 py-2.5 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors shadow-lg shadow-brand-200">
-                                Save Changes
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="px-6 py-2.5 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 transition-colors shadow-lg shadow-brand-200 disabled:opacity-50"
+                            >
+                                {isSaving ? 'Saving...' : 'Save Changes'}
                             </button>
                         </div>
                     </div>
@@ -168,6 +206,26 @@ const ProviderProfile = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Services */}
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-900">My Services</h3>
+                            <button onClick={() => navigate('/provider/services')} className="text-brand-600 text-xs font-bold hover:underline">Edit</button>
+                        </div>
+                        <div className="space-y-3">
+                            {profile?.services && profile.services.length > 0 ? (
+                                profile.services.map((service, index) => (
+                                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                        <span className="font-medium text-gray-700 text-sm">{service.name}</span>
+                                        <span className="font-bold text-gray-900 text-sm">${service.price}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-gray-500 italic">No services added yet.</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Middle/Right Column: Content */}
@@ -179,8 +237,10 @@ const ProviderProfile = () => {
                             <h3 className="text-xl font-bold text-gray-900">About Me</h3>
                         </div>
                         <textarea
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
                             className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 leading-relaxed focus:ring-2 focus:ring-brand-100 focus:border-brand-300 outline-none resize-none"
-                            defaultValue="Hi! I have over 5 years of experience. I take pride in my attention to detail and treating your home with the utmost respect."
+                            placeholder="Tell clients about yourself..."
                         />
                     </div>
 
