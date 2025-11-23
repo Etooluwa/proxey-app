@@ -52,15 +52,10 @@ function SignUpPage() {
           "Your account is ready. Check your inbox if email confirmation is required.",
         variant: "success",
       });
-      if (result?.session) {
-        const onboardingPath = role === "provider" ? "/provider/onboarding" : "/onboarding";
-        navigate(onboardingPath, { replace: true });
-      } else {
-        navigate("/auth/sign-in", {
-          replace: true,
-          state: { role, email },
-        });
-      }
+      // Always navigate to onboarding after signup (regardless of whether session exists immediately)
+      // For email confirmation flows, the session will be set once user confirms their email
+      const onboardingPath = role === "provider" ? "/provider/onboarding" : "/onboarding";
+      navigate(onboardingPath, { replace: true });
     } catch (error) {
       setFormError(error.message || "Failed to create account.");
       toast.push({

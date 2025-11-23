@@ -426,7 +426,11 @@ function OnboardingPage() {
 
       {/* Step Content */}
       <div className="onboarding__main">
-        {renderStepContent()}
+        {renderStepContent() || (
+          <div className="onboarding__content">
+            <p>Loading...</p>
+          </div>
+        )}
 
         {/* Next/Save Button */}
         {paymentStep !== 1 && (
