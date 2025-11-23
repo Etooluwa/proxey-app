@@ -62,7 +62,6 @@ const ProviderShell = () => {
                         >
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-gray-900">{displayName}</p>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">{displayRole}</p>
                             </div>
                             <img
                                 src={displayPhoto}
