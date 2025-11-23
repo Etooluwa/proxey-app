@@ -1,6 +1,6 @@
 :root {
-  --teal: #5b4ae6;
-  --teal-pressed: #4737d1;
+  --teal: #F58027;
+  --teal-pressed: #E67420;
   --ink: #0e0f11;
   --text: #2f3a3a;
   --muted: #6b7c7c;
@@ -49,7 +49,7 @@ body {
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  background: #b2cb6a;
+  background: #F58027;
   color: var(--surface);
   display: grid;
   place-items: center;
@@ -104,7 +104,7 @@ body {
 }
 
 .login-signup__mode-btn--active {
-  background: rgba(16, 231, 225, 0.14);
+  background: rgba(245, 128, 39, 0.14);
   color: var(--text);
 }
 
@@ -138,14 +138,14 @@ body {
 }
 
 .login-signup__role:focus-visible {
-  outline: 3px solid rgba(16, 231, 225, 0.5);
+  outline: 3px solid rgba(245, 128, 39, 0.5);
   outline-offset: 2px;
 }
 
 .login-signup__role--active {
   background: var(--teal);
   color: var(--surface);
-  box-shadow: 0 8px 24px rgba(16, 231, 225, 0.35);
+  box-shadow: 0 8px 24px rgba(245, 128, 39, 0.35);
 }
 
 .login-signup__input {
@@ -161,10 +161,10 @@ body {
 }
 
 .login-signup__input:focus-visible {
-  outline: 3px solid rgba(16, 231, 225, 0.45);
+  outline: 3px solid rgba(245, 128, 39, 0.45);
   outline-offset: 1px;
   border-color: var(--teal);
-  box-shadow: 0 0 0 4px rgba(16, 231, 225, 0.18);
+  box-shadow: 0 0 0 4px rgba(245, 128, 39, 0.18);
 }
 
 .login-signup__error {

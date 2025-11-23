@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { CATEGORIES, TOP_PROVIDERS, CLIENT_BOOKINGS } from '../constants';
 
@@ -418,8 +419,8 @@ const LeaveReviewView = ({ booking, onBack, onSuccess }) => {
                                 <Icons.Star
                                     size={40}
                                     className={`transition-colors ${(hoverRating || rating) >= star
-                                            ? 'text-yellow-400 fill-current'
-                                            : 'text-gray-200'
+                                        ? 'text-yellow-400 fill-current'
+                                        : 'text-gray-200'
                                         }`}
                                 />
                             </button>
@@ -467,6 +468,7 @@ const LeaveReviewView = ({ booking, onBack, onSuccess }) => {
 // --- MAIN COMPONENT ---
 
 const BookingsPage = () => {
+    const navigate = useNavigate();
     const [bookings, setBookings] = useState(CLIENT_BOOKINGS);
     const [activeFilter, setActiveFilter] = useState('UPCOMING');
 
@@ -559,7 +561,10 @@ const BookingsPage = () => {
                     <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
                     <p className="text-gray-500 text-sm">Manage your appointments and history</p>
                 </div>
-                <button className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-brand-600 transition-colors shadow-lg shadow-gray-200">
+                <button
+                    onClick={() => navigate('/app')}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-brand-600 transition-colors shadow-lg shadow-gray-200"
+                >
                     + New Booking
                 </button>
             </div>
@@ -571,8 +576,8 @@ const BookingsPage = () => {
                         key={tab}
                         onClick={() => setActiveFilter(tab)}
                         className={`px-6 py-3 text-sm font-bold transition-all relative ${activeFilter === tab
-                                ? 'text-brand-600'
-                                : 'text-gray-400 hover:text-gray-600'
+                            ? 'text-brand-600'
+                            : 'text-gray-400 hover:text-gray-600'
                             }`}
                     >
                         {tab.charAt(0) + tab.slice(1).toLowerCase()}
@@ -602,9 +607,9 @@ const BookingsPage = () => {
                                     <div className="flex justify-between items-start mb-2">
                                         <h3 className="text-lg font-bold text-gray-900">{booking.serviceName}</h3>
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                                                booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                    booking.status === 'completed' ? 'bg-gray-100 text-gray-600' :
-                                                        'bg-red-50 text-red-500'
+                                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                booking.status === 'completed' ? 'bg-gray-100 text-gray-600' :
+                                                    'bg-red-50 text-red-500'
                                             }`}>
                                             {booking.status}
                                         </span>

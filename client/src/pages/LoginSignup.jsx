@@ -118,9 +118,9 @@ export default function LoginSignup({ onLogin, onSignup }) {
     <main className="login-signup">
       <div className="login-signup__container">
         <div className="login-signup__logo" aria-hidden="true">
-          PROXEY
+          KLIQUES
         </div>
-        <h1 className="login-signup__heading">Welcome to Proxey</h1>
+        <h1 className="login-signup__heading">Welcome to Kliques</h1>
         <p className="login-signup__subheading">Sign in or create an account</p>
 
         <form className="login-signup__form" onSubmit={handleSubmit} noValidate>
