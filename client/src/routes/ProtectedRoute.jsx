@@ -32,7 +32,12 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
     return <Navigate to="/onboarding" replace />;
   }
 
-  return children ? children : <Outlet />;
+  // Render children if provided, otherwise use outlet for nested routes
+  if (children) {
+    return children;
+  }
+
+  return <Outlet />;
 }
 
 export default ProtectedRoute;
