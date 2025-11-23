@@ -44,7 +44,7 @@ function ProviderOnboardingPage() {
         variant: "success",
       });
 
-      navigate("/provider/profile");
+      navigate("/provider");
     } catch (error) {
       console.error("Failed to complete onboarding", error);
       toast.push({

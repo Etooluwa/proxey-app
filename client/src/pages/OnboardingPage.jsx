@@ -6,6 +6,7 @@ import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
 import PaymentMethodScreen from "../components/payment/PaymentMethodScreen";
+import { SERVICE_CATEGORIES } from "../utils/categories";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
@@ -23,6 +24,7 @@ function OnboardingPage() {
     email: "",
     phone: "",
     defaultLocation: "",
+    serviceCategory: [],
     stripeClientSecret: null,
     stripeCustomerId: null,
   });
@@ -67,6 +69,7 @@ function OnboardingPage() {
           name: form.name,
           phone: form.phone,
           email: form.email,
+          serviceCategory: form.serviceCategory,
           defaultLocation: form.email, // Using email as placeholder for location
           stripeCustomerId: form.stripeCustomerId,
           paymentMethodSetupComplete: true,
@@ -95,51 +98,35 @@ function OnboardingPage() {
   };
 
   const handleNext = async () => {
-    // Validate step 1
+    // Validate step 1 (Profile Info)
     if (currentStep === 1) {
       if (!form.name.trim()) {
-        toast.push({
-          title: "Name required",
-          description: "Please enter your full name to continue.",
-          variant: "error",
-        });
+        toast.push({ title: "Name required", description: "Please enter your full name.", variant: "error" });
+        return;
+      }
+      if (!form.email.trim()) {
+        toast.push({ title: "Email required", description: "Please enter your email address.", variant: "error" });
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        toast.push({ title: "Invalid email", description: "Please enter a valid email address.", variant: "error" });
+        return;
+      }
+      if (!form.phone.trim()) {
+        toast.push({ title: "Phone required", description: "Please enter your phone number.", variant: "error" });
         return;
       }
       setCurrentStep(2);
       return;
     }
 
-    // Validate step 2
+    // Validate step 2 (Categories)
     if (currentStep === 2) {
-      if (!form.email.trim()) {
-        toast.push({
-          title: "Email required",
-          description: "Please enter your email address to continue.",
-          variant: "error",
-        });
+      if (form.serviceCategory.length === 0) {
+        toast.push({ title: "Category required", description: "Please select at least one service category.", variant: "error" });
         return;
       }
-
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(form.email)) {
-        toast.push({
-          title: "Invalid email",
-          description: "Please enter a valid email address.",
-          variant: "error",
-        });
-        return;
-      }
-
-      if (!form.phone.trim()) {
-        toast.push({
-          title: "Phone number required",
-          description: "Please enter your phone number to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
       setCurrentStep(3);
       return;
     }
@@ -238,20 +225,6 @@ function OnboardingPage() {
               />
             </label>
           </div>
-        </div>
-      );
-    }
-
-    if (currentStep === 2) {
-      return (
-        <div className="onboarding__content onboarding__content--step2">
-          {/* Step 2 Header */}
-          <div className="onboarding__step-header">
-            <h2 className="onboarding__step-title">Contact Details</h2>
-            <p className="onboarding__step-subtitle">
-              We'll use this to confirm your bookings.
-            </p>
-          </div>
 
           {/* Contact Fields */}
           <div className="onboarding__fields">
@@ -281,15 +254,54 @@ function OnboardingPage() {
       );
     }
 
+    if (currentStep === 2) {
+      return (
+        <div className="onboarding__content">
+          <div className="onboarding__step-header">
+            <h2 className="onboarding__step-title">What do you need help with?</h2>
+            <p className="onboarding__step-subtitle">
+              Select the services you're interested in.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {SERVICE_CATEGORIES.map((cat) => {
+              const isSelected = form.serviceCategory.includes(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      serviceCategory: isSelected
+                        ? prev.serviceCategory.filter(id => id !== cat.id)
+                        : [...prev.serviceCategory, cat.id]
+                    }));
+                  }}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${isSelected
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-gray-100 bg-white hover:border-gray-200'
+                    }`}
+                >
+                  <div className="font-bold text-sm">{cat.label}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (currentStep === 3) {
       // Step 3a: Initial payment method prompt
       if (paymentStep === 0) {
         return (
-        <div className="onboarding__content onboarding__content--step3">
-          <div className="onboarding__payment-section">
-            {/* Icon */}
-            <div className="onboarding__payment-icon-large">
-              <svg viewBox="0 0 24 24" fill="currentColor">
+          <div className="onboarding__content onboarding__content--step3">
+            <div className="onboarding__payment-section">
+              {/* Icon */}
+              <div className="onboarding__payment-icon-large">
+                <svg viewBox="0 0 24 24" fill="currentColor">
                   <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
                 </svg>
               </div>
