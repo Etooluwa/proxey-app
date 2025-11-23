@@ -93,6 +93,7 @@ function App() {
                 }
               >
                 <Route index element={<ProviderDashboard />} />
+                <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="schedule" element={<ProviderSchedule />} />
                 <Route path="earnings" element={<ProviderEarnings />} />
                 <Route path="messages" element={<ProviderMessages />} />

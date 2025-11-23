@@ -216,9 +216,15 @@ const ProviderProfile = () => {
                         <div className="space-y-3">
                             {profile?.services && profile.services.length > 0 ? (
                                 profile.services.map((service, index) => (
-                                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                                        <span className="font-medium text-gray-700 text-sm">{service.name}</span>
-                                        <span className="font-bold text-gray-900 text-sm">${service.price}</span>
+                                    <div key={index} className="p-3 bg-gray-50 rounded-xl">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="font-medium text-gray-700 text-sm">{service.name}</span>
+                                            <span className="font-bold text-gray-900 text-sm">${service.price}</span>
+                                        </div>
+                                        {service.description && (
+                                            <p className="text-xs text-gray-500 line-clamp-2">{service.description}</p>
+                                        )}
+                                        <div className="text-xs text-gray-400 mt-1">{service.duration} min</div>
                                     </div>
                                 ))
                             ) : (

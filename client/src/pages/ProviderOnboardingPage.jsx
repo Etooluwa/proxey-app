@@ -3,12 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Button from "../components/ui/Button";
 import StepIndicator from "../components/ui/StepIndicator";
 import { useSession } from "../auth/authContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import { useToast } from "../components/ui/ToastProvider";
 import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
 import "../styles/providerOnboarding.css";
 
 function ProviderOnboardingPage() {
   const { updateProfile, session } = useSession();
+  const { addNotification } = useNotifications();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,6 +44,13 @@ function ProviderOnboardingPage() {
         title: "Setup Complete!",
         description: "Your provider profile is now active.",
         variant: "success",
+      });
+
+      // Add Welcome Notification
+      addNotification({
+        title: "Welcome to Kliques Pro!",
+        message: "Your provider profile is live. Start managing your services and bookings.",
+        type: "welcome"
       });
 
       navigate("/provider");

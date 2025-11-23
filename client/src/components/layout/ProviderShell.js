@@ -6,11 +6,13 @@ import { Icons } from '../Icons';
 import { SERVICE_CATEGORIES } from '../../utils/categories';
 
 import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 const ProviderShell = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile } = useSession();
+    const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'Provider';
     const displayRole = profile?.category ? SERVICE_CATEGORIES.find(c => c.id === profile.category)?.label || 'Provider' : 'Provider';
@@ -48,12 +50,64 @@ const ProviderShell = () => {
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setNotificationsOpen(!notificationsOpen);
+                                    if (!notificationsOpen && unreadCount > 0) {
+                                        markAllAsRead();
+                                    }
                                 }}
                                 className={`relative p-2 rounded-full transition-colors ${notificationsOpen ? 'bg-brand-50 text-brand-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
                             >
                                 <Icons.Bell size={20} />
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                                )}
                             </button>
+
+                            {/* Notification Dropdown */}
+                            {notificationsOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="p-4 border-b border-gray-50 flex justify-between items-center">
+                                        <h3 className="font-bold text-gray-900">Notifications</h3>
+                                        {unreadCount > 0 && (
+                                            <button onClick={markAllAsRead} className="text-xs font-bold text-brand-600 hover:text-brand-700">
+                                                Mark all read
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-96 overflow-y-auto">
+                                        {notifications.length > 0 ? (
+                                            notifications.slice(0, 5).map((notification) => (
+                                                <div key={notification.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/30' : ''}`}>
+                                                    <div className="flex gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${!notification.read ? 'bg-brand-100 text-brand-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                            <Icons.Bell size={14} />
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-sm ${!notification.read ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>{notification.title}</p>
+                                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notification.message}</p>
+                                                            <p className="text-[10px] text-gray-400 mt-2">{new Date(notification.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-8 text-center text-gray-400">
+                                                <p className="text-sm">No notifications yet</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-3 bg-gray-50 text-center border-t border-gray-100">
+                                        <button
+                                            onClick={() => {
+                                                setNotificationsOpen(false);
+                                                navigate('/provider/notifications');
+                                            }}
+                                            className="text-sm font-bold text-brand-600 hover:text-brand-700"
+                                        >
+                                            See All
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <button

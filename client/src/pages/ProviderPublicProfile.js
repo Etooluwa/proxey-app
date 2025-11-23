@@ -492,8 +492,8 @@ const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => 
                                     key={slot}
                                     onClick={() => setSelectedTime(slot)}
                                     className={`py-3 md:py-4 px-3 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${selectedTime === slot
-                                            ? 'border-brand-500 bg-brand-600 text-white shadow-lg shadow-brand-200'
-                                            : 'border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700'
+                                        ? 'border-brand-500 bg-brand-600 text-white shadow-lg shadow-brand-200'
+                                        : 'border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700'
                                         }`}
                                 >
                                     {selectedTime === slot && <Icons.Check size={16} />}
@@ -744,6 +744,30 @@ const ProviderPublicProfile = () => {
                         </div>
                     </div>
 
+                    {/* Services */}
+                    <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
+                        <h2 className="text-xl font-bold text-gray-900 mb-6">Services</h2>
+                        <div className="space-y-4">
+                            {displayServices.map((service) => (
+                                <div key={service.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-brand-200 transition-colors cursor-pointer" onClick={() => { setSelectedService(service.id); setViewMode('CALENDAR'); }}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-bold text-gray-900">{service.title}</h3>
+                                        <div className="text-right">
+                                            <span className="block font-bold text-brand-600">${service.price}</span>
+                                            <span className="text-xs text-gray-500">{service.duration}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                                        {service.description || "Professional service delivered with care and attention to detail."}
+                                    </p>
+                                    <button className="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                                        Book Now <Icons.ChevronRight size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Portfolio */}
                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
@@ -823,8 +847,8 @@ const ProviderPublicProfile = () => {
                                         key={s.id}
                                         onClick={() => setSelectedService(s.id)}
                                         className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedService === s.id
-                                                ? 'border-brand-500 bg-brand-50'
-                                                : 'border-gray-200 hover:border-brand-300'
+                                            ? 'border-brand-500 bg-brand-50'
+                                            : 'border-gray-200 hover:border-brand-300'
                                             }`}
                                     >
                                         <div className="flex justify-between items-center mb-1">
