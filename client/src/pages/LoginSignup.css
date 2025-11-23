@@ -245,12 +245,12 @@ body {
 }
 
 .login-signup__secondary:hover {
-  border-color: rgba(16, 231, 225, 0.4);
+  border-color: rgba(245, 128, 39, 0.4);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
 }
 
 .login-signup__secondary:focus-visible {
-  outline: 3px solid rgba(16, 231, 225, 0.4);
+  outline: 3px solid rgba(245, 128, 39, 0.4);
   outline-offset: 2px;
 }
 
