@@ -28,7 +28,7 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
     return <Navigate to={session.user.role === 'client' ? '/app' : '/provider'} replace />;
   }
 
-  if (requireProfile && !isProfileComplete && location.pathname !== "/onboarding") {
+  if (requireProfile && !isProfileComplete && location.pathname !== "/onboarding" && location.pathname !== "/provider/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 

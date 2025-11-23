@@ -20,6 +20,7 @@ import BookingsPage from './pages/BookingsPage';
 import MessagesPage from './pages/MessagesPage';
 import AccountPage from './pages/AccountPage';
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
+import OnboardingPage from './pages/OnboardingPage';
 
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -41,6 +42,16 @@ function App() {
 
             {/* Root Redirect */}
             <Route path="/" element={<RoleRedirect />} />
+
+            {/* Client Onboarding Route */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute allowedRoles={['client']} requireProfile={false}>
+                  <OnboardingPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Client Routes */}
             <Route
