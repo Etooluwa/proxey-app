@@ -121,7 +121,10 @@ const ProviderProfile = () => {
                         </div>
 
                         <div className="flex gap-3 mt-4 md:mt-0">
-                            <button className="px-6 py-2.5 border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors">
+                            <button
+                                onClick={() => navigate(`/preview/provider/${session?.user?.id || 'preview'}`)}
+                                className="px-6 py-2.5 border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                            >
                                 Preview Public View
                             </button>
                             <button
