@@ -3,10 +3,18 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
+import { SERVICE_CATEGORIES } from '../../utils/categories';
+
+import { useSession } from '../../auth/authContext';
 
 const ProviderShell = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const navigate = useNavigate();
+    const { session, profile } = useSession();
+
+    const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'Provider';
+    const displayRole = profile?.category ? SERVICE_CATEGORIES.find(c => c.id === profile.category)?.label || 'Provider' : 'Provider';
+    const displayPhoto = profile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
 
     return (
         <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative">
@@ -32,7 +40,7 @@ const ProviderShell = () => {
                     <div className="flex items-center gap-3 md:gap-6 relative">
                         <div className="hidden md:flex items-center gap-2 text-gray-400 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
                             <Icons.MapPin size={16} className="text-brand-500" />
-                            <span className="text-sm text-gray-600 font-medium">San Francisco, CA</span>
+                            <span className="text-sm text-gray-600 font-medium">{profile?.city || 'Location'}</span>
                         </div>
 
                         <div className="relative">
@@ -53,11 +61,11 @@ const ProviderShell = () => {
                             className="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-100 hover:bg-gray-50 rounded-xl transition-colors p-1"
                         >
                             <div className="text-right hidden md:block">
-                                <p className="text-sm font-bold text-gray-900">Jane Doe</p>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Provider</p>
+                                <p className="text-sm font-bold text-gray-900">{displayName}</p>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">{displayRole}</p>
                             </div>
                             <img
-                                src="https://picsum.photos/seed/jane/100/100"
+                                src={displayPhoto}
                                 alt="Profile"
                                 className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm object-cover"
                             />

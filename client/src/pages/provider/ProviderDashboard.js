@@ -14,9 +14,14 @@ import { Icons } from '../../components/Icons';
 import { StatCard } from '../../components/StatCard';
 import { EARNINGS_DATA, PROVIDER_REQUESTS } from '../../constants';
 
+import { useSession } from '../../auth/authContext';
+
 const ProviderDashboard = () => {
     const navigate = useNavigate();
+    const { profile } = useSession();
     const [requests] = useState(PROVIDER_REQUESTS); // Using mock data
+
+    const firstName = profile?.name?.split(' ')[0] || 'Provider';
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
@@ -25,7 +30,7 @@ const ProviderDashboard = () => {
             <div className="flex justify-between items-end">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-                    <p className="text-gray-500 mt-1">Welcome, Jane! You have {requests.length} new requests.</p>
+                    <p className="text-gray-500 mt-1">Welcome, {firstName}! You have {requests.length} new requests.</p>
                 </div>
                 <div className="flex gap-3">
                     <button
