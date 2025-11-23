@@ -141,7 +141,7 @@
 
 .provider-onboarding__input:focus {
   outline: none;
-  border-color: #13ecec;
+  border-color: #F58027;
   box-shadow: 0 0 0 3px rgba(19, 236, 236, 0.1);
 }
 
@@ -167,7 +167,7 @@
 
 .provider-onboarding__select:focus {
   outline: none;
-  border-color: #13ecec;
+  border-color: #F58027;
   box-shadow: 0 0 0 3px rgba(19, 236, 236, 0.1);
 }
 
@@ -235,7 +235,7 @@
 .provider-onboarding__suggestion-icon {
   width: 16px;
   height: 16px;
-  color: #13ecec;
+  color: #F58027;
   flex-shrink: 0;
 }
 
@@ -292,7 +292,7 @@
 }
 
 .provider-onboarding__photo-button:hover .provider-onboarding__photo-circle {
-  border-color: #13ecec;
+  border-color: #F58027;
   background: #e0f7f7;
 }
 
@@ -304,7 +304,7 @@
 }
 
 .provider-onboarding__photo-button:hover .provider-onboarding__photo-icon {
-  color: #13ecec;
+  color: #F58027;
 }
 
 .provider-onboarding__photo-preview {
@@ -320,7 +320,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #13ecec;
+  background: #F58027;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -379,7 +379,7 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #13ecec !important;
+  background: #F58027 !important;
   color: #102222 !important;
   border-radius: 12px;
   box-shadow: 0 10px 15px -3px rgba(19, 236, 236, 0.3),
@@ -388,7 +388,7 @@
 }
 
 .provider-onboarding__button:hover {
-  background: #11d4d4 !important;
+  background: #E67420 !important;
   transform: scale(1.02);
   box-shadow: 0 20px 25px -5px rgba(19, 236, 236, 0.35),
     0 10px 10px -5px rgba(19, 236, 236, 0.2);
@@ -437,9 +437,9 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 600;
-  color: #13ecec;
+  color: #F58027;
   background: #ffffff;
-  border: 2px dashed #13ecec;
+  border: 2px dashed #F58027;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -448,7 +448,7 @@
 
 .provider-onboarding__add-service-button:hover {
   background: #e0f7f7;
-  border-color: #11d4d4;
+  border-color: #E67420;
 }
 
 .provider-onboarding__add-service-button svg {
@@ -522,7 +522,7 @@
 .provider-onboarding__service-icon svg {
   width: 24px;
   height: 24px;
-  color: #13ecec;
+  color: #F58027;
 }
 
 .provider-onboarding__service-info {
@@ -706,13 +706,13 @@
   height: 48px;
   font-size: 1rem;
   font-weight: 700;
-  background: #13ecec !important;
+  background: #F58027 !important;
   color: #102222 !important;
   border-radius: 12px;
 }
 
 .provider-onboarding__modal-save:hover {
-  background: #11d4d4 !important;
+  background: #E67420 !important;
 }
 
 /* Step 4 - Availability */
@@ -749,8 +749,8 @@
 }
 
 .provider-onboarding__checkbox:checked {
-  background: #13ecec;
-  border-color: #13ecec;
+  background: #F58027;
+  border-color: #F58027;
 }
 
 .provider-onboarding__checkbox:checked::after {
@@ -767,7 +767,7 @@
 
 .provider-onboarding__checkbox:focus {
   outline: none;
-  border-color: #13ecec;
+  border-color: #F58027;
   box-shadow: 0 0 0 3px rgba(19, 236, 236, 0.1);
 }
 
@@ -821,7 +821,7 @@
 }
 
 .provider-onboarding__toggle:has(input:checked) {
-  background: #13ecec;
+  background: #F58027;
 }
 
 .provider-onboarding__toggle-input {
@@ -888,7 +888,7 @@
 
 .provider-onboarding__time-input:focus {
   outline: none;
-  border-color: #13ecec;
+  border-color: #F58027;
   box-shadow: 0 0 0 3px rgba(19, 236, 236, 0.1);
 }
 
@@ -942,7 +942,7 @@
 .provider-onboarding__stripe-icon {
   width: 64px;
   height: 64px;
-  color: #13ecec;
+  color: #F58027;
 }
 
 .provider-onboarding__stripe-title {
@@ -972,7 +972,7 @@
   font-size: 1rem;
   font-weight: 700;
   color: #ffffff;
-  background: #13ecec;
+  background: #F58027;
   border: none;
   border-radius: 12px;
   cursor: pointer;
@@ -982,7 +982,7 @@
 }
 
 .provider-onboarding__stripe-button:hover {
-  background: #11d4d4;
+  background: #E67420;
   transform: scale(1.02);
   box-shadow: 0 20px 25px -5px rgba(19, 236, 236, 0.35),
     0 10px 10px -5px rgba(19, 236, 236, 0.2);
