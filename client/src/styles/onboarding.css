@@ -97,7 +97,7 @@
 }
 
 .onboarding__photo-button:hover .onboarding__photo-circle {
-  border-color: #14b8a6;
+  border-color: #F58027;
 }
 
 .onboarding__photo-icon {
@@ -108,7 +108,7 @@
 }
 
 .onboarding__photo-button:hover .onboarding__photo-icon {
-  color: #14b8a6;
+  color: #F58027;
 }
 
 .onboarding__photo-preview {
@@ -124,7 +124,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #14b8a6;
+  background: #F58027;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +222,7 @@
 
 .onboarding__input:focus {
   outline: none;
-  border-color: #14b8a6;
+  border-color: #F58027;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
 }
 
@@ -243,13 +243,13 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #14b8a6 !important;
+  background: #F58027 !important;
   box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.2),
     0 4px 6px -2px rgba(20, 184, 166, 0.1);
 }
 
 .onboarding__button:hover {
-  background: #0f9d8e !important;
+  background: #E67420 !important;
   box-shadow: 0 20px 25px -5px rgba(20, 184, 166, 0.25),
     0 10px 10px -5px rgba(20, 184, 166, 0.1);
 }
@@ -299,7 +299,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #14b8a6;
+  color: #F58027;
   margin-bottom: 0.5rem;
 }
 
@@ -334,14 +334,14 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #14b8a6 !important;
+  background: #F58027 !important;
   border-radius: 9999px;
   box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
   margin-top: 1rem;
 }
 
 .onboarding__add-payment-button:hover {
-  background: #0f9d8e !important;
+  background: #E67420 !important;
   box-shadow: 0 15px 30px rgba(20, 184, 166, 0.4);
 }
 
@@ -359,7 +359,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #14b8a6;
+  color: #F58027;
   margin-bottom: 1rem;
 }
 
@@ -383,7 +383,7 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #14b8a6 !important;
+  background: #F58027 !important;
   color: #ffffff !important;
   border: none;
   border-radius: 9999px;
@@ -393,7 +393,7 @@
 }
 
 .onboarding__payment-add-button:hover {
-  background: #0f9d8e !important;
+  background: #E67420 !important;
   box-shadow: 0 15px 30px rgba(20, 184, 166, 0.4);
 }
 

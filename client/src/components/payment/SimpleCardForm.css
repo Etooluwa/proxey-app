@@ -47,7 +47,7 @@
 
 .simple-input:focus,
 .simple-stripe-field:focus-within {
-  border-color: #14b8a6;
+  border-color: #F58027;
   box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15);
   outline: none;
 }
@@ -69,7 +69,7 @@
 .simple-submit {
   width: 100%;
   min-height: 52px !important;
-  background: #14b8a6 !important;
+  background: #F58027 !important;
   color: #ffffff !important;
   border-radius: 12px;
 }

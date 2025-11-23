@@ -313,20 +313,6 @@ function OnboardingPage() {
               <p className="onboarding__payment-subtitle">
                 Adding a payment method now will allow for quick and seamless bookings in the future.
               </p>
-
-              {/* Add Payment Button - will trigger handleNext */}
-              <div className="onboarding__payment-action">
-                <button
-                  onClick={() => setPaymentStep(1)}
-                  className="onboarding__payment-add-button"
-                  type="button"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                  </svg>
-                  Add Payment Method
-                </button>
-              </div>
             </div>
           </div>
         );
@@ -383,13 +369,13 @@ function OnboardingPage() {
             <div className="onboarding__payment-section">
               {/* Success Icon */}
               <div className="onboarding__payment-success-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#14b8a6", width: "48px", height: "48px" }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#F58027", width: "48px", height: "48px" }}>
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                 </svg>
               </div>
 
               {/* Success Message */}
-              <p style={{ marginTop: "1rem", color: "#14b8a6", fontWeight: "500", fontSize: "1rem", textAlign: "center" }}>
+              <p style={{ marginTop: "1rem", color: "#F58027", fontWeight: "500", fontSize: "1rem", textAlign: "center" }}>
                 Card saved successfully!
               </p>
             </div>

@@ -119,12 +119,12 @@
 }
 
 .provider-profile__action-btn--primary {
-  background: #14b8a6;
+  background: #F58027;
   color: #0f172a;
 }
 
 .provider-profile__action-btn--primary:hover {
-  background: #0f9d8e;
+  background: #E67420;
   transform: translateY(-2px);
   box-shadow: 0 8px 16px rgba(20, 184, 166, 0.3);
 }
@@ -153,14 +153,14 @@
 .provider-profile__read-more {
   display: inline-block;
   font-weight: 700;
-  color: #14b8a6;
+  color: #F58027;
   text-decoration: none;
   cursor: pointer;
   transition: color 0.2s ease;
 }
 
 .provider-profile__read-more:hover {
-  color: #0f9d8e;
+  color: #E67420;
 }
 
 /* Services Section */
@@ -241,7 +241,7 @@
 .provider-profile__see-all {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #14b8a6;
+  color: #F58027;
   text-decoration: none;
   cursor: pointer;
 }
@@ -311,7 +311,7 @@
 
 .provider-profile__rating-bar {
   height: 100%;
-  background: #14b8a6;
+  background: #F58027;
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -368,7 +368,7 @@
 }
 
 .provider-profile__review-star--filled {
-  color: #14b8a6;
+  color: #F58027;
 }
 
 .provider-profile__review-text {
@@ -398,7 +398,7 @@
 .provider-profile__book-btn {
   width: 100%;
   min-height: 56px;
-  background: #14b8a6 !important;
+  background: #F58027 !important;
   color: #0f172a !important;
   font-weight: 700;
   border-radius: 12px;
@@ -409,7 +409,7 @@
 }
 
 .provider-profile__book-btn:hover:not(:disabled) {
-  background: #0f9d8e !important;
+  background: #E67420 !important;
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(20, 184, 166, 0.3);
 }
