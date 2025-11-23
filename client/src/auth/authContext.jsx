@@ -51,6 +51,9 @@ function persistProfile(userId, profile) {
 
 function isProfileCompleteShape(profile) {
     if (!profile) return false;
+    // If the profile explicitly has isProfileComplete flag, trust it
+    if (profile.isProfileComplete === true) return true;
+    // Otherwise, check for required fields (for legacy profiles or incomplete onboarding)
     return Boolean(profile.name && profile.phone && profile.defaultLocation);
 }
 
