@@ -31,7 +31,7 @@ export const Sidebar = ({ role }) => {
 
     const handleLogout = async () => {
         await logout();
-        navigate('/auth/sign-in');
+        navigate('/');
     };
 
     return (
