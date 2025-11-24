@@ -1,33 +1,34 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 
-const MOCK_CONVERSATIONS = [
+const INITIAL_CONVERSATIONS = [
     {
         id: '1',
+        providerId: 'p1',
         providerName: 'Sarah Jenkins',
         avatar: 'https://picsum.photos/seed/sarah/100/100',
         lastMessage: 'Great, see you on Thursday at 10!',
         time: '2m ago',
         unread: 2,
-        online: true,
     },
     {
         id: '2',
+        providerId: 'p2',
         providerName: 'Mike Ross',
         avatar: 'https://picsum.photos/seed/mike/100/100',
         lastMessage: 'Can you send me a photo of the leak?',
         time: '1h ago',
         unread: 0,
-        online: false,
     },
     {
         id: '3',
-        providerName: 'David Kim',
+        providerId: 'p5',
+        providerName: 'David Green',
         avatar: 'https://picsum.photos/seed/david/100/100',
         lastMessage: 'Thanks for the review!',
         time: '2d ago',
         unread: 0,
-        online: false,
     }
 ];
 
@@ -40,11 +41,20 @@ const MOCK_CHAT_HISTORY = [
 ];
 
 const MessagesPage = () => {
-    const [activeChat, setActiveChat] = useState(MOCK_CONVERSATIONS[0]);
+    const navigate = useNavigate();
+    const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
+    const [activeChat, setActiveChat] = useState(INITIAL_CONVERSATIONS[0]);
     const [showMobileChat, setShowMobileChat] = useState(false);
 
     const handleChatSelect = (chat) => {
-        setActiveChat(chat);
+        // Mark as read
+        const updatedConversations = conversations.map(c =>
+            c.id === chat.id ? { ...c, unread: 0 } : c
+        );
+        setConversations(updatedConversations);
+
+        // Update active chat with the read status
+        setActiveChat({ ...chat, unread: 0 });
         setShowMobileChat(true);
     };
 
@@ -66,18 +76,17 @@ const MessagesPage = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {MOCK_CONVERSATIONS.map((chat) => (
+                    {conversations.map((chat) => (
                         <div
                             key={chat.id}
                             onClick={() => handleChatSelect(chat)}
                             className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChat.id === chat.id
-                                    ? 'bg-brand-50/50 border-brand-500'
-                                    : 'border-transparent'
+                                ? 'bg-brand-50/50 border-brand-500'
+                                : 'border-transparent'
                                 }`}
                         >
                             <div className="relative">
                                 <img src={chat.avatar} alt={chat.providerName} className="w-12 h-12 rounded-full object-cover" />
-                                {chat.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
@@ -117,11 +126,12 @@ const MessagesPage = () => {
 
                         <img src={activeChat.avatar} alt={activeChat.providerName} className="w-10 h-10 rounded-full object-cover" />
                         <div>
-                            <h3 className="font-bold text-gray-900">{activeChat.providerName}</h3>
-                            <div className="flex items-center gap-1.5">
-                                <div className={`w-2 h-2 rounded-full ${activeChat.online ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                <span className="text-xs text-gray-500">{activeChat.online ? 'Online' : 'Offline'}</span>
-                            </div>
+                            <h3
+                                onClick={() => navigate(`/app/provider/${activeChat.providerId}`)}
+                                className="font-bold text-gray-900 cursor-pointer hover:text-brand-600 transition-colors"
+                            >
+                                {activeChat.providerName}
+                            </h3>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -140,8 +150,8 @@ const MessagesPage = () => {
                         <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[85%] md:max-w-[70%] ${msg.sender === 'me' ? 'items-end' : 'items-start'} flex flex-col`}>
                                 <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.sender === 'me'
-                                        ? 'bg-brand-500 text-white rounded-tr-sm'
-                                        : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'
+                                    ? 'bg-brand-500 text-white rounded-tr-sm'
+                                    : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'
                                     }`}>
                                     {msg.text}
                                 </div>
