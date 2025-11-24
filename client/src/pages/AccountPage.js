@@ -3,7 +3,12 @@ import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 import { useToast } from '../components/ui/ToastProvider';
 import { uploadProfilePhoto } from '../utils/photoUpload';
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import PaymentMethodModal from '../components/PaymentMethodModal';
+
+// Initialize Stripe (use your publishable key)
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
 
 const TRANSACTIONS = [
     { id: 't1', date: 'Oct 24, 2023', service: 'Deep Home Cleaning', provider: 'Sarah Jenkins', amount: 120.00, status: 'PAID', method: 'Visa ••4242' },
@@ -629,11 +634,13 @@ const AccountPage = () => {
 
             </div>
 
-            <PaymentMethodModal
-                isOpen={isPaymentModalOpen}
-                onClose={() => setIsPaymentModalOpen(false)}
-                onSuccess={handleAddPaymentMethod}
-            />
+            <Elements stripe={stripePromise}>
+                <PaymentMethodModal
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    onSuccess={handleAddPaymentMethod}
+                />
+            </Elements>
         </div>
     );
 };
