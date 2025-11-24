@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { TOP_PROVIDERS, PROVIDER_SERVICES } from '../constants';
+import { useBookings } from '../contexts/BookingContext';
 
 // --- MOCK CALENDAR DATA & UTILS ---
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -532,10 +533,15 @@ const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => 
     );
 }
 
+
+
+// ... (imports)
+
 // --- MAIN COMPONENT ---
 const ProviderPublicProfile = () => {
     const { providerId } = useParams();
     const navigate = useNavigate();
+    const { addBooking } = useBookings(); // Use context
     const [viewMode, setViewMode] = useState('PROFILE');
     const [selectedService, setSelectedService] = useState(null);
     const [selectedTimeLabel, setSelectedTimeLabel] = useState(null);
@@ -597,8 +603,12 @@ const ProviderPublicProfile = () => {
     };
 
     const onBook = (data) => {
-        // In a real app, this would save the booking to the backend
-        console.log('Booking created:', data);
+        // Add booking to context
+        addBooking({
+            ...data,
+            location: '123 Main St, San Francisco, CA', // Mock location for now
+            status: 'confirmed'
+        });
         navigate('/app/bookings');
     };
 

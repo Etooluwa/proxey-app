@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { CATEGORIES, TOP_PROVIDERS, CLIENT_BOOKINGS } from '../constants';
 
+import { useBookings } from '../contexts/BookingContext';
+
 const AppDashboard = () => {
     const navigate = useNavigate();
+    const { getUpcomingBookings } = useBookings();
+    const bookings = getUpcomingBookings();
     const [viewState, setViewState] = useState('HOME');
     const [selectedCategory, setSelectedCategory] = useState(null);
-    const [bookings] = useState(CLIENT_BOOKINGS); // Using mock data for now
 
     // Search States
     const [topSearchQuery, setTopSearchQuery] = useState('');

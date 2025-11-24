@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { CATEGORIES, TOP_PROVIDERS, CLIENT_BOOKINGS } from '../constants';
+import { useBookings } from '../contexts/BookingContext';
 
 // --- UTILS: CALENDAR LINK GENERATOR ---
 const generateCalendarLinks = (booking) => {
@@ -467,9 +468,13 @@ const LeaveReviewView = ({ booking, onBack, onSuccess }) => {
 
 // --- MAIN COMPONENT ---
 
+
+
+// ... (imports)
+
 const BookingsPage = () => {
     const navigate = useNavigate();
-    const [bookings, setBookings] = useState(CLIENT_BOOKINGS);
+    const { bookings, updateBooking } = useBookings();
     const [activeFilter, setActiveFilter] = useState('UPCOMING');
 
     // View States
@@ -480,7 +485,7 @@ const BookingsPage = () => {
     const [calendarBookingId, setCalendarBookingId] = useState(null);
 
     const handleUpdateBooking = (updatedBooking) => {
-        setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+        updateBooking(updatedBooking);
     };
 
     const filteredBookings = bookings.filter(booking => {
