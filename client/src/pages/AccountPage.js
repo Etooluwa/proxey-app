@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 import { useToast } from '../components/ui/ToastProvider';
+import { uploadProfilePhoto } from '../utils/photoUpload';
+import PaymentMethodModal from '../components/PaymentMethodModal';
 
 const TRANSACTIONS = [
     { id: 't1', date: 'Oct 24, 2023', service: 'Deep Home Cleaning', provider: 'Sarah Jenkins', amount: 120.00, status: 'PAID', method: 'Visa ••4242' },
@@ -20,6 +22,7 @@ const TRANSACTIONS = [
 const AccountPage = () => {
     const { session, profile, updateProfile } = useSession();
     const toast = useToast();
+    const fileInputRef = useRef(null);
 
     // Initialize state with profile data or defaults
     const [profileData, setProfileData] = useState({
@@ -29,7 +32,7 @@ const AccountPage = () => {
         phone: profile?.phone || '',
         bio: profile?.bio || 'Just a regular person looking for great services.',
         photo: profile?.photo || null,
-        stripePaymentMethodId: profile?.stripePaymentMethodId || null
+        paymentMethods: profile?.paymentMethods || []
     });
 
     const [viewMode, setViewMode] = useState('MAIN');
@@ -41,6 +44,12 @@ const AccountPage = () => {
     const [tempProfileData, setTempProfileData] = useState(profileData);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Photo Upload State
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+    // Payment Method State
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
     // Update local state when profile changes (e.g. initial load)
     useEffect(() => {
         if (profile) {
@@ -51,7 +60,7 @@ const AccountPage = () => {
                 phone: profile.phone || '',
                 bio: profile.bio || 'Just a regular person looking for great services.',
                 photo: profile.photo || null,
-                stripePaymentMethodId: profile.stripePaymentMethodId || null
+                paymentMethods: profile.paymentMethods || []
             });
         }
     }, [profile, session]);
@@ -101,6 +110,131 @@ const AccountPage = () => {
     const handleCancelClick = () => {
         setIsEditing(false);
         setTempProfileData(profileData);
+    };
+
+    const handlePhotoClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.push({
+                title: "Invalid file type",
+                description: "Please select an image file.",
+                variant: "error"
+            });
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.push({
+                title: "File too large",
+                description: "Please select an image smaller than 5MB.",
+                variant: "error"
+            });
+            return;
+        }
+
+        setIsUploadingPhoto(true);
+        try {
+            const photoUrl = await uploadProfilePhoto(file, session.user.id);
+
+            await updateProfile({ photo: photoUrl });
+
+            setProfileData(prev => ({ ...prev, photo: photoUrl }));
+
+            toast.push({
+                title: "Photo updated",
+                description: "Your profile picture has been updated successfully.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error('Photo upload error:', error);
+            toast.push({
+                title: "Upload failed",
+                description: "Could not upload photo. Please try again.",
+                variant: "error"
+            });
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    };
+
+    const handleAddPaymentMethod = async (cardData) => {
+        try {
+            const updatedMethods = [...profileData.paymentMethods, cardData];
+
+            await updateProfile({ paymentMethods: updatedMethods });
+
+            setProfileData(prev => ({ ...prev, paymentMethods: updatedMethods }));
+
+            toast.push({
+                title: "Card added",
+                description: "Your payment method has been added successfully.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error('Add payment method error:', error);
+            toast.push({
+                title: "Failed to add card",
+                description: "Could not add payment method. Please try again.",
+                variant: "error"
+            });
+        }
+    };
+
+    const handleSetDefaultPayment = async (methodId) => {
+        try {
+            const updatedMethods = profileData.paymentMethods.map(method => ({
+                ...method,
+                isDefault: method.id === methodId
+            }));
+
+            await updateProfile({ paymentMethods: updatedMethods });
+
+            setProfileData(prev => ({ ...prev, paymentMethods: updatedMethods }));
+
+            toast.push({
+                title: "Default card updated",
+                description: "Your default payment method has been changed.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error('Set default payment error:', error);
+            toast.push({
+                title: "Update failed",
+                description: "Could not update default payment method.",
+                variant: "error"
+            });
+        }
+    };
+
+    const handleRemovePaymentMethod = async (methodId) => {
+        try {
+            const updatedMethods = profileData.paymentMethods.filter(method => method.id !== methodId);
+
+            await updateProfile({ paymentMethods: updatedMethods });
+
+            setProfileData(prev => ({ ...prev, paymentMethods: updatedMethods }));
+
+            toast.push({
+                title: "Card removed",
+                description: "Your payment method has been removed.",
+                variant: "success"
+            });
+        } catch (error) {
+            console.error('Remove payment method error:', error);
+            toast.push({
+                title: "Removal failed",
+                description: "Could not remove payment method. Please try again.",
+                variant: "error"
+            });
+        }
     };
 
     // --- VIEW: ALL TRANSACTIONS ---
@@ -246,11 +380,23 @@ const AccountPage = () => {
                                 alt="Profile"
                                 className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
                             />
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoChange}
+                                className="hidden"
+                            />
                             <button
-                                onClick={handleEditClick}
-                                className="absolute bottom-0 right-0 p-2 bg-gray-900 text-white rounded-full hover:bg-brand-500 transition-colors border-2 border-white"
+                                onClick={handlePhotoClick}
+                                disabled={isUploadingPhoto}
+                                className="absolute bottom-0 right-0 p-2 bg-gray-900 text-white rounded-full hover:bg-brand-500 transition-colors border-2 border-white disabled:opacity-50"
                             >
-                                <Icons.Settings size={14} />
+                                {isUploadingPhoto ? (
+                                    <Icons.Loader size={14} className="animate-spin" />
+                                ) : (
+                                    <Icons.Camera size={14} />
+                                )}
                             </button>
                         </div>
                         <h2 className="text-xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
@@ -377,22 +523,55 @@ const AccountPage = () => {
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-gray-900 text-lg">Payment Methods</h3>
-                            <button className="text-sm bg-brand-50 text-brand-600 px-3 py-1 rounded-lg font-bold hover:bg-brand-100 transition-colors">
+                            <button
+                                onClick={() => setIsPaymentModalOpen(true)}
+                                className="text-sm bg-brand-50 text-brand-600 px-3 py-1 rounded-lg font-bold hover:bg-brand-100 transition-colors"
+                            >
                                 + Add New
                             </button>
                         </div>
-                        {profileData.stripePaymentMethodId ? (
-                            <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-8 bg-gray-900 rounded text-white flex items-center justify-center text-[10px] font-bold tracking-widest">
-                                        CARD
+                        {profileData.paymentMethods.length > 0 ? (
+                            <div className="space-y-3">
+                                {profileData.paymentMethods.map((method) => (
+                                    <div
+                                        key={method.id}
+                                        className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors group"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-8 bg-gray-900 rounded text-white flex items-center justify-center text-[10px] font-bold tracking-widest">
+                                                {method.brand.toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm">
+                                                    •••• {method.last4}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    Expires {method.expMonth}/{method.expYear}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {method.isDefault ? (
+                                                <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">
+                                                    DEFAULT
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleSetDefaultPayment(method.id)}
+                                                    className="text-xs text-brand-600 font-bold hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    Set as default
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleRemovePaymentMethod(method.id)}
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Icons.Trash size={16} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-gray-800 text-sm">Payment Method Saved</p>
-                                        <p className="text-xs text-gray-500">Ready for bookings</p>
-                                    </div>
-                                </div>
-                                <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">DEFAULT</span>
+                                ))}
                             </div>
                         ) : (
                             <div className="text-center py-6 text-gray-500 text-sm">
@@ -449,6 +628,12 @@ const AccountPage = () => {
                 </div>
 
             </div>
+
+            <PaymentMethodModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                onSuccess={handleAddPaymentMethod}
+            />
         </div>
     );
 };

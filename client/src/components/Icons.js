@@ -34,7 +34,10 @@ import {
     Landmark,
     Tag,
     FileText,
-    Download
+    Download,
+    Loader2,
+    Trash2,
+    X
 } from 'lucide-react';
 
 export const Icons = {
@@ -52,6 +55,7 @@ export const Icons = {
     Check: CheckCircle,
     X: XCircle,
     Alert: AlertCircle,
+    AlertCircle,
     Wallet,
     Trending: TrendingUp,
     ChevronRight,
@@ -73,5 +77,7 @@ export const Icons = {
     Landmark,
     Tag,
     FileText,
-    Download
+    Download,
+    Loader: Loader2,
+    Trash: Trash2
 };
