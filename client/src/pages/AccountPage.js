@@ -365,7 +365,7 @@ const AccountPage = () => {
         doc.setFont('helvetica', 'italic');
         doc.setTextColor(100, 100, 100);
         doc.text('Thank you for using Kliques!', 105, 270, { align: 'center' });
-        doc.text('For support, visit www.kliques.com', 105, 280, { align: 'center' });
+        doc.text('For support, visit www.mykliques.com', 105, 280, { align: 'center' });
 
         // Save the PDF
         doc.save(`Kliques-Receipt-${transaction.id}-${transaction.date.replace(/[^a-zA-Z0-9]/g, '')}.pdf`);
