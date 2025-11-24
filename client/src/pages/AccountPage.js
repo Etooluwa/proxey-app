@@ -263,6 +263,42 @@ const AccountPage = () => {
         }
     };
 
+    const handleDownloadReceipt = (transaction) => {
+        // Create a simple text receipt
+        const receiptContent = `
+KLIQUES - TRANSACTION RECEIPT
+========================================
+
+Transaction ID: ${transaction.id}
+Date: ${transaction.date}
+Service: ${transaction.service}
+Provider: ${transaction.provider}
+Payment Method: ${transaction.method}
+Status: ${transaction.status}
+Amount: $${transaction.amount.toFixed(2)}
+
+========================================
+Thank you for using Kliques!
+        `.trim();
+
+        // Create a blob and download
+        const blob = new Blob([receiptContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `receipt-${transaction.id}-${transaction.date.replace(/[^a-zA-Z0-9]/g, '')}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.push({
+            title: "Receipt downloaded",
+            description: `Receipt for ${transaction.service} has been downloaded.`,
+            variant: "success"
+        });
+    };
+
     // --- VIEW: ALL TRANSACTIONS ---
     if (viewMode === 'TRANSACTIONS') {
         const filteredTransactions = TRANSACTIONS.filter(t => {
@@ -362,7 +398,10 @@ const AccountPage = () => {
                                                 </span>
                                             </td>
                                             <td className="p-6 text-center">
-                                                <button className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                                <button
+                                                    onClick={() => handleDownloadReceipt(tx)}
+                                                    className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                                                >
                                                     <Icons.Download size={18} />
                                                 </button>
                                             </td>
@@ -633,7 +672,10 @@ const AccountPage = () => {
                                         <p className="font-bold text-gray-900 text-sm">
                                             {transaction.status === 'REFUNDED' ? '+' : '-'}${transaction.amount.toFixed(2)}
                                         </p>
-                                        <button className="text-[10px] font-semibold text-brand-600 hover:underline mt-1">
+                                        <button
+                                            onClick={() => handleDownloadReceipt(transaction)}
+                                            className="text-[10px] font-semibold text-brand-600 hover:underline mt-1"
+                                        >
                                             Download Receipt
                                         </button>
                                     </div>
