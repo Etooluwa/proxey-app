@@ -330,6 +330,10 @@ export function AuthProvider({ children }) {
         }
 
         setProfile(nextProfile);
+
+        // Immediately persist to localStorage to ensure data is saved
+        persistProfile(session.user.id, nextProfile);
+
         return nextProfile;
     };
 
