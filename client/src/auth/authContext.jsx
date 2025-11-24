@@ -236,6 +236,8 @@ export function AuthProvider({ children }) {
         persistSession(fallbackSession);
         setLocalRole(email, chosenRole);
         const storedProfile = loadProfile(fallbackSession.user.id);
+        console.log('[authContext] Loading profile for user:', fallbackSession.user.id);
+        console.log('[authContext] Loaded profile:', storedProfile);
         if (storedProfile) {
             setProfile(storedProfile);
             return { session: fallbackSession, profile: storedProfile };
@@ -332,6 +334,7 @@ export function AuthProvider({ children }) {
         setProfile(nextProfile);
 
         // Immediately persist to localStorage to ensure data is saved
+        console.log('[authContext] Persisting profile to localStorage:', nextProfile);
         persistProfile(session.user.id, nextProfile);
 
         return nextProfile;

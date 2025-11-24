@@ -176,9 +176,14 @@ const AccountPage = () => {
         try {
             const updatedMethods = [...profileData.paymentMethods, cardData];
 
+            console.log('[AccountPage] Adding payment method:', cardData);
+            console.log('[AccountPage] Updated methods:', updatedMethods);
+
             await updateProfile({ paymentMethods: updatedMethods });
 
             setProfileData(prev => ({ ...prev, paymentMethods: updatedMethods }));
+
+            console.log('[AccountPage] Payment methods saved to profile');
 
             toast.push({
                 title: "Card added",
