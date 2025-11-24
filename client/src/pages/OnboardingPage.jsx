@@ -7,7 +7,7 @@ import { useNotifications } from "../contexts/NotificationContext";
 import { useToast } from "../components/ui/ToastProvider";
 import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
 import PaymentMethodScreen from "../components/payment/PaymentMethodScreen";
-import { SERVICE_CATEGORIES } from "../utils/categories";
+import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
@@ -24,6 +24,7 @@ function OnboardingPage() {
     photoPreview: null,
     email: "",
     phone: "",
+    city: "",
     defaultLocation: "",
     serviceCategory: [],
     stripeClientSecret: null,
@@ -31,6 +32,8 @@ function OnboardingPage() {
   });
   const [paymentStep, setPaymentStep] = useState(0); // 0: not started, 1: form shown, 2: complete
   const [submitting, setSubmitting] = useState(false);
+  const [cityInputFocused, setCityInputFocused] = useState(false);
+  const [citySuggestions, setCitySuggestions] = useState([]);
 
   const handlePhotoClick = () => {
     fileInputRef.current?.click();
@@ -61,6 +64,23 @@ function OnboardingPage() {
     setForm((prev) => ({ ...prev, phone: event.target.value }));
   };
 
+  const handleCityChange = (event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, city: value }));
+    if (value.trim().length > 0) {
+      const suggestions = filterCities(value);
+      setCitySuggestions(suggestions);
+    } else {
+      setCitySuggestions([]);
+    }
+  };
+
+  const handleCitySelect = (city) => {
+    setForm((prev) => ({ ...prev, city }));
+    setCitySuggestions([]);
+    setCityInputFocused(false);
+  };
+
   const handleCompleteOnboarding = async () => {
     setSubmitting(true);
     try {
@@ -71,7 +91,7 @@ function OnboardingPage() {
           phone: form.phone,
           email: form.email,
           serviceCategory: form.serviceCategory,
-          defaultLocation: form.email, // Using email as placeholder for location
+          defaultLocation: form.city,
           stripeCustomerId: form.stripeCustomerId,
           paymentMethodSetupComplete: true,
           isComplete: true,
@@ -123,6 +143,10 @@ function OnboardingPage() {
       }
       if (!form.phone.trim()) {
         toast.push({ title: "Phone required", description: "Please enter your phone number.", variant: "error" });
+        return;
+      }
+      if (!form.city.trim()) {
+        toast.push({ title: "City required", description: "Please select your city.", variant: "error" });
         return;
       }
       setCurrentStep(2);
@@ -257,6 +281,65 @@ function OnboardingPage() {
                 onChange={handlePhoneNumberChange}
               />
             </label>
+
+            <div className="onboarding__field">
+              <label>
+                <span className="onboarding__field-label">City</span>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    className="onboarding__input"
+                    placeholder="Start typing your city..."
+                    value={form.city}
+                    onChange={handleCityChange}
+                    onFocus={() => setCityInputFocused(true)}
+                    onBlur={() => setTimeout(() => setCityInputFocused(false), 200)}
+                    autoComplete="off"
+                  />
+                  {cityInputFocused && citySuggestions.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderTop: "none",
+                        borderRadius: "0 0 12px 12px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        zIndex: 10,
+                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                      }}
+                    >
+                      {citySuggestions.map((city) => (
+                        <button
+                          key={city}
+                          type="button"
+                          onClick={() => handleCitySelect(city)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 16px",
+                            backgroundColor: "#ffffff",
+                            border: "none",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            color: "#0f172a",
+                            transition: "background-color 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => (e.target.style.backgroundColor = "#f3f4f6")}
+                          onMouseLeave={(e) => (e.target.style.backgroundColor = "#ffffff")}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
           </div>
         </div>
       );
