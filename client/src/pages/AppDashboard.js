@@ -305,49 +305,13 @@ const AppDashboard = () => {
 
     // --- MAIN HOME RENDER ---
 
+    // --- MAIN HOME RENDER ---
+
     if (viewState === 'CATEGORY_DETAIL') return renderCategoryDetail();
     if (viewState === 'ALL_CATEGORIES') return renderAllCategories();
-    if (viewState === 'SEARCH_RESULTS') return renderSearchResults();
 
-    return (
-        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-            {/* Hero / Search Section */}
-            <div className="bg-gradient-to-r from-brand-500 to-brand-700 rounded-3xl p-8 md:p-12 text-white shadow-lg relative overflow-hidden">
-                <div className="relative z-10 max-w-3xl">
-                    <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
-                        Find the perfect professional for your home & lifestyle.
-                    </h1>
-                    <p className="text-brand-100 mb-10 text-lg max-w-xl">From cleaning to repairs, book trusted local services in minutes.</p>
-
-                    {/* Enhanced Search Bar */}
-                    <form onSubmit={handleTopSearch} className="bg-white p-2 rounded-3xl shadow-2xl shadow-brand-900/20 flex flex-col md:flex-row gap-2">
-
-                        {/* Search Input */}
-                        <div className="flex-1 flex items-center px-4 py-3 relative group">
-                            <Icons.Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors flex-shrink-0" size={24} />
-                            <input
-                                type="text"
-                                value={topSearchQuery}
-                                onChange={(e) => setTopSearchQuery(e.target.value)}
-                                placeholder="What service do you need?"
-                                className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 px-4 text-base md:text-lg font-medium w-full"
-                            />
-                        </div>
-
-                        {/* Search Button */}
-                        <button type="submit" className="bg-gray-900 text-white px-8 py-3 md:py-4 rounded-2xl font-bold text-lg hover:bg-brand-600 transition-all shadow-lg shadow-gray-900/10 hover:shadow-brand-500/25 flex items-center justify-center gap-2 md:ml-2">
-                            Search
-                        </button>
-                    </form>
-
-                </div>
-
-                {/* Abstract Decoration */}
-                <div className="absolute right-0 bottom-0 opacity-20 transform translate-y-1/4 translate-x-1/4 pointer-events-none">
-                    <Icons.Sparkles size={400} />
-                </div>
-            </div>
-
+    const renderHomeContent = () => (
+        <>
             {/* Categories Preview (Top 6) */}
             <div>
                 <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
@@ -560,6 +524,57 @@ const AppDashboard = () => {
                 </div>
 
             </div>
+        </>
+    );
+
+    return (
+        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+            {/* Hero / Search Section */}
+            <div className="bg-gradient-to-r from-brand-500 to-brand-700 rounded-3xl p-8 md:p-12 text-white shadow-lg relative overflow-hidden">
+                <div className="relative z-10 max-w-3xl">
+                    <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
+                        Find the perfect professional for your home & lifestyle.
+                    </h1>
+                    <p className="text-brand-100 mb-10 text-lg max-w-xl">From cleaning to repairs, book trusted local services in minutes.</p>
+
+                    {/* Enhanced Search Bar */}
+                    <form onSubmit={handleTopSearch} className="bg-white p-2 rounded-3xl shadow-2xl shadow-brand-900/20 flex flex-col md:flex-row gap-2">
+
+                        {/* Search Input */}
+                        <div className="flex-1 flex items-center px-4 py-3 relative group">
+                            <Icons.Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors flex-shrink-0" size={24} />
+                            <input
+                                type="text"
+                                value={topSearchQuery}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTopSearchQuery(val);
+                                    if (val.trim()) {
+                                        setViewState('SEARCH_RESULTS');
+                                    } else {
+                                        setViewState('HOME');
+                                    }
+                                }}
+                                placeholder="What service do you need?"
+                                className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 px-4 text-base md:text-lg font-medium w-full"
+                            />
+                        </div>
+
+                        {/* Search Button */}
+                        <button type="submit" className="bg-gray-900 text-white px-8 py-3 md:py-4 rounded-2xl font-bold text-lg hover:bg-brand-600 transition-all shadow-lg shadow-gray-900/10 hover:shadow-brand-500/25 flex items-center justify-center gap-2 md:ml-2">
+                            Search
+                        </button>
+                    </form>
+
+                </div>
+
+                {/* Abstract Decoration */}
+                <div className="absolute right-0 bottom-0 opacity-20 transform translate-y-1/4 translate-x-1/4 pointer-events-none">
+                    <Icons.Sparkles size={400} />
+                </div>
+            </div>
+
+            {viewState === 'SEARCH_RESULTS' ? renderSearchResults() : renderHomeContent()}
         </div>
     );
 };
