@@ -7,6 +7,7 @@ import { uploadProfilePhoto } from '../utils/photoUpload';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import PaymentMethodModal from '../components/PaymentMethodModal';
+import jsPDF from 'jspdf';
 
 // Initialize Stripe (use your publishable key)
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
@@ -264,33 +265,110 @@ const AccountPage = () => {
     };
 
     const handleDownloadReceipt = (transaction) => {
-        // Create a simple text receipt
-        const receiptContent = `
-KLIQUES - TRANSACTION RECEIPT
-========================================
+        const doc = new jsPDF();
 
-Transaction ID: ${transaction.id}
-Date: ${transaction.date}
-Service: ${transaction.service}
-Provider: ${transaction.provider}
-Payment Method: ${transaction.method}
-Status: ${transaction.status}
-Amount: $${transaction.amount.toFixed(2)}
+        // Set brand color
+        const brandColor = [255, 107, 0]; // Orange brand color
 
-========================================
-Thank you for using Kliques!
-        `.trim();
+        // Add Kliques branding header
+        doc.setFillColor(...brandColor);
+        doc.rect(0, 0, 210, 40, 'F');
 
-        // Create a blob and download
-        const blob = new Blob([receiptContent], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `receipt-${transaction.id}-${transaction.date.replace(/[^a-zA-Z0-9]/g, '')}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Add "KLIQUES" text
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(28);
+        doc.setFont('helvetica', 'bold');
+        doc.text('KLIQUES', 20, 25);
+
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
+
+        // Title
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TRANSACTION RECEIPT', 20, 60);
+
+        // Horizontal line
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 65, 190, 65);
+
+        // Transaction details
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+
+        let yPos = 80;
+        const lineHeight = 10;
+
+        // Transaction ID
+        doc.setFont('helvetica', 'bold');
+        doc.text('Transaction ID:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(transaction.id, 80, yPos);
+        yPos += lineHeight;
+
+        // Date
+        doc.setFont('helvetica', 'bold');
+        doc.text('Date:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(transaction.date, 80, yPos);
+        yPos += lineHeight;
+
+        // Service
+        doc.setFont('helvetica', 'bold');
+        doc.text('Service:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(transaction.service, 80, yPos);
+        yPos += lineHeight;
+
+        // Provider
+        doc.setFont('helvetica', 'bold');
+        doc.text('Provider:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(transaction.provider, 80, yPos);
+        yPos += lineHeight;
+
+        // Payment Method
+        doc.setFont('helvetica', 'bold');
+        doc.text('Payment Method:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.text(transaction.method, 80, yPos);
+        yPos += lineHeight;
+
+        // Status
+        doc.setFont('helvetica', 'bold');
+        doc.text('Status:', 20, yPos);
+        doc.setFont('helvetica', 'normal');
+        if (transaction.status === 'PAID') {
+            doc.setTextColor(0, 150, 0);
+        } else if (transaction.status === 'REFUNDED') {
+            doc.setTextColor(200, 0, 0);
+        }
+        doc.text(transaction.status, 80, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += lineHeight + 5;
+
+        // Horizontal line before amount
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, yPos, 190, yPos);
+        yPos += 10;
+
+        // Amount (larger)
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Amount:', 20, yPos);
+        doc.setTextColor(...brandColor);
+        doc.text(`$${transaction.amount.toFixed(2)}`, 80, yPos);
+        doc.setTextColor(0, 0, 0);
+
+        // Footer
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Thank you for using Kliques!', 105, 270, { align: 'center' });
+        doc.text('For support, visit www.kliques.com', 105, 280, { align: 'center' });
+
+        // Save the PDF
+        doc.save(`Kliques-Receipt-${transaction.id}-${transaction.date.replace(/[^a-zA-Z0-9]/g, '')}.pdf`);
 
         toast.push({
             title: "Receipt downloaded",
