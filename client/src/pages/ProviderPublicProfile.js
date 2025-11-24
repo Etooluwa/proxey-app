@@ -120,10 +120,7 @@ const BookingSummaryView = ({ onBack, onSuccess, onBook, provider, service, time
                                 <span className="text-gray-500">Date & Time</span>
                                 <span className="font-semibold text-gray-900">{timeLabel}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-500">Location</span>
-                                <span className="font-semibold text-gray-900">123 Main St, San Francisco</span>
-                            </div>
+
                             <div className="flex justify-between pt-2">
                                 <span className="text-gray-500">Total Paid</span>
                                 <span className="font-bold text-brand-600">${total.toFixed(2)}</span>
@@ -226,15 +223,7 @@ const BookingSummaryView = ({ onBack, onSuccess, onBook, provider, service, time
                                     {timeLabel}
                                 </div>
                             </div>
-                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Location</span>
-                                        <span className="font-bold text-gray-900 block">123 Main St, San Francisco, CA</span>
-                                    </div>
-                                    <button className="text-brand-600 text-xs font-bold hover:underline">Edit</button>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
 
@@ -649,7 +638,7 @@ const ProviderPublicProfile = () => {
 
     const handleCalendarSelection = (timeLabel) => {
         setSelectedTimeLabel(timeLabel);
-        setViewMode('PROFILE');
+        setViewMode('BOOKING_SUMMARY');
     };
 
     const handleBookClick = () => {
