@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 import { useToast } from '../components/ui/ToastProvider';
@@ -25,7 +26,8 @@ const TRANSACTIONS = [
 
 
 const AccountPage = () => {
-    const { session, profile, updateProfile } = useSession();
+    const { session, profile, updateProfile, logout } = useSession();
+    const navigate = useNavigate();
     const toast = useToast();
     const fileInputRef = useRef(null);
 
@@ -237,6 +239,20 @@ const AccountPage = () => {
             toast.push({
                 title: "Removal failed",
                 description: "Could not remove payment method. Please try again.",
+                variant: "error"
+            });
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            toast.push({
+                title: "Logout failed",
+                description: "Please try again.",
                 variant: "error"
             });
         }
@@ -624,7 +640,10 @@ const AccountPage = () => {
                     {/* Account Actions / Logout - Moved to bottom */}
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <h3 className="font-bold text-gray-900 mb-4">Account Actions</h3>
-                        <button className="w-full flex items-center justify-center gap-2 text-red-600 font-bold bg-red-50 py-3 rounded-xl hover:bg-red-100 transition-colors">
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-center gap-2 text-red-600 font-bold bg-red-50 py-3 rounded-xl hover:bg-red-100 transition-colors"
+                        >
                             <Icons.LogOut size={18} />
                             Log Out
                         </button>
