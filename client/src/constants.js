@@ -223,6 +223,171 @@ export const PROVIDER_REQUESTS = [
     }
 ];
 
+// All Provider Appointments (Upcoming, Past, Cancelled)
+export const ALL_PROVIDER_APPOINTMENTS = [
+    // Upcoming Appointments
+    {
+        id: 'apt1',
+        clientName: 'Alice Cooper',
+        clientAvatar: 'https://picsum.photos/seed/alice/100/100',
+        service: 'Deep Home Cleaning',
+        date: 'Oct 24, 2023',
+        time: '09:00 AM - 11:00 AM',
+        address: '456 Oak Lane, San Francisco',
+        status: 'UPCOMING',
+        price: 120.00,
+        notes: 'Please pay attention to the master bathroom tiles. Gate code is #4455.',
+        phone: '+1 (555) 123-4567'
+    },
+    {
+        id: 'apt2',
+        clientName: 'Bob Smith',
+        clientAvatar: 'https://picsum.photos/seed/bob/100/100',
+        service: 'Window Cleaning',
+        date: 'Oct 24, 2023',
+        time: '01:00 PM - 02:30 PM',
+        address: '789 Pine St, San Francisco',
+        status: 'UPCOMING',
+        price: 85.00,
+        notes: 'Backyard windows only.',
+        phone: '+1 (555) 987-6543'
+    },
+    {
+        id: 'apt3',
+        clientName: 'Carol Danvers',
+        clientAvatar: 'https://picsum.photos/seed/carol/100/100',
+        service: 'Move-out Clean',
+        date: 'Oct 25, 2023',
+        time: '04:00 PM - 06:00 PM',
+        address: '321 Elm St, San Francisco',
+        status: 'UPCOMING',
+        price: 250.00,
+        notes: 'Apartment will be empty. Keys are with the doorman.',
+        phone: '+1 (555) 555-5555'
+    },
+    {
+        id: 'apt4',
+        clientName: 'David Lee',
+        clientAvatar: 'https://picsum.photos/seed/david/100/100',
+        service: 'Carpet Shampooing',
+        date: 'Oct 26, 2023',
+        time: '10:00 AM - 12:00 PM',
+        address: '567 Maple Ave, San Francisco',
+        status: 'UPCOMING',
+        price: 90.00,
+        notes: 'Living room and two bedrooms.',
+        phone: '+1 (555) 111-2222'
+    },
+
+    // Past Appointments
+    {
+        id: 'apt5',
+        clientName: 'Emma Watson',
+        clientAvatar: 'https://picsum.photos/seed/emma/100/100',
+        service: 'Deep Home Cleaning',
+        date: 'Oct 15, 2023',
+        time: '09:00 AM - 11:00 AM',
+        address: '123 Main St, San Francisco',
+        status: 'COMPLETED',
+        price: 120.00,
+        notes: 'Regular monthly cleaning.',
+        phone: '+1 (555) 333-4444'
+    },
+    {
+        id: 'apt6',
+        clientName: 'Frank Miller',
+        clientAvatar: 'https://picsum.photos/seed/frank/100/100',
+        service: 'Window Cleaning',
+        date: 'Oct 12, 2023',
+        time: '02:00 PM - 03:30 PM',
+        address: '890 Broadway, San Francisco',
+        status: 'COMPLETED',
+        price: 85.00,
+        notes: 'All windows, inside and out.',
+        phone: '+1 (555) 555-6666'
+    },
+    {
+        id: 'apt7',
+        clientName: 'Grace Kelly',
+        clientAvatar: 'https://picsum.photos/seed/grace/100/100',
+        service: 'Move-out Clean',
+        date: 'Oct 10, 2023',
+        time: '10:00 AM - 02:00 PM',
+        address: '234 Park Ave, San Francisco',
+        status: 'COMPLETED',
+        price: 250.00,
+        notes: 'Full apartment deep clean.',
+        phone: '+1 (555) 777-8888'
+    },
+    {
+        id: 'apt8',
+        clientName: 'Henry Ford',
+        clientAvatar: 'https://picsum.photos/seed/henry/100/100',
+        service: 'Carpet Shampooing',
+        date: 'Oct 08, 2023',
+        time: '11:00 AM - 01:00 PM',
+        address: '678 Oak St, San Francisco',
+        status: 'COMPLETED',
+        price: 90.00,
+        notes: 'Three bedrooms.',
+        phone: '+1 (555) 999-0000'
+    },
+    {
+        id: 'apt9',
+        clientName: 'Ivy Chen',
+        clientAvatar: 'https://picsum.photos/seed/ivy/100/100',
+        service: 'Deep Home Cleaning',
+        date: 'Oct 05, 2023',
+        time: '09:00 AM - 11:00 AM',
+        address: '456 Sunset Blvd, San Francisco',
+        status: 'COMPLETED',
+        price: 120.00,
+        notes: 'Focus on kitchen and bathrooms.',
+        phone: '+1 (555) 222-3333'
+    },
+
+    // Cancelled Appointments
+    {
+        id: 'apt10',
+        clientName: 'Jack Ryan',
+        clientAvatar: 'https://picsum.photos/seed/jack/100/100',
+        service: 'Window Cleaning',
+        date: 'Oct 20, 2023',
+        time: '03:00 PM - 04:30 PM',
+        address: '789 Hill St, San Francisco',
+        status: 'CANCELLED',
+        price: 85.00,
+        notes: 'Client cancelled due to schedule conflict.',
+        phone: '+1 (555) 444-5555'
+    },
+    {
+        id: 'apt11',
+        clientName: 'Kate Bishop',
+        clientAvatar: 'https://picsum.photos/seed/kate/100/100',
+        service: 'Deep Home Cleaning',
+        date: 'Oct 18, 2023',
+        time: '10:00 AM - 12:00 PM',
+        address: '321 Valley Rd, San Francisco',
+        status: 'CANCELLED',
+        price: 120.00,
+        notes: 'Cancelled by provider - emergency.',
+        phone: '+1 (555) 666-7777'
+    },
+    {
+        id: 'apt12',
+        clientName: 'Leo Martinez',
+        clientAvatar: 'https://picsum.photos/seed/leo/100/100',
+        service: 'Move-out Clean',
+        date: 'Oct 16, 2023',
+        time: '01:00 PM - 05:00 PM',
+        address: '567 River St, San Francisco',
+        status: 'CANCELLED',
+        price: 250.00,
+        notes: 'Client found another service.',
+        phone: '+1 (555) 888-9999'
+    }
+];
+
 // Empty state: No earnings yet
 export const EARNINGS_DATA = [
     { name: 'Mon', value: 0 },

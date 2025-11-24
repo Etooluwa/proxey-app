@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -320,9 +321,9 @@ const AppointmentDetailView = ({ appointment, onBack }) => {
                     </div>
                 </div>
                 <div className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide border ${localStatus === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-100' :
-                        localStatus === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
-                            localStatus === 'COMPLETED' ? 'bg-gray-800 text-white border-gray-800' :
-                                'bg-gray-100 text-gray-600 border-gray-200'
+                    localStatus === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                        localStatus === 'COMPLETED' ? 'bg-gray-800 text-white border-gray-800' :
+                            'bg-gray-100 text-gray-600 border-gray-200'
                     }`}>
                     {localStatus}
                 </div>
@@ -538,7 +539,9 @@ const AppointmentDetailView = ({ appointment, onBack }) => {
 };
 
 
+
 const ProviderSchedule = () => {
+    const navigate = useNavigate();
     const [selectedDate, setSelectedDate] = useState(24);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [eventType, setEventType] = useState('APPOINTMENT');
@@ -634,12 +637,21 @@ const ProviderSchedule = () => {
                         <h3 className="text-xl font-bold text-gray-900">Oct {selectedDate}, 2023</h3>
                         <p className="text-sm text-gray-500">3 Appointments</p>
                     </div>
-                    <button
-                        onClick={() => handleOpenAddModal()}
-                        className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-colors"
-                    >
-                        + Add
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => navigate('/provider/appointments')}
+                            className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 transition-colors"
+                            title="View All Appointments"
+                        >
+                            View All
+                        </button>
+                        <button
+                            onClick={() => handleOpenAddModal()}
+                            className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-colors"
+                        >
+                            + Add
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-4 flex-1">

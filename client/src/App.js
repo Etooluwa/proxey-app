@@ -29,6 +29,7 @@ import OnboardingPage from './pages/OnboardingPage';
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
 import ProviderSchedule from './pages/provider/ProviderSchedule';
+import ProviderAppointments from './pages/provider/ProviderAppointments';
 import ProviderEarnings from './pages/provider/ProviderEarnings';
 import ProviderMessages from './pages/provider/ProviderMessages';
 import ProviderServices from './pages/provider/ProviderServices';
@@ -99,6 +100,7 @@ function App() {
                     <Route index element={<ProviderDashboard />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="schedule" element={<ProviderSchedule />} />
+                    <Route path="appointments" element={<ProviderAppointments />} />
                     <Route path="earnings" element={<ProviderEarnings />} />
                     <Route path="messages" element={<ProviderMessages />} />
                     <Route path="services" element={<ProviderServices />} />
