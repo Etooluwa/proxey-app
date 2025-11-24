@@ -6,10 +6,6 @@ import { useBookings } from '../contexts/BookingContext';
 
 // --- MOCK CALENDAR DATA & UTILS ---
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const CURRENT_MONTH_DAYS = Array.from({ length: 35 }, (_, i) => {
-    const d = i - 1; // Start from prev month end effectively
-    return d > 0 && d <= 31 ? d : null;
-});
 
 // Calendar Logic
 const generateCalendarLinks = (serviceName, providerName, dateStr, location) => {
@@ -396,17 +392,72 @@ const RequestTimeView = ({ onBack, providerName }) => {
 
 // --- CALENDAR COMPONENT ---
 const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => {
-    const [selectedDate, setSelectedDate] = useState(27);
+    const [viewDate, setViewDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState(null);
 
-    const getSlots = (date) => {
-        if (date < 24) return [];
-        return date % 2 === 0
-            ? ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '04:30 PM']
-            : ['01:00 PM', '02:30 PM', '03:45 PM', '05:00 PM'];
-    }
+    const getDaysInMonth = (date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const days = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
 
-    const slots = getSlots(selectedDate);
+        const daysArray = Array(firstDay).fill(null);
+        for (let i = 1; i <= days; i++) {
+            daysArray.push(new Date(year, month, i));
+        }
+        return daysArray;
+    };
+
+    const handlePrevMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+    };
+
+    const isSameDay = (d1, d2) => {
+        if (!d1 || !d2) return false;
+        return d1.getDate() === d2.getDate() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getFullYear() === d2.getFullYear();
+    };
+
+    const isToday = (date) => {
+        const today = new Date();
+        return isSameDay(date, today);
+    };
+
+    const isPast = (date) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return date < today;
+    };
+
+    const getSlots = (date) => {
+        if (!date) return [];
+        // Mock logic: Weekends have different slots than weekdays
+        const day = date.getDay();
+        const isWeekend = day === 0 || day === 6;
+
+        if (isWeekend) {
+            return ['10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM'];
+        }
+        return ['09:00 AM', '10:00 AM', '11:00 AM', '01:00 PM', '02:30 PM', '04:00 PM', '05:30 PM'];
+    };
+
+    const slots = selectedDate ? getSlots(selectedDate) : [];
+    const days = getDaysInMonth(viewDate);
+    const monthName = viewDate.toLocaleString('default', { month: 'long' });
+    const year = viewDate.getFullYear();
+
+    const handleConfirm = () => {
+        if (selectedDate && selectedTime) {
+            const dateStr = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            onSelectSlot(`${dateStr}, ${selectedTime}`);
+        }
+    };
 
     return (
         <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-right-8 duration-300 pb-12">
@@ -426,10 +477,10 @@ const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => 
                 <div className="flex-1 w-full bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
                     {/* Month Nav */}
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-bold text-gray-900">October 2023</h3>
+                        <h3 className="text-xl font-bold text-gray-900">{monthName} {year}</h3>
                         <div className="flex gap-2">
-                            <button className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 border border-gray-100 hover:border-gray-200 transition-all"><Icons.ChevronRight className="rotate-180" size={20} /></button>
-                            <button className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 border border-gray-100 hover:border-gray-200 transition-all"><Icons.ChevronRight size={20} /></button>
+                            <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 border border-gray-100 hover:border-gray-200 transition-all"><Icons.ChevronRight className="rotate-180" size={20} /></button>
+                            <button onClick={handleNextMonth} className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 border border-gray-100 hover:border-gray-200 transition-all"><Icons.ChevronRight size={20} /></button>
                         </div>
                     </div>
 
@@ -438,25 +489,27 @@ const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => 
                         {DAYS.map(d => <div key={d} className="text-center text-xs font-bold text-gray-400 uppercase py-2 tracking-wider">{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1 md:gap-2">
-                        {CURRENT_MONTH_DAYS.map((day, i) => {
-                            if (!day) return <div key={`empty-${i}`} className="h-10 md:h-16"></div>;
+                        {days.map((date, i) => {
+                            if (!date) return <div key={`empty-${i}`} className="h-10 md:h-16"></div>;
 
-                            const isSelected = selectedDate === day;
-                            const isAvailable = day >= 24;
+                            const isSelected = isSameDay(selectedDate, date);
+                            const disabled = isPast(date);
+                            const isTodayDate = isToday(date);
 
                             return (
                                 <button
-                                    key={day}
-                                    disabled={!isAvailable}
-                                    onClick={() => { setSelectedDate(day); setSelectedTime(null); }}
+                                    key={i}
+                                    disabled={disabled}
+                                    onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
                                     className={`
                          h-10 md:h-16 rounded-xl md:rounded-2xl flex flex-col items-center justify-center text-sm font-medium transition-all relative group
                          ${isSelected ? 'bg-brand-600 text-white shadow-md shadow-brand-200 scale-105 z-10' : 'bg-gray-50 text-gray-700 hover:bg-white hover:shadow-md hover:border-gray-100 border border-transparent'}
-                         ${!isAvailable ? 'opacity-30 cursor-not-allowed hover:bg-gray-50 hover:shadow-none' : ''}
+                         ${disabled ? 'opacity-30 cursor-not-allowed hover:bg-gray-50 hover:shadow-none' : ''}
+                         ${isTodayDate && !isSelected ? 'border-brand-200 bg-brand-50 text-brand-700' : ''}
                        `}
                                 >
-                                    <span className={`text-base md:text-lg ${isSelected ? 'font-bold' : 'font-semibold'}`}>{day}</span>
-                                    {isAvailable && !isSelected && (
+                                    <span className={`text-base md:text-lg ${isSelected ? 'font-bold' : 'font-semibold'}`}>{date.getDate()}</span>
+                                    {!disabled && !isSelected && (
                                         <div className="w-1 h-1 rounded-full bg-brand-400 mt-1"></div>
                                     )}
                                 </button>
@@ -482,39 +535,48 @@ const CalendarView = ({ onBack, onSelectSlot, onRequestTime, providerName }) => 
                         <h3 className="text-xl font-bold text-gray-900">Available Times</h3>
                         <p className="text-gray-500 mt-1 flex items-center gap-2">
                             <Icons.Calendar size={16} className="text-brand-500" />
-                            Oct {selectedDate}, 2023
+                            {selectedDate ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Select a date'}
                         </p>
                     </div>
 
-                    {slots.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-3 overflow-y-auto custom-scrollbar pr-2 -mr-2 pb-4">
-                            {slots.map(slot => (
-                                <button
-                                    key={slot}
-                                    onClick={() => setSelectedTime(slot)}
-                                    className={`py-3 md:py-4 px-3 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${selectedTime === slot
-                                        ? 'border-brand-500 bg-brand-600 text-white shadow-lg shadow-brand-200'
-                                        : 'border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700'
-                                        }`}
-                                >
-                                    {selectedTime === slot && <Icons.Check size={16} />}
-                                    {slot}
-                                </button>
-                            ))}
-                        </div>
+                    {selectedDate ? (
+                        slots.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3 overflow-y-auto custom-scrollbar pr-2 -mr-2 pb-4">
+                                {slots.map(slot => (
+                                    <button
+                                        key={slot}
+                                        onClick={() => setSelectedTime(slot)}
+                                        className={`py-3 md:py-4 px-3 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${selectedTime === slot
+                                            ? 'border-brand-500 bg-brand-600 text-white shadow-lg shadow-brand-200'
+                                            : 'border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700'
+                                            }`}
+                                    >
+                                        {selectedTime === slot && <Icons.Check size={16} />}
+                                        {slot}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 py-12">
+                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                    <Icons.Clock size={32} className="opacity-40" />
+                                </div>
+                                <p className="font-medium text-gray-600">No slots available.</p>
+                            </div>
+                        )
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 py-12">
                             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                <Icons.Clock size={32} className="opacity-40" />
+                                <Icons.Calendar size={32} className="opacity-40" />
                             </div>
-                            <p className="font-medium text-gray-600">No slots available.</p>
+                            <p className="font-medium text-gray-600">Please select a date to view times.</p>
                         </div>
                     )}
 
                     <div className="mt-auto pt-6 border-t border-gray-100 space-y-4">
                         <button
                             disabled={!selectedTime}
-                            onClick={() => selectedTime && onSelectSlot(`Oct ${selectedDate}, 2023, ${selectedTime}`)}
+                            onClick={handleConfirm}
                             className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-brand-600 transition-all shadow-xl shadow-gray-200 hover:shadow-brand-200 flex items-center justify-center gap-2"
                         >
                             Confirm Time
