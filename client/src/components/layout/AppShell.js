@@ -38,11 +38,6 @@ const AppShell = () => {
                             </div>
                             <h1 className="text-xl font-bold text-gray-800 tracking-tight">Kliques</h1>
                         </div>
-
-                        <div className="hidden md:flex items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-64 lg:w-96 transition-all focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300">
-                            <Icons.Search size={18} className="text-gray-400 mr-3" />
-                            <input type="text" placeholder="Search..." className="bg-transparent outline-none text-sm w-full placeholder-gray-400 text-gray-700" />
-                        </div>
                     </div>
 
                     <div className="flex items-center gap-3 md:gap-6 relative">
