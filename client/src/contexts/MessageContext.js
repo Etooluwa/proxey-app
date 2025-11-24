@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useSession } from '../auth/authContext';
 
 const MessageContext = createContext();
 
@@ -35,14 +36,36 @@ const INITIAL_CONVERSATIONS = [
 ];
 
 export const MessageProvider = ({ children }) => {
-    const [conversations, setConversations] = useState(() => {
-        const saved = localStorage.getItem('conversations');
-        return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
-    });
+    const { session } = useSession();
+    const userId = session?.user?.id;
 
+    const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
+
+    // Load conversations when userId changes
     useEffect(() => {
-        localStorage.setItem('conversations', JSON.stringify(conversations));
-    }, [conversations]);
+        if (userId) {
+            const saved = localStorage.getItem(`proxey.conversations.${userId}`);
+            if (saved) {
+                try {
+                    setConversations(JSON.parse(saved));
+                } catch (e) {
+                    console.error("Failed to parse conversations", e);
+                    setConversations(INITIAL_CONVERSATIONS);
+                }
+            } else {
+                // If no saved conversations for this user, reset to initial (or empty)
+                // For prototype, we reset to INITIAL_CONVERSATIONS so they see data
+                setConversations(INITIAL_CONVERSATIONS);
+            }
+        }
+    }, [userId]);
+
+    // Save conversations when they change
+    useEffect(() => {
+        if (userId) {
+            localStorage.setItem(`proxey.conversations.${userId}`, JSON.stringify(conversations));
+        }
+    }, [conversations, userId]);
 
     const markAsRead = (conversationId) => {
         setConversations(prev => prev.map(c =>
