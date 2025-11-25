@@ -9,9 +9,10 @@ const ProviderAppointments = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     // Filter appointments by status
-    const upcomingAppointments = ALL_PROVIDER_APPOINTMENTS.filter(apt => apt.status === 'UPCOMING');
-    const pastAppointments = ALL_PROVIDER_APPOINTMENTS.filter(apt => apt.status === 'COMPLETED');
-    const cancelledAppointments = ALL_PROVIDER_APPOINTMENTS.filter(apt => apt.status === 'CANCELLED');
+    const allAppointments = ALL_PROVIDER_APPOINTMENTS || [];
+    const upcomingAppointments = allAppointments.filter(apt => apt.status === 'UPCOMING');
+    const pastAppointments = allAppointments.filter(apt => apt.status === 'COMPLETED');
+    const cancelledAppointments = allAppointments.filter(apt => apt.status === 'CANCELLED');
 
     // Get current appointments based on active tab
     const getCurrentAppointments = () => {
@@ -106,8 +107,8 @@ const ProviderAppointments = () => {
                         <button
                             onClick={() => setActiveTab('UPCOMING')}
                             className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'UPCOMING'
-                                    ? 'bg-white shadow-sm text-brand-600'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white shadow-sm text-brand-600'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             Upcoming ({upcomingAppointments.length})
@@ -115,8 +116,8 @@ const ProviderAppointments = () => {
                         <button
                             onClick={() => setActiveTab('PAST')}
                             className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'PAST'
-                                    ? 'bg-white shadow-sm text-gray-900'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             Past ({pastAppointments.length})
@@ -124,8 +125,8 @@ const ProviderAppointments = () => {
                         <button
                             onClick={() => setActiveTab('CANCELLED')}
                             className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'CANCELLED'
-                                    ? 'bg-white shadow-sm text-gray-900'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             Cancelled ({cancelledAppointments.length})
