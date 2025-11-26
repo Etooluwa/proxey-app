@@ -59,12 +59,56 @@ const BookingSummaryView = ({ onBack, onSuccess, onBook, provider, service, time
     const [isProcessing, setIsProcessing] = useState(false);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [showCalendarOptions, setShowCalendarOptions] = useState(false);
+    const [promoCode, setPromoCode] = useState('');
+    const [appliedPromo, setAppliedPromo] = useState(null);
+    const [promoError, setPromoError] = useState('');
+
+    // Validate and apply promo code
+    const handleApplyPromo = () => {
+        setPromoError('');
+        if (!promoCode.trim()) {
+            setPromoError('Please enter a promo code');
+            return;
+        }
+
+        // Find matching promo from PROVIDER_PROMOTIONS
+        const matchedPromo = PROVIDER_PROMOTIONS.find(
+            p => p.promoCode.toUpperCase() === promoCode.toUpperCase() && p.isActive
+        );
+
+        if (!matchedPromo) {
+            setPromoError('Invalid or expired promo code');
+            setAppliedPromo(null);
+            return;
+        }
+
+        // Check if promo applies to this service
+        if (matchedPromo.applicableServices[0] !== 'All Services' &&
+            !matchedPromo.applicableServices.includes(service.title)) {
+            setPromoError(`This code doesn't apply to ${service.title}`);
+            setAppliedPromo(null);
+            return;
+        }
+
+        setAppliedPromo(matchedPromo);
+        setPromoCode('');
+    };
 
     // Calculate Totals
     const subtotal = service.price;
     const bookingFee = 5.00;
-    const tax = subtotal * 0.08; // 8% tax
-    const total = subtotal + bookingFee + tax;
+
+    // Calculate discount
+    let discountAmount = 0;
+    if (appliedPromo) {
+        discountAmount = appliedPromo.discountType === 'percentage'
+            ? (subtotal * appliedPromo.discountValue) / 100
+            : appliedPromo.discountValue;
+    }
+
+    const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+    const tax = subtotalAfterDiscount * 0.08; // 8% tax
+    const total = subtotalAfterDiscount + bookingFee + tax;
 
     const handleConfirm = () => {
         setIsProcessing(true);
@@ -250,6 +294,15 @@ const BookingSummaryView = ({ onBack, onSuccess, onBook, provider, service, time
                             <span>{service.title} {service.priceUnit === 'hour' ? '(1 hr base)' : ''}</span>
                             <span className="font-medium">${subtotal.toFixed(2)}</span>
                         </div>
+                        {appliedPromo && (
+                            <div className="flex justify-between text-green-600 font-medium">
+                                <span>
+                                    Promo ({appliedPromo.promoCode}):
+                                    {appliedPromo.discountType === 'percentage' ? ` -${appliedPromo.discountValue}%` : ` -$${appliedPromo.discountValue}`}
+                                </span>
+                                <span>-${discountAmount.toFixed(2)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-gray-600">
                             <span>Booking Fee</span>
                             <span className="font-medium">${bookingFee.toFixed(2)}</span>
@@ -260,10 +313,59 @@ const BookingSummaryView = ({ onBack, onSuccess, onBook, provider, service, time
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-end mb-8">
+                    <div className="flex justify-between items-end mb-6">
                         <span className="font-bold text-gray-900 text-lg">Total</span>
                         <span className="font-bold text-gray-900 text-3xl">${total.toFixed(2)}</span>
                     </div>
+
+                    {/* Promo Code Input */}
+                    {!appliedPromo && (
+                        <div className="mb-6 pb-6 border-b border-gray-100">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Have a Promo Code?</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={promoCode}
+                                    onChange={(e) => {
+                                        setPromoCode(e.target.value.toUpperCase());
+                                        setPromoError('');
+                                    }}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleApplyPromo()}
+                                    placeholder="Enter code"
+                                    className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300"
+                                />
+                                <button
+                                    onClick={handleApplyPromo}
+                                    className="px-4 py-2.5 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition-colors"
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                            {promoError && (
+                                <p className="text-red-600 text-xs font-medium mt-2">{promoError}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {appliedPromo && (
+                        <div className="mb-6 pb-6 border-b border-gray-100 bg-green-50 p-3 rounded-lg">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-400 uppercase">Applied Promo</p>
+                                    <p className="text-sm font-bold text-gray-900">{appliedPromo.promoCode}</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setAppliedPromo(null);
+                                        setPromoError('');
+                                    }}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    <Icons.X size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Payment Method Selection (Mock) */}
                     <div className="mb-8">
