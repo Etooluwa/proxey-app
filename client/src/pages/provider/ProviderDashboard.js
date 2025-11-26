@@ -128,21 +128,21 @@ const ProviderDashboard = () => {
 
                 {/* Recent Requests */}
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <h3 className="text-lg font-bold text-gray-900 truncate">Booking Requests</h3>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-3">Booking Requests</h3>
+                        <div className="flex items-center justify-between gap-3">
                             {requests.length > 0 && (
                                 <span className="bg-blue-100 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse flex-shrink-0">
                                     {requests.length} New
                                 </span>
                             )}
+                            <button
+                                onClick={() => navigate('/provider/appointments')}
+                                className="text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors whitespace-nowrap ml-auto"
+                            >
+                                See All →
+                            </button>
                         </div>
-                        <button
-                            onClick={() => navigate('/provider/appointments')}
-                            className="text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors whitespace-nowrap self-start sm:self-center"
-                        >
-                            See All →
-                        </button>
                     </div>
 
                     {requests.length > 0 ? (
