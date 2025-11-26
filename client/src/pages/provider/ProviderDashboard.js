@@ -42,7 +42,7 @@ const ProviderDashboard = () => {
                         Edit Availability
                     </button>
                     <button
-                        onClick={() => navigate('/provider/jobs')}
+                        onClick={() => navigate('/provider/promotions')}
                         className="px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 shadow-md shadow-brand-200"
                     >
                         + Create Promotion
