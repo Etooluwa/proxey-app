@@ -34,6 +34,7 @@ import ProviderEarnings from './pages/provider/ProviderEarnings';
 import ProviderMessages from './pages/provider/ProviderMessages';
 import ProviderServices from './pages/provider/ProviderServices';
 import ProviderProfile from './pages/provider/ProviderProfile';
+import ProviderJobs from './pages/provider/ProviderJobs';
 
 function App() {
   return (
@@ -101,6 +102,7 @@ function App() {
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="schedule" element={<ProviderSchedule />} />
                     <Route path="appointments" element={<ProviderAppointments />} />
+                    <Route path="jobs" element={<ProviderJobs />} />
                     <Route path="earnings" element={<ProviderEarnings />} />
                     <Route path="messages" element={<ProviderMessages />} />
                     <Route path="services" element={<ProviderServices />} />
