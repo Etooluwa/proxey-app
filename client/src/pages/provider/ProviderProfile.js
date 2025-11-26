@@ -235,6 +235,29 @@ const ProviderProfile = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Promotions */}
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-900">Promotions</h3>
+                            <button onClick={() => navigate('/provider/promotions')} className="text-brand-600 text-xs font-bold hover:underline">Manage</button>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-brand-50 to-orange-50 rounded-xl border border-brand-100">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-white rounded-lg text-brand-600 shadow-sm">
+                                    <Icons.Tag size={18} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-brand-800 uppercase tracking-wide">Active Deal</p>
+                                    <p className="font-bold text-gray-900">Summer Special</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-600 mb-3">20% Off • Expires Aug 31</p>
+                            <button onClick={() => navigate('/provider/promotions')} className="w-full py-2 bg-white text-brand-600 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Middle/Right Column: Content */}
