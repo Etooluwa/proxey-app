@@ -16,6 +16,7 @@ import {
     Wallet,
     TrendingUp,
     ChevronRight,
+    ChevronLeft,
     Menu,
     Wrench,
     Scissors,
@@ -38,7 +39,10 @@ import {
     Loader2,
     Trash2,
     X,
-    Eye
+    Eye,
+    Plus,
+    Edit,
+    Percent
 } from 'lucide-react';
 
 export const Icons = {
@@ -60,6 +64,7 @@ export const Icons = {
     Wallet,
     Trending: TrendingUp,
     ChevronRight,
+    ChevronLeft,
     Menu,
     Wrench,
     Scissors,
@@ -81,5 +86,9 @@ export const Icons = {
     Download,
     Loader: Loader2,
     Trash: Trash2,
-    Eye
+    Trash2,
+    Eye,
+    Plus,
+    Edit,
+    Percent
 };
