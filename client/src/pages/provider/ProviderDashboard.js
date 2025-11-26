@@ -23,6 +23,7 @@ const ProviderDashboard = () => {
 
     const firstName = profile?.name?.split(' ')[0] || 'Provider';
 
+    console.log('ProviderDashboard: Rendering with requests:', requests.length);
     return (
         <div className="max-w-7xl mx-auto space-y-8">
 
@@ -131,7 +132,7 @@ const ProviderDashboard = () => {
                         <div className="flex items-center gap-3">
                             <h3 className="text-lg font-bold text-gray-900">Booking Requests</h3>
                             {requests.length > 0 && (
-                                <span className="bg-red-100 text-red-600 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
+                                <span className="bg-blue-100 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
                                     {requests.length} New
                                 </span>
                             )}

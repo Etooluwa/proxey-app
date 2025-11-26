@@ -4,12 +4,16 @@ import { Icons } from '../../components/Icons';
 import { ALL_PROVIDER_APPOINTMENTS } from '../../constants';
 
 const ProviderAppointments = () => {
+    console.log('ProviderAppointments: Component rendering');
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('UPCOMING');
     const [searchQuery, setSearchQuery] = useState('');
 
+    console.log('ProviderAppointments: ALL_PROVIDER_APPOINTMENTS raw:', ALL_PROVIDER_APPOINTMENTS);
+
     // Filter appointments by status
     const allAppointments = ALL_PROVIDER_APPOINTMENTS || [];
+    console.log('ProviderAppointments: allAppointments:', allAppointments);
     const upcomingAppointments = allAppointments.filter(apt => apt.status === 'UPCOMING');
     const pastAppointments = allAppointments.filter(apt => apt.status === 'COMPLETED');
     const cancelledAppointments = allAppointments.filter(apt => apt.status === 'CANCELLED');
