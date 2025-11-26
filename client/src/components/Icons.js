@@ -37,7 +37,8 @@ import {
     Download,
     Loader2,
     Trash2,
-    X
+    X,
+    Eye
 } from 'lucide-react';
 
 export const Icons = {
@@ -79,5 +80,6 @@ export const Icons = {
     FileText,
     Download,
     Loader: Loader2,
-    Trash: Trash2
+    Trash: Trash2,
+    Eye
 };
