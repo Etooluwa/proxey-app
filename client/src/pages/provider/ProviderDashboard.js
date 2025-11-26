@@ -127,7 +127,7 @@ const ProviderDashboard = () => {
                 </div>
 
                 {/* Recent Requests */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[600px] lg:h-auto">
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col lg:h-auto">
                     <div className="flex justify-between items-center mb-4 flex-wrap gap-2 lg:flex-nowrap">
                         <div className="flex items-center gap-3 whitespace-nowrap">
                             <h3 className="text-lg font-bold text-gray-900">Booking Requests</h3>
@@ -149,25 +149,25 @@ const ProviderDashboard = () => {
                         <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                             {requests.map((request) => (
                                 <div key={request.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <img src={request.clientAvatar} alt={request.clientName} className="w-10 h-10 rounded-full object-cover shadow-sm" />
-                                            <div>
-                                                <h4 className="font-bold text-gray-900 text-sm">{request.clientName}</h4>
-                                                <p className="text-xs text-gray-500 flex items-center gap-1">
-                                                    <Icons.MapPin size={10} /> {request.location}
+                                    <div className="flex justify-between items-start mb-3 gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <img src={request.clientAvatar} alt={request.clientName} className="w-10 h-10 rounded-full object-cover shadow-sm flex-shrink-0" />
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-gray-900 text-sm truncate">{request.clientName}</h4>
+                                                <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
+                                                    <Icons.MapPin size={10} className="flex-shrink-0" /> <span className="truncate">{request.location}</span>
                                                 </p>
                                             </div>
                                         </div>
-                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg">
+                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg flex-shrink-0 whitespace-nowrap">
                                             ${request.price}
                                         </span>
                                     </div>
 
-                                    <div className="mb-4 pl-1">
-                                        <p className="font-bold text-gray-800 text-sm mb-1">{request.serviceName}</p>
-                                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                                            <Icons.Calendar size={12} /> {request.date} at {request.time}
+                                    <div className="mb-4 pl-1 min-w-0">
+                                        <p className="font-bold text-gray-800 text-sm mb-1 truncate">{request.serviceName}</p>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
+                                            <Icons.Calendar size={12} className="flex-shrink-0" /> <span className="truncate">{request.date} at {request.time}</span>
                                         </p>
                                     </div>
 
