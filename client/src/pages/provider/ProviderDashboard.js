@@ -128,8 +128,8 @@ const ProviderDashboard = () => {
 
                 {/* Recent Requests */}
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[600px] lg:h-auto">
-                    <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-center gap-3">
+                    <div className="flex justify-between items-center mb-4 flex-wrap gap-2 lg:flex-nowrap">
+                        <div className="flex items-center gap-3 whitespace-nowrap">
                             <h3 className="text-lg font-bold text-gray-900">Booking Requests</h3>
                             {requests.length > 0 && (
                                 <span className="bg-blue-100 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
@@ -139,7 +139,7 @@ const ProviderDashboard = () => {
                         </div>
                         <button
                             onClick={() => navigate('/provider/appointments')}
-                            className="text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors whitespace-nowrap"
+                            className="text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors whitespace-nowrap ml-auto"
                         >
                             See All →
                         </button>
