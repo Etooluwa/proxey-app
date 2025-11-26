@@ -63,6 +63,7 @@ export const Icons = {
     AlertCircle,
     Wallet,
     Trending: TrendingUp,
+    TrendingUp,
     ChevronRight,
     ChevronLeft,
     Menu,
