@@ -8,6 +8,7 @@ const ProviderAppointments = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('UPCOMING');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
 
     console.log('ProviderAppointments: ALL_PROVIDER_APPOINTMENTS raw:', ALL_PROVIDER_APPOINTMENTS);
 
@@ -156,7 +157,8 @@ const ProviderAppointments = () => {
                         {currentAppointments.map((apt) => (
                             <div
                                 key={apt.id}
-                                className="p-5 border border-gray-100 rounded-2xl hover:border-brand-200 hover:bg-brand-50/30 transition-all group"
+                                onClick={() => setSelectedAppointment(apt)}
+                                className="p-5 border border-gray-100 rounded-2xl hover:border-brand-200 hover:bg-brand-50/30 transition-all group cursor-pointer"
                             >
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                     {/* Left: Client Info */}
@@ -200,13 +202,14 @@ const ProviderAppointments = () => {
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => navigate(`/provider/schedule`)}
+                                                onClick={() => navigate(`/provider/schedule?date=${encodeURIComponent(apt.date)}`)}
                                                 className="p-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-colors"
-                                                title="View Details"
+                                                title="View in Schedule"
                                             >
                                                 <Icons.Eye size={18} />
                                             </button>
                                             <button
+                                                onClick={() => navigate(`/provider/messages?clientId=${apt.clientId}&clientName=${encodeURIComponent(apt.clientName)}`)}
                                                 className="p-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-colors"
                                                 title="Message Client"
                                             >
@@ -232,6 +235,122 @@ const ProviderAppointments = () => {
                     </div>
                 )}
             </div>
+
+            {/* Appointment Details Modal */}
+            {selectedAppointment && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedAppointment(null)}>
+                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between">
+                            <h2 className="text-2xl font-bold text-gray-900">Appointment Details</h2>
+                            <button
+                                onClick={() => setSelectedAppointment(null)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <Icons.X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Client Info Section */}
+                            <div className="bg-gray-50 rounded-xl p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Client Information</h3>
+                                <div className="flex items-center gap-4 mb-4">
+                                    <img
+                                        src={selectedAppointment.clientAvatar}
+                                        alt={selectedAppointment.clientName}
+                                        className="w-16 h-16 rounded-full object-cover"
+                                    />
+                                    <div>
+                                        <p className="text-lg font-bold text-gray-900">{selectedAppointment.clientName}</p>
+                                        <p className="text-sm text-gray-600">{selectedAppointment.service}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Appointment Details Section */}
+                            <div className="bg-gray-50 rounded-xl p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Appointment Details</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Date</p>
+                                        <p className="text-sm font-bold text-gray-900 flex items-center gap-2 mt-1">
+                                            <Icons.Calendar size={14} />
+                                            {selectedAppointment.date}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Time</p>
+                                        <p className="text-sm font-bold text-gray-900 flex items-center gap-2 mt-1">
+                                            <Icons.Clock size={14} />
+                                            {selectedAppointment.time}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Location</p>
+                                        <p className="text-sm font-bold text-gray-900 flex items-center gap-2 mt-1">
+                                            <Icons.MapPin size={14} />
+                                            {selectedAppointment.address}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Service & Price Section */}
+                            <div className="bg-gray-50 rounded-xl p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Service Details</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Service</p>
+                                        <p className="text-sm font-bold text-gray-900 mt-1">{selectedAppointment.service}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Price</p>
+                                        <p className="text-lg font-bold text-brand-600 mt-1">${selectedAppointment.price.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Status Section */}
+                            <div className="bg-gray-50 rounded-xl p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Status</h3>
+                                <span
+                                    className={`inline-block px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wide border ${getStatusBadge(
+                                        selectedAppointment.status
+                                    )}`}
+                                >
+                                    {selectedAppointment.status}
+                                </span>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 pt-4 border-t border-gray-100">
+                                <button
+                                    onClick={() => {
+                                        navigate(`/provider/schedule?date=${encodeURIComponent(selectedAppointment.date)}`);
+                                        setSelectedAppointment(null);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors"
+                                >
+                                    <Icons.Eye size={16} />
+                                    View in Schedule
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        navigate(`/provider/messages?clientId=${selectedAppointment.clientId}&clientName=${encodeURIComponent(selectedAppointment.clientName)}`);
+                                        setSelectedAppointment(null);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 transition-colors"
+                                >
+                                    <Icons.Message size={16} />
+                                    Message Client
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
