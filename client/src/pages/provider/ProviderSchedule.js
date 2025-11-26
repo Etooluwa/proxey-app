@@ -614,6 +614,14 @@ const ProviderSchedule = () => {
 
     const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+    // Get appointments for the selected date
+    const appointmentsForSelectedDate = UPCOMING_APPOINTMENTS.filter(apt => {
+        const aptDate = new Date(apt.date);
+        return aptDate.getDate() === selectedDate &&
+               aptDate.getMonth() === currentDate.getMonth() &&
+               aptDate.getFullYear() === currentDate.getFullYear();
+    });
+
     // If viewing details, render detail view
     if (viewingAppointment) {
         return <AppointmentDetailView appointment={viewingAppointment} onBack={() => setViewingAppointment(null)} />;
@@ -703,84 +711,82 @@ const ProviderSchedule = () => {
             </div>
 
             {/* Right Column: Daily Agenda */}
-            <div className="w-full lg:w-96 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-auto lg:h-auto">
-                <div className="flex justify-between items-center mb-6 pb-6 border-b border-gray-100">
+            <div className="w-full lg:w-96 bg-white p-4 md:p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-auto lg:h-auto min-h-[400px]">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-6 pb-6 border-b border-gray-100">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                            {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <h3 className="text-lg md:text-xl font-bold text-gray-900">
+                            {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </h3>
-                        <p className="text-sm text-gray-500">3 Appointments</p>
+                        <p className="text-sm text-gray-500">{appointmentsForSelectedDate.length} {appointmentsForSelectedDate.length === 1 ? 'Appointment' : 'Appointments'}</p>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => navigate('/provider/appointments')}
-                            className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 transition-colors"
+                            className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 transition-colors whitespace-nowrap"
                             title="View All Appointments"
                         >
                             View All
                         </button>
                         <button
                             onClick={() => handleOpenAddModal()}
-                            className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-colors"
+                            className="bg-brand-600 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-colors whitespace-nowrap"
                         >
                             + Add
                         </button>
                     </div>
                 </div>
 
-                <div className="space-y-4 flex-1">
-                    {UPCOMING_APPOINTMENTS.map(apt => (
-                        <div key={apt.id} className="group relative pl-4 border-l-2 border-gray-200 hover:border-brand-500 transition-colors pb-6 last:pb-0">
-                            {/* Time Indicator */}
-                            <div className="absolute -left-[9px] top-0 w-4 h-4 bg-white border-2 border-gray-300 rounded-full group-hover:border-brand-500 transition-colors"></div>
+                <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                    {appointmentsForSelectedDate.length > 0 ? (
+                        appointmentsForSelectedDate.map(apt => (
+                            <div key={apt.id} className="group relative pl-4 border-l-2 border-gray-200 hover:border-brand-500 transition-colors pb-4">
+                                {/* Time Indicator */}
+                                <div className="absolute -left-[9px] top-0 w-4 h-4 bg-white border-2 border-gray-300 rounded-full group-hover:border-brand-500 transition-colors"></div>
 
-                            <div className="bg-gray-50 p-4 rounded-2xl group-hover:bg-brand-50/50 transition-colors">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
-                                        <Icons.Clock size={12} /> {apt.time}
-                                    </span>
-                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${apt.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                        {apt.status}
-                                    </span>
-                                </div>
+                                <div className="bg-gray-50 p-3 md:p-4 rounded-2xl group-hover:bg-brand-50/50 transition-colors">
+                                    <div className="flex justify-between items-start mb-2 gap-2">
+                                        <span className="text-xs font-bold text-gray-500 flex items-center gap-1 whitespace-nowrap">
+                                            <Icons.Clock size={12} /> {apt.time}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase flex-shrink-0 ${apt.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                            {apt.status}
+                                        </span>
+                                    </div>
 
-                                <h4 className="font-bold text-gray-900 mb-1">{apt.service}</h4>
+                                    <h4 className="font-bold text-gray-900 mb-1 text-sm">{apt.service}</h4>
 
-                                <div className="flex items-center gap-2 mb-3">
-                                    <img src={apt.avatar} alt={apt.clientName} className="w-5 h-5 rounded-full" />
-                                    <span className="text-sm text-gray-600 font-medium">{apt.clientName}</span>
-                                </div>
+                                    <div className="flex items-center gap-2 mb-3 min-w-0">
+                                        <img src={apt.avatar} alt={apt.clientName} className="w-5 h-5 rounded-full flex-shrink-0" />
+                                        <span className="text-xs md:text-sm text-gray-600 font-medium truncate">{apt.clientName}</span>
+                                    </div>
 
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <Icons.MapPin size={12} />
-                                    <span className="truncate">{apt.address}</span>
-                                </div>
+                                    <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
+                                        <Icons.MapPin size={12} className="flex-shrink-0" />
+                                        <span className="truncate">{apt.address}</span>
+                                    </div>
 
-                                {/* Hover Actions */}
-                                <div className="mt-3 flex gap-2 opacity-100 md:opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => setViewingAppointment(apt)}
-                                        className="flex-1 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-colors"
-                                    >
-                                        Details
-                                    </button>
-                                    <button className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
-                                        <Icons.X size={14} />
-                                    </button>
+                                    {/* Hover Actions */}
+                                    <div className="mt-3 flex gap-2 opacity-100 md:opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => setViewingAppointment(apt)}
+                                            className="flex-1 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-colors"
+                                        >
+                                            Details
+                                        </button>
+                                        <button className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
+                                            <Icons.X size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                        ))
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center py-8 text-gray-400">
+                            <Icons.Calendar size={32} className="mb-2 text-gray-300" />
+                            <p className="text-sm font-medium">No appointments on this date</p>
                         </div>
-                    ))}
-
-                    {/* Mock Free Time Slot */}
-                    <div className="relative pl-4 border-l-2 border-dashed border-gray-200 py-4">
-                        <div className="absolute -left-[9px] top-4 w-4 h-4 bg-white border-2 border-gray-200 rounded-full"></div>
-                        <div className="text-sm text-gray-400 font-medium italic">
-                            Free slot (11:00 AM - 01:00 PM)
-                        </div>
-                    </div>
-
+                    )}
                 </div>
             </div>
 
