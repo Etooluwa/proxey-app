@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
-import { TOP_PROVIDERS, PROVIDER_SERVICES } from '../constants';
+import { TOP_PROVIDERS, PROVIDER_SERVICES, PROVIDER_PROMOTIONS } from '../constants';
 import { useBookings } from '../contexts/BookingContext';
 
 // --- MOCK CALENDAR DATA & UTILS ---
@@ -804,6 +804,74 @@ const ProviderPublicProfile = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Active Promotions */}
+                    {PROVIDER_PROMOTIONS.filter(p => p.isActive).length > 0 && (
+                        <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-red-50 text-red-600 rounded-lg">
+                                    <Icons.Tag size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">Active Promotions</h2>
+                                    <p className="text-sm text-gray-500">Limited time offers from {provider.name.split(' ')[0]}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                {PROVIDER_PROMOTIONS.filter(p => p.isActive).map((promo) => {
+                                    const expiryDate = new Date(promo.expiresOn);
+                                    const today = new Date();
+                                    const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                                    const isExpiringSoon = daysLeft <= 7 && daysLeft > 0;
+
+                                    return (
+                                        <div key={promo.id} className="relative overflow-hidden bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-2xl p-4">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <h3 className="font-bold text-gray-900">{promo.title}</h3>
+                                                        {isExpiringSoon && (
+                                                            <span className="text-xs font-bold bg-red-500 text-white px-2 py-1 rounded animate-pulse">
+                                                                ENDING SOON
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-gray-600 mb-3">{promo.description}</p>
+
+                                                    <div className="flex flex-wrap items-center gap-4">
+                                                        <div className="bg-white rounded-lg px-3 py-2 border border-gray-200">
+                                                            <p className="text-xs text-gray-500 font-semibold">Code</p>
+                                                            <p className="text-lg font-bold text-gray-900 font-mono">{promo.promoCode}</p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 font-semibold">Discount</p>
+                                                            <p className="text-lg font-bold text-red-600">
+                                                                {promo.discountType === 'percentage' ? `${promo.discountValue}%` : `$${promo.discountValue}`} OFF
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 font-semibold">Expires</p>
+                                                            <p className="text-sm font-bold text-gray-900">{new Date(promo.expiresOn).toLocaleDateString()}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right flex-shrink-0">
+                                                    <div className="bg-red-500 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-sm">
+                                                        {promo.discountType === 'percentage' ? `${promo.discountValue}%` : `$${promo.discountValue}`}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-2 font-semibold">{promo.usageCount} used</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Services */}
                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">

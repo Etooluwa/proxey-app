@@ -398,3 +398,43 @@ export const EARNINGS_DATA = [
     { name: 'Sat', value: 0 },
     { name: 'Sun', value: 0 },
 ];
+
+// Provider Promotions (visible to clients on public profiles)
+export const PROVIDER_PROMOTIONS = [
+    {
+        id: 1,
+        title: 'Summer Special Discount',
+        promoCode: 'SUMMER20',
+        discountType: 'percentage',
+        discountValue: 20,
+        applicableServices: ['Deep Home Cleaning'],
+        expiresOn: '2024-08-31',
+        isActive: true,
+        usageCount: 12,
+        description: 'Get 20% off on all deep cleaning services this summer!'
+    },
+    {
+        id: 2,
+        title: 'First Time Client Offer',
+        promoCode: 'WELCOME50',
+        discountType: 'fixed',
+        discountValue: 50,
+        applicableServices: ['All Services'],
+        expiresOn: '2024-12-31',
+        isActive: true,
+        usageCount: 28,
+        description: 'New clients get $50 off their first booking!'
+    },
+    {
+        id: 3,
+        title: 'Weekly Maintenance Bundle',
+        promoCode: 'WEEKLY15',
+        discountType: 'percentage',
+        discountValue: 15,
+        applicableServices: ['Standard Weekly Clean'],
+        expiresOn: '2024-12-15',
+        isActive: true,
+        usageCount: 45,
+        description: 'Subscribe to weekly cleaning and save 15%'
+    }
+];
