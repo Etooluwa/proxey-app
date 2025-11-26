@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -542,15 +542,77 @@ const AppointmentDetailView = ({ appointment, onBack }) => {
 
 const ProviderSchedule = () => {
     const navigate = useNavigate();
-    const [selectedDate, setSelectedDate] = useState(24);
+    const [searchParams] = useSearchParams();
+    const [currentDate, setCurrentDate] = useState(() => {
+        // Initialize with current date or date from URL parameter
+        const dateParam = searchParams.get('date');
+        if (dateParam) {
+            try {
+                const parsedDate = new Date(decodeURIComponent(dateParam));
+                if (!isNaN(parsedDate)) {
+                    return parsedDate;
+                }
+            } catch (e) {
+                // Invalid date, fall back to today
+            }
+        }
+        return new Date();
+    });
+
+    const [selectedDate, setSelectedDate] = useState(() => {
+        const dateParam = searchParams.get('date');
+        if (dateParam) {
+            try {
+                const parsedDate = new Date(decodeURIComponent(dateParam));
+                if (!isNaN(parsedDate)) {
+                    return parsedDate.getDate();
+                }
+            } catch (e) {
+                // Invalid date, fall back to today
+            }
+        }
+        return new Date().getDate();
+    });
+
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [eventType, setEventType] = useState('APPOINTMENT');
     const [viewingAppointment, setViewingAppointment] = useState(null);
+
+    // Parse the date from URL when component mounts
+    useEffect(() => {
+        const dateParam = searchParams.get('date');
+        if (dateParam) {
+            try {
+                const parsedDate = new Date(decodeURIComponent(dateParam));
+                if (!isNaN(parsedDate)) {
+                    setCurrentDate(parsedDate);
+                    setSelectedDate(parsedDate.getDate());
+                }
+            } catch (e) {
+                console.error('Error parsing date from URL:', e);
+            }
+        }
+    }, [searchParams]);
 
     const handleOpenAddModal = (e) => {
         if (e) e.stopPropagation();
         setIsAddModalOpen(true);
     };
+
+    // Get the first day of the month and number of days in month
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+
+    // Handle month navigation
+    const handlePreviousMonth = () => {
+        setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+        setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    };
+
+    const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     // If viewing details, render detail view
     if (viewingAppointment) {
@@ -564,14 +626,22 @@ const ProviderSchedule = () => {
             <div className="flex-1 bg-white p-4 md:p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col min-h-[400px]">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">October 2023</h2>
+                        <h2 className="text-2xl font-bold text-gray-900">{monthYear}</h2>
                         <p className="text-gray-500 text-sm">Manage your availability</p>
                     </div>
                     <div className="flex gap-2">
-                        <button className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
+                        <button
+                            onClick={handlePreviousMonth}
+                            className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 transition-colors"
+                            title="Previous Month"
+                        >
                             <Icons.ChevronRight className="transform rotate-180" size={20} />
                         </button>
-                        <button className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
+                        <button
+                            onClick={handleNextMonth}
+                            className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 transition-colors"
+                            title="Next Month"
+                        >
                             <Icons.ChevronRight size={20} />
                         </button>
                     </div>
@@ -589,11 +659,13 @@ const ProviderSchedule = () => {
                         </div>
                         <div className="grid grid-cols-7 gap-1 md:gap-2 flex-1 content-start">
                             {/* Empty cells for previous month */}
-                            <div className="h-16 md:h-24"></div>
-                            <div className="h-16 md:h-24"></div>
+                            {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                                <div key={`empty-${i}`} className="h-16 md:h-24"></div>
+                            ))}
 
-                            {/* Days */}
-                            {DATES.slice(0, 31).map(date => {
+                            {/* Days of current month */}
+                            {Array.from({ length: daysInMonth }).map((_,i) => {
+                                const date = i + 1;
                                 const isSelected = date === selectedDate;
                                 const hasEvents = [2, 15, 24, 28].includes(date);
 
@@ -634,7 +706,9 @@ const ProviderSchedule = () => {
             <div className="w-full lg:w-96 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-auto lg:h-auto">
                 <div className="flex justify-between items-center mb-6 pb-6 border-b border-gray-100">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900">Oct {selectedDate}, 2023</h3>
+                        <h3 className="text-xl font-bold text-gray-900">
+                            {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </h3>
                         <p className="text-sm text-gray-500">3 Appointments</p>
                     </div>
                     <div className="flex gap-2">
