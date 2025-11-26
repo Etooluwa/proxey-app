@@ -48,7 +48,7 @@ const ProviderAppointments = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="max-w-7xl mx-auto space-y-6 border-2 border-red-500 p-4">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
