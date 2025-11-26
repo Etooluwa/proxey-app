@@ -1,51 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
+import { ALL_PROVIDER_APPOINTMENTS } from '../../constants';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DATES = Array.from({ length: 35 }, (_, i) => i + 1); // Mock 35 days
-
-const UPCOMING_APPOINTMENTS = [
-    {
-        id: '1',
-        clientName: 'Alice Cooper',
-        service: 'Deep Home Cleaning',
-        time: '09:00 AM - 11:00 AM',
-        date: 'Oct 24, 2023',
-        address: '456 Oak Lane, San Francisco',
-        status: 'CONFIRMED',
-        avatar: 'https://picsum.photos/seed/alice/100/100',
-        price: 120.00,
-        notes: 'Please pay attention to the master bathroom tiles. Gate code is #4455.',
-        phone: '+1 (555) 123-4567'
-    },
-    {
-        id: '2',
-        clientName: 'Bob Smith',
-        service: 'Window Cleaning',
-        time: '01:00 PM - 02:30 PM',
-        date: 'Oct 24, 2023',
-        address: '789 Pine St, San Francisco',
-        status: 'CONFIRMED',
-        avatar: 'https://picsum.photos/seed/bob/100/100',
-        price: 85.00,
-        notes: 'Backyard windows only.',
-        phone: '+1 (555) 987-6543'
-    },
-    {
-        id: '3',
-        clientName: 'Carol Danvers',
-        service: 'Move-out Clean',
-        time: '04:00 PM - 06:00 PM',
-        date: 'Oct 24, 2023',
-        address: '321 Elm St, San Francisco',
-        status: 'PENDING',
-        avatar: 'https://picsum.photos/seed/carol/100/100',
-        price: 250.00,
-        notes: 'Apartment will be empty. Keys are with the doorman.',
-        phone: '+1 (555) 555-5555'
-    }
-];
 
 const InvoiceGeneratorModal = ({ appointment, onClose }) => {
     const [items, setItems] = useState([
@@ -616,7 +575,7 @@ const ProviderSchedule = () => {
     const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     // Get appointments for the selected date
-    const appointmentsForSelectedDate = UPCOMING_APPOINTMENTS.filter(apt => {
+    const appointmentsForSelectedDate = ALL_PROVIDER_APPOINTMENTS.filter(apt => {
         const aptDate = new Date(apt.date);
         return aptDate.getDate() === selectedDate &&
                aptDate.getMonth() === currentDate.getMonth() &&
@@ -624,7 +583,7 @@ const ProviderSchedule = () => {
     });
 
     // Get all dates that have appointments in the current month
-    const datesWithAppointments = UPCOMING_APPOINTMENTS.reduce((acc, apt) => {
+    const datesWithAppointments = ALL_PROVIDER_APPOINTMENTS.reduce((acc, apt) => {
         const aptDate = new Date(apt.date);
         if (aptDate.getMonth() === currentDate.getMonth() &&
             aptDate.getFullYear() === currentDate.getFullYear()) {
