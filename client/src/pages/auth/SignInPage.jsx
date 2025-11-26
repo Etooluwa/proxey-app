@@ -21,6 +21,7 @@ function SignInPage() {
   const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [suggestedRole, setSuggestedRole] = useState(null);
 
   const redirectPath = location.state?.from;
 
@@ -49,6 +50,16 @@ function SignInPage() {
       window.localStorage.removeItem("proxey.lastEmail");
     }
   }, [email, remember]);
+
+  // Detect role mismatch and suggest switching roles
+  useEffect(() => {
+    if (formError && formError.includes("registered as a")) {
+      const isProvider = formError.includes("Service Provider");
+      setSuggestedRole(isProvider ? "provider" : "client");
+    } else {
+      setSuggestedRole(null);
+    }
+  }, [formError]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -123,7 +134,30 @@ function SignInPage() {
             <AuthTabs value={role} onChange={setRole} />
             {(formError || authError) && (
               <div className="login-alert" role="alert">
-                {formError || authError}
+                <div style={{ marginBottom: suggestedRole ? "10px" : "0" }}>
+                  {formError || authError}
+                </div>
+                {suggestedRole && (
+                  <button
+                    type="button"
+                    onClick={() => setRole(suggestedRole)}
+                    style={{
+                      background: "#b91c1c",
+                      color: "white",
+                      border: "none",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "opacity 0.2s",
+                    }}
+                    onMouseEnter={(e) => (e.target.style.opacity = "0.8")}
+                    onMouseLeave={(e) => (e.target.style.opacity = "1")}
+                  >
+                    Switch to {suggestedRole === "provider" ? "Service Provider" : "Client"}
+                  </button>
+                )}
               </div>
             )}
             <form className="login-form" onSubmit={handleSubmit} autoComplete="on">

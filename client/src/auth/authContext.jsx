@@ -177,8 +177,10 @@ export function AuthProvider({ children }) {
             }
             const storedRole = data.session.user?.user_metadata?.role;
             if (storedRole && storedRole !== role) {
+                const roleLabel = storedRole === 'provider' ? 'Service Provider' : 'Client';
+                const switchToRole = storedRole === 'provider' ? 'Service Provider tab' : 'Client tab';
                 const err = new Error(
-                    `This account is registered as a ${storedRole}. Switch to that role to sign in.`
+                    `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
                 );
                 setAuthError(err.message);
                 throw err;
@@ -215,8 +217,10 @@ export function AuthProvider({ children }) {
 
         const existingRole = getLocalRole(email);
         if (existingRole && existingRole !== role) {
+            const roleLabel = existingRole === 'provider' ? 'Service Provider' : 'Client';
+            const switchToRole = existingRole === 'provider' ? 'Service Provider tab' : 'Client tab';
             const err = new Error(
-                `This account is registered as a ${existingRole}. Switch to that role to sign in.`
+                `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
             );
             setAuthError(err.message);
             throw err;
