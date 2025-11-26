@@ -127,7 +127,7 @@ const ProviderDashboard = () => {
                 </div>
 
                 {/* Recent Requests */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col lg:h-auto">
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col lg:h-auto overflow-hidden">
                     <div className="flex justify-between items-center mb-4 flex-wrap gap-2 lg:flex-nowrap">
                         <div className="flex items-center gap-3 whitespace-nowrap">
                             <h3 className="text-lg font-bold text-gray-900">Booking Requests</h3>
@@ -148,34 +148,31 @@ const ProviderDashboard = () => {
                     {requests.length > 0 ? (
                         <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                             {requests.map((request) => (
-                                <div key={request.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                                    <div className="flex justify-between items-start mb-3 gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <img src={request.clientAvatar} alt={request.clientName} className="w-10 h-10 rounded-full object-cover shadow-sm flex-shrink-0" />
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-gray-900 text-sm truncate">{request.clientName}</h4>
-                                                <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                                                    <Icons.MapPin size={10} className="flex-shrink-0" /> <span className="truncate">{request.location}</span>
-                                                </p>
-                                            </div>
+                                <div key={request.id} className="p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors overflow-hidden">
+                                    {/* Client Info Row */}
+                                    <div className="flex items-center gap-2 mb-2 min-w-0">
+                                        <img src={request.clientAvatar} alt={request.clientName} className="w-8 h-8 rounded-full object-cover shadow-sm flex-shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="font-bold text-gray-900 text-xs truncate">{request.clientName}</h4>
+                                            <p className="text-xs text-gray-500 truncate">{request.location}</p>
                                         </div>
-                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg flex-shrink-0 whitespace-nowrap">
+                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded flex-shrink-0 whitespace-nowrap">
                                             ${request.price}
                                         </span>
                                     </div>
 
-                                    <div className="mb-4 pl-1 min-w-0">
-                                        <p className="font-bold text-gray-800 text-sm mb-1 truncate">{request.serviceName}</p>
-                                        <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                                            <Icons.Calendar size={12} className="flex-shrink-0" /> <span className="truncate">{request.date} at {request.time}</span>
-                                        </p>
+                                    {/* Service Info */}
+                                    <div className="mb-2 px-1">
+                                        <p className="font-bold text-gray-800 text-xs mb-0.5 truncate">{request.serviceName}</p>
+                                        <p className="text-xs text-gray-500 truncate">{request.date} at {request.time}</p>
                                     </div>
 
-                                    <div className="flex gap-2">
-                                        <button className="flex-1 bg-gray-900 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200">
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-1.5">
+                                        <button className="flex-1 bg-gray-900 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-800 transition-colors">
                                             Accept
                                         </button>
-                                        <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
+                                        <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-1.5 rounded text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
                                             Decline
                                         </button>
                                     </div>
