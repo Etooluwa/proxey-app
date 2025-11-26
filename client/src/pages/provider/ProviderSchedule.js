@@ -576,6 +576,7 @@ const ProviderSchedule = () => {
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [eventType, setEventType] = useState('APPOINTMENT');
+    const [blockType, setBlockType] = useState('TIME_SLOT');
     const [viewingAppointment, setViewingAppointment] = useState(null);
 
     // Parse the date from URL when component mounts
@@ -621,6 +622,16 @@ const ProviderSchedule = () => {
                aptDate.getMonth() === currentDate.getMonth() &&
                aptDate.getFullYear() === currentDate.getFullYear();
     });
+
+    // Get all dates that have appointments in the current month
+    const datesWithAppointments = UPCOMING_APPOINTMENTS.reduce((acc, apt) => {
+        const aptDate = new Date(apt.date);
+        if (aptDate.getMonth() === currentDate.getMonth() &&
+            aptDate.getFullYear() === currentDate.getFullYear()) {
+            acc.add(aptDate.getDate());
+        }
+        return acc;
+    }, new Set());
 
     // If viewing details, render detail view
     if (viewingAppointment) {
@@ -675,7 +686,7 @@ const ProviderSchedule = () => {
                             {Array.from({ length: daysInMonth }).map((_,i) => {
                                 const date = i + 1;
                                 const isSelected = date === selectedDate;
-                                const hasEvents = [2, 15, 24, 28].includes(date);
+                                const hasEvents = datesWithAppointments.has(date);
 
                                 return (
                                     <div
@@ -837,22 +848,54 @@ const ProviderSchedule = () => {
                                     </div>
                                 </>
                             ) : (
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Reason</label>
-                                    <input type="text" placeholder="e.g. Lunch break, Personal appointment" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
-                                </div>
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Block Type</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setBlockType('TIME_SLOT')}
+                                                className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-colors ${blockType === 'TIME_SLOT' ? 'bg-gray-800 border border-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                            >
+                                                Time Slot
+                                            </button>
+                                            <button
+                                                onClick={() => setBlockType('FULL_DAY')}
+                                                className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-colors ${blockType === 'FULL_DAY' ? 'bg-gray-800 border border-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                            >
+                                                Full Day
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Reason</label>
+                                        <input type="text" placeholder="e.g. Vacation, Personal day, Sick leave" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                                    </div>
+                                </>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
-                                    <input type="time" defaultValue="09:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                            {eventType === 'APPOINTMENT' ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
+                                        <input type="time" defaultValue="09:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Time</label>
+                                        <input type="time" defaultValue="10:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Time</label>
-                                    <input type="time" defaultValue="10:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                            ) : blockType === 'TIME_SLOT' ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
+                                        <input type="time" defaultValue="09:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Time</label>
+                                        <input type="time" defaultValue="10:00" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300" />
+                                    </div>
                                 </div>
-                            </div>
+                            ) : null}
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Notes</label>
