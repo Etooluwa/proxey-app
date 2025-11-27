@@ -1,21 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { ALL_PROVIDER_APPOINTMENTS } from '../../constants';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { useToast } from '../../components/ui/ToastProvider';
 
 const ProviderAppointments = () => {
     console.log('ProviderAppointments: Component rendering');
     const navigate = useNavigate();
+    const { addNotification } = useNotifications();
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('UPCOMING');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [appointments, setAppointments] = useState([]);
+    const [actionModal, setActionModal] = useState(null); // { type: 'accept'|'decline', appointment: apt, declineReason: '' }
+
+    // Initialize appointments from localStorage or constants
+    useEffect(() => {
+        const savedAppointments = localStorage.getItem('all_provider_appointments');
+        if (savedAppointments) {
+            setAppointments(JSON.parse(savedAppointments));
+        } else {
+            setAppointments([...ALL_PROVIDER_APPOINTMENTS]);
+        }
+    }, []);
 
     console.log('ProviderAppointments: ALL_PROVIDER_APPOINTMENTS raw:', ALL_PROVIDER_APPOINTMENTS);
 
     // Filter appointments by status
-    const allAppointments = ALL_PROVIDER_APPOINTMENTS || [];
+    const allAppointments = appointments || [];
     console.log('ProviderAppointments: allAppointments:', allAppointments);
-    const upcomingAppointments = allAppointments.filter(apt => apt.status === 'UPCOMING');
+    const upcomingAppointments = allAppointments.filter(apt => apt.status === 'UPCOMING' || apt.status === 'PENDING');
     const pastAppointments = allAppointments.filter(apt => apt.status === 'COMPLETED');
     const cancelledAppointments = allAppointments.filter(apt => apt.status === 'CANCELLED');
 
@@ -39,12 +55,111 @@ const ProviderAppointments = () => {
     const currentAppointments = getCurrentAppointments();
 
     const getStatusBadge = (status) => {
-        if (status === 'UPCOMING') {
+        if (status === 'UPCOMING' || status === 'PENDING') {
             return 'bg-blue-100 text-blue-700 border-blue-200';
         } else if (status === 'COMPLETED') {
             return 'bg-green-100 text-green-700 border-green-200';
         } else {
             return 'bg-red-100 text-red-700 border-red-200';
+        }
+    };
+
+    const handleAcceptAppointment = async () => {
+        if (!actionModal?.appointment) return;
+
+        try {
+            const apt = actionModal.appointment;
+
+            // Update appointment status to CONFIRMED
+            const updatedAppointments = appointments.map(a =>
+                a.id === apt.id ? { ...a, status: 'CONFIRMED' } : a
+            );
+            setAppointments(updatedAppointments);
+            localStorage.setItem('all_provider_appointments', JSON.stringify(updatedAppointments));
+
+            // Create time block for this appointment
+            const blockData = {
+                id: `block_${apt.id}`,
+                date: apt.date,
+                time: apt.time,
+                type: 'APPOINTMENT_BLOCK',
+                appointmentId: apt.id,
+                clientName: apt.clientName,
+                service: apt.service,
+            };
+            const savedBlocks = localStorage.getItem('time_blocks');
+            const blocks = savedBlocks ? JSON.parse(savedBlocks) : [];
+            blocks.push(blockData);
+            localStorage.setItem('time_blocks', JSON.stringify(blocks));
+
+            // Send notification to client
+            addNotification({
+                type: 'appointment_approved',
+                title: 'Appointment Approved',
+                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been approved by the provider.`,
+                clientId: apt.clientId,
+            });
+
+            toast.push({
+                title: 'Appointment Accepted',
+                description: `You've confirmed the booking with ${apt.clientName}. Time slot is now blocked.`,
+                variant: 'success',
+            });
+
+            setActionModal(null);
+            setSelectedAppointment(null);
+        } catch (error) {
+            console.error('Error accepting appointment:', error);
+            toast.push({
+                title: 'Error',
+                description: 'Failed to accept appointment. Please try again.',
+                variant: 'error',
+            });
+        }
+    };
+
+    const handleDeclineAppointment = async () => {
+        if (!actionModal?.appointment) return;
+
+        try {
+            const apt = actionModal.appointment;
+            const reason = actionModal.declineReason || 'Provider declined the appointment';
+
+            // Update appointment status to DECLINED
+            const updatedAppointments = appointments.map(a =>
+                a.id === apt.id ? {
+                    ...a,
+                    status: 'DECLINED',
+                    declineReason: reason,
+                    declinedAt: new Date().toISOString()
+                } : a
+            );
+            setAppointments(updatedAppointments);
+            localStorage.setItem('all_provider_appointments', JSON.stringify(updatedAppointments));
+
+            // Send notification to client
+            addNotification({
+                type: 'appointment_declined',
+                title: 'Appointment Declined',
+                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been declined. Reason: ${reason}`,
+                clientId: apt.clientId,
+            });
+
+            toast.push({
+                title: 'Appointment Declined',
+                description: 'Client has been notified of the decline.',
+                variant: 'info',
+            });
+
+            setActionModal(null);
+            setSelectedAppointment(null);
+        } catch (error) {
+            console.error('Error declining appointment:', error);
+            toast.push({
+                title: 'Error',
+                description: 'Failed to decline appointment. Please try again.',
+                variant: 'error',
+            });
         }
     };
 
@@ -189,7 +304,7 @@ const ProviderAppointments = () => {
                                     </div>
 
                                     {/* Right: Status and Actions */}
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex flex-col md:flex-row md:items-center gap-4">
                                         <div className="text-right">
                                             <p className="text-xl font-bold text-gray-900">${apt.price.toFixed(2)}</p>
                                             <span
@@ -200,7 +315,29 @@ const ProviderAppointments = () => {
                                                 {apt.status}
                                             </span>
                                         </div>
-                                        <div className="flex gap-2">
+
+                                        {/* Action Buttons */}
+                                        <div className="flex flex-wrap gap-2 md:flex-nowrap">
+                                            {(apt.status === 'PENDING' || apt.status === 'UPCOMING') && (
+                                                <>
+                                                    <button
+                                                        onClick={() => setActionModal({ type: 'accept', appointment: apt, declineReason: '' })}
+                                                        className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors whitespace-nowrap"
+                                                        title="Accept Appointment"
+                                                    >
+                                                        <Icons.Check size={16} className="inline mr-1" />
+                                                        Accept
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActionModal({ type: 'decline', appointment: apt, declineReason: '' })}
+                                                        className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors whitespace-nowrap"
+                                                        title="Decline Appointment"
+                                                    >
+                                                        <Icons.X size={16} className="inline mr-1" />
+                                                        Decline
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => navigate(`/provider/schedule?date=${encodeURIComponent(apt.date)}`)}
                                                 className="p-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-colors"
@@ -235,6 +372,116 @@ const ProviderAppointments = () => {
                     </div>
                 )}
             </div>
+
+            {/* Action Confirmation Modal */}
+            {actionModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setActionModal(null)}>
+                    <div className="bg-white rounded-2xl max-w-lg w-full shadow-xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                            <h3 className="text-lg font-bold text-gray-900">
+                                {actionModal.type === 'accept' ? 'Accept Appointment' : 'Decline Appointment'}
+                            </h3>
+                            <button
+                                onClick={() => setActionModal(null)}
+                                className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                <Icons.X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-4">
+                            {/* Appointment Info */}
+                            <div className="bg-gray-50 rounded-xl p-4">
+                                <h4 className="font-bold text-gray-900 mb-3">Appointment Details</h4>
+                                <div className="space-y-2 text-sm">
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-semibold uppercase">Client</p>
+                                        <p className="text-gray-900 font-medium">{actionModal.appointment.clientName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-semibold uppercase">Service</p>
+                                        <p className="text-gray-900 font-medium">{actionModal.appointment.service}</p>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-semibold uppercase">Date</p>
+                                            <p className="text-gray-900 font-medium">{actionModal.appointment.date}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-semibold uppercase">Time</p>
+                                            <p className="text-gray-900 font-medium">{actionModal.appointment.time}</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-semibold uppercase">Price</p>
+                                        <p className="text-lg font-bold text-brand-600">${actionModal.appointment.price.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Message for Action */}
+                            {actionModal.type === 'accept' && (
+                                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                                    <p className="text-sm text-green-700">
+                                        <Icons.Check size={16} className="inline mr-2 text-green-600" />
+                                        Accepting this appointment will confirm the booking. The time slot will be automatically blocked.
+                                    </p>
+                                </div>
+                            )}
+
+                            {actionModal.type === 'decline' && (
+                                <div className="space-y-3">
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                                        <p className="text-sm text-red-700">
+                                            <Icons.AlertCircle size={16} className="inline mr-2 text-red-600" />
+                                            The client will be notified that you've declined this appointment.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-900 mb-2">Reason for declining (optional)</label>
+                                        <textarea
+                                            value={actionModal.declineReason}
+                                            onChange={(e) => setActionModal({ ...actionModal, declineReason: e.target.value })}
+                                            placeholder="e.g., Double-booked, transportation issue, etc."
+                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 resize-none"
+                                            rows="3"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 justify-end">
+                            <button
+                                onClick={() => setActionModal(null)}
+                                className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            {actionModal.type === 'accept' ? (
+                                <button
+                                    onClick={handleAcceptAppointment}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
+                                >
+                                    <Icons.Check size={16} />
+                                    Confirm Accept
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleDeclineAppointment}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
+                                >
+                                    <Icons.X size={16} />
+                                    Confirm Decline
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Appointment Details Modal */}
             {selectedAppointment && (
