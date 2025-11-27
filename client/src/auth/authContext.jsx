@@ -161,6 +161,17 @@ export function AuthProvider({ children }) {
             throw new Error("Email and password are required.");
         }
 
+        const existingRole = getLocalRole(email);
+        if (existingRole && existingRole !== role) {
+            const roleLabel = existingRole === 'provider' ? 'Service Provider' : 'Client';
+            const switchToRole = existingRole === 'provider' ? 'Service Provider tab' : 'Client tab';
+            const err = new Error(
+                `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
+            );
+            setAuthError(err.message);
+            throw err;
+        }
+
         if (supabase) {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
@@ -221,17 +232,6 @@ export function AuthProvider({ children }) {
             }
             setProfile(null);
             return { session: mapped, profile: null };
-        }
-
-        const existingRole = getLocalRole(email);
-        if (existingRole && existingRole !== role) {
-            const roleLabel = existingRole === 'provider' ? 'Service Provider' : 'Client';
-            const switchToRole = existingRole === 'provider' ? 'Service Provider tab' : 'Client tab';
-            const err = new Error(
-                `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
-            );
-            setAuthError(err.message);
-            throw err;
         }
 
         const chosenRole = existingRole || role;
