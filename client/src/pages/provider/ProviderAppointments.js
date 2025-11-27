@@ -282,7 +282,13 @@ const ProviderAppointments = () => {
                         {currentAppointments.map((apt) => (
                             <div
                                 key={apt.id}
-                                onClick={() => setSelectedAppointment(apt)}
+                                onClick={() => {
+                                    if (apt.status === 'PENDING' || apt.status === 'UPCOMING') {
+                                        setActionModal({ type: 'accept', appointment: apt, declineReason: '' });
+                                    } else {
+                                        setSelectedAppointment(apt);
+                                    }
+                                }}
                                 className="p-5 border border-gray-100 rounded-2xl hover:border-brand-200 hover:bg-brand-50/30 transition-all group cursor-pointer"
                             >
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
