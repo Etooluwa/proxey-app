@@ -4,10 +4,12 @@ import { Icons } from '../../components/Icons';
 import { ALL_PROVIDER_APPOINTMENTS } from '../../constants';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useToast } from '../../components/ui/ToastProvider';
+import { useSession } from '../../auth/authContext';
 
 const ProviderAppointments = () => {
     console.log('ProviderAppointments: Component rendering');
     const navigate = useNavigate();
+    const { session, profile } = useSession();
     const { addNotification } = useNotifications();
     const toast = useToast();
     const [activeTab, setActiveTab] = useState('UPCOMING');
@@ -99,10 +101,11 @@ const ProviderAppointments = () => {
             localStorage.setItem('time_blocks', JSON.stringify(blocks));
 
             // Send notification to client
+            const providerName = profile?.name || session?.user?.email?.split('@')[0] || 'the provider';
             addNotification({
                 type: 'appointment_approved',
                 title: 'Appointment Approved',
-                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been approved by the provider.`,
+                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been approved by ${providerName}.`,
                 clientId: apt.clientId,
             });
 
@@ -144,10 +147,11 @@ const ProviderAppointments = () => {
             localStorage.setItem('all_provider_appointments', JSON.stringify(updatedAppointments));
 
             // Send notification to client
+            const providerName = profile?.name || session?.user?.email?.split('@')[0] || 'the provider';
             addNotification({
                 type: 'appointment_declined',
                 title: 'Appointment Declined',
-                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been declined. Reason: ${reason}`,
+                message: `Your ${apt.service} appointment on ${apt.date} at ${apt.time} has been declined by ${providerName}. Reason: ${reason}`,
                 clientId: apt.clientId,
             });
 
