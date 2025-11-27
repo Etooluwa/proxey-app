@@ -24,14 +24,22 @@ jest.mock("react-router-dom", () => {
   };
 });
 
-jest.mock("./auth/authContext", () => ({
-  useSession: () => ({
-    session: { user: { id: "test-user" } },
+jest.mock("./auth/authContext", () => {
+  const sessionValue = {
+    session: { user: { id: "test-user", role: "client" } },
     loading: false,
     isProfileComplete: true,
-  }),
-  AuthProvider: ({ children }) => <>{children}</>,
-}));
+    authError: "",
+    clearAuthError: jest.fn(),
+    login: jest.fn(),
+    register: jest.fn(),
+  };
+  return {
+    useSession: () => sessionValue,
+    useAuth: () => ({ logout: jest.fn() }),
+    AuthProvider: ({ children }) => <>{children}</>,
+  };
+});
 
 jest.mock("./components/ui/ToastProvider", () => ({
   ToastProvider: ({ children }) => <>{children}</>,

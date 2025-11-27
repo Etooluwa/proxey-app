@@ -1,9 +1,19 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 
+function resolveUserRole(session) {
+  return (
+    session?.user?.role ||
+    session?.user?.metadata?.role ||
+    session?.user?.user_metadata?.role ||
+    "client"
+  );
+}
+
 function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
   const { session, loading, isProfileComplete } = useSession();
   const location = useLocation();
+  const userRole = resolveUserRole(session);
 
   if (loading) {
     return (
@@ -23,13 +33,17 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
     );
   }
 
-  if (allowedRoles && !allowedRoles.includes(session.user.role)) {
-    // Redirect to the correct dashboard based on their actual role
-    return <Navigate to={session.user.role === 'client' ? '/app' : '/provider'} replace />;
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    const fallbackPath = userRole === "provider" ? "/provider" : "/app";
+    return <Navigate to={fallbackPath} replace />;
   }
 
-  if (requireProfile && !isProfileComplete && location.pathname !== "/onboarding" && location.pathname !== "/provider/onboarding") {
-    return <Navigate to="/onboarding" replace />;
+  if (requireProfile && !isProfileComplete) {
+    const onboardingPath =
+      userRole === "provider" ? "/provider/onboarding" : "/onboarding";
+    if (location.pathname !== onboardingPath) {
+      return <Navigate to={onboardingPath} replace />;
+    }
   }
 
   // Render children if provided, otherwise use outlet for nested routes

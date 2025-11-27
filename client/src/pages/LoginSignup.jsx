@@ -15,7 +15,7 @@ import "./LoginSignup.css";
  * />
  */
 
-export default function LoginSignup({ onLogin, onSignup }) {
+export default function LoginSignup({ onLogin, onSignup, globalError, onClearError }) {
   const [role, setRole] = useState("client");
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -27,6 +27,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
 
   const handleRoleSelect = (nextRole) => {
     setRole(nextRole);
+    onClearError?.();
   };
 
   const onRoleKeyDown = (event, nextRole) => {
@@ -124,6 +125,11 @@ export default function LoginSignup({ onLogin, onSignup }) {
         <p className="login-signup__subheading">Sign in or create an account</p>
 
         <form className="login-signup__form" onSubmit={handleSubmit} noValidate>
+          {globalError ? (
+            <div className="login-signup__error" role="alert">
+              {globalError}
+            </div>
+          ) : null}
           <div className="login-signup__mode">
             <button
               type="button"
@@ -133,6 +139,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
               onClick={() => {
                 setMode("login");
                 setPasswordError("");
+                onClearError?.();
               }}
             >
               Login
@@ -145,6 +152,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
               onClick={() => {
                 setMode("signup");
                 setPasswordError("");
+                onClearError?.();
               }}
             >
               Sign up
@@ -191,6 +199,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
             onChange={(event) => {
               setEmail(event.target.value);
               if (emailError) setEmailError("");
+              onClearError?.();
             }}
             placeholder="you@example.com"
             aria-required="true"
@@ -215,6 +224,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
             onChange={(event) => {
               setPassword(event.target.value);
               if (passwordError) setPasswordError("");
+              onClearError?.();
             }}
             placeholder="Enter your password"
             aria-required="true"
@@ -235,6 +245,7 @@ export default function LoginSignup({ onLogin, onSignup }) {
                 onChange={(event) => {
                   setConfirmPassword(event.target.value);
                   if (passwordError) setPasswordError("");
+                  onClearError?.();
                 }}
                 placeholder="Re-enter your password"
                 aria-required="true"
@@ -310,9 +321,13 @@ export default function LoginSignup({ onLogin, onSignup }) {
 LoginSignup.defaultProps = {
   onLogin: undefined,
   onSignup: undefined,
+  globalError: "",
+  onClearError: undefined,
 };
 
 LoginSignup.propTypes = {
   onLogin: PropTypes.func,
   onSignup: PropTypes.func,
+  globalError: PropTypes.string,
+  onClearError: PropTypes.func,
 };

@@ -1,10 +1,26 @@
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import LoginSignup from "../pages/LoginSignup";
 
+function resolveUserRole(session) {
+  return (
+    session?.user?.role ||
+    session?.user?.metadata?.role ||
+    session?.user?.user_metadata?.role ||
+    "client"
+  );
+}
+
 function RoleRedirect() {
-  const navigate = useNavigate();
-  const { session, loading, login, register, isProfileComplete } = useSession();
+  const {
+    session,
+    loading,
+    login,
+    register,
+    isProfileComplete,
+    authError,
+    clearAuthError,
+  } = useSession();
 
   if (loading) {
     return (
@@ -18,31 +34,29 @@ function RoleRedirect() {
     return (
       <LoginSignup
         onLogin={async ({ role, email, password }) => {
-          const result = await login({ email, password, role });
-          // After login, the state will update and RoleRedirect will re-render
-          // The new render will check isProfileComplete and redirect appropriately
+          await login({ email, password, role });
         }}
         onSignup={async ({ role, email, password }) => {
-          const result = await register({ email, password, role });
-          // After signup, SignUpPage now redirects to the correct onboarding path
+          await register({ email, password, role });
         }}
+        globalError={authError}
+        onClearError={clearAuthError}
       />
     );
   }
 
-  // Check if client profile is incomplete and redirect to onboarding
-  if (session.user.role === "client" && !isProfileComplete) {
-    return <Navigate to="/onboarding" replace />;
-  }
+  const userRole = resolveUserRole(session);
+  const onboardingPath =
+    userRole === "provider" ? "/provider/onboarding" : "/onboarding";
 
-  // Check if provider profile is incomplete and redirect to provider onboarding
-  if (session.user.role === "provider" && !isProfileComplete) {
-    return <Navigate to="/provider/onboarding" replace />;
+  // Check if client profile is incomplete and redirect to onboarding
+  if (!isProfileComplete) {
+    return <Navigate to={onboardingPath} replace />;
   }
 
   return (
     <Navigate
-      to={session.user.role === "provider" ? "/provider" : "/app"}
+      to={userRole === "provider" ? "/provider" : "/app"}
       replace
     />
   );

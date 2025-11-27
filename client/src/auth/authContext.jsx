@@ -344,12 +344,15 @@ export function AuthProvider({ children }) {
         return nextProfile;
     };
 
+    const clearAuthError = () => setAuthError(null);
+
     const value = useMemo(
         () => ({
             session,
             profile,
             loading,
             authError,
+            clearAuthError,
             login,
             register,
             logout,
