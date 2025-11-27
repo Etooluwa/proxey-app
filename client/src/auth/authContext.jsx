@@ -182,6 +182,14 @@ export function AuthProvider({ children }) {
                 const err = new Error(
                     `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
                 );
+                try {
+                    await supabase.auth.signOut();
+                } catch (signOutError) {
+                    console.warn("[auth] Failed to sign out after role mismatch", signOutError);
+                }
+                setSession(null);
+                setProfile(null);
+                persistSession(null);
                 setAuthError(err.message);
                 throw err;
             }
