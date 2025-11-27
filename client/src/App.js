@@ -35,6 +35,7 @@ import ProviderMessages from './pages/provider/ProviderMessages';
 import ProviderServices from './pages/provider/ProviderServices';
 import ProviderProfile from './pages/provider/ProviderProfile';
 import ProviderPromotions from './pages/provider/ProviderPromotions';
+import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcceptance';
 
 function App() {
   return (
@@ -100,6 +101,7 @@ function App() {
                   >
                     <Route index element={<ProviderDashboard />} />
                     <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="requests/:requestId" element={<AppointmentRequestAcceptance />} />
                     <Route path="schedule" element={<ProviderSchedule />} />
                     <Route path="appointments" element={<ProviderAppointments />} />
                     <Route path="promotions" element={<ProviderPromotions />} />

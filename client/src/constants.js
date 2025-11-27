@@ -399,6 +399,55 @@ export const EARNINGS_DATA = [
     { name: 'Sun', value: 0 },
 ];
 
+// Pending Appointment Requests (waiting for provider acceptance/decline)
+export const PENDING_APPOINTMENT_REQUESTS = [
+    {
+        id: 'req1',
+        clientName: 'Emma Wilson',
+        clientAvatar: 'https://picsum.photos/seed/emma/100/100',
+        clientEmail: 'emma.wilson@email.com',
+        clientPhone: '+1 (555) 234-5678',
+        service: 'Deep Home Cleaning',
+        requestedDate: 'Oct 27, 2023',
+        requestedTime: '10:00 AM - 12:00 PM',
+        address: '890 Birch Ave, San Francisco',
+        price: 120.00,
+        clientNotes: 'Would love to focus on the kitchen and living room areas.',
+        requestedAt: '2023-10-24T14:30:00Z',
+        status: 'PENDING'
+    },
+    {
+        id: 'req2',
+        clientName: 'Frank Miller',
+        clientAvatar: 'https://picsum.photos/seed/frank/100/100',
+        clientEmail: 'frank.miller@email.com',
+        clientPhone: '+1 (555) 345-6789',
+        service: 'Move-out Clean',
+        requestedDate: 'Oct 28, 2023',
+        requestedTime: '09:00 AM - 01:00 PM',
+        address: '234 Cedar Ln, San Francisco',
+        price: 250.00,
+        clientNotes: 'Moving out by end of month. Need thorough cleaning.',
+        requestedAt: '2023-10-24T15:45:00Z',
+        status: 'PENDING'
+    },
+    {
+        id: 'req3',
+        clientName: 'Grace Lee',
+        clientAvatar: 'https://picsum.photos/seed/grace/100/100',
+        clientEmail: 'grace.lee@email.com',
+        clientPhone: '+1 (555) 456-7890',
+        service: 'Standard Weekly Clean',
+        requestedDate: 'Oct 30, 2023',
+        requestedTime: '02:00 PM - 04:00 PM',
+        address: '567 Walnut St, San Francisco',
+        price: 80.00,
+        clientNotes: 'Recurring weekly service preferred.',
+        requestedAt: '2023-10-24T16:20:00Z',
+        status: 'PENDING'
+    }
+];
+
 // Provider Promotions (visible to clients on public profiles)
 export const PROVIDER_PROMOTIONS = [
     {
