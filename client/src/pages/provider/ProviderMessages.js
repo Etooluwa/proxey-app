@@ -1,39 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
+import { useMessages } from '../../contexts/MessageContext';
 
-// Mock data adapted for Provider view (Clients instead of Providers)
-const MOCK_CLIENT_CONVERSATIONS = [
-    {
-        id: '1',
-        clientName: 'Alice Cooper',
-        avatar: 'https://picsum.photos/seed/alice/100/100',
-        lastMessage: 'Is 10 AM okay for you?',
-        time: '5m ago',
-        unread: 1,
-        online: true,
-        serviceInterest: 'Deep Home Cleaning'
-    },
-    {
-        id: '2',
-        clientName: 'Bob Smith',
-        avatar: 'https://picsum.photos/seed/bob/100/100',
-        lastMessage: 'Thanks again for the great work!',
-        time: '3h ago',
-        unread: 0,
-        online: false,
-        serviceInterest: 'Window Cleaning'
-    },
-    {
-        id: '3',
-        clientName: 'Carol Danvers',
-        avatar: 'https://picsum.photos/seed/carol/100/100',
-        lastMessage: 'I need to reschedule.',
-        time: '1d ago',
-        unread: 0,
-        online: false,
-        serviceInterest: 'Move-out Clean'
-    }
-];
 
 const MOCK_CHAT_HISTORY = [
     { id: 1, sender: 'them', text: 'Hi there! I am interested in your deep cleaning service.', time: '10:00 AM' },
@@ -44,11 +12,20 @@ const MOCK_CHAT_HISTORY = [
 ];
 
 const ProviderMessages = () => {
-    const [activeChat, setActiveChat] = useState(MOCK_CLIENT_CONVERSATIONS[0]);
+    const { conversations, markAsRead } = useMessages();
+    const [activeChat, setActiveChat] = useState(null);
     const [showMobileChat, setShowMobileChat] = useState(false);
 
+    // Initialize activeChat from conversations on first load
+    useEffect(() => {
+        if (conversations.length > 0 && !activeChat) {
+            setActiveChat(conversations[0]);
+        }
+    }, [conversations, activeChat]);
+
     const handleChatSelect = (chat) => {
-        setActiveChat(chat);
+        markAsRead(chat.id);
+        setActiveChat({ ...chat, unread: 0 });
         setShowMobileChat(true);
     };
 
@@ -70,11 +47,11 @@ const ProviderMessages = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {MOCK_CLIENT_CONVERSATIONS.map((chat) => (
+                    {conversations.map((chat) => (
                         <div
                             key={chat.id}
                             onClick={() => handleChatSelect(chat)}
-                            className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChat.id === chat.id
+                            className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChat?.id === chat.id
                                     ? 'bg-brand-50/50 border-brand-500'
                                     : 'border-transparent'
                                 }`}
@@ -85,7 +62,7 @@ const ProviderMessages = () => {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <h4 className={`text-sm font-bold truncate ${activeChat.id === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
+                                    <h4 className={`text-sm font-bold truncate ${activeChat?.id === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
                                         {chat.clientName}
                                     </h4>
                                     <span className="text-xs text-gray-400 whitespace-nowrap">{chat.time}</span>

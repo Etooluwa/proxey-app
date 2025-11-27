@@ -5,7 +5,7 @@ const MessageContext = createContext();
 
 export const useMessages = () => useContext(MessageContext);
 
-const INITIAL_CONVERSATIONS = [
+const INITIAL_CLIENT_CONVERSATIONS = [
     {
         id: '1',
         providerId: 'p1',
@@ -35,37 +35,73 @@ const INITIAL_CONVERSATIONS = [
     }
 ];
 
+const INITIAL_PROVIDER_CONVERSATIONS = [
+    {
+        id: '1',
+        clientName: 'Alice Cooper',
+        avatar: 'https://picsum.photos/seed/alice/100/100',
+        lastMessage: 'Is 10 AM okay for you?',
+        time: '5m ago',
+        unread: 1,
+        online: true,
+        serviceInterest: 'Deep Home Cleaning'
+    },
+    {
+        id: '2',
+        clientName: 'Bob Smith',
+        avatar: 'https://picsum.photos/seed/bob/100/100',
+        lastMessage: 'Thanks again for the great work!',
+        time: '3h ago',
+        unread: 0,
+        online: false,
+        serviceInterest: 'Window Cleaning'
+    },
+    {
+        id: '3',
+        clientName: 'Carol Danvers',
+        avatar: 'https://picsum.photos/seed/carol/100/100',
+        lastMessage: 'I need to reschedule.',
+        time: '1d ago',
+        unread: 0,
+        online: false,
+        serviceInterest: 'Move-out Clean'
+    }
+];
+
 export const MessageProvider = ({ children }) => {
-    const { session } = useSession();
+    const { session, role } = useSession();
     const userId = session?.user?.id;
 
-    const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
+    const [conversations, setConversations] = useState([]);
 
-    // Load conversations when userId changes
+    // Load conversations when userId or role changes
     useEffect(() => {
         if (userId) {
-            const saved = localStorage.getItem(`proxey.conversations.${userId}`);
+            const storageKey = `proxey.conversations.${role}.${userId}`;
+            const saved = localStorage.getItem(storageKey);
             if (saved) {
                 try {
                     setConversations(JSON.parse(saved));
                 } catch (e) {
                     console.error("Failed to parse conversations", e);
-                    setConversations(INITIAL_CONVERSATIONS);
+                    const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
+                    setConversations(initialConvs);
                 }
             } else {
-                // If no saved conversations for this user, reset to initial (or empty)
-                // For prototype, we reset to INITIAL_CONVERSATIONS so they see data
-                setConversations(INITIAL_CONVERSATIONS);
+                // Initialize with appropriate data based on role
+                const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
+                setConversations(initialConvs);
             }
         }
-    }, [userId]);
+    }, [userId, role]);
 
     // Save conversations when they change
     useEffect(() => {
-        if (userId) {
-            localStorage.setItem(`proxey.conversations.${userId}`, JSON.stringify(conversations));
+        if (userId && role && conversations.length > 0) {
+            const storageKey = `proxey.conversations.${role}.${userId}`;
+            localStorage.setItem(storageKey, JSON.stringify(conversations));
         }
-    }, [conversations, userId]);
+    }, [conversations, userId, role]);
 
     const markAsRead = (conversationId) => {
         setConversations(prev => prev.map(c =>
