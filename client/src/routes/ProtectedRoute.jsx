@@ -26,7 +26,7 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
   if (!session?.user) {
     return (
       <Navigate
-        to="/auth/sign-in"
+        to="/"
         replace
         state={{ from: location.pathname + location.search }}
       />
