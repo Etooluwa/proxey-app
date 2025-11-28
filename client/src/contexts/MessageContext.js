@@ -76,7 +76,7 @@ export const MessageProvider = ({ children }) => {
 
     // Load conversations when userId or role changes
     useEffect(() => {
-        if (userId) {
+        if (userId && role) {
             const storageKey = `proxey.conversations.${role}.${userId}`;
             const saved = localStorage.getItem(storageKey);
             if (saved) {
@@ -90,6 +90,7 @@ export const MessageProvider = ({ children }) => {
             } else {
                 // Initialize with appropriate data based on role
                 const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
+                console.log('Initializing conversations for role:', role, initialConvs);
                 setConversations(initialConvs);
             }
         }

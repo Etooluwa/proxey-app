@@ -11,10 +11,46 @@ const MOCK_CHAT_HISTORY = [
     { id: 5, sender: 'them', text: 'Yes, the code is #1234.', time: '10:12 AM' },
 ];
 
+const FALLBACK_PROVIDER_CONVERSATIONS = [
+    {
+        id: '1',
+        clientName: 'Alice Cooper',
+        avatar: 'https://picsum.photos/seed/alice/100/100',
+        lastMessage: 'Is 10 AM okay for you?',
+        time: '5m ago',
+        unread: 1,
+        online: true,
+        serviceInterest: 'Deep Home Cleaning'
+    },
+    {
+        id: '2',
+        clientName: 'Bob Smith',
+        avatar: 'https://picsum.photos/seed/bob/100/100',
+        lastMessage: 'Thanks again for the great work!',
+        time: '3h ago',
+        unread: 0,
+        online: false,
+        serviceInterest: 'Window Cleaning'
+    },
+    {
+        id: '3',
+        clientName: 'Carol Danvers',
+        avatar: 'https://picsum.photos/seed/carol/100/100',
+        lastMessage: 'I need to reschedule.',
+        time: '1d ago',
+        unread: 0,
+        online: false,
+        serviceInterest: 'Move-out Clean'
+    }
+];
+
 const ProviderMessages = () => {
-    const { conversations, markAsRead } = useMessages();
+    const { conversations: contextConversations, markAsRead } = useMessages();
     const [activeChatId, setActiveChatId] = useState(null);
     const [showMobileChat, setShowMobileChat] = useState(false);
+
+    // Use context conversations if available, otherwise use fallback
+    const conversations = contextConversations && contextConversations.length > 0 ? contextConversations : FALLBACK_PROVIDER_CONVERSATIONS;
 
     // Initialize activeChatId from conversations on first load
     useEffect(() => {
