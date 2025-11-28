@@ -76,15 +76,15 @@ export const MessageProvider = ({ children }) => {
 
     // Load conversations when userId or role changes
     useEffect(() => {
-        // Always initialize with appropriate data based on role, with or without userId
-        const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
-
+        // Try to load from localStorage first if both userId and role are available
         if (userId && role) {
             const storageKey = `proxey.conversations.${role}.${userId}`;
             const saved = localStorage.getItem(storageKey);
             if (saved) {
                 try {
-                    setConversations(JSON.parse(saved));
+                    const parsed = JSON.parse(saved);
+                    console.log('Loaded conversations from storage:', parsed);
+                    setConversations(parsed);
                     return;
                 } catch (e) {
                     console.error("Failed to parse conversations", e);
@@ -92,11 +92,14 @@ export const MessageProvider = ({ children }) => {
             }
         }
 
-        // Always set initial conversations if we have a role
-        if (role) {
-            console.log('Setting initial conversations for role:', role);
-            setConversations(initialConvs);
-        }
+        // If no role available yet, default to provider conversations for now
+        // This handles the case where role loads asynchronously
+        const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS :
+                            role === 'client' ? INITIAL_CLIENT_CONVERSATIONS :
+                            INITIAL_PROVIDER_CONVERSATIONS; // default to provider
+
+        console.log('Setting conversations with role:', role, 'convos count:', initialConvs.length);
+        setConversations(initialConvs);
     }, [userId, role]);
 
     // Save conversations when they change
