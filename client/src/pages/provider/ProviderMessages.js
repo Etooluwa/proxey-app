@@ -83,6 +83,7 @@ const ProviderMessages = () => {
             </div>
 
             {/* Right Side: Chat Window */}
+            {activeChat && (
             <div className={`flex-1 flex-col bg-gray-50/30 w-full md:w-auto absolute inset-0 z-20 md:relative md:flex ${showMobileChat ? 'flex' : 'hidden'}`}>
                 {/* Chat Header */}
                 <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-center">
@@ -95,12 +96,12 @@ const ProviderMessages = () => {
                             <Icons.ArrowLeft size={20} />
                         </button>
 
-                        <img src={activeChat?.avatar} alt={activeChat?.clientName} className="w-10 h-10 rounded-full object-cover" />
+                        <img src={activeChat.avatar} alt={activeChat.clientName} className="w-10 h-10 rounded-full object-cover" />
                         <div>
-                            <h3 className="font-bold text-gray-900">{activeChat?.clientName}</h3>
+                            <h3 className="font-bold text-gray-900">{activeChat.clientName}</h3>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md text-gray-600 font-medium">{activeChat?.serviceInterest}</span>
-                                {activeChat?.online && <span className="text-xs text-green-600 font-bold">• Online</span>}
+                                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md text-gray-600 font-medium">{activeChat.serviceInterest}</span>
+                                {activeChat.online && <span className="text-xs text-green-600 font-bold">• Online</span>}
                             </div>
                         </div>
                     </div>
@@ -153,6 +154,7 @@ const ProviderMessages = () => {
                     </div>
                 </div>
             </div>
+            )}
 
         </div>
     );
