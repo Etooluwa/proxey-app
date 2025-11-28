@@ -64,18 +64,20 @@ const ProviderMessages = () => {
                                 {chat.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start mb-1">
-                                    <h4 className={`text-sm font-bold truncate ${activeChatId === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
-                                        {chat.clientName}
-                                    </h4>
-                                    <span className="text-xs text-gray-400 whitespace-nowrap">{chat.time}</span>
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className={`text-sm font-bold truncate ${activeChatId === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
+                                            {chat.clientName}
+                                        </h4>
+                                        <p className={`text-xs ${chat.unread > 0 ? 'text-brand-600 font-bold' : 'text-gray-500'} truncate`}>
+                                            Re: {chat.serviceInterest}
+                                        </p>
+                                        <p className={`text-xs truncate mt-1 ${chat.unread > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                                            {chat.lastMessage}
+                                        </p>
+                                    </div>
+                                    <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">{chat.time}</span>
                                 </div>
-                                <p className={`text-xs text-brand-600 font-medium mb-1 truncate`}>
-                                    Re: {chat.serviceInterest}
-                                </p>
-                                <p className={`text-sm truncate ${chat.unread > 0 ? 'font-bold text-gray-800' : 'text-gray-500'}`}>
-                                    {chat.lastMessage}
-                                </p>
                             </div>
                         </div>
                     ))}
