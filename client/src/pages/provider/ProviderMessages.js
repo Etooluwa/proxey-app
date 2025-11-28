@@ -13,19 +13,22 @@ const MOCK_CHAT_HISTORY = [
 
 const ProviderMessages = () => {
     const { conversations, markAsRead } = useMessages();
-    const [activeChat, setActiveChat] = useState(null);
+    const [activeChatId, setActiveChatId] = useState(null);
     const [showMobileChat, setShowMobileChat] = useState(false);
 
-    // Initialize activeChat from conversations on first load
+    // Initialize activeChatId from conversations on first load
     useEffect(() => {
-        if (conversations.length > 0 && !activeChat) {
-            setActiveChat(conversations[0]);
+        if (conversations.length > 0 && !activeChatId) {
+            setActiveChatId(conversations[0].id);
         }
-    }, [conversations, activeChat]);
+    }, [conversations, activeChatId]);
+
+    // Get the current active chat from conversations to always have fresh data
+    const activeChat = conversations.find(c => c.id === activeChatId) || conversations[0];
 
     const handleChatSelect = (chat) => {
         markAsRead(chat.id);
-        setActiveChat({ ...chat, unread: 0 });
+        setActiveChatId(chat.id);
         setShowMobileChat(true);
     };
 
@@ -51,7 +54,7 @@ const ProviderMessages = () => {
                         <div
                             key={chat.id}
                             onClick={() => handleChatSelect(chat)}
-                            className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChat?.id === chat.id
+                            className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChatId === chat.id
                                     ? 'bg-brand-50/50 border-brand-500'
                                     : 'border-transparent'
                                 }`}
@@ -62,7 +65,7 @@ const ProviderMessages = () => {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <h4 className={`text-sm font-bold truncate ${activeChat?.id === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
+                                    <h4 className={`text-sm font-bold truncate ${activeChatId === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
                                         {chat.clientName}
                                     </h4>
                                     <span className="text-xs text-gray-400 whitespace-nowrap">{chat.time}</span>
@@ -92,12 +95,12 @@ const ProviderMessages = () => {
                             <Icons.ArrowLeft size={20} />
                         </button>
 
-                        <img src={activeChat.avatar} alt={activeChat.clientName} className="w-10 h-10 rounded-full object-cover" />
+                        <img src={activeChat?.avatar} alt={activeChat?.clientName} className="w-10 h-10 rounded-full object-cover" />
                         <div>
-                            <h3 className="font-bold text-gray-900">{activeChat.clientName}</h3>
+                            <h3 className="font-bold text-gray-900">{activeChat?.clientName}</h3>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md text-gray-600 font-medium">{activeChat.serviceInterest}</span>
-                                {activeChat.online && <span className="text-xs text-green-600 font-bold">• Online</span>}
+                                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md text-gray-600 font-medium">{activeChat?.serviceInterest}</span>
+                                {activeChat?.online && <span className="text-xs text-green-600 font-bold">• Online</span>}
                             </div>
                         </div>
                     </div>
