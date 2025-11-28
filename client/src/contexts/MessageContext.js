@@ -76,23 +76,26 @@ export const MessageProvider = ({ children }) => {
 
     // Load conversations when userId or role changes
     useEffect(() => {
+        // Always initialize with appropriate data based on role, with or without userId
+        const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
+
         if (userId && role) {
             const storageKey = `proxey.conversations.${role}.${userId}`;
             const saved = localStorage.getItem(storageKey);
             if (saved) {
                 try {
                     setConversations(JSON.parse(saved));
+                    return;
                 } catch (e) {
                     console.error("Failed to parse conversations", e);
-                    const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
-                    setConversations(initialConvs);
                 }
-            } else {
-                // Initialize with appropriate data based on role
-                const initialConvs = role === 'provider' ? INITIAL_PROVIDER_CONVERSATIONS : INITIAL_CLIENT_CONVERSATIONS;
-                console.log('Initializing conversations for role:', role, initialConvs);
-                setConversations(initialConvs);
             }
+        }
+
+        // Always set initial conversations if we have a role
+        if (role) {
+            console.log('Setting initial conversations for role:', role);
+            setConversations(initialConvs);
         }
     }, [userId, role]);
 
