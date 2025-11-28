@@ -64,19 +64,21 @@ const ProviderMessages = () => {
                                 {chat.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start gap-2">
+                                <div className="flex gap-2 w-full">
                                     <div className="flex-1 min-w-0">
-                                        <h4 className={`text-sm font-bold truncate ${activeChatId === chat.id ? 'text-brand-900' : 'text-gray-900'}`}>
-                                            {chat.clientName}
+                                        <h4 className="text-sm font-bold text-gray-900 truncate block">
+                                            {chat.clientName || 'Unknown'}
                                         </h4>
-                                        <p className={`text-xs ${chat.unread > 0 ? 'text-brand-600 font-bold' : 'text-gray-500'} truncate`}>
-                                            Re: {chat.serviceInterest}
+                                        <p className={`text-xs block ${chat.unread > 0 ? 'text-brand-600 font-bold' : 'text-gray-500'}`}>
+                                            Re: {chat.serviceInterest || 'Service'}
                                         </p>
-                                        <p className={`text-xs truncate mt-1 ${chat.unread > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
-                                            {chat.lastMessage}
+                                        <p className={`text-xs mt-1 block ${chat.unread > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                                            {chat.lastMessage || 'No message'}
                                         </p>
                                     </div>
-                                    <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">{chat.time}</span>
+                                    <div className="flex-shrink-0">
+                                        <span className="text-xs text-gray-400 whitespace-nowrap">{chat.time}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
