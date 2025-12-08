@@ -14,6 +14,9 @@ const ICONS = {
   calendar: (
     <path d="M7 4V2m10 2V2m-9 6h8m3 13H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2z" />
   ),
+  document: (
+    <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9zm3 0v5h5M9 13h6m-6 4h6" />
+  ),
   user: (
     <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" />
   ),
@@ -24,6 +27,7 @@ function ProviderBottomNav({ activePath }) {
     { to: "/provider", label: "Home", icon: "home" },
     { to: "/provider/jobs", label: "Jobs", icon: "briefcase" },
     { to: "/provider/earnings", label: "Earnings", icon: "coins" },
+    { to: "/provider/invoices", label: "Invoices", icon: "document" },
     { to: "/provider/schedule", label: "Schedule", icon: "calendar" },
     { to: "/provider/profile", label: "Profile", icon: "user" },
   ];

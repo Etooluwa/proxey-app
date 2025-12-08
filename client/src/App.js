@@ -31,6 +31,7 @@ import ProviderDashboard from './pages/provider/ProviderDashboard';
 import ProviderSchedule from './pages/provider/ProviderSchedule';
 import ProviderAppointments from './pages/provider/ProviderAppointments';
 import ProviderEarnings from './pages/provider/ProviderEarnings';
+import ProviderInvoices from './pages/provider/ProviderInvoices';
 import ProviderMessages from './pages/provider/ProviderMessages';
 import ProviderServices from './pages/provider/ProviderServices';
 import ProviderProfile from './pages/provider/ProviderProfile';
@@ -106,6 +107,7 @@ function App() {
                     <Route path="appointments" element={<ProviderAppointments />} />
                     <Route path="promotions" element={<ProviderPromotions />} />
                     <Route path="earnings" element={<ProviderEarnings />} />
+                    <Route path="invoices" element={<ProviderInvoices />} />
                     <Route path="messages" element={<ProviderMessages />} />
                     <Route path="services" element={<ProviderServices />} />
                     <Route path="profile" element={<ProviderProfile />} />

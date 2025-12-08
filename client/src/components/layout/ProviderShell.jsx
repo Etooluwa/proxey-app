@@ -13,6 +13,7 @@ function ProviderShell() {
   const pageTitle = useMemo(() => {
     if (location.pathname.startsWith("/provider/jobs")) return "Jobs";
     if (location.pathname.startsWith("/provider/earnings")) return "Earnings";
+    if (location.pathname.startsWith("/provider/invoices")) return "Invoices";
     if (location.pathname.startsWith("/provider/schedule")) return "Schedule";
     if (location.pathname.startsWith("/provider/profile")) return "Profile";
     return "Dashboard";
