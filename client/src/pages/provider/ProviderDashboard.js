@@ -21,6 +21,15 @@ const ProviderDashboard = () => {
     const { profile } = useSession();
     const [requests] = useState(PROVIDER_REQUESTS); // Using mock data
 
+    const handleDateClick = (date) => {
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+        navigate(`/provider/schedule?date=${encodeURIComponent(formattedDate)}`);
+    };
+
     const firstName = profile?.name?.split(' ')[0] || 'Provider';
 
     console.log('ProviderDashboard: Rendering with requests:', requests.length);
@@ -211,7 +220,14 @@ const ProviderDashboard = () => {
                         date.setDate(date.getDate() + i);
                         const isToday = i === 0;
                         return (
-                            <div key={i} className={`flex-shrink-0 w-28 p-4 rounded-xl border text-center cursor-pointer transition-all group ${isToday ? 'bg-gray-800 border-gray-800 text-white shadow-md' : 'bg-white border-gray-100 hover:border-brand-300'}`}>
+                            <div
+                                key={i}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => handleDateClick(date)}
+                                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDateClick(date)}
+                                className={`flex-shrink-0 w-28 p-4 rounded-xl border text-center cursor-pointer transition-all group ${isToday ? 'bg-gray-800 border-gray-800 text-white shadow-md' : 'bg-white border-gray-100 hover:border-brand-300'}`}
+                            >
                                 <div className={`text-xs mb-1 ${isToday ? 'text-gray-400' : 'text-gray-400'}`}>
                                     {date.toLocaleDateString('en-US', { weekday: 'short' })}
                                 </div>
