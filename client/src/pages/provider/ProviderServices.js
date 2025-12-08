@@ -17,7 +17,11 @@ const ProviderServices = () => {
         duration: '1 hour',
         description: '',
         active: true,
+        requiresDeposit: false,
+        depositPercentage: 50,
+        customInputs: [],
     });
+    const [newInputField, setNewInputField] = useState({ label: '', type: 'text', required: false });
 
     const toggleActive = (id) => {
         setServices(services.map(s => s.id === id ? { ...s, active: !s.active } : s));
@@ -33,7 +37,11 @@ const ProviderServices = () => {
             duration: '1 hour',
             description: '',
             active: true,
+            requiresDeposit: false,
+            depositPercentage: 50,
+            customInputs: [],
         });
+        setNewInputField({ label: '', type: 'text', required: false });
         setIsModalOpen(true);
     };
 
@@ -59,6 +67,22 @@ const ProviderServices = () => {
             setServices([...services, newService]);
         }
         setIsModalOpen(false);
+    };
+
+    const addCustomInputField = () => {
+        if (!newInputField.label.trim()) return;
+        setFormData({
+            ...formData,
+            customInputs: [...formData.customInputs, { ...newInputField, id: Math.random().toString(36).substr(2, 9) }]
+        });
+        setNewInputField({ label: '', type: 'text', required: false });
+    };
+
+    const removeCustomInputField = (fieldId) => {
+        setFormData({
+            ...formData,
+            customInputs: formData.customInputs.filter(f => f.id !== fieldId)
+        });
     };
 
     return (
@@ -252,6 +276,121 @@ const ProviderServices = () => {
                                     placeholder="Describe what's included in this service..."
                                     className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-medium h-32 resize-none transition-all"
                                 />
+                            </div>
+
+                            {/* Deposit Payment Section */}
+                            <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="requiresDeposit"
+                                        checked={formData.requiresDeposit}
+                                        onChange={(e) => setFormData({ ...formData, requiresDeposit: e.target.checked })}
+                                        className="w-4 h-4 rounded border-gray-300 text-brand-600 cursor-pointer"
+                                    />
+                                    <label htmlFor="requiresDeposit" className="text-sm font-bold text-gray-800 cursor-pointer">
+                                        Require initial deposit from clients
+                                    </label>
+                                </div>
+                                <p className="text-xs text-gray-600 mb-4">Clients will pay an upfront deposit, with the remaining balance due after service completion.</p>
+
+                                {formData.requiresDeposit && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Deposit Percentage</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="range"
+                                                min="10"
+                                                max="100"
+                                                step="5"
+                                                value={formData.depositPercentage}
+                                                onChange={(e) => setFormData({ ...formData, depositPercentage: parseInt(e.target.value) })}
+                                                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                            />
+                                            <span className="text-sm font-bold text-gray-900 min-w-16">{formData.depositPercentage}%</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Deposit: ${((formData.price * formData.depositPercentage) / 100).toFixed(2)} · Final: ${((formData.price * (100 - formData.depositPercentage)) / 100).toFixed(2)}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Custom Client Input Fields Section */}
+                            <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100">
+                                <label className="block text-sm font-bold text-gray-800 mb-4">Request additional information from clients (optional)</label>
+                                <p className="text-xs text-gray-600 mb-4">Add custom fields to collect specific information when clients book this service.</p>
+
+                                {/* Existing Custom Fields */}
+                                {formData.customInputs.length > 0 && (
+                                    <div className="mb-6 space-y-2">
+                                        {formData.customInputs.map((field) => (
+                                            <div key={field.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-green-100">
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-gray-900">{field.label}</p>
+                                                    <p className="text-xs text-gray-500">Type: {field.type} {field.required ? '(Required)' : '(Optional)'}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCustomInputField(field.id)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Icons.X size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Add New Field Form */}
+                                <div className="space-y-3 border-t border-green-100 pt-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Field Label</label>
+                                        <input
+                                            type="text"
+                                            value={newInputField.label}
+                                            onChange={(e) => setNewInputField({ ...newInputField, label: e.target.value })}
+                                            placeholder="e.g., 'Square Footage', 'Pet Information'"
+                                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 text-sm transition-all"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Field Type</label>
+                                        <select
+                                            value={newInputField.type}
+                                            onChange={(e) => setNewInputField({ ...newInputField, type: e.target.value })}
+                                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 text-sm appearance-none transition-all"
+                                        >
+                                            <option value="text">Text</option>
+                                            <option value="number">Number</option>
+                                            <option value="textarea">Long Text</option>
+                                            <option value="select">Dropdown</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="fieldRequired"
+                                            checked={newInputField.required}
+                                            onChange={(e) => setNewInputField({ ...newInputField, required: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 text-brand-600 cursor-pointer"
+                                        />
+                                        <label htmlFor="fieldRequired" className="text-xs font-medium text-gray-700 cursor-pointer">
+                                            Make this field required
+                                        </label>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={addCustomInputField}
+                                        disabled={!newInputField.label.trim()}
+                                        className={`w-full py-2 rounded-lg text-sm font-bold transition-all ${newInputField.label.trim() ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                    >
+                                        + Add Field
+                                    </button>
+                                </div>
                             </div>
 
                         </div>

@@ -77,6 +77,10 @@ function BookingConfirmPage() {
     if (!booking) return;
     setLoadingCheckout(true);
     try {
+      // Determine amount to charge: deposit if required, otherwise full price
+      const chargeAmount = booking.depositAmount || booking.price;
+      const paymentType = booking.depositAmount ? "deposit" : "full payment";
+
       // If user has a saved payment method selected, use it
       if (selectedPaymentMethodId && profile?.stripeCustomerId) {
         const chargeResponse = await fetch(
@@ -87,11 +91,14 @@ function BookingConfirmPage() {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              amount: booking.price,
+              amount: chargeAmount,
               paymentMethodId: selectedPaymentMethodId,
               customerId: profile.stripeCustomerId,
               bookingId: booking.id,
               providerId: booking.providerId,
+              paymentType,
+              depositAmount: booking.depositAmount,
+              finalAmount: booking.finalAmount,
             }),
           }
         );
@@ -105,7 +112,9 @@ function BookingConfirmPage() {
 
         toast.push({
           title: "Payment successful!",
-          description: "Your booking has been confirmed",
+          description: booking.depositAmount
+            ? `Deposit of $${(booking.depositAmount / 100).toFixed(2)} confirmed. Final payment due after service.`
+            : "Your booking has been confirmed",
           variant: "success",
         });
 
@@ -180,9 +189,23 @@ function BookingConfirmPage() {
             <div>
               <dt>Price</dt>
               <dd>
-                {booking.price
-                  ? `$${(booking.price / 100).toFixed(2)}`
-                  : "Provided after provider review"}
+                {booking.price ? (
+                  <div>
+                    <p style={{ margin: 0 }}>Total: ${(booking.price / 100).toFixed(2)}</p>
+                    {booking.depositAmount && booking.depositPercentage && (
+                      <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", color: "#666" }}>
+                        <p style={{ margin: "0.25rem 0" }}>
+                          Deposit ({booking.depositPercentage}%): ${(booking.depositAmount / 100).toFixed(2)}
+                        </p>
+                        <p style={{ margin: "0.25rem 0" }}>
+                          Final payment: ${((booking.price - booking.depositAmount) / 100).toFixed(2)} after service
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  "Provided after provider review"
+                )}
               </dd>
             </div>
           </dl>
@@ -247,7 +270,9 @@ function BookingConfirmPage() {
               Go to my bookings
             </Button>
             <Button onClick={handleCheckout} loading={loadingCheckout}>
-              Proceed to checkout
+              {booking?.depositAmount
+                ? `Pay deposit: $${(booking.depositAmount / 100).toFixed(2)}`
+                : "Proceed to checkout"}
             </Button>
           </div>
         </Card>

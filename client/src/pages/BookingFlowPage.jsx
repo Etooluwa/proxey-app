@@ -12,7 +12,7 @@ import { createBooking } from "../data/bookings";
 import { loadDraft, saveDraft, clearDraft } from "../bookings/draftStore";
 import "../styles/bookingFlow.css";
 
-const STEPS = ["service", "schedule", "location", "notes", "review"];
+const STEPS = ["service", "schedule", "location", "custom", "notes", "review"];
 
 function BookingFlowPage() {
   const toast = useToast();
@@ -29,6 +29,7 @@ function BookingFlowPage() {
     scheduledDate: existingDraft?.scheduledDate || "",
     scheduledTime: existingDraft?.scheduledTime || "",
     location: existingDraft?.location || "",
+    customInputValues: existingDraft?.customInputValues || {},
     notes: existingDraft?.notes || "",
     price: existingDraft?.price || "",
   }));
@@ -85,6 +86,16 @@ function BookingFlowPage() {
       if (!form.location) nextErrors.location = "Add a service location.";
     }
 
+    if (step === "custom") {
+      if (selectedService?.customInputs && selectedService.customInputs.length > 0) {
+        selectedService.customInputs.forEach((field) => {
+          if (field.required && !form.customInputValues[field.id]) {
+            nextErrors[`custom_${field.id}`] = `${field.label} is required.`;
+          }
+        });
+      }
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -103,7 +114,7 @@ function BookingFlowPage() {
     setSubmitting(true);
     const scheduledAt = new Date(`${form.scheduledDate}T${form.scheduledTime}`);
     try {
-      const booking = await createBooking({
+      const bookingData = {
         serviceId: form.serviceId,
         providerId: form.providerId,
         scheduledAt: scheduledAt.toISOString(),
@@ -111,11 +122,23 @@ function BookingFlowPage() {
         notes: form.notes,
         status: "upcoming",
         price: selectedService?.basePrice || null,
-      });
+      };
+
+      if (selectedService?.requiresDeposit) {
+        bookingData.depositAmount = (selectedService.basePrice * selectedService.depositPercentage) / 100;
+        bookingData.finalAmount = selectedService.basePrice - bookingData.depositAmount;
+        bookingData.depositPercentage = selectedService.depositPercentage;
+      }
+
+      if (Object.keys(form.customInputValues).length > 0) {
+        bookingData.customInputValues = form.customInputValues;
+      }
+
+      const booking = await createBooking(bookingData);
       clearDraft();
       toast.push({
         title: "Booking confirmed",
-        description: "We’ve notified your provider and saved the details.",
+        description: "We've notified your provider and saved the details.",
         variant: "success",
       });
       navigate(`/app/book/confirm?bookingId=${booking.id}`, {
@@ -223,6 +246,107 @@ function BookingFlowPage() {
           </div>
         )}
 
+        {step === "custom" && (
+          <div className="booking-flow__section">
+            {selectedService?.customInputs && selectedService.customInputs.length > 0 ? (
+              <div>
+                <h3 style={{ marginBottom: "1.5rem", fontSize: "1.1rem", fontWeight: "bold" }}>
+                  {selectedService.name} - Additional Information
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  {selectedService.customInputs.map((field) => (
+                    <div key={field.id}>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "bold" }}>
+                        {field.label}
+                        {field.required && <span style={{ color: "red", marginLeft: "0.25rem" }}>*</span>}
+                      </label>
+                      {field.type === "text" && (
+                        <Input
+                          id={`custom_${field.id}`}
+                          type="text"
+                          value={form.customInputValues[field.id] || ""}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              customInputValues: {
+                                ...prev.customInputValues,
+                                [field.id]: event.target.value,
+                              },
+                            }))
+                          }
+                          error={errors[`custom_${field.id}`]}
+                        />
+                      )}
+                      {field.type === "number" && (
+                        <Input
+                          id={`custom_${field.id}`}
+                          type="number"
+                          value={form.customInputValues[field.id] || ""}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              customInputValues: {
+                                ...prev.customInputValues,
+                                [field.id]: event.target.value,
+                              },
+                            }))
+                          }
+                          error={errors[`custom_${field.id}`]}
+                        />
+                      )}
+                      {field.type === "textarea" && (
+                        <textarea
+                          id={`custom_${field.id}`}
+                          className="ui-input booking-flow__textarea"
+                          value={form.customInputValues[field.id] || ""}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              customInputValues: {
+                                ...prev.customInputValues,
+                                [field.id]: event.target.value,
+                              },
+                            }))
+                          }
+                          style={{
+                            borderColor: errors[`custom_${field.id}`] ? "#ef4444" : undefined,
+                          }}
+                          rows={4}
+                        />
+                      )}
+                      {field.type === "select" && (
+                        <Select
+                          id={`custom_${field.id}`}
+                          options={[
+                            { label: "Select an option", value: "" },
+                            { label: "Option 1", value: "opt1" },
+                            { label: "Option 2", value: "opt2" },
+                          ]}
+                          value={form.customInputValues[field.id] || ""}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              customInputValues: {
+                                ...prev.customInputValues,
+                                [field.id]: event.target.value,
+                              },
+                            }))
+                          }
+                          error={errors[`custom_${field.id}`]}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "2rem", color: "#6B7280" }}>
+                <p>No additional information needed for this service</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {step === "notes" && (
           <div className="booking-flow__section">
             <label className="ui-input__root" htmlFor="booking-notes">
@@ -261,6 +385,18 @@ function BookingFlowPage() {
               <h3>Location</h3>
               <p>{form.location}</p>
             </div>
+            {selectedService?.customInputs && selectedService.customInputs.length > 0 && (
+              <div>
+                <h3>Provided Information</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {selectedService.customInputs.map((field) => (
+                    <p key={field.id}>
+                      <strong>{field.label}:</strong> {form.customInputValues[field.id] || "(not provided)"}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
             {form.notes ? (
               <div>
                 <h3>Notes</h3>
@@ -268,12 +404,20 @@ function BookingFlowPage() {
               </div>
             ) : null}
             <div>
-              <h3>Estimated price</h3>
-              <p>
-                {selectedService?.basePrice
-                  ? `$${(selectedService.basePrice / 100).toFixed(2)}`
-                  : "Provided after confirmation"}
-              </p>
+              <h3>Pricing</h3>
+              {selectedService?.basePrice ? (
+                <>
+                  <p>Total: ${(selectedService.basePrice / 100).toFixed(2)}</p>
+                  {selectedService?.requiresDeposit && (
+                    <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", color: "#6B7280" }}>
+                      <p>Deposit ({selectedService.depositPercentage}%): ${((selectedService.basePrice * selectedService.depositPercentage) / 100 / 100).toFixed(2)}</p>
+                      <p>Final payment: ${((selectedService.basePrice * (100 - selectedService.depositPercentage)) / 100 / 100).toFixed(2)}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p>Provided after confirmation</p>
+              )}
             </div>
           </div>
         )}

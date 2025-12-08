@@ -432,10 +432,30 @@ const ProviderAppointments = () => {
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500 font-semibold uppercase">Price</p>
-                                        <p className="text-lg font-bold text-brand-600">${actionModal.appointment.price.toFixed(2)}</p>
+                                        <div>
+                                            <p className="text-lg font-bold text-brand-600">${actionModal.appointment.price.toFixed(2)}</p>
+                                            {actionModal.appointment.depositAmount && (
+                                                <p className="text-xs text-gray-600 mt-1">Deposit: ${actionModal.appointment.depositAmount.toFixed(2)}</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Client Provided Information */}
+                            {actionModal.appointment.customInputValues && Object.keys(actionModal.appointment.customInputValues).length > 0 && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <h4 className="font-bold text-gray-900 mb-2">Client Information</h4>
+                                    <div className="space-y-2 text-sm">
+                                        {Object.entries(actionModal.appointment.customInputValues).map(([key, value]) => (
+                                            <div key={key}>
+                                                <p className="text-xs text-gray-500 font-semibold uppercase">{key}</p>
+                                                <p className="text-gray-900 font-medium">{value || '(not provided)'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Message for Action */}
                             {actionModal.type === 'accept' && (
@@ -570,10 +590,41 @@ const ProviderAppointments = () => {
                                     </div>
                                     <div>
                                         <p className="text-xs font-semibold text-gray-500 uppercase">Price</p>
-                                        <p className="text-lg font-bold text-brand-600 mt-1">${selectedAppointment.price.toFixed(2)}</p>
+                                        <div>
+                                            <p className="text-lg font-bold text-brand-600 mt-1">${selectedAppointment.price.toFixed(2)}</p>
+                                            {selectedAppointment.depositAmount && (
+                                                <div className="text-xs text-gray-600 mt-1">
+                                                    <p>Deposit: ${selectedAppointment.depositAmount.toFixed(2)}</p>
+                                                    <p>Final: ${(selectedAppointment.price - selectedAppointment.depositAmount).toFixed(2)}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Client Provided Information Section */}
+                            {selectedAppointment.customInputValues && Object.keys(selectedAppointment.customInputValues).length > 0 && (
+                                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Client Information</h3>
+                                    <div className="space-y-3">
+                                        {Object.entries(selectedAppointment.customInputValues).map(([key, value]) => (
+                                            <div key={key}>
+                                                <p className="text-xs font-semibold text-gray-500 uppercase">{key}</p>
+                                                <p className="text-sm font-medium text-gray-900 mt-1 break-words">{value || '(not provided)'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Notes Section */}
+                            {selectedAppointment.notes && (
+                                <div className="bg-amber-50 rounded-xl p-6 border border-amber-100">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Client Notes</h3>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedAppointment.notes}</p>
+                                </div>
+                            )}
 
                             {/* Status Section */}
                             <div className="bg-gray-50 rounded-xl p-6">
