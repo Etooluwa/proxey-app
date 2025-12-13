@@ -1,420 +1,338 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Icons } from '../../components/Icons';
-import { PROVIDER_SERVICES, CATEGORIES } from '../../constants';
+import { CATEGORIES } from '../../constants';
+import { request } from '../../data/apiClient';
+import { useSession } from '../../auth/authContext';
 
 const ProviderServices = () => {
-    // Initialize with services that match the logged-in provider's category (Mocking "Cleaning" as the current user)
-    const [services, setServices] = useState(PROVIDER_SERVICES.filter(s => s.category === 'Cleaning'));
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingServiceId, setEditingServiceId] = useState(null);
-
-    // Form State
-    const [formData, setFormData] = useState({
-        title: '',
-        category: 'Cleaning',
-        price: 0,
-        priceUnit: 'hour',
-        duration: '1 hour',
+    const [services, setServices] = useState([]);
+    const [filtered, setFiltered] = useState([]);
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [saving, setSaving] = useState(false);
+    const { role } = useSession();
+    const [form, setForm] = useState({
+        id: null,
+        name: '',
         description: '',
-        active: true,
-        requiresDeposit: false,
-        depositPercentage: 50,
-        customInputs: [],
+        category: '',
+        basePrice: 0,
+        unit: 'visit',
+        duration: 60,
     });
-    const [newInputField, setNewInputField] = useState({ label: '', type: 'text', required: false });
 
-    const toggleActive = (id) => {
-        setServices(services.map(s => s.id === id ? { ...s, active: !s.active } : s));
-    };
-
-    const handleAddNew = () => {
-        setEditingServiceId(null);
-        setFormData({
-            title: '',
-            category: 'Cleaning',
-            price: 0,
-            priceUnit: 'hour',
-            duration: '1 hour',
-            description: '',
-            active: true,
-            requiresDeposit: false,
-            depositPercentage: 50,
-            customInputs: [],
-        });
-        setNewInputField({ label: '', type: 'text', required: false });
-        setIsModalOpen(true);
-    };
-
-    const handleEdit = (service) => {
-        setEditingServiceId(service.id);
-        setFormData({ ...service });
-        setIsModalOpen(true);
-    };
-
-    const handleSave = () => {
-        if (!formData.title || !formData.price) return; // Basic validation
-
-        if (editingServiceId) {
-            // Update existing
-            setServices(services.map(s => s.id === editingServiceId ? { ...s, ...formData } : s));
-        } else {
-            // Create new
-            const newService = {
-                id: Math.random().toString(36).substr(2, 9),
-                bookingsCount: 0,
-                ...formData
-            };
-            setServices([...services, newService]);
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoading(true);
+            try {
+                const resp = await request("/services");
+                const data = resp.services || [];
+                if (!cancelled) {
+                    setServices(data);
+                    setFiltered(data);
+                }
+            } catch (error) {
+                console.error("Failed to load services", error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         }
-        setIsModalOpen(false);
+        load();
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        let list = [...services];
+        if (activeCategory !== 'All') {
+            list = list.filter((svc) =>
+                (svc.category || '').toLowerCase() === activeCategory.toLowerCase()
+            );
+        }
+        if (search) {
+            const q = search.toLowerCase();
+            list = list.filter((svc) =>
+                (svc.name || svc.title || '').toLowerCase().includes(q) ||
+                (svc.description || '').toLowerCase().includes(q)
+            );
+        }
+        setFiltered(list);
+    }, [services, activeCategory, search]);
+
+    const resetForm = () => {
+        setForm({
+            id: null,
+            name: '',
+            description: '',
+            category: '',
+            basePrice: 0,
+            unit: 'visit',
+            duration: 60,
+        });
     };
 
-    const addCustomInputField = () => {
-        if (!newInputField.label.trim()) return;
-        setFormData({
-            ...formData,
-            customInputs: [...formData.customInputs, { ...newInputField, id: Math.random().toString(36).substr(2, 9) }]
-        });
-        setNewInputField({ label: '', type: 'text', required: false });
+    const openModal = (svc) => {
+        if (svc) {
+            setForm({
+                id: svc.id,
+                name: svc.name || svc.title || '',
+                description: svc.description || '',
+                category: svc.category || '',
+                basePrice: svc.base_price || svc.price || 0,
+                unit: svc.unit || 'visit',
+                duration: svc.duration || 60,
+            });
+        } else {
+            resetForm();
+        }
+        setModalOpen(true);
     };
 
-    const removeCustomInputField = (fieldId) => {
-        setFormData({
-            ...formData,
-            customInputs: formData.customInputs.filter(f => f.id !== fieldId)
+    const saveService = async () => {
+        const nextErrors = {};
+        if (!form.name) nextErrors.name = "Name is required.";
+        if (!form.category) nextErrors.category = "Category is required.";
+        if (!form.basePrice || Number(form.basePrice) <= 0) nextErrors.basePrice = "Price must be greater than zero.";
+        if (!form.duration || Number(form.duration) <= 0) nextErrors.duration = "Duration must be greater than zero.";
+        setErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) return;
+
+        setSaving(true);
+        const payload = {
+            id: form.id,
+            name: form.name,
+            description: form.description,
+            category: form.category,
+            basePrice: Number(form.basePrice),
+            unit: form.unit,
+            duration: Number(form.duration) || 60,
+        };
+        try {
+            const saved = {
+                ...(form.id ? form : { id: payload.id }),
+                ...payload,
+            };
+            setServices((prev) => {
+                const exists = prev.find((s) => s.id === saved.id);
+                if (exists) {
+                    return prev.map((s) => (s.id === saved.id ? saved : s));
+                }
+                return [saved, ...prev];
+            });
+            // Fire request but keep optimistic state
+            request("/services", { method: "POST", body: JSON.stringify(payload) }).catch((error) => {
+                console.error("Failed to persist service", error);
+            });
+            setModalOpen(false);
+        } catch (error) {
+            console.error("Failed to save service", error);
+            setErrors({ submit: error.message || "Failed to save service." });
+        }
+        setSaving(false);
+    };
+
+    const removeService = async (serviceId) => {
+        setServices((prev) => prev.filter((s) => s.id !== serviceId));
+        request(`/services/${serviceId}`, { method: "DELETE" }).catch((error) => {
+            console.error("Failed to delete service", error);
         });
+    };
+
+    const handleCategory = (cat) => {
+        setActiveCategory(cat);
     };
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 relative">
-            <div className="flex justify-between items-end">
+        <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">My Services</h1>
-                    <p className="text-gray-500 mt-1">Manage what you offer to clients.</p>
+                    <h1 className="text-3xl font-bold text-gray-900">Your Services</h1>
+                    <p className="text-gray-500 mt-1">Manage and edit the services you offer.</p>
                 </div>
-                <button
-                    onClick={handleAddNew}
-                    className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-500 transition-colors shadow-lg flex items-center gap-2"
-                >
-                    <Icons.Wrench size={18} />
-                    Add New Service
-                </button>
+                <div className="relative w-full md:w-72">
+                    <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search services..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition-all"
+                    />
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-                {services.map((service) => (
-                    <div key={service.id} className={`bg-white p-6 rounded-2xl border transition-all flex flex-col md:flex-row gap-6 items-start ${service.active ? 'border-gray-100 shadow-sm hover:shadow-md' : 'border-gray-100 opacity-75 bg-gray-50'}`}>
+            <div className="flex flex-wrap gap-2">
+                <button
+                    onClick={() => handleCategory('All')}
+                    className={`px-3 py-2 rounded-lg text-sm font-semibold border ${activeCategory === 'All' ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-white text-gray-700 border-gray-200'}`}
+                >
+                    All
+                </button>
+                {CATEGORIES.map((cat) => (
+                    <button
+                        key={cat.id}
+                        onClick={() => handleCategory(cat.name)}
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold border ${activeCategory === cat.name ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-white text-gray-700 border-gray-200'}`}
+                    >
+                        {cat.name}
+                    </button>
+                ))}
+            </div>
 
-                        {/* Icon Box */}
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 ${service.active ? 'bg-brand-50 text-brand-600' : 'bg-gray-200 text-gray-400'}`}>
-                            {service.priceUnit === 'fixed' ? <Icons.Tag size={28} /> : <Icons.Clock size={28} />}
-                        </div>
+            {loading && <div className="text-gray-500">Loading services...</div>}
 
-                        {/* Content */}
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-900">{service.title}</h3>
-                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{service.category}</span>
-                                </div>
-                                <div className="flex flex-col items-end">
-                                    <span className="text-xl font-bold text-gray-900">
-                                        ${service.price} <span className="text-sm text-gray-500 font-normal">{service.priceUnit === 'hour' ? '/ hr' : ' flat fee'}</span>
-                                    </span>
-                                    <span className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                                        <Icons.Clock size={12} /> {service.duration}
-                                    </span>
-                                </div>
+            {!loading && filtered.length === 0 && (
+                <div className="text-center py-12 text-gray-500 bg-white border border-dashed border-gray-200 rounded-2xl">
+                    No services found.
+                </div>
+            )}
+
+            {role === 'provider' && (
+                <div>
+                    <button
+                        onClick={() => openModal(null)}
+                        className="px-4 py-2 mb-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
+                    >
+                        Add Service
+                    </button>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filtered.map((service) => (
+                    <div key={service.id} className="p-5 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-2">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">{service.name || service.title}</h3>
+                                <p className="text-sm text-gray-500">{service.description}</p>
                             </div>
-
-                            <p className="text-gray-600 text-sm leading-relaxed mb-4 max-w-2xl">
-                                {service.description}
-                            </p>
-
-                            <div className="flex items-center gap-6 pt-4 border-t border-gray-50">
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                    <Icons.Calendar size={16} className="text-brand-400" />
-                                    <span className="font-bold text-gray-700">{service.bookingsCount}</span> Bookings
-                                </div>
+                            <div className="text-lg font-bold text-gray-900">
+                                ${service.base_price || service.price}<span className="text-sm text-gray-500">/{service.unit || 'visit'}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <span className="flex items-center gap-1"><Icons.Tag size={14} /> {service.category || 'General'}</span>
+                            <span className="flex items-center gap-1"><Icons.Clock size={14} /> {service.duration || 60} mins</span>
+                        </div>
+                        {role === 'provider' && (
+                            <div className="flex gap-2">
                                 <button
-                                    onClick={() => handleEdit(service)}
-                                    className="text-sm font-bold text-brand-600 hover:underline"
+                                    onClick={() => openModal(service)}
+                                    className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
                                 >
-                                    Edit Details
+                                    Edit
+                                </button>
+                                <button
+                                    onClick={() => removeService(service.id)}
+                                    className="px-3 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors"
+                                >
+                                    Remove
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Toggle */}
-                        <div className="flex items-center gap-3 md:flex-col md:items-end md:justify-center h-full">
-                            <span className={`text-xs font-bold uppercase tracking-wide ${service.active ? 'text-green-600' : 'text-gray-400'}`}>
-                                {service.active ? 'Active' : 'Inactive'}
-                            </span>
-                            <button
-                                onClick={() => toggleActive(service.id)}
-                                className={`w-12 h-6 rounded-full relative transition-colors ${service.active ? 'bg-green-500' : 'bg-gray-300'}`}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${service.active ? 'left-7' : 'left-1'}`}></div>
-                            </button>
-                        </div>
-
+                        )}
                     </div>
                 ))}
             </div>
 
-            <div className="text-center pt-8 border-t border-gray-200">
-                <p className="text-gray-400 text-sm mb-4">Want to offer more services?</p>
-                <button className="text-brand-600 font-bold text-sm hover:underline">
-                    Browse Service Categories
-                </button>
-            </div>
-
-            {/* Add/Edit Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
-
-                        {/* Modal Header */}
-                        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            {modalOpen && role === 'provider' && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+                    <div className="bg-white rounded-3xl shadow-xl max-w-xl w-full p-6 space-y-4">
+                        <div className="flex items-start justify-between">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">{editingServiceId ? 'Edit Service' : 'Add New Service'}</h2>
-                                <p className="text-sm text-gray-500">Define details and pricing.</p>
+                                <h3 className="text-xl font-bold text-gray-900">{form.id ? "Edit Service" : "Add Service"}</h3>
+                                <p className="text-gray-500 text-sm">Set the details for this service.</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
-                                <Icons.X size={20} />
+                            <button onClick={() => setModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                <Icons.X size={18} />
                             </button>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
-
-                            {/* Service Name */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Service Title</label>
+                                <label className="text-sm font-semibold text-gray-700">Name</label>
                                 <input
-                                    type="text"
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    placeholder="e.g. Deep Cleaning, Leaky Faucet Repair"
-                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-medium transition-all"
+                                    value={form.name}
+                                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
                                 />
+                                {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Category */}
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
-                                    <div className="relative">
-                                        <select
-                                            value={formData.category}
-                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-medium appearance-none transition-all"
-                                        >
-                                            {CATEGORIES.map(cat => (
-                                                <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                            ))}
-                                        </select>
-                                        <Icons.ChevronRight className="absolute right-4 top-1/2 transform -translate-y-1/2 rotate-90 text-gray-400 pointer-events-none" size={16} />
-                                    </div>
-                                </div>
-
-                                {/* Duration */}
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Est. Duration</label>
-                                    <input
-                                        type="text"
-                                        value={formData.duration}
-                                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                        placeholder="e.g. 2 hours, 3 days"
-                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-medium transition-all"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Pricing Section */}
-                            <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100">
-                                <label className="block text-sm font-bold text-gray-800 mb-3">Pricing Structure</label>
-
-                                {/* Toggle */}
-                                <div className="flex p-1.5 bg-gray-200/60 rounded-xl mb-6 w-full">
-                                    <button
-                                        onClick={() => setFormData({ ...formData, priceUnit: 'hour' })}
-                                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${formData.priceUnit === 'hour' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                                    >
-                                        <Icons.Clock size={16} /> Hourly Rate
-                                    </button>
-                                    <button
-                                        onClick={() => setFormData({ ...formData, priceUnit: 'fixed' })}
-                                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${formData.priceUnit === 'fixed' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                                    >
-                                        <Icons.Tag size={16} /> Flat Fee
-                                    </button>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
-                                        {formData.priceUnit === 'hour' ? 'Price per Hour' : 'Total Service Price'}
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 font-bold text-gray-400 text-lg">$</span>
-                                        <input
-                                            type="number"
-                                            value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                                            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-bold text-xl text-gray-900 transition-all"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Description */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Description</label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    placeholder="Describe what's included in this service..."
-                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 font-medium h-32 resize-none transition-all"
+                                <label className="text-sm font-semibold text-gray-700">Category</label>
+                                <select
+                                    value={form.category}
+                                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
+                                >
+                                    <option value="">Select</option>
+                                    {CATEGORIES.map((cat) => (
+                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                    ))}
+                                </select>
+                                {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
+                            </div>
+                            <div>
+                                <label className="text-sm font-semibold text-gray-700">Price</label>
+                                <input
+                                    type="number"
+                                    value={form.basePrice}
+                                    onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
+                                />
+                                {errors.basePrice && <p className="text-xs text-red-600 mt-1">{errors.basePrice}</p>}
+                            </div>
+                            <div>
+                                <label className="text-sm font-semibold text-gray-700">Unit</label>
+                                <input
+                                    value={form.unit}
+                                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
                                 />
                             </div>
-
-                            {/* Deposit Payment Section */}
-                            <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <input
-                                        type="checkbox"
-                                        id="requiresDeposit"
-                                        checked={formData.requiresDeposit}
-                                        onChange={(e) => setFormData({ ...formData, requiresDeposit: e.target.checked })}
-                                        className="w-4 h-4 rounded border-gray-300 text-brand-600 cursor-pointer"
-                                    />
-                                    <label htmlFor="requiresDeposit" className="text-sm font-bold text-gray-800 cursor-pointer">
-                                        Require initial deposit from clients
-                                    </label>
-                                </div>
-                                <p className="text-xs text-gray-600 mb-4">Clients will pay an upfront deposit, with the remaining balance due after service completion.</p>
-
-                                {formData.requiresDeposit && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Deposit Percentage</label>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="range"
-                                                min="10"
-                                                max="100"
-                                                step="5"
-                                                value={formData.depositPercentage}
-                                                onChange={(e) => setFormData({ ...formData, depositPercentage: parseInt(e.target.value) })}
-                                                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                            />
-                                            <span className="text-sm font-bold text-gray-900 min-w-16">{formData.depositPercentage}%</span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            Deposit: ${((formData.price * formData.depositPercentage) / 100).toFixed(2)} · Final: ${((formData.price * (100 - formData.depositPercentage)) / 100).toFixed(2)}
-                                        </p>
-                                    </div>
-                                )}
+                            <div>
+                                <label className="text-sm font-semibold text-gray-700">Duration (mins)</label>
+                                <input
+                                    type="number"
+                                    value={form.duration}
+                                    onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
+                                />
+                                {errors.duration && <p className="text-xs text-red-600 mt-1">{errors.duration}</p>}
                             </div>
-
-                            {/* Custom Client Input Fields Section */}
-                            <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100">
-                                <label className="block text-sm font-bold text-gray-800 mb-4">Request additional information from clients (optional)</label>
-                                <p className="text-xs text-gray-600 mb-4">Add custom fields to collect specific information when clients book this service.</p>
-
-                                {/* Existing Custom Fields */}
-                                {formData.customInputs.length > 0 && (
-                                    <div className="mb-6 space-y-2">
-                                        {formData.customInputs.map((field) => (
-                                            <div key={field.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-green-100">
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-bold text-gray-900">{field.label}</p>
-                                                    <p className="text-xs text-gray-500">Type: {field.type} {field.required ? '(Required)' : '(Optional)'}</p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeCustomInputField(field.id)}
-                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <Icons.X size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Add New Field Form */}
-                                <div className="space-y-3 border-t border-green-100 pt-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Field Label</label>
-                                        <input
-                                            type="text"
-                                            value={newInputField.label}
-                                            onChange={(e) => setNewInputField({ ...newInputField, label: e.target.value })}
-                                            placeholder="e.g., 'Square Footage', 'Pet Information'"
-                                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 text-sm transition-all"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Field Type</label>
-                                        <select
-                                            value={newInputField.type}
-                                            onChange={(e) => setNewInputField({ ...newInputField, type: e.target.value })}
-                                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 text-sm appearance-none transition-all"
-                                        >
-                                            <option value="text">Text</option>
-                                            <option value="number">Number</option>
-                                            <option value="textarea">Long Text</option>
-                                            <option value="select">Dropdown</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="fieldRequired"
-                                            checked={newInputField.required}
-                                            onChange={(e) => setNewInputField({ ...newInputField, required: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 text-brand-600 cursor-pointer"
-                                        />
-                                        <label htmlFor="fieldRequired" className="text-xs font-medium text-gray-700 cursor-pointer">
-                                            Make this field required
-                                        </label>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={addCustomInputField}
-                                        disabled={!newInputField.label.trim()}
-                                        className={`w-full py-2 rounded-lg text-sm font-bold transition-all ${newInputField.label.trim() ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-                                    >
-                                        + Add Field
-                                    </button>
-                                </div>
+                            <div className="md:col-span-2">
+                                <label className="text-sm font-semibold text-gray-700">Description</label>
+                                <textarea
+                                    value={form.description}
+                                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-100 focus:border-brand-200 text-sm"
+                                    rows={3}
+                                />
                             </div>
-
                         </div>
 
-                        {/* Modal Footer */}
-                        <div className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                        {errors.submit && <p className="text-sm text-red-600">{errors.submit}</p>}
+
+                        <div className="flex gap-3">
                             <button
-                                onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-3 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors"
+                                onClick={saveService}
+                                disabled={saving}
+                                className="px-5 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors disabled:opacity-60"
+                            >
+                                {saving ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                                onClick={() => { setModalOpen(false); resetForm(); }}
+                                className="px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
                             >
                                 Cancel
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={!formData.title || !formData.price}
-                                className={`px-8 py-3 font-bold text-white rounded-xl transition-all shadow-lg ${!formData.title || !formData.price ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-brand-600 shadow-brand-200'}`}
-                            >
-                                {editingServiceId ? 'Save Changes' : 'Create Service'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

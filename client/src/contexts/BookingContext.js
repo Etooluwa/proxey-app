@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { CLIENT_BOOKINGS } from '../constants';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { fetchBookings, createBooking, cancelBooking } from '../data/bookings';
+import { useToast } from '../components/ui/ToastProvider';
 
 const BookingContext = createContext();
 
@@ -12,35 +13,63 @@ export const useBookings = () => {
 };
 
 export const BookingProvider = ({ children }) => {
-    // Initialize from localStorage or default constant
-    const [bookings, setBookings] = useState(() => {
-        const saved = localStorage.getItem('client_bookings');
-        return saved ? JSON.parse(saved) : CLIENT_BOOKINGS;
-    });
+    const toast = useToast();
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Persist to localStorage whenever bookings change
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await fetchBookings();
+            setBookings(data);
+        } catch (err) {
+            setError(err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
-        localStorage.setItem('client_bookings', JSON.stringify(bookings));
-    }, [bookings]);
+        load();
+    }, [load]);
 
-    const addBooking = (bookingData) => {
-        const newBooking = {
-            id: `bk_${Date.now()}`,
-            status: 'confirmed', // Default to confirmed for prototype
-            ...bookingData
+    const addBooking = async (bookingData) => {
+        const payload = {
+            ...bookingData,
+            status: bookingData?.status || "upcoming",
         };
-        setBookings(prev => [newBooking, ...prev]);
-        return newBooking;
+        const created = await createBooking(payload);
+        await load();
+        return created;
     };
 
-    const updateBooking = (updatedBooking) => {
-        setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+    const updateBooking = async (updatedBooking) => {
+        // No dedicated update endpoint; refresh after optimistic replace
+        setBookings((prev) =>
+            prev.map((b) => (b.id === updatedBooking.id ? updatedBooking : b))
+        );
+        await load();
     };
 
-    const cancelBooking = (bookingId) => {
-        setBookings(prev => prev.map(b =>
-            b.id === bookingId ? { ...b, status: 'cancelled' } : b
-        ));
+    const cancel = async (bookingId) => {
+        try {
+            await cancelBooking(bookingId);
+            toast.push({
+                title: "Booking cancelled",
+                description: "We’ll notify the provider about the change.",
+                variant: "info",
+            });
+            await load();
+        } catch (err) {
+            toast.push({
+                title: "Unable to cancel booking",
+                description: err.message,
+                variant: "error",
+            });
+            throw err;
+        }
     };
 
     const getUpcomingBookings = () => {
@@ -50,10 +79,14 @@ export const BookingProvider = ({ children }) => {
     return (
         <BookingContext.Provider value={{
             bookings,
+            loading,
+            error,
             addBooking,
             updateBooking,
-            cancelBooking,
-            getUpcomingBookings
+            cancelBooking: cancel,
+            cancel,
+            getUpcomingBookings,
+            refresh: load
         }}>
             {children}
         </BookingContext.Provider>

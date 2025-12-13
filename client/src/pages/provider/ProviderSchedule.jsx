@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ScheduleEditor from "../../components/provider/ScheduleEditor";
 import { useToast } from "../../components/ui/ToastProvider";
 import {
-  fetchProviderProfile,
-  updateProviderSchedule,
+  fetchProviderTimeBlocks,
+  saveProviderTimeBlocks,
 } from "../../data/provider";
 import "../../styles/provider/providerSchedule.css";
 
@@ -13,38 +13,68 @@ function ProviderSchedule() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const profile = await fetchProviderProfile();
-        if (!cancelled) {
-          setSchedule(profile?.schedule || []);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          toast.push({
-            title: "Unable to load schedule",
-            description: error.message,
-            variant: "error",
-          });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const dayMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const toSchedule = (blocks = []) => {
+    if (!Array.isArray(blocks)) return [];
+    const byDay = blocks.reduce((acc, block) => {
+      const idx = block.day_index ?? block.dayIndex ?? 0;
+      if (!acc[idx]) acc[idx] = [];
+      acc[idx].push(block);
+      return acc;
+    }, {});
+    return Object.entries(byDay).map(([dayIndex, dayBlocks]) => {
+      const earliest = dayBlocks.reduce(
+        (min, b) => (b.start_time < min ? b.start_time : min),
+        dayBlocks[0].start_time
+      );
+      const latest = dayBlocks.reduce(
+        (max, b) => (b.end_time > max ? b.end_time : max),
+        dayBlocks[0].end_time
+      );
+      const available = dayBlocks.some((b) => b.is_available ?? true);
+      return {
+        day: dayMap[Number(dayIndex)] || "Sunday",
+        startTime: earliest,
+        endTime: latest,
+        available,
+      };
+    });
+  };
+
+  const fromSchedule = (sched = []) =>
+    (sched || []).map((item) => ({
+      dayIndex: dayMap.indexOf(item.day),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      isAvailable: item.available,
+    }));
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const blocks = await fetchProviderTimeBlocks();
+      setSchedule(toSchedule(blocks));
+    } catch (error) {
+      toast.push({
+        title: "Unable to load schedule",
+        description: error.message,
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, [toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async (nextSchedule) => {
     setSaving(true);
     try {
-      const saved = await updateProviderSchedule(nextSchedule);
-      setSchedule(saved);
+      const saved = await saveProviderTimeBlocks(fromSchedule(nextSchedule));
+      setSchedule(toSchedule(saved));
       toast.push({
         title: "Availability updated",
         description: "Clients will now see your new working hours.",

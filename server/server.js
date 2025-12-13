@@ -348,6 +348,76 @@ app.get("/api/services", async (req, res) => {
   res.status(200).json({ services: memoryStore.services });
 });
 
+// Create or update a service (provider-owned)
+app.post("/api/services", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const { id, name, description, category, basePrice, unit, duration } = req.body || {};
+
+  if (!name || !category || !basePrice) {
+    return res.status(400).json({ error: "name, category, and basePrice are required." });
+  }
+
+  const payload = {
+    id: id || crypto.randomUUID(),
+    name,
+    description: description || "",
+    category,
+    base_price: basePrice,
+    unit: unit || "visit",
+    duration: duration || 60,
+    provider_id: providerId,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("services")
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({ service: data });
+  } catch (err) {
+    console.error("[supabase] Failed to upsert service", err);
+    res.status(500).json({ error: "Failed to save service." });
+  }
+});
+
+// Delete a service (provider-owned)
+app.delete("/api/services/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const serviceId = req.params.id;
+
+  try {
+    const { data, error } = await supabase
+      .from("services")
+      .delete()
+      .eq("id", serviceId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: "Service not found." });
+    }
+
+    res.status(200).json({ service: data });
+  } catch (err) {
+    console.error("[supabase] Failed to delete service", err);
+    res.status(500).json({ error: "Failed to delete service." });
+  }
+});
+
 app.get("/api/providers", async (req, res) => {
   const { category, minPrice, maxPrice, minRating } = req.query;
 
@@ -888,6 +958,851 @@ app.patch("/api/provider/schedule", async (req, res) => {
 
   res.status(200).json({ schedule });
 });
+
+// ============================================================================
+// SUPABASE-ONLY ENDPOINTS: Notifications, Messages, Reviews, Promotions, Portfolio
+// ============================================================================
+
+app.get("/api/provider/notifications", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ notifications: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load notifications", err);
+    res.status(500).json({ error: "Failed to load notifications." });
+  }
+});
+
+app.patch("/api/notifications/:id/read", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const notificationId = req.params.id;
+
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", notificationId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+
+    res.status(200).json({ notification: data });
+  } catch (err) {
+    console.error("[supabase] Failed to mark notification read", err);
+    res.status(500).json({ error: "Failed to update notification." });
+  }
+});
+
+app.get("/api/messages/:threadId", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const threadId = req.params.threadId;
+
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("thread_id", threadId)
+      .order("sent_at", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const enriched = await attachProfilesToMessages(data);
+    res.status(200).json({ messages: enriched });
+  } catch (err) {
+    console.error("[supabase] Failed to load messages", err);
+    res.status(500).json({ error: "Failed to load messages." });
+  }
+});
+
+app.post("/api/messages", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { threadId, senderId, receiverId, body } = req.body || {};
+
+  if (!senderId || !receiverId || !body) {
+    return res.status(400).json({
+      error: "senderId, receiverId, and body are required.",
+    });
+  }
+
+  const payload = {
+    thread_id: threadId || crypto.randomUUID(),
+    sender_id: senderId,
+    receiver_id: receiverId,
+    body,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const enriched = (await attachProfilesToMessages([data]))?.[0] || data;
+    res.status(201).json({ message: enriched });
+  } catch (err) {
+    console.error("[supabase] Failed to send message", err);
+    res.status(500).json({ error: "Failed to send message." });
+  }
+});
+
+app.get("/api/provider/:id/reviews", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = req.params.id;
+
+  try {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ reviews: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load reviews", err);
+    res.status(500).json({ error: "Failed to load reviews." });
+  }
+});
+
+app.post("/api/reviews", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { bookingId, providerId, userId, rating, comment } = req.body || {};
+
+  if (!bookingId || !providerId || !userId || typeof rating !== "number") {
+    return res.status(400).json({
+      error: "bookingId, providerId, userId, and numeric rating are required.",
+    });
+  }
+
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ error: "rating must be between 1 and 5." });
+  }
+
+  const payload = {
+    booking_id: bookingId,
+    provider_id: providerId,
+    user_id: userId,
+    rating,
+    comment: comment || "",
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("reviews")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ review: data });
+  } catch (err) {
+    const isUniqueViolation = err?.code === "23505";
+    if (isUniqueViolation) {
+      return res.status(409).json({ error: "A review already exists for this booking." });
+    }
+    console.error("[supabase] Failed to create review", err);
+    res.status(500).json({ error: "Failed to create review." });
+  }
+});
+
+app.get("/api/provider/promotions", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("promotions")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("start_at", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ promotions: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load promotions", err);
+    res.status(500).json({ error: "Failed to load promotions." });
+  }
+});
+
+app.post("/api/provider/promotions", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const {
+    promoCode,
+    discountType,
+    discountValue,
+    startAt,
+    endAt,
+    isActive = true,
+    applicableServices = [],
+  } = req.body || {};
+
+  if (!promoCode || !discountType || typeof discountValue !== "number") {
+    return res.status(400).json({
+      error: "promoCode, discountType, and numeric discountValue are required.",
+    });
+  }
+
+  const normalizedType = String(discountType).toLowerCase();
+  if (!["percentage", "fixed"].includes(normalizedType)) {
+    return res.status(400).json({ error: "discountType must be 'percentage' or 'fixed'." });
+  }
+
+  const payload = {
+    provider_id: providerId,
+    promo_code: promoCode,
+    discount_type: normalizedType,
+    discount_value: discountValue,
+    is_active: Boolean(isActive),
+    start_at: startAt || null,
+    end_at: endAt || null,
+    applicable_services: Array.isArray(applicableServices)
+      ? applicableServices
+      : [],
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("promotions")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ promotion: data });
+  } catch (err) {
+    const isConflict = err?.code === "23505";
+    if (isConflict) {
+      return res.status(409).json({ error: "Promo code already exists for this provider." });
+    }
+    console.error("[supabase] Failed to create promotion", err);
+    res.status(500).json({ error: "Failed to create promotion." });
+  }
+});
+
+app.patch("/api/provider/promotions/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const promotionId = req.params.id;
+  const {
+    promoCode,
+    discountType,
+    discountValue,
+    startAt,
+    endAt,
+    isActive,
+    applicableServices,
+  } = req.body || {};
+
+  const updates = {};
+  if (typeof promoCode !== "undefined") updates.promo_code = promoCode;
+  if (typeof discountType !== "undefined") {
+    const normalizedType = String(discountType).toLowerCase();
+    if (!["percentage", "fixed"].includes(normalizedType)) {
+      return res.status(400).json({ error: "discountType must be 'percentage' or 'fixed'." });
+    }
+    updates.discount_type = normalizedType;
+  }
+  if (typeof discountValue !== "undefined") {
+    if (typeof discountValue !== "number") {
+      return res.status(400).json({ error: "discountValue must be numeric." });
+    }
+    updates.discount_value = discountValue;
+  }
+  if (typeof startAt !== "undefined") updates.start_at = startAt || null;
+  if (typeof endAt !== "undefined") updates.end_at = endAt || null;
+  if (typeof isActive !== "undefined") updates.is_active = Boolean(isActive);
+  if (typeof applicableServices !== "undefined") {
+    updates.applicable_services = Array.isArray(applicableServices)
+      ? applicableServices
+      : [];
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No valid fields provided to update." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("promotions")
+      .update(updates)
+      .eq("id", promotionId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Promotion not found." });
+    }
+
+    res.status(200).json({ promotion: data });
+  } catch (err) {
+    console.error("[supabase] Failed to update promotion", err);
+    res.status(500).json({ error: "Failed to update promotion." });
+  }
+});
+
+app.get("/api/provider/portfolio", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("portfolio_media")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ media: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load portfolio media", err);
+    res.status(500).json({ error: "Failed to load portfolio media." });
+  }
+});
+
+app.post("/api/provider/portfolio", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const { title, description, mediaUrl, mediaType = "image" } = req.body || {};
+
+  if (!mediaUrl) {
+    return res.status(400).json({ error: "mediaUrl is required." });
+  }
+
+  const payload = {
+    provider_id: providerId,
+    title: title || null,
+    description: description || null,
+    media_url: mediaUrl,
+    media_type: mediaType || "image",
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("portfolio_media")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ media: data });
+  } catch (err) {
+    console.error("[supabase] Failed to add portfolio media", err);
+    res.status(500).json({ error: "Failed to add portfolio media." });
+  }
+});
+
+app.delete("/api/provider/portfolio/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const mediaId = req.params.id;
+
+  try {
+    const { data, error } = await supabase
+      .from("portfolio_media")
+      .delete()
+      .eq("id", mediaId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Portfolio media not found." });
+    }
+
+    res.status(200).json({ media: data });
+  } catch (err) {
+    console.error("[supabase] Failed to delete portfolio media", err);
+    res.status(500).json({ error: "Failed to delete portfolio media." });
+  }
+});
+
+// ============================================================================
+// SUPABASE-ONLY ENDPOINTS: Client profile, notifications, transaction ledger
+// ============================================================================
+
+app.get("/api/client/profile", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("client_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(200).json({ profile: null });
+    }
+
+    res.status(200).json({ profile: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load client profile", err);
+    res.status(500).json({ error: "Failed to load client profile." });
+  }
+});
+
+app.put("/api/client/profile", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+  const updates = req.body || {};
+
+  const payload = {
+    user_id: userId,
+    name: updates.name || null,
+    email: updates.email || null,
+    phone: updates.phone || null,
+    bio: updates.bio || null,
+    avatar: updates.avatar || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("client_profiles")
+      .upsert(payload, { onConflict: "user_id" })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ profile: data });
+  } catch (err) {
+    console.error("[supabase] Failed to upsert client profile", err);
+    res.status(500).json({ error: "Failed to save client profile." });
+  }
+});
+
+app.get("/api/client/notifications", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("client_notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ notifications: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load client notifications", err);
+    res.status(500).json({ error: "Failed to load notifications." });
+  }
+});
+
+app.post("/api/client/notifications", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+  const { type, title, body, data = {}, is_read = false } = req.body || {};
+
+  if (!title) {
+    return res.status(400).json({ error: "title is required." });
+  }
+
+  const payload = {
+    user_id: userId,
+    type: type || null,
+    title,
+    body: body || "",
+    data,
+    is_read: Boolean(is_read),
+  };
+
+  try {
+    const { data: inserted, error } = await supabase
+      .from("client_notifications")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ notification: inserted });
+  } catch (err) {
+    console.error("[supabase] Failed to create client notification", err);
+    res.status(500).json({ error: "Failed to create notification." });
+  }
+});
+
+app.patch("/api/client/notifications/:id/read", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const notificationId = req.params.id;
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("client_notifications")
+      .update({ is_read: true })
+      .eq("id", notificationId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+
+    res.status(200).json({ notification: data });
+  } catch (err) {
+    console.error("[supabase] Failed to mark client notification read", err);
+    res.status(500).json({ error: "Failed to update notification." });
+  }
+});
+
+app.get("/api/client/transactions", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("client_transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ transactions: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load client transactions", err);
+    res.status(500).json({ error: "Failed to load transactions." });
+  }
+});
+
+app.post("/api/client/transactions", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+  const {
+    bookingId,
+    amount,
+    currency = "usd",
+    status = "pending",
+    description = "",
+  } = req.body || {};
+
+  if (typeof amount !== "number" || Number.isNaN(amount)) {
+    return res.status(400).json({ error: "amount (number) is required." });
+  }
+
+  const payload = {
+    user_id: userId,
+    booking_id: bookingId || null,
+    amount,
+    currency,
+    status,
+    description,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("client_transactions")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(201).json({ transaction: data });
+  } catch (err) {
+    console.error("[supabase] Failed to create client transaction", err);
+    res.status(500).json({ error: "Failed to create transaction." });
+  }
+});
+
+// Messages list for current user (sender or receiver)
+app.get("/api/messages", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("sent_at", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const enriched = await attachProfilesToMessages(data);
+    res.status(200).json({ messages: enriched });
+  } catch (err) {
+    console.error("[supabase] Failed to load user messages", err);
+    res.status(500).json({ error: "Failed to load messages." });
+  }
+});
+
+// Provider time blocks (availability)
+app.get("/api/provider/time-blocks", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  try {
+    const { data, error } = await supabase
+      .from("provider_time_blocks")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("day_index", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (error) throw error;
+
+    res.status(200).json({ blocks: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider time blocks", err);
+    res.status(500).json({ error: "Failed to load time blocks." });
+  }
+});
+
+app.post("/api/provider/time-blocks", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const { blocks = [] } = req.body || {};
+
+  if (!Array.isArray(blocks)) {
+    return res.status(400).json({ error: "blocks must be an array." });
+  }
+
+  const payload = blocks.map((block) => ({
+    provider_id: providerId,
+    day_index: block.dayIndex ?? block.day_index ?? 0,
+    start_time: block.startTime ?? block.start_time,
+    end_time: block.endTime ?? block.end_time,
+    is_available: block.isAvailable ?? block.is_available ?? true,
+  }));
+
+  try {
+    await supabase.from("provider_time_blocks").delete().eq("provider_id", providerId);
+
+    const { data, error } = await supabase
+      .from("provider_time_blocks")
+      .insert(payload)
+      .select();
+
+    if (error) throw error;
+
+    res.status(201).json({ blocks: data });
+  } catch (err) {
+    console.error("[supabase] Failed to upsert provider time blocks", err);
+    res.status(500).json({ error: "Failed to save time blocks." });
+  }
+});
+
+// Provider invoices
+app.get("/api/provider/invoices", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  try {
+    const { data, error } = await supabase
+      .from("provider_invoices")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("issued_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ invoices: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider invoices", err);
+    res.status(500).json({ error: "Failed to load invoices." });
+  }
+});
+
+app.post("/api/provider/invoices", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const invoice = req.body || {};
+
+  if (!invoice?.invoiceNumber && !invoice?.bookingId) {
+    return res.status(400).json({
+      error: "invoiceNumber or bookingId is required to create an invoice.",
+    });
+  }
+
+  const payload = {
+    provider_id: providerId,
+    booking_id: invoice.bookingId || null,
+    invoice_number: invoice.invoiceNumber || null,
+    client_name: invoice.clientName || null,
+    client_email: invoice.clientEmail || null,
+    client_phone: invoice.clientPhone || null,
+    service: invoice.service || null,
+    description: invoice.description || null,
+    total_amount: invoice.totalAmount ?? null,
+    deposit_amount: invoice.depositAmount ?? null,
+    final_amount: invoice.finalAmount ?? null,
+    status: invoice.status || "pending",
+    issued_at: invoice.issuedAt || new Date().toISOString(),
+    paid_at: invoice.paidAt || null,
+    notes: invoice.notes || null,
+    address: invoice.address || null,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_invoices")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({ invoice: data });
+  } catch (err) {
+    console.error("[supabase] Failed to create provider invoice", err);
+    res.status(500).json({ error: "Failed to create invoice." });
+  }
+});
+
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -1106,6 +2021,75 @@ async function reportWebhookError(event, error) {
   } catch (notifyError) {
     console.error("[stripe] Failed to send webhook alert", notifyError);
   }
+}
+
+async function attachProfilesToMessages(messages = []) {
+  if (!supabase || !Array.isArray(messages) || messages.length === 0) {
+    return messages;
+  }
+
+  const ids = Array.from(
+    new Set(
+      messages.flatMap((m) => [m.sender_id, m.receiver_id]).filter(Boolean)
+    )
+  );
+
+  const profileMap = {};
+
+  if (ids.length > 0) {
+    const { data: providerProfiles } = await supabase
+      .from("provider_profiles")
+      .select("provider_id,name,avatar")
+      .in("provider_id", ids);
+
+    (providerProfiles || []).forEach((p) => {
+      profileMap[p.provider_id] = {
+        name: p.name,
+        avatar: p.avatar,
+        role: "provider",
+      };
+    });
+
+    const { data: clientProfiles } = await supabase
+      .from("client_profiles")
+      .select("user_id,name,avatar")
+      .in("user_id", ids);
+
+    (clientProfiles || []).forEach((c) => {
+      profileMap[c.user_id] = {
+        name: c.name,
+        avatar: c.avatar,
+        role: "client",
+      };
+    });
+
+    const missing = ids.filter((id) => !profileMap[id]);
+    if (missing.length > 0) {
+      const { data: providers } = await supabase
+        .from("providers")
+        .select("id,name,avatar")
+        .in("id", missing);
+      (providers || []).forEach((p) => {
+        profileMap[p.id] = {
+          name: p.name,
+          avatar: p.avatar,
+          role: "provider",
+        };
+      });
+    }
+  }
+
+  return messages.map((m) => {
+    const sender = profileMap[m.sender_id] || {};
+    const receiver = profileMap[m.receiver_id] || {};
+    return {
+      ...m,
+      sender_name: sender.name || m.sender_name || null,
+      sender_avatar: sender.avatar || m.sender_avatar || null,
+      receiver_name: receiver.name || m.receiver_name || null,
+      receiver_avatar: receiver.avatar || m.receiver_avatar || null,
+    };
+  });
 }
 
 // ============================================================================

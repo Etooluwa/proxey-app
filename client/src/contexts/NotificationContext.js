@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from '../auth/authContext';
+import { fetchClientNotifications, createClientNotification, markClientNotificationRead } from '../data/notifications';
 
 const NotificationContext = createContext();
 
@@ -10,55 +11,54 @@ export const NotificationProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Load notifications from localStorage on mount (simulating backend)
-    useEffect(() => {
-        if (session?.user?.id) {
-            const savedNotifications = localStorage.getItem(`notifications_${session.user.id}`);
-            if (savedNotifications) {
-                const parsed = JSON.parse(savedNotifications);
-                setNotifications(parsed);
-                setUnreadCount(parsed.filter(n => !n.read).length);
-            } else {
-                // Initial state for new users - could be triggered by onboarding, 
-                // but checking here ensures it exists if local storage is empty.
-                // However, we'll let the onboarding flow trigger it to be more precise,
-                // or just leave it empty initially.
-                setNotifications([]);
-                setUnreadCount(0);
-            }
+    const refresh = useCallback(async () => {
+        if (!session?.user?.id) return;
+        try {
+            const data = await fetchClientNotifications();
+            setNotifications(data);
+            setUnreadCount(data.filter((n) => !n.is_read).length);
+        } catch (error) {
+            console.error("[notifications] Failed to load notifications", error);
         }
     }, [session?.user?.id]);
 
-    // Save to localStorage whenever notifications change
     useEffect(() => {
-        if (session?.user?.id) {
-            localStorage.setItem(`notifications_${session.user.id}`, JSON.stringify(notifications));
-            setUnreadCount(notifications.filter(n => !n.read).length);
-        }
-    }, [notifications, session?.user?.id]);
+        refresh();
+    }, [refresh]);
 
-    const addNotification = (notification) => {
-        const newNotification = {
-            id: Date.now().toString(),
-            timestamp: new Date().toISOString(),
-            read: false,
-            ...notification
+    const addNotification = async (notification) => {
+        const payload = {
+            type: notification.type || null,
+            title: notification.title || notification.message || "Notification",
+            body: notification.message || notification.body || "",
+            data: notification.data || {},
         };
-        setNotifications(prev => [newNotification, ...prev]);
+        const created = await createClientNotification(payload);
+        setNotifications((prev) => [created, ...prev]);
+        setUnreadCount((prev) => prev + (created.is_read ? 0 : 1));
     };
 
-    const markAsRead = (id) => {
-        setNotifications(prev => prev.map(n =>
-            n.id === id ? { ...n, read: true } : n
-        ));
+    const markAsRead = async (id) => {
+        try {
+            const updated = await markClientNotificationRead(id);
+            setNotifications((prev) =>
+                prev.map((n) => (n.id === id ? updated : n))
+            );
+            setUnreadCount((prev) => prev - (updated.is_read ? 1 : 0));
+        } catch (error) {
+            console.error("[notifications] Failed to mark as read", error);
+        }
     };
 
     const markAllAsRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        // No bulk endpoint; mark locally and rely on individual calls if needed
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+        setUnreadCount(0);
     };
 
     const clearNotifications = () => {
         setNotifications([]);
+        setUnreadCount(0);
     };
 
     return (
@@ -68,7 +68,8 @@ export const NotificationProvider = ({ children }) => {
             addNotification,
             markAsRead,
             markAllAsRead,
-            clearNotifications
+            clearNotifications,
+            refresh
         }}>
             {children}
         </NotificationContext.Provider>

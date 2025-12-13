@@ -1,20 +1,42 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
-import { CATEGORIES, TOP_PROVIDERS, CLIENT_BOOKINGS } from '../constants';
-
-import { useBookings } from '../contexts/BookingContext';
+import { CATEGORIES } from '../constants';
+import { fetchProviders } from '../data/providers';
+import { fetchBookings } from '../data/bookings';
 
 const AppDashboard = () => {
     const navigate = useNavigate();
-    const { getUpcomingBookings } = useBookings();
-    const bookings = getUpcomingBookings();
     const [viewState, setViewState] = useState('HOME');
     const [selectedCategory, setSelectedCategory] = useState(null);
-
-    // Search States
     const [topSearchQuery, setTopSearchQuery] = useState('');
     const [categorySearchQuery, setCategorySearchQuery] = useState('');
+    const [providers, setProviders] = useState([]);
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoading(true);
+            try {
+                const [provData, bookingData] = await Promise.all([
+                    fetchProviders(),
+                    fetchBookings(),
+                ]);
+                if (!cancelled) {
+                    setProviders(provData || []);
+                    setBookings(bookingData || []);
+                }
+            } catch (error) {
+                console.error("Failed to load dashboard data", error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        load();
+        return () => { cancelled = true; };
+    }, []);
 
     const getCategoryIcon = (name) => {
         switch (name) {
@@ -58,19 +80,16 @@ const AppDashboard = () => {
         }
     };
 
-    // --- SUB-VIEWS ---
-
     const renderCategoryDetail = () => {
         if (!selectedCategory) return null;
         const Icon = getCategoryIcon(selectedCategory.name);
 
-        const categoryProviders = TOP_PROVIDERS.filter(p =>
-            p.categories.some(c => c.includes(selectedCategory.name) || selectedCategory.name.includes(c))
+        const categoryProviders = providers.filter(p =>
+            (p.categories || []).some(c => c.includes(selectedCategory.name) || selectedCategory.name.includes(c))
         );
 
         return (
             <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
                     <button
                         onClick={handleBackToHome}
@@ -87,7 +106,6 @@ const AppDashboard = () => {
                     </div>
                 </div>
 
-                {/* Provider List */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {categoryProviders.length > 0 ? (
                         categoryProviders.map((provider) => (
@@ -97,20 +115,20 @@ const AppDashboard = () => {
                                 className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
                             >
                                 <div className="flex items-start gap-4 mb-4">
-                                    <img src={provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                     <div>
                                         <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{provider.name}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{provider.title}</p>
+                                        <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{provider.rating}</span>
-                                            <span className="text-xs text-gray-400">({provider.reviewCount} reviews)</span>
+                                            <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
+                                            <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                    {provider.categories.map(tag => (
+                                    {(provider.categories || []).map(tag => (
                                         <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
                                             {tag}
                                         </span>
@@ -119,7 +137,7 @@ const AppDashboard = () => {
 
                                 <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                                     <div className="text-lg font-bold text-gray-900">
-                                        ${provider.hourlyRate}<span className="text-sm font-normal text-gray-500">/hr</span>
+                                        ${provider.hourly_rate || provider.hourlyRate || 0}<span className="text-sm font-normal text-gray-500">/hr</span>
                                     </div>
                                     <button
                                         onClick={(e) => {
@@ -151,17 +169,13 @@ const AppDashboard = () => {
 
     const renderSearchResults = () => {
         const query = topSearchQuery.toLowerCase();
-
-        // Filter Categories
         const matchedCategories = CATEGORIES.filter(cat =>
             cat.name.toLowerCase().includes(query)
         );
-
-        // Filter Providers
-        const matchedProviders = TOP_PROVIDERS.filter(p =>
-            p.name.toLowerCase().includes(query) ||
-            p.title.toLowerCase().includes(query) ||
-            p.categories.some(c => c.toLowerCase().includes(query))
+        const matchedProviders = providers.filter(p =>
+            (p.name || '').toLowerCase().includes(query) ||
+            (p.headline || p.title || '').toLowerCase().includes(query) ||
+            (p.categories || []).some(c => c.toLowerCase().includes(query))
         );
 
         return (
@@ -179,7 +193,6 @@ const AppDashboard = () => {
                     </div>
                 </div>
 
-                {/* Categories Results */}
                 {matchedCategories.length > 0 && (
                     <div className="space-y-4">
                         <h2 className="text-xl font-bold text-gray-900">Categories</h2>
@@ -203,75 +216,174 @@ const AppDashboard = () => {
                     </div>
                 )}
 
-                {/* Providers Results */}
-                {matchedProviders.length > 0 && (
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold text-gray-900">Providers</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {matchedProviders.map((provider) => (
+                <div className="space-y-4">
+                    <h2 className="text-xl font-bold text-gray-900">Providers</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {matchedProviders.length > 0 ? (
+                            matchedProviders.map((provider) => (
                                 <div
                                     key={provider.id}
                                     onClick={() => handleProviderClick(provider.id)}
                                     className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
                                 >
                                     <div className="flex items-start gap-4 mb-4">
-                                        <img src={provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                        <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                         <div>
                                             <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{provider.name}</h3>
-                                            <p className="text-sm text-brand-600 font-medium">{provider.title}</p>
+                                            <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
                                             <div className="flex items-center gap-1 mt-1">
                                                 <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                                <span className="text-sm font-bold text-gray-800">{provider.rating}</span>
-                                                <span className="text-xs text-gray-400">({provider.reviewCount} reviews)</span>
+                                                <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
+                                                <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {provider.categories.map(tag => (
-                                            <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                        <div className="text-lg font-bold text-gray-900">
-                                            ${provider.hourlyRate}<span className="text-sm font-normal text-gray-500">/hr</span>
-                                        </div>
-                                        <button className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors">
-                                            Book Now
-                                        </button>
-                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full text-center py-10 text-gray-500 bg-white rounded-2xl border border-dashed border-gray-200">
+                                No providers match your search.
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
+            </div>
+        );
+    };
 
-                {matchedCategories.length === 0 && matchedProviders.length === 0 && (
-                    <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-gray-200">
-                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Icons.Search className="text-gray-300" size={32} />
+    const renderHome = () => {
+        return (
+            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+                <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div className="space-y-3">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-bold">
+                            <Icons.Sparkles size={14} /> Welcome back
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">No results found</h3>
-                        <p className="text-gray-500">
-                            We couldn't find any categories or providers matching "{topSearchQuery}".
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
+                            Book trusted pros for anything you need done.
+                        </h1>
+                        <p className="text-gray-500 max-w-2xl">
+                            Browse top providers, view your upcoming bookings, and stay on top of notifications—all in one place.
                         </p>
+                        <form onSubmit={handleTopSearch} className="flex flex-col sm:flex-row gap-3 max-w-xl">
+                            <div className="relative flex-1">
+                                <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search for cleaning, plumbing, painting..."
+                                    value={topSearchQuery}
+                                    onChange={(e) => setTopSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-200"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="px-5 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
+                            >
+                                Search
+                            </button>
+                        </form>
+                    </div>
+                    <div className="bg-gradient-to-br from-brand-50 to-white border border-gray-100 rounded-2xl p-5 shadow-inner">
+                        <div className="text-sm text-gray-500 mb-1">Upcoming bookings</div>
+                        <div className="text-4xl font-bold text-gray-900">{bookings.length}</div>
+                        <p className="text-sm text-gray-500 mt-1">Keep track of your next appointments</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold text-gray-900">Popular categories</h2>
                         <button
-                            onClick={handleBackToHome}
-                            className="mt-6 text-brand-600 font-bold hover:underline"
+                            onClick={handleViewAllCategories}
+                            className="text-sm font-semibold text-brand-600 hover:text-brand-700"
                         >
-                            Clear Search
+                            View all
                         </button>
                     </div>
-                )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {CATEGORIES.filter(cat => cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())).map((cat) => {
+                            const Icon = getCategoryIcon(cat.name);
+                            return (
+                                <div
+                                    key={cat.id}
+                                    onClick={() => handleCategoryClick(cat)}
+                                    className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
+                                >
+                                    <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                                        <Icon size={22} />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-gray-800 group-hover:text-brand-600">{cat.name}</span>
+                                        <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold text-gray-900">Recommended providers</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {(providers || []).slice(0, 6).map((provider) => (
+                            <div
+                                key={provider.id}
+                                className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer"
+                                onClick={() => handleProviderClick(provider.id)}
+                            >
+                                <div className="flex items-start gap-4 mb-4">
+                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">{provider.name}</h3>
+                                        <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
+                                        <div className="flex items-center gap-1 mt-1">
+                                            <Icons.Star size={14} className="text-yellow-400 fill-current" />
+                                            <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
+                                            <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {(provider.categories || []).map(tag => (
+                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
+                                    <div className="text-lg font-bold text-gray-900">
+                                        ${provider.hourly_rate || provider.hourlyRate || 0}<span className="text-sm font-normal text-gray-500">/hr</span>
+                                    </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleProviderClick(provider.id);
+                                        }}
+                                        className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
+                                    >
+                                        View Profile
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {!loading && providers.length === 0 && (
+                        <div className="text-center py-10 text-gray-500 bg-white rounded-2xl border border-dashed border-gray-200">
+                            No providers available yet.
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
 
     const renderAllCategories = () => {
         return (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-4 mb-8">
+            <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-4 mb-4">
                     <button
                         onClick={handleBackToHome}
                         className="p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -280,25 +392,38 @@ const AppDashboard = () => {
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">All Categories</h1>
-                        <p className="text-gray-500 text-sm">Explore all services available on Kliques</p>
+                        <p className="text-gray-500 text-sm">Browse all available service categories</p>
                     </div>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                    {CATEGORIES.map((cat) => {
+                <div className="relative">
+                    <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search categories..."
+                        value={categorySearchQuery}
+                        onChange={(e) => setCategorySearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-200"
+                    />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {CATEGORIES.filter(cat =>
+                        cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                    ).map((cat) => {
                         const Icon = getCategoryIcon(cat.name);
                         return (
-                            <button
+                            <div
                                 key={cat.id}
                                 onClick={() => handleCategoryClick(cat)}
-                                className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-brand-200 hover:-translate-y-1 transition-all group text-center flex flex-col items-center justify-center aspect-square"
+                                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
                             >
-                                <div className={`w-16 h-16 rounded-full ${cat.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <Icon size={28} />
+                                <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                                    <Icon size={22} />
                                 </div>
-                                <span className="font-bold text-gray-700 text-lg group-hover:text-brand-600">{cat.name}</span>
-                                <span className="text-xs text-gray-400 mt-2 font-medium">View Providers</span>
-                            </button>
+                                <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-gray-800 group-hover:text-brand-600">{cat.name}</span>
+                                    <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
+                                </div>
+                            </div>
                         );
                     })}
                 </div>
@@ -306,280 +431,15 @@ const AppDashboard = () => {
         );
     };
 
-    // --- MAIN HOME RENDER ---
-
-    // --- MAIN HOME RENDER ---
+    if (loading) {
+        return <div className="p-6">Loading...</div>;
+    }
 
     if (viewState === 'CATEGORY_DETAIL') return renderCategoryDetail();
+    if (viewState === 'SEARCH_RESULTS') return renderSearchResults();
     if (viewState === 'ALL_CATEGORIES') return renderAllCategories();
 
-    const renderHomeContent = () => (
-        <>
-            {/* Categories Preview (Top 6) */}
-            <div>
-                <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">Browse Categories</h2>
-                        <p className="text-gray-500 text-sm mt-1">Explore our most popular services</p>
-                    </div>
-
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        {/* Category Search */}
-                        <div className="relative flex-1 md:w-64">
-                            <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                                type="text"
-                                value={categorySearchQuery}
-                                onChange={(e) => setCategorySearchQuery(e.target.value)}
-                                placeholder="Filter categories..."
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition-all"
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleViewAllCategories}
-                            className="text-brand-600 font-medium text-sm hover:underline flex items-center gap-1 whitespace-nowrap"
-                        >
-                            View all <Icons.ChevronRight size={14} />
-                        </button>
-                    </div>
-                </div>
-
-                {(() => {
-                    const filteredCategories = CATEGORIES.filter(cat =>
-                        cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
-                    );
-
-                    // If searching, show all matches. If not, show top 6.
-                    const displayCategories = categorySearchQuery ? filteredCategories : filteredCategories.slice(0, 6);
-
-                    return (
-                        <>
-                            {displayCategories.length > 0 ? (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    {displayCategories.map((cat) => {
-                                        const Icon = getCategoryIcon(cat.name);
-                                        return (
-                                            <div
-                                                key={cat.id}
-                                                onClick={() => handleCategoryClick(cat)}
-                                                className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group text-center flex flex-col items-center justify-center"
-                                            >
-                                                <div className={`w-14 h-14 rounded-full ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                                    <Icon size={24} />
-                                                </div>
-                                                <span className="font-semibold text-gray-700 group-hover:text-brand-600">{cat.name}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-                                    <p className="text-gray-500">No categories match "{categorySearchQuery}"</p>
-                                </div>
-                            )}
-                        </>
-                    );
-                })()}
-            </div>
-
-            {/* Main Content Grid: Popular Providers & Upcoming Bookings */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                {/* Popular Providers - Span 2 cols */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-gray-900">Popular Providers</h2>
-                        {TOP_PROVIDERS.length > 0 && (
-                            <button className="text-gray-400 hover:text-gray-600">
-                                <Icons.ChevronRight />
-                            </button>
-                        )}
-                    </div>
-
-                    {TOP_PROVIDERS.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {TOP_PROVIDERS.slice(0, 4).map((provider) => (
-                                <div
-                                    key={provider.id}
-                                    onClick={() => handleProviderClick(provider.id)}
-                                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
-                                >
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <img src={provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
-                                        <div>
-                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{provider.name}</h3>
-                                            <p className="text-sm text-brand-600 font-medium">{provider.title}</p>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                                <span className="text-sm font-bold text-gray-800">{provider.rating}</span>
-                                                <span className="text-xs text-gray-400">({provider.reviewCount} reviews)</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {provider.categories.map(tag => (
-                                            <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-
-                                    <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                        <div className="text-lg font-bold text-gray-900">
-                                            ${provider.hourlyRate}<span className="text-sm font-normal text-gray-500">/hr</span>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleProviderClick(provider.id);
-                                            }}
-                                            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
-                                        >
-                                            Book Now
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="bg-gradient-to-b from-white to-gray-50 rounded-3xl border border-gray-100 p-12 flex flex-col items-center justify-center text-center h-96 shadow-sm">
-                            {/* Empty state content */}
-                            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
-                                <Icons.Search className="text-brand-400" size={40} />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">We are launching in your area!</h3>
-                        </div>
-                    )}
-                </div>
-
-                {/* Upcoming Bookings - Span 1 col */}
-                <div className="space-y-6">
-                    <h2 className="text-xl font-bold text-gray-900">My Bookings</h2>
-                    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${bookings.length > 0 ? 'p-6' : 'p-8 text-center flex flex-col items-center justify-center min-h-[300px]'}`}>
-                        {bookings.length > 0 ? (
-                            <>
-                                <div className="space-y-6">
-                                    {bookings.slice(0, 3).map((booking) => (
-                                        <div key={booking.id} className="relative pb-6 border-b border-gray-100 last:border-0 last:pb-0">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                                                    booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-gray-100 text-gray-600'
-                                                    }`}>
-                                                    {booking.status}
-                                                </span>
-                                                <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
-                                                    <Icons.Clock size={12} /> {booking.time}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex gap-4 items-center">
-                                                <div className="bg-brand-50 rounded-xl p-3 flex-shrink-0 text-brand-600">
-                                                    <Icons.Calendar size={20} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-gray-800">{booking.serviceName}</h4>
-                                                    <p className="text-sm text-gray-500">{booking.providerName}</p>
-                                                    <p className="text-xs text-gray-400 mt-1">{booking.date}</p>
-                                                </div>
-                                            </div>
-
-                                            {booking.status === 'confirmed' && (
-                                                <div className="mt-4 flex gap-2">
-                                                    <button onClick={() => navigate('/app/messages')} className="flex-1 py-2 text-xs font-semibold text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
-                                                        Message
-                                                    </button>
-                                                    <button onClick={() => navigate('/app/bookings')} className="flex-1 py-2 text-xs font-semibold text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                                        Reschedule
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                                <button
-                                    onClick={() => navigate('/app/bookings')}
-                                    className="w-full py-3 mt-6 text-sm text-center text-brand-600 font-semibold hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-colors"
-                                >
-                                    View Full History
-                                </button>
-                            </>
-                        ) : (
-                            <div className="py-8">
-                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Icons.Calendar className="text-gray-300" size={32} />
-                                </div>
-                                <h4 className="text-gray-900 font-bold mb-2">No upcoming bookings</h4>
-                                <p className="text-gray-400 text-sm mb-6 max-w-[200px] mx-auto">
-                                    You haven't booked any services yet. Your schedule will appear here.
-                                </p>
-                                <button
-                                    onClick={() => navigate('/app/browse')}
-                                    className="text-sm font-semibold text-brand-600 bg-brand-50 px-6 py-2 rounded-xl hover:bg-brand-100 transition-colors"
-                                >
-                                    Find a Service
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-            </div>
-        </>
-    );
-
-    return (
-        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-            {/* Hero / Search Section */}
-            <div className="bg-gradient-to-r from-brand-500 to-brand-700 rounded-3xl p-8 md:p-12 text-white shadow-lg relative overflow-hidden">
-                <div className="relative z-10 max-w-3xl">
-                    <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
-                        Find the perfect professional for your home & lifestyle.
-                    </h1>
-                    <p className="text-brand-100 mb-10 text-lg max-w-xl">From cleaning to repairs, book trusted local services in minutes.</p>
-
-                    {/* Enhanced Search Bar */}
-                    <form onSubmit={handleTopSearch} className="bg-white p-2 rounded-3xl shadow-2xl shadow-brand-900/20 flex flex-col md:flex-row gap-2">
-
-                        {/* Search Input */}
-                        <div className="flex-1 flex items-center px-4 py-3 relative group">
-                            <Icons.Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors flex-shrink-0" size={24} />
-                            <input
-                                type="text"
-                                value={topSearchQuery}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    setTopSearchQuery(val);
-                                    if (val.trim()) {
-                                        setViewState('SEARCH_RESULTS');
-                                    } else {
-                                        setViewState('HOME');
-                                    }
-                                }}
-                                placeholder="What service do you need?"
-                                className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 px-4 text-base md:text-lg font-medium w-full"
-                            />
-                        </div>
-
-                        {/* Search Button */}
-                        <button type="submit" className="bg-gray-900 text-white px-8 py-3 md:py-4 rounded-2xl font-bold text-lg hover:bg-brand-600 transition-all shadow-lg shadow-gray-900/10 hover:shadow-brand-500/25 flex items-center justify-center gap-2 md:ml-2">
-                            Search
-                        </button>
-                    </form>
-
-                </div>
-
-                {/* Abstract Decoration */}
-                <div className="absolute right-0 bottom-0 opacity-20 transform translate-y-1/4 translate-x-1/4 pointer-events-none">
-                    <Icons.Sparkles size={400} />
-                </div>
-            </div>
-
-            {viewState === 'SEARCH_RESULTS' ? renderSearchResults() : renderHomeContent()}
-        </div>
-    );
+    return renderHome();
 };
 
 export default AppDashboard;

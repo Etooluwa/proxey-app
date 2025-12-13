@@ -54,3 +54,31 @@ export async function updateProviderSchedule(schedule) {
 export async function fetchProviderTodayJobs() {
   return fetchProviderJobs({ status: "today" });
 }
+
+// Time blocks (provider availability)
+export async function fetchProviderTimeBlocks() {
+  const data = await request("/provider/time-blocks");
+  return data.blocks || [];
+}
+
+export async function saveProviderTimeBlocks(blocks) {
+  const data = await request("/provider/time-blocks", {
+    method: "POST",
+    body: JSON.stringify({ blocks }),
+  });
+  return data.blocks || [];
+}
+
+// Invoices
+export async function fetchProviderInvoices() {
+  const data = await request("/provider/invoices");
+  return data.invoices || [];
+}
+
+export async function createProviderInvoice(invoice) {
+  const data = await request("/provider/invoices", {
+    method: "POST",
+    body: JSON.stringify(invoice),
+  });
+  return data.invoice;
+}

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Skeleton from "../../components/ui/Skeleton";
 import { useToast } from "../../components/ui/ToastProvider";
 import { useSession } from "../../auth/authContext";
+import { fetchProviderInvoices, createProviderInvoice, fetchProviderJobs } from "../../data/provider";
 import "../../styles/provider/providerInvoices.css";
 
 function ProviderInvoices() {
@@ -19,28 +20,22 @@ function ProviderInvoices() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [sortBy, setSortBy] = useState("date-desc");
 
-  // Initialize invoices from localStorage or create from appointments
-  useEffect(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Try to load from localStorage first
-      const savedInvoices = localStorage.getItem("provider_invoices");
-      if (savedInvoices) {
-        const parsed = JSON.parse(savedInvoices);
-        setInvoices(parsed);
-      } else {
-        // Generate invoices from completed appointments
-        const savedAppointments = localStorage.getItem("all_provider_appointments");
-        if (savedAppointments) {
-          const appointments = JSON.parse(savedAppointments);
-          const completedAppointments = appointments.filter(
-            (apt) => apt.status === "COMPLETED"
+      const data = await fetchProviderInvoices();
+      const normalized = (data || []).map(normalizeInvoice);
+      setInvoices(normalized);
+      // If no invoices, attempt to generate from completed jobs
+      if (!normalized || normalized.length === 0) {
+        const jobs = await fetchProviderJobs({ status: "completed" });
+        if (jobs?.length) {
+          const generated = await Promise.all(
+            jobs.map((job) =>
+              createProviderInvoice(generateInvoiceFromAppointment(job))
+            )
           );
-          const generatedInvoices = completedAppointments.map((apt) =>
-            generateInvoiceFromAppointment(apt)
-          );
-          setInvoices(generatedInvoices);
-          localStorage.setItem("provider_invoices", JSON.stringify(generatedInvoices));
+          setInvoices(generated.map(normalizeInvoice));
         }
       }
     } catch (error) {
@@ -54,6 +49,10 @@ function ProviderInvoices() {
       setLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Filter and sort invoices
   useEffect(() => {
@@ -94,7 +93,7 @@ function ProviderInvoices() {
   }, [invoices, searchQuery, statusFilter, sortBy]);
 
   const generateInvoiceFromAppointment = (appointment) => {
-    const invoiceDate = new Date(appointment.date);
+    const invoiceDate = new Date(appointment.scheduled_at || appointment.date || Date.now());
     const invoiceNumber = `INV-${Date.now()}-${Math.random()
       .toString(36)
       .substr(2, 9)
@@ -105,22 +104,43 @@ function ProviderInvoices() {
       invoiceNumber,
       invoiceDate: invoiceDate.toISOString(),
       appointmentId: appointment.id,
-      clientName: appointment.clientName,
+      clientName: appointment.client_name || appointment.clientName,
       clientEmail: appointment.clientEmail || "N/A",
       clientPhone: appointment.phone || "N/A",
-      service: appointment.service,
-      description: `Service provided: ${appointment.service}`,
+      service: appointment.service_name || appointment.service,
+      description: `Service provided: ${appointment.service_name || appointment.service}`,
       quantity: 1,
-      unitPrice: appointment.price,
-      totalAmount: appointment.price,
+      unitPrice: appointment.price || appointment.total_amount || 0,
+      totalAmount: appointment.price || appointment.total_amount || 0,
       depositAmount: appointment.depositAmount || 0,
-      finalAmount: appointment.price - (appointment.depositAmount || 0),
-      status: "paid",
+      finalAmount: (appointment.price || 0) - (appointment.depositAmount || 0),
+      status: appointment.status || "paid",
       paymentDate: new Date(appointment.date),
       notes: appointment.notes || "",
       address: appointment.address || "N/A",
     };
   };
+
+  const normalizeInvoice = (inv) => ({
+    id: inv.id,
+    invoiceNumber: inv.invoice_number || inv.invoiceNumber,
+    invoiceDate: inv.issued_at || inv.invoiceDate,
+    appointmentId: inv.booking_id || inv.appointmentId,
+    clientName: inv.client_name || inv.clientName,
+    clientEmail: inv.client_email || inv.clientEmail || "N/A",
+    clientPhone: inv.client_phone || inv.clientPhone || "N/A",
+    service: inv.service || "Service",
+    description: inv.description || "",
+    quantity: 1,
+    unitPrice: inv.unit_price || inv.unitPrice || inv.total_amount || 0,
+    totalAmount: inv.total_amount || inv.totalAmount || 0,
+    depositAmount: inv.deposit_amount || inv.depositAmount || 0,
+    finalAmount: inv.final_amount || inv.finalAmount || inv.total_amount || 0,
+    status: inv.status || "pending",
+    paymentDate: inv.paid_at || inv.paymentDate,
+    notes: inv.notes || "",
+    address: inv.address || "N/A",
+  });
 
   const handleDownloadInvoice = (invoice) => {
     const invoiceHTML = generateInvoiceHTML(invoice);
