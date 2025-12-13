@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     BarChart,
@@ -12,14 +12,41 @@ import {
 } from 'recharts';
 import { Icons } from '../../components/Icons';
 import { StatCard } from '../../components/StatCard';
-import { EARNINGS_DATA, PROVIDER_REQUESTS } from '../../constants';
+import { EARNINGS_DATA } from '../../constants';
 
 import { useSession } from '../../auth/authContext';
+import { fetchProviderJobs } from '../../data/provider';
 
 const ProviderDashboard = () => {
     const navigate = useNavigate();
     const { profile } = useSession();
-    const [requests] = useState(PROVIDER_REQUESTS); // Using mock data
+    const [requests, setRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoadingRequests(true);
+            try {
+                const jobs = await fetchProviderJobs();
+                if (!cancelled) {
+                    // Show only pending/active/upcoming
+                    const filtered = (jobs || []).filter((job) => {
+                        const status = (job.status || '').toLowerCase();
+                        return status === 'pending' || status === 'upcoming' || status === 'active' || status === 'confirmed';
+                    });
+                    setRequests(filtered);
+                }
+            } catch (error) {
+                console.error("Failed to load provider requests", error);
+                if (!cancelled) setRequests([]);
+            } finally {
+                if (!cancelled) setLoadingRequests(false);
+            }
+        }
+        load();
+        return () => { cancelled = true; };
+    }, []);
 
     const handleDateClick = (date) => {
         const formattedDate = date.toLocaleDateString('en-US', {
@@ -32,7 +59,6 @@ const ProviderDashboard = () => {
 
     const firstName = profile?.name?.split(' ')[0] || 'Provider';
 
-    console.log('ProviderDashboard: Rendering with requests:', requests.length);
     return (
         <div className="max-w-7xl mx-auto space-y-8">
 
@@ -154,39 +180,52 @@ const ProviderDashboard = () => {
                         </div>
                     </div>
 
-                    {requests.length > 0 ? (
+                    {loadingRequests ? (
+                        <div className="text-sm text-gray-500">Loading requests...</div>
+                    ) : requests.length > 0 ? (
                         <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-                            {requests.map((request) => (
-                                <div key={request.id} className="p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors overflow-hidden">
-                                    {/* Client Info Row */}
-                                    <div className="flex items-center gap-2 mb-2 min-w-0">
-                                        <img src={request.clientAvatar} alt={request.clientName} className="w-8 h-8 rounded-full object-cover shadow-sm flex-shrink-0" />
-                                        <div className="min-w-0 flex-1">
-                                            <h4 className="font-bold text-gray-900 text-xs truncate">{request.clientName}</h4>
-                                            <p className="text-xs text-gray-500 truncate">{request.location}</p>
+                            {requests.map((request) => {
+                                const dateLabel = request.scheduled_at
+                                    ? new Date(request.scheduled_at).toLocaleString()
+                                    : 'TBD';
+                                const priceLabel = typeof request.price === 'number'
+                                    ? `$${(request.price / 100).toFixed(2)}`
+                                    : request.price
+                                    ? `$${request.price}`
+                                    : '';
+                                return (
+                                    <div key={request.id} className="p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors overflow-hidden">
+                                        <div className="flex items-center gap-2 mb-2 min-w-0">
+                                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
+                                                {(request.client_name || 'C')[0]}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className="font-bold text-gray-900 text-xs truncate">{request.client_name || 'Client'}</h4>
+                                                <p className="text-xs text-gray-500 truncate">{request.location || 'Location not set'}</p>
+                                            </div>
+                                            {priceLabel && (
+                                                <span className="text-xs font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded flex-shrink-0 whitespace-nowrap">
+                                                    {priceLabel}
+                                                </span>
+                                            )}
                                         </div>
-                                        <span className="text-xs font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded flex-shrink-0 whitespace-nowrap">
-                                            ${request.price}
-                                        </span>
-                                    </div>
 
-                                    {/* Service Info */}
-                                    <div className="mb-2 px-1">
-                                        <p className="font-bold text-gray-800 text-xs mb-0.5 truncate">{request.serviceName}</p>
-                                        <p className="text-xs text-gray-500 truncate">{request.date} at {request.time}</p>
-                                    </div>
+                                        <div className="mb-2 px-1">
+                                            <p className="font-bold text-gray-800 text-xs mb-0.5 truncate">{request.service_name || 'Service'}</p>
+                                            <p className="text-xs text-gray-500 truncate">{dateLabel}</p>
+                                        </div>
 
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-1.5">
-                                        <button className="flex-1 bg-gray-900 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-800 transition-colors">
-                                            Accept
-                                        </button>
-                                        <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-1.5 rounded text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
-                                            Decline
-                                        </button>
+                                        <div className="flex gap-1.5">
+                                            <button className="flex-1 bg-gray-900 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-800 transition-colors">
+                                                Accept
+                                            </button>
+                                            <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-1.5 rounded text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
+                                                Decline
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-gray-100 rounded-xl bg-gray-50/50">
