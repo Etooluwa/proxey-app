@@ -15,7 +15,12 @@ export const ToastProvider = ({ children }) => {
 
     const push = useCallback(({ title, description, variant = 'info', duration = 3000 }) => {
         const id = Math.random().toString(36).substr(2, 9);
-        setToasts((prev) => [...prev, { id, title, description, variant }]);
+
+        // Sanitize content to prevent object rendering crashes
+        const safeTitle = typeof title === 'object' ? JSON.stringify(title) : String(title || '');
+        const safeDesc = typeof description === 'object' ? (description.message || JSON.stringify(description)) : String(description || '');
+
+        setToasts((prev) => [...prev, { id, title: safeTitle, description: safeDesc, variant }]);
 
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -43,8 +48,8 @@ export const ToastProvider = ({ children }) => {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h4 className={`font-bold text-sm ${toast.variant === 'success' ? 'text-green-700' :
-                                        toast.variant === 'error' ? 'text-red-700' :
-                                            'text-blue-700'
+                                    toast.variant === 'error' ? 'text-red-700' :
+                                        'text-blue-700'
                                     }`}>
                                     {toast.title}
                                 </h4>
