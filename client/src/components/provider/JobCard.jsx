@@ -12,16 +12,20 @@ function JobCard({ job, onAccept, onDecline, onComplete }) {
   if (!job) return null;
 
   const statusBadge = STATUS_LABELS[job.status] || STATUS_LABELS.pending;
-  const scheduledAt = job.scheduledAt
-    ? new Date(job.scheduledAt).toLocaleString()
+  const scheduledRaw = job.scheduledAt || job.scheduled_at;
+  const scheduledAt = scheduledRaw
+    ? new Date(scheduledRaw).toLocaleString()
     : "TBD";
+  const clientName = job.clientName || job.client_name || "Client";
+  const serviceName = job.serviceName || job.service_name || "Service";
+  const priceValue = typeof job.price === "number" ? job.price : Number(job.price) || 0;
 
   return (
     <article className="provider-job-card">
       <header className="provider-job-card__header">
         <div>
-          <h3>{job.clientName}</h3>
-          <p>{job.serviceName}</p>
+          <h3>{clientName}</h3>
+          <p>{serviceName}</p>
         </div>
         <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
       </header>
@@ -36,7 +40,7 @@ function JobCard({ job, onAccept, onDecline, onComplete }) {
         </div>
         <div>
           <dt>Price</dt>
-          <dd>${((job.price || 0) / 100).toFixed(2)}</dd>
+          <dd>${(priceValue / 100).toFixed(2)}</dd>
         </div>
       </dl>
       {job.notes ? <p className="provider-job-card__notes">{job.notes}</p> : null}

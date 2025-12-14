@@ -193,35 +193,8 @@ export const TOP_PROVIDERS = [
 // Empty state: No bookings yet
 export const CLIENT_BOOKINGS = [];
 
-// Mock requests for provider view
-export const PROVIDER_REQUESTS = [
-    {
-        id: 'req1',
-        serviceName: 'Deep Home Cleaning',
-        providerName: 'Jane Doe',
-        providerAvatar: 'https://picsum.photos/seed/jane/100/100',
-        clientName: 'Michael Scott',
-        clientAvatar: 'https://picsum.photos/seed/michael/100/100',
-        date: 'Oct 26, 2023',
-        time: '10:00 AM',
-        status: BookingStatus.PENDING,
-        price: 120,
-        location: '1725 Slough Ave, Scranton'
-    },
-    {
-        id: 'req2',
-        serviceName: 'Window Cleaning',
-        providerName: 'Jane Doe',
-        providerAvatar: 'https://picsum.photos/seed/jane/100/100',
-        clientName: 'Pam Beesly',
-        clientAvatar: 'https://picsum.photos/seed/pam/100/100',
-        date: 'Oct 27, 2023',
-        time: '02:00 PM',
-        status: BookingStatus.PENDING,
-        price: 85,
-        location: '45 Beesly St, Scranton'
-    }
-];
+// Provider requests (API-backed in UI; keep empty to avoid demo data)
+export const PROVIDER_REQUESTS = [];
 
 // All Provider Appointments (Upcoming, Past, Cancelled)
 export const ALL_PROVIDER_APPOINTMENTS = [
