@@ -13,7 +13,7 @@ const ProviderServices = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
-    const { role } = useSession();
+    const { role, session } = useSession();
     const [form, setForm] = useState({
         id: null,
         name: '',
@@ -101,6 +101,7 @@ const ProviderServices = () => {
         if (Object.keys(nextErrors).length > 0) return;
 
         setSaving(true);
+        const providerId = session?.user?.id || null;
         const payload = {
             id: form.id,
             name: form.name,
@@ -109,6 +110,7 @@ const ProviderServices = () => {
             basePrice: Number(form.basePrice),
             unit: form.unit,
             duration: Number(form.duration) || 60,
+            provider_id: providerId,
         };
         try {
             const saved = {
