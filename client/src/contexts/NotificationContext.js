@@ -15,8 +15,15 @@ export const NotificationProvider = ({ children }) => {
         if (!session?.user?.id) return;
         try {
             const data = await fetchClientNotifications();
-            setNotifications(data);
-            setUnreadCount(data.filter((n) => !n.is_read).length);
+            // Sanitize notifications to prevent React rendering objects
+            const sanitized = (data || []).map(n => ({
+                ...n,
+                title: typeof n.title === 'object' ? JSON.stringify(n.title) : String(n.title || 'Notification'),
+                message: typeof n.message === 'object' ? JSON.stringify(n.message) : String(n.message || n.body || ''),
+                body: typeof n.body === 'object' ? JSON.stringify(n.body) : String(n.body || '')
+            }));
+            setNotifications(sanitized);
+            setUnreadCount(sanitized.filter((n) => !n.is_read).length);
         } catch (error) {
             console.error("[notifications] Failed to load notifications", error);
         }
