@@ -5,6 +5,23 @@ import { CATEGORIES } from '../constants';
 import { fetchProviders } from '../data/providers';
 import { fetchBookings } from '../data/bookings';
 
+const safeRender = (value, fallback = '') => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'object') {
+        if (value.name && typeof value.name === 'string') return value.name;
+        if (value.title && typeof value.title === 'string') return value.title;
+        if (value.message && typeof value.message === 'string') return value.message;
+        if (value.value && typeof value.value === 'number') return value.value;
+        if (value.count && typeof value.count === 'number') return value.count;
+        if (value.amount && typeof value.amount === 'number') return value.amount;
+        return JSON.stringify(value);
+    }
+    return String(value);
+};
+
 const AppDashboard = () => {
     const navigate = useNavigate();
     const [viewState, setViewState] = useState('HOME');
@@ -39,7 +56,8 @@ const AppDashboard = () => {
     }, []);
 
     const getCategoryIcon = (name) => {
-        switch (name) {
+        const safeName = safeRender(name);
+        switch (safeName) {
             case 'Cleaning': return Icons.Sparkles;
             case 'Repair': return Icons.Wrench;
             case 'Beauty': return Icons.Scissors;
@@ -85,7 +103,10 @@ const AppDashboard = () => {
         const Icon = getCategoryIcon(selectedCategory.name);
 
         const categoryProviders = providers.filter(p =>
-            (p.categories || []).some(c => c.includes(selectedCategory.name) || selectedCategory.name.includes(c))
+            (p.categories || []).some(c =>
+                safeRender(c).includes(safeRender(selectedCategory.name)) ||
+                safeRender(selectedCategory.name).includes(safeRender(c))
+            )
         );
 
         return (
@@ -101,8 +122,8 @@ const AppDashboard = () => {
                         <Icon size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{selectedCategory.name} Services</h1>
-                        <p className="text-gray-500 text-sm">Find the best local {selectedCategory.name.toLowerCase()} professionals</p>
+                        <h1 className="text-2xl font-bold text-gray-900">{safeRender(selectedCategory.name)} Services</h1>
+                        <p className="text-gray-500 text-sm">Find the best local {safeRender(selectedCategory.name).toLowerCase()} professionals</p>
                     </div>
                 </div>
 
@@ -115,14 +136,14 @@ const AppDashboard = () => {
                                 className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
                             >
                                 <div className="flex items-start gap-4 mb-4">
-                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                     <div>
-                                        <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
+                                        <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{safeRender(provider.name, 'Provider')}</h3>
+                                        <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
-                                            <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
+                                            <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
+                                            <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -130,17 +151,14 @@ const AppDashboard = () => {
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {(provider.categories || []).map((tag, index) => (
                                         <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {typeof tag === 'string' ? tag : (tag?.name || '')}
+                                            {safeRender(tag)}
                                         </span>
                                     ))}
                                 </div>
 
                                 <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                                     <div className="text-lg font-bold text-gray-900">
-                                        {(() => {
-                                            const rate = typeof provider.hourly_rate === 'object' ? (provider.hourly_rate?.amount || parseInt(provider.hourly_rate) || 0) : (provider.hourly_rate || provider.hourlyRate || 0);
-                                            return `$${rate}`;
-                                        })()}<span className="text-sm font-normal text-gray-500">/hr</span>
+                                        ${safeRender(provider.hourly_rate) || safeRender(provider.hourlyRate) || '0'}<span className="text-sm font-normal text-gray-500">/hr</span>
                                     </div>
                                     <button
                                         onClick={(e) => {
@@ -161,7 +179,7 @@ const AppDashboard = () => {
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 mb-2">No providers found</h3>
                             <p className="text-gray-500 max-w-md mx-auto">
-                                We currently don't have any {selectedCategory.name.toLowerCase()} providers available in your area. Please check back later!
+                                We currently don't have any {safeRender(selectedCategory.name).toLowerCase()} providers available in your area. Please check back later!
                             </p>
                         </div>
                     )}
@@ -173,12 +191,12 @@ const AppDashboard = () => {
     const renderSearchResults = () => {
         const query = topSearchQuery.toLowerCase();
         const matchedCategories = CATEGORIES.filter(cat =>
-            cat.name.toLowerCase().includes(query)
+            safeRender(cat.name).toLowerCase().includes(query)
         );
         const matchedProviders = providers.filter(p =>
-            (p.name || '').toLowerCase().includes(query) ||
-            (p.headline || p.title || '').toLowerCase().includes(query) ||
-            (p.categories || []).some(c => c.toLowerCase().includes(query))
+            safeRender(p.name).toLowerCase().includes(query) ||
+            safeRender(p.headline).toLowerCase().includes(query) || safeRender(p.title).toLowerCase().includes(query) ||
+            (p.categories || []).some(c => safeRender(c).toLowerCase().includes(query))
         );
 
         return (
@@ -211,7 +229,7 @@ const AppDashboard = () => {
                                         <div className={`w-14 h-14 rounded-full ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                                             <Icon size={24} />
                                         </div>
-                                        <span className="font-semibold text-gray-700 group-hover:text-brand-600">{cat.name}</span>
+                                        <span className="font-semibold text-gray-700 group-hover:text-brand-600">{safeRender(cat.name)}</span>
                                     </div>
                                 );
                             })}
@@ -230,14 +248,14 @@ const AppDashboard = () => {
                                     className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
                                 >
                                     <div className="flex items-start gap-4 mb-4">
-                                        <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                        <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                         <div>
-                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
-                                            <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
+                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{safeRender(provider.name, 'Provider')}</h3>
+                                            <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
                                             <div className="flex items-center gap-1 mt-1">
                                                 <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                                <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
-                                                <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
+                                                <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
+                                                <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
                                             </div>
                                         </div>
                                     </div>
@@ -305,7 +323,7 @@ const AppDashboard = () => {
                         </button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {CATEGORIES.filter(cat => cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())).map((cat) => {
+                        {CATEGORIES.filter(cat => safeRender(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())).map((cat) => {
                             const Icon = getCategoryIcon(cat.name);
                             return (
                                 <div
@@ -317,7 +335,7 @@ const AppDashboard = () => {
                                         <Icon size={22} />
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-gray-800 group-hover:text-brand-600">{cat.name}</span>
+                                        <span className="font-semibold text-gray-800 group-hover:text-brand-600">{safeRender(cat.name)}</span>
                                         <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
                                     </div>
                                 </div>
@@ -338,27 +356,27 @@ const AppDashboard = () => {
                                 onClick={() => handleProviderClick(provider.id)}
                             >
                                 <div className="flex items-start gap-4 mb-4">
-                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
+                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                     <div>
-                                        <h3 className="font-bold text-gray-900">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
+                                        <h3 className="font-bold text-gray-900">{safeRender(provider.name, 'Provider')}</h3>
+                                        <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
-                                            <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
+                                            <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
+                                            <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {(provider.categories || []).map((tag, index) => (
                                         <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {typeof tag === 'string' ? tag : (tag?.name || '')}
+                                            {safeRender(tag)}
                                         </span>
                                     ))}
                                 </div>
                                 <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                                     <div className="text-lg font-bold text-gray-900">
-                                        ${provider.hourly_rate || provider.hourlyRate || 0}<span className="text-sm font-normal text-gray-500">/hr</span>
+                                        ${safeRender(provider.hourly_rate) || safeRender(provider.hourlyRate) || '0'}<span className="text-sm font-normal text-gray-500">/hr</span>
                                     </div>
                                     <button
                                         onClick={(e) => {
@@ -410,7 +428,7 @@ const AppDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {CATEGORIES.filter(cat =>
-                        cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                        safeRender(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())
                     ).map((cat) => {
                         const Icon = getCategoryIcon(cat.name);
                         return (
@@ -423,7 +441,7 @@ const AppDashboard = () => {
                                     <Icon size={22} />
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="font-semibold text-gray-800 group-hover:text-brand-600">{cat.name}</span>
+                                    <span className="font-semibold text-gray-800 group-hover:text-brand-600">{safeRender(cat.name)}</span>
                                     <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
                                 </div>
                             </div>
