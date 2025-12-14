@@ -18,6 +18,33 @@ function loadStoredSession() {
     }
 }
 
+function sanitizeProfile(profile) {
+    if (!profile || typeof profile !== 'object') return null;
+
+    // Create a safe copy
+    const safeProfile = { ...profile };
+
+    // Helper to ensure string or null
+    const asString = (val) => {
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'string') return val;
+        // If it's an object/array, return empty string (or JSON string if you prefer, but empty is safer for rendering)
+        return '';
+    };
+
+    // Sanitize common fields expected to be strings
+    // List sourced from usage in AccountPage.js, AppShell.js, etc.
+    const stringFields = ['name', 'firstName', 'lastName', 'email', 'phone', 'bio', 'photo', 'avatar', 'city', 'defaultLocation'];
+
+    stringFields.forEach(field => {
+        if (field in safeProfile) {
+            safeProfile[field] = asString(safeProfile[field]);
+        }
+    });
+
+    return safeProfile;
+}
+
 function persistSession(session) {
     if (!session) {
         window.localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -30,7 +57,8 @@ function loadProfile(userId) {
     if (!userId) return null;
     try {
         const raw = window.localStorage.getItem(`${PROFILE_STORAGE_KEY}:${userId}`);
-        return raw ? JSON.parse(raw) : null;
+        const parsed = raw ? JSON.parse(raw) : null;
+        return sanitizeProfile(parsed);
     } catch (error) {
         console.warn("[auth] Failed to parse stored profile", error);
         return null;
@@ -104,7 +132,7 @@ export function AuthProvider({ children }) {
                         if (storedProfile) {
                             setProfile(storedProfile);
                         } else if (sbSession.user?.user_metadata?.profile) {
-                            setProfile(sbSession.user.user_metadata.profile);
+                            setProfile(sanitizeProfile(sbSession.user.user_metadata.profile));
                         }
                     }
                 } catch (error) {
@@ -117,7 +145,7 @@ export function AuthProvider({ children }) {
                         persistSession(mapped);
                         const storedProfile = loadProfile(mapped.user.id);
                         setProfile(
-                            storedProfile || sbSession.user?.user_metadata?.profile || null
+                            storedProfile || sanitizeProfile(sbSession.user?.user_metadata?.profile) || null
                         );
                     } else {
                         setSession(null);
@@ -227,8 +255,9 @@ export function AuthProvider({ children }) {
             }
             const metaProfile = data.session.user?.user_metadata?.profile || null;
             if (metaProfile) {
-                setProfile(metaProfile);
-                return { session: mapped, profile: metaProfile };
+                const sanitized = sanitizeProfile(metaProfile);
+                setProfile(sanitized);
+                return { session: mapped, profile: sanitized };
             }
             setProfile(null);
             return { session: mapped, profile: null };
