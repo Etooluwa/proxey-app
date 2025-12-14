@@ -17,8 +17,19 @@ export const ToastProvider = ({ children }) => {
         const id = Math.random().toString(36).substr(2, 9);
 
         // Sanitize content to prevent object rendering crashes
-        const safeTitle = typeof title === 'object' ? JSON.stringify(title) : String(title || '');
-        const safeDesc = typeof description === 'object' ? (description.message || JSON.stringify(description)) : String(description || '');
+        let safeTitle = '';
+        if (typeof title === 'string') safeTitle = title;
+        else if (title && typeof title === 'object' && title.message) safeTitle = String(title.message);
+        else safeTitle = String(title || '');
+
+        let safeDesc = '';
+        if (typeof description === 'string') safeDesc = description;
+        else if (description && typeof description === 'object') {
+            if (description.message) safeDesc = String(description.message);
+            else safeDesc = JSON.stringify(description);
+        } else {
+            safeDesc = String(description || '');
+        }
 
         setToasts((prev) => [...prev, { id, title: safeTitle, description: safeDesc, variant }]);
 

@@ -97,8 +97,8 @@ function SignInPage() {
         const destination = redirectPath
           ? redirectPath
           : role === "provider"
-          ? "/provider"
-          : "/app";
+            ? "/provider"
+            : "/app";
         navigate(destination, { replace: true });
       } else {
         const onboardingPath = role === "provider" ? "/provider/onboarding" : "/onboarding";
@@ -135,7 +135,8 @@ function SignInPage() {
             {(formError || authError) && (
               <div className="login-alert" role="alert">
                 <div style={{ marginBottom: suggestedRole ? "10px" : "0" }}>
-                  {formError || authError}
+                  {typeof formError === 'string' ? formError : String(formError || '')}
+                  {authError && (typeof authError === 'string' ? authError : String(authError.message || JSON.stringify(authError)))}
                 </div>
                 {suggestedRole && (
                   <button

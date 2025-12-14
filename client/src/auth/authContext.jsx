@@ -2,6 +2,13 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import supabase from "../utils/supabase";
 import { uploadProfilePhoto } from "../utils/photoUpload";
 
+const SAFE_STRING = (val) => {
+    if (typeof val === 'string') return val;
+    if (val && typeof val === 'object' && val.message) return String(val.message);
+    if (val === null || val === undefined) return '';
+    return String(val);
+};
+
 const SESSION_STORAGE_KEY = "proxey.auth.session";
 const PROFILE_STORAGE_KEY = "proxey.profile";
 const LOCAL_ROLE_KEY = "proxey.userRoles";
@@ -206,7 +213,8 @@ export function AuthProvider({ children }) {
                 password,
             });
             if (error) {
-                setAuthError(error.message);
+                const msg = SAFE_STRING(error.message || error);
+                setAuthError(msg);
                 throw error;
             }
             if (!data.session) {
@@ -302,7 +310,8 @@ export function AuthProvider({ children }) {
                 },
             });
             if (error) {
-                setAuthError(error.message);
+                const msg = SAFE_STRING(error.message || error);
+                setAuthError(msg);
                 throw error;
             }
             setLocalRole(email, role);
