@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from '../auth/authContext';
 import { fetchMessages, sendMessage } from '../data/messages';
 
@@ -7,20 +7,25 @@ const MessageContext = createContext();
 export const useMessages = () => useContext(MessageContext);
 
 export const MessageProvider = ({ children }) => {
-    const { session, role } = useSession();
+    const { session } = useSession();
     const userId = session?.user?.id;
 
     const [conversations, setConversations] = useState([]);
     const [messages, setMessages] = useState([]);
 
     const refresh = useCallback(async () => {
-        if (!userId) return;
+        if (!userId) {
+            setMessages([]);
+            setConversations([]);
+            return;
+        }
         try {
             const data = await fetchMessages();
-            setMessages(data);
+            const safeData = Array.isArray(data) ? data : [];
+            setMessages(safeData);
 
             // Build lightweight conversations list grouped by thread_id
-            const grouped = data.reduce((acc, msg) => {
+            const grouped = safeData.reduce((acc, msg) => {
                 const threadId = msg.thread_id || "default";
                 if (!acc[threadId]) acc[threadId] = [];
                 acc[threadId].push(msg);
@@ -60,6 +65,8 @@ export const MessageProvider = ({ children }) => {
             setConversations(convs);
         } catch (e) {
             console.error("[messages] Failed to load messages", e);
+            setMessages([]);
+            setConversations([]);
         }
     }, [userId]);
 
@@ -74,15 +81,20 @@ export const MessageProvider = ({ children }) => {
     };
 
     const send = async ({ receiverId, body, threadId }) => {
-        const payload = {
-            receiverId,
-            body,
-        };
-        if (threadId) payload.threadId = threadId;
-        const sent = await sendMessage(payload);
-        setMessages((prev) => [...prev, sent]);
-        refresh();
-        return sent;
+        try {
+            const payload = {
+                receiverId,
+                body,
+            };
+            if (threadId) payload.threadId = threadId;
+            const sent = await sendMessage(payload);
+            setMessages((prev) => [...prev, sent]);
+            refresh();
+            return sent;
+        } catch (error) {
+            console.error("[messages] Failed to send message", error);
+            throw error;
+        }
     };
 
     const getUnreadCount = () => {
