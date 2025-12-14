@@ -117,8 +117,8 @@ const AppDashboard = () => {
                                 <div className="flex items-start gap-4 mb-4">
                                     <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                     <div>
-                                        <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{provider.name}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
+                                        <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
+                                        <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
                                             <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
@@ -128,9 +128,9 @@ const AppDashboard = () => {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                    {(provider.categories || []).map(tag => (
-                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {tag}
+                                    {(provider.categories || []).map((tag, index) => (
+                                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
+                                            {typeof tag === 'string' ? tag : (tag?.name || '')}
                                         </span>
                                     ))}
                                 </div>
@@ -229,8 +229,8 @@ const AppDashboard = () => {
                                     <div className="flex items-start gap-4 mb-4">
                                         <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                         <div>
-                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{provider.name}</h3>
-                                            <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
+                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
+                                            <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                             <div className="flex items-center gap-1 mt-1">
                                                 <Icons.Star size={14} className="text-yellow-400 fill-current" />
                                                 <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
@@ -337,8 +337,8 @@ const AppDashboard = () => {
                                 <div className="flex items-start gap-4 mb-4">
                                     <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={provider.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
                                     <div>
-                                        <h3 className="font-bold text-gray-900">{provider.name}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{provider.headline || provider.title}</p>
+                                        <h3 className="font-bold text-gray-900">{typeof provider.name === 'string' ? provider.name : 'Provider'}</h3>
+                                        <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
                                             <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
@@ -347,9 +347,9 @@ const AppDashboard = () => {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                    {(provider.categories || []).map(tag => (
-                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {tag}
+                                    {(provider.categories || []).map((tag, index) => (
+                                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
+                                            {typeof tag === 'string' ? tag : (tag?.name || '')}
                                         </span>
                                     ))}
                                 </div>
