@@ -121,8 +121,8 @@ const AppDashboard = () => {
                                         <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
-                                            <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
+                                            <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
+                                            <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -137,7 +137,10 @@ const AppDashboard = () => {
 
                                 <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                                     <div className="text-lg font-bold text-gray-900">
-                                        ${provider.hourly_rate || provider.hourlyRate || 0}<span className="text-sm font-normal text-gray-500">/hr</span>
+                                        {(() => {
+                                            const rate = typeof provider.hourly_rate === 'object' ? (provider.hourly_rate?.amount || parseInt(provider.hourly_rate) || 0) : (provider.hourly_rate || provider.hourlyRate || 0);
+                                            return `$${rate}`;
+                                        })()}<span className="text-sm font-normal text-gray-500">/hr</span>
                                     </div>
                                     <button
                                         onClick={(e) => {
@@ -233,8 +236,8 @@ const AppDashboard = () => {
                                             <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                             <div className="flex items-center gap-1 mt-1">
                                                 <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                                <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
-                                                <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
+                                                <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
+                                                <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
                                             </div>
                                         </div>
                                     </div>
@@ -341,8 +344,8 @@ const AppDashboard = () => {
                                         <p className="text-sm text-brand-600 font-medium">{typeof provider.headline === 'string' ? provider.headline : (typeof provider.title === 'string' ? provider.title : '')}</p>
                                         <div className="flex items-center gap-1 mt-1">
                                             <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{provider.rating || '4.8'}</span>
-                                            <span className="text-xs text-gray-400">({provider.review_count || provider.reviewCount || 0} reviews)</span>
+                                            <span className="text-sm font-bold text-gray-800">{typeof provider.rating === 'object' ? (provider.rating?.value || 4.8) : (provider.rating || '4.8')}</span>
+                                            <span className="text-xs text-gray-400">({typeof provider.review_count === 'object' ? (provider.review_count?.count || 0) : (provider.review_count || provider.reviewCount || 0)} reviews)</span>
                                         </div>
                                     </div>
                                 </div>

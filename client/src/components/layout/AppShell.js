@@ -13,8 +13,8 @@ const AppShell = () => {
     const { session, profile } = useSession();
     const { unreadCount, notifications, markAllAsRead } = useNotifications();
 
-    const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'User';
-    const displayPhoto = profile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
+    const displayName = (profile?.name && typeof profile.name === 'string') ? profile.name : (session?.user?.email?.split('@')[0] || 'User');
+    const displayPhoto = (profile?.photo && typeof profile.photo === 'string') ? profile.photo : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
 
     const handleNotificationClick = (e) => {
         e.stopPropagation();
@@ -43,7 +43,7 @@ const AppShell = () => {
                     <div className="flex items-center gap-3 md:gap-6 relative">
                         <div className="hidden md:flex items-center gap-2 text-gray-400 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
                             <Icons.MapPin size={16} className="text-brand-500" />
-                            <span className="text-sm text-gray-600 font-medium">{profile?.city || 'San Francisco, CA'}</span>
+                            <span className="text-sm text-gray-600 font-medium">{(profile?.city && typeof profile.city === 'string') ? profile.city : 'San Francisco, CA'}</span>
                         </div>
 
                         <div className="relative">
