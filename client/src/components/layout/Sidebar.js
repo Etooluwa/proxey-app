@@ -1,13 +1,13 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icons } from '../Icons';
-import { useAuth } from '../../auth/authContext';
+import { useSession } from '../../auth/authContext';
 import { useMessages } from '../../contexts/MessageContext';
 
 export const Sidebar = ({ role }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { signOut } = useSession();
     const { getUnreadCount } = useMessages();
     const unreadMessages = getUnreadCount();
 
@@ -30,7 +30,7 @@ export const Sidebar = ({ role }) => {
     const links = role === 'client' ? clientLinks : providerLinks;
 
     const handleLogout = async () => {
-        await logout();
+        await signOut();
         navigate('/');
     };
 

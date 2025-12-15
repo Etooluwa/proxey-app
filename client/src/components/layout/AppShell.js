@@ -3,23 +3,23 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
-import { useClientData } from '../../hooks/useClientData';
+import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 const AppShell = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const navigate = useNavigate();
+    const { session, profile } = useSession();
+    const { unreadCount, notifications, markAllAsRead } = useNotifications();
 
-    // Use safe client data hook
-    const { profile, unreadCount, notifications, markAllAsRead } = useClientData();
-
-    // Display helpers with fallbacks for visuals
-    const displayName = profile.name;
-    const displayPhoto = profile.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
-    const displayCity = profile.city || 'San Francisco, CA';
+    // Display helpers with fallbacks
+    const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'User';
+    const displayPhoto = profile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
+    const displayCity = profile?.city || profile?.defaultLocation || 'San Francisco, CA';
 
     const handleNotificationClick = (e) => {
         e.stopPropagation();
-        if (!notificationsOpen) {
+        if (!notificationsOpen && markAllAsRead) {
             markAllAsRead();
         }
         setNotificationsOpen(!notificationsOpen);
@@ -27,14 +27,17 @@ const AppShell = () => {
 
     return (
         <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative">
-            {/* <Sidebar role="client" /> */}
+            <Sidebar role="client" />
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
                 <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 sticky top-0 z-30 relative">
                     <div className="flex items-center gap-4">
                         <div className="md:hidden flex items-center gap-2">
-                            {/* ... */}
+                            <div className="w-6 h-6 bg-brand-400 rounded-md transform rotate-45 flex items-center justify-center">
+                                <div className="w-3 h-3 bg-white rounded-sm transform -rotate-45"></div>
+                            </div>
+                            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Kliques</h1>
                         </div>
                     </div>
 
@@ -65,13 +68,19 @@ const AppShell = () => {
                                         <button onClick={() => navigate('/app/notifications')} className="text-xs font-bold text-brand-600 hover:underline">See All</button>
                                     </div>
                                     <div className="max-h-96 overflow-y-auto">
-                                        {notifications.slice(0, 5).map((notification) => (
-                                            <div key={notification.id || Math.random()} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}>
-                                                <p className="text-sm text-gray-800 font-medium mb-1">{notification.title}</p>
-                                                <p className="text-xs text-gray-500">{notification.message}</p>
-                                                <p className="text-[10px] text-gray-400 mt-2">{new Date(notification.timestamp || Date.now()).toLocaleDateString()}</p>
+                                        {notifications && notifications.length > 0 ? (
+                                            notifications.slice(0, 5).map((notification, idx) => (
+                                                <div key={notification.id || idx} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}>
+                                                    <p className="text-sm text-gray-800 font-medium mb-1">{notification.title}</p>
+                                                    <p className="text-xs text-gray-500">{notification.message}</p>
+                                                    <p className="text-[10px] text-gray-400 mt-2">{new Date(notification.timestamp || Date.now()).toLocaleDateString()}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-8 text-center text-gray-400 text-sm">
+                                                No notifications yet
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -84,6 +93,7 @@ const AppShell = () => {
                         >
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-gray-900">{displayName}</p>
+                                <p className="text-xs text-gray-500">MEMBER</p>
                             </div>
                             <img
                                 src={displayPhoto}
@@ -95,11 +105,11 @@ const AppShell = () => {
                 </header>
 
                 {/* Main Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth pb-24 md:pb-10">
+                <main className="flex-1 overflow-y-auto scroll-smooth pb-24 md:pb-10">
                     <Outlet />
                 </main>
 
-                {/* <MobileBottomNav role="client" /> */}
+                <MobileBottomNav role="client" />
             </div>
         </div>
     );
