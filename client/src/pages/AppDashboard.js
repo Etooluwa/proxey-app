@@ -1,202 +1,217 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
-import { useClientData } from '../hooks/useClientData';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import { useSession } from '../auth/authContext';
+
+const CATEGORIES = [
+    { id: '1', name: 'Cleaning', color: 'bg-blue-100 text-blue-600', icon: 'Sparkles' },
+    { id: '2', name: 'Repair', color: 'bg-orange-100 text-orange-600', icon: 'Wrench' },
+    { id: '3', name: 'Beauty', color: 'bg-pink-100 text-pink-600', icon: 'Scissors' },
+    { id: '4', name: 'Moving', color: 'bg-green-100 text-green-600', icon: 'Truck' },
+    { id: '5', name: 'Painting', color: 'bg-purple-100 text-purple-600', icon: 'Paintbrush' },
+    { id: '6', name: 'Plumbing', color: 'bg-cyan-100 text-cyan-600', icon: 'Droplets' },
+    { id: '7', name: 'Electrical', color: 'bg-yellow-100 text-yellow-600', icon: 'Zap' },
+    { id: '8', name: 'Gardening', color: 'bg-emerald-100 text-emerald-600', icon: 'Leaf' },
+    { id: '9', name: 'Pet Care', color: 'bg-rose-100 text-rose-600', icon: 'PawPrint' },
+    { id: '10', name: 'Photography', color: 'bg-indigo-100 text-indigo-600', icon: 'Camera' },
+];
 
 const AppDashboard = () => {
-    // Use the robust data hook instead of raw useSession/fetchProviders
-    const {
-        profile,
-        providers,
-        loadProviders,
-        isProvidersLoading,
-        notifications,
-        unreadCount
-    } = useClientData();
-
     const navigate = useNavigate();
+    const { profile } = useSession();
+    const [providers, setProviders] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('All');
 
-    // Initial Load
     useEffect(() => {
         loadProviders();
-    }, [loadProviders]);
+    }, []);
 
-    // Categories
-    const categories = [
-        { name: 'All', icon: Icons.Grid },
-        { name: 'Cleaning', icon: Icons.Star },
-        { name: 'Plumbing', icon: Icons.Tool }, // Changed from Wrench to Tool if Wrench is missing, or just keep Tool
-        { name: 'Electrical', icon: Icons.Zap },
-        { name: 'Moving', icon: Icons.Truck },
-        { name: 'Painting', icon: Icons.Edit }, // Using Edit as a placeholder for Brush/Roller
-        { name: 'Landscaping', icon: Icons.Sun },
-    ];
-
-    // Filter Providers
-    const filteredProviders = providers.filter(provider => {
-        // Safe access because normalizeProvider guarantees these are strings/arrays
-        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            provider.headline.toLowerCase().includes(searchQuery.toLowerCase());
-
-        const matchesCategory = selectedCategory === 'All' ||
-            provider.categories.map(c => c.toLowerCase()).includes(selectedCategory.toLowerCase());
-
-        return matchesSearch && matchesCategory;
-    });
-
-    // Helper to render stars safely
-    const renderStars = (rating) => {
-        // Rating is guaranteed to be a number by normalizeProvider
-        return (
-            <div className="flex items-center text-yellow-400">
-                <Icons.Star size={14} fill="currentColor" />
-                <span className="ml-1 text-xs font-bold text-gray-700">
-                    {rating.toFixed(1)}
-                </span>
-            </div>
-        );
+    const loadProviders = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch('/api/providers');
+            const data = await response.json();
+            setProviders(data.providers || []);
+        } catch (error) {
+            console.error('Failed to load providers:', error);
+            setProviders([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
+    const handleCategoryClick = (category) => {
+        navigate(`/app/browse?category=${encodeURIComponent(category.name)}`);
+    };
+
+    const handleProviderClick = (providerId) => {
+        navigate(`/app/provider/${providerId}`);
+    };
+
+    const getCategoryIcon = (iconName) => {
+        return Icons[iconName] || Icons.Sparkles;
+    };
+
+    const filteredProviders = providers.filter(provider => {
+        if (!searchQuery.trim()) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            provider.name?.toLowerCase().includes(query) ||
+            provider.headline?.toLowerCase().includes(query) ||
+            provider.categories?.some(cat => cat.toLowerCase().includes(query))
+        );
+    });
+
     return (
-        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-                        Welcome back, <span className="text-brand-600">{profile.name.split(' ')[0]}</span>!
+        <div className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+            {/* Hero Section */}
+            <div className="bg-gradient-to-br from-brand-500 to-brand-600 text-white px-4 md:px-10 py-8 md:py-12">
+                <div className="max-w-7xl mx-auto">
+                    <h1 className="text-3xl md:text-4xl font-bold mb-3">
+                        Welcome back, {profile?.name || 'there'}! 👋
                     </h1>
-                    <p className="text-gray-500 mt-1">What service do you need today?</p>
-                </div>
+                    <p className="text-brand-100 text-lg mb-6">
+                        Find trusted service providers in your area
+                    </p>
 
-                {/* Search Bar */}
-                <div className="relative w-full md:w-96 group focus-within:w-full md:focus-within:w-[500px] transition-all duration-300 ease-in-out z-20">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Icons.Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+                    {/* Search Bar */}
+                    <div className="bg-white rounded-xl p-2 flex items-center gap-3 shadow-lg max-w-2xl">
+                        <Icons.Search size={20} className="text-gray-400 ml-2" />
+                        <input
+                            type="text"
+                            placeholder="Search for services or providers..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="flex-1 outline-none text-gray-800 placeholder-gray-400"
+                        />
+                        <Button size="sm" className="!bg-brand-600 hover:!bg-brand-700">
+                            Search
+                        </Button>
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Search for cleaners, plumbers..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-100 focus:border-brand-300 outline-none transition-all placeholder-gray-400 text-gray-700"
-                    />
                 </div>
             </div>
 
-            {/* Quick Stats / Notifications Banner */}
-            {unreadCount > 0 && (
-                <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-3xl p-6 text-white shadow-xl shadow-brand-200/50 flex items-center justify-between relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h2 className="text-lg font-bold">You have new updates!</h2>
-                        <p className="text-brand-100 text-sm mt-1 mb-4 max-w-md">
-                            {notifications[0]?.message || "Check your notifications for the latest updates."}
-                        </p>
-                        <button
-                            onClick={() => navigate('/app/notifications')}
-                            className="bg-white text-brand-600 px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-50 transition-colors"
-                        >
-                            View Notifications
-                        </button>
-                    </div>
-                    <div className="absolute right-0 top-0 h-full w-1/3 opacity-10 transform translate-x-10 -skew-x-12 bg-white"></div>
-                    <Icons.Bell size={120} className="absolute -right-6 -bottom-6 text-white opacity-20 transform rotate-12" />
-                </div>
-            )}
-
-            {/* Categories Carousel */}
-            <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4 px-1">Categories</h3>
-                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
-                    {categories.map((cat) => (
-                        <button
-                            key={cat.name}
-                            onClick={() => setSelectedCategory(cat.name)}
-                            className={`flex flex-col items-center justify-center min-w-[100px] h-[100px] rounded-2xl border transition-all snap-start ${selectedCategory === cat.name
-                                    ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-105 border-transparent'
-                                    : 'bg-white text-gray-500 border-gray-100 hover:border-brand-200 hover:bg-brand-50/50'
-                                }`}
-                        >
-                            <cat.icon size={28} className={`mb-2 ${selectedCategory === cat.name ? 'text-white' : 'text-gray-400'}`} />
-                            <span className="text-sm font-bold">{cat.name}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Popular Providers Grid */}
-            <div>
-                <div className="flex justify-between items-center mb-6 px-1">
-                    <h3 className="text-lg font-bold text-gray-900">Top Rated Pros</h3>
-                    <button className="text-brand-600 text-sm font-bold hover:underline">See all</button>
+            {/* Categories Section */}
+            <div className="px-4 md:px-10 py-8 max-w-7xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900">Browse Categories</h2>
                 </div>
 
-                {isProvidersLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 animate-pulse h-64"></div>
-                        ))}
-                    </div>
-                ) : filteredProviders.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {filteredProviders.map(provider => (
-                            <div
-                                key={provider.id}
-                                className="group bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-brand-100/50 hover:border-brand-200 transition-all duration-300 cursor-pointer flex flex-col h-full relative"
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+                    {CATEGORIES.map((category) => {
+                        const IconComponent = getCategoryIcon(category.icon);
+                        return (
+                            <button
+                                key={category.id}
+                                onClick={() => handleCategoryClick(category)}
+                                className="bg-white rounded-xl p-6 hover:shadow-lg transition-all duration-200 border border-gray-100 hover:border-brand-200 group"
                             >
-                                {/* Provider Image & Badge */}
-                                <div className="relative mb-4">
-                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden mx-auto shadow-sm group-hover:scale-105 transition-transform">
-                                        <img
-                                            src={provider.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.name)}&background=random`}
-                                            alt={provider.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                    <div className="absolute top-0 right-0 bg-white shadow-sm border border-gray-100 rounded-full px-2 py-1 flex items-center gap-1">
-                                        {renderStars(provider.rating)}
-                                    </div>
+                                <div className={`w-14 h-14 rounded-xl ${category.color} flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                                    <IconComponent size={28} />
                                 </div>
+                                <p className="font-semibold text-gray-800 text-center">
+                                    {category.name}
+                                </p>
+                            </button>
+                        );
+                    })}
+                </div>
 
-                                {/* Content */}
-                                <div className="text-center flex-1">
-                                    <h4 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-brand-600 transition-colors">
-                                        {provider.name}
-                                    </h4>
-                                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-3 line-clamp-1">
-                                        {provider.categories.join(', ')}
-                                    </p>
-                                    <p className="text-sm text-gray-600 line-clamp-2 mb-4 leading-relaxed">
-                                        {provider.headline || "Experienced professional ready to help."}
-                                    </p>
-                                </div>
+                {/* Top Providers Section */}
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                        {searchQuery ? 'Search Results' : 'Available Providers'}
+                    </h2>
 
-                                {/* Footer: Price & Action */}
-                                <div className="pt-4 border-t border-gray-50 flex items-center justify-between mt-auto">
-                                    <div className="text-left">
-                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Starting at</p>
-                                        <p className="text-brand-600 font-bold text-lg">
-                                            ${provider.hourly_rate}<span className="text-xs text-gray-400 font-normal">/hr</span>
-                                        </p>
-                                    </div>
-                                    <button className="bg-gray-900 text-white p-2.5 rounded-xl group-hover:bg-brand-600 transition-colors shadow-lg shadow-gray-200">
-                                        <Icons.ArrowRight size={18} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Icons.Search className="text-gray-300" size={32} />
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Icons.Loader size={32} className="text-brand-600 animate-spin" />
                         </div>
-                        <h3 className="text-gray-900 font-bold text-lg">No professionals found</h3>
-                        <p className="text-gray-500">Try adjusting your mood or search terms.</p>
-                    </div>
-                )}
+                    ) : filteredProviders.length === 0 ? (
+                        <Card className="p-12 text-center">
+                            <Icons.AlertCircle size={48} className="text-gray-300 mx-auto mb-4" />
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                                {searchQuery ? 'No providers found' : 'No providers available yet'}
+                            </h3>
+                            <p className="text-gray-500 mb-6">
+                                {searchQuery
+                                    ? 'Try adjusting your search query'
+                                    : 'Service providers will appear here once they register'}
+                            </p>
+                            {searchQuery && (
+                                <Button onClick={() => setSearchQuery('')} variant="secondary">
+                                    Clear Search
+                                </Button>
+                            )}
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredProviders.map((provider) => (
+                                <Card
+                                    key={provider.id}
+                                    className="hover:shadow-xl transition-shadow duration-200 cursor-pointer group"
+                                    onClick={() => handleProviderClick(provider.id)}
+                                >
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <img
+                                            src={provider.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.name || 'Provider')}&background=random`}
+                                            alt={provider.name}
+                                            className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
+                                        />
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-lg text-gray-900 group-hover:text-brand-600 transition-colors">
+                                                {provider.name || 'Unknown Provider'}
+                                            </h3>
+                                            <p className="text-sm text-gray-600 line-clamp-1">
+                                                {provider.headline || 'Service Provider'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="flex items-center gap-1">
+                                            <Icons.Star size={16} className="text-yellow-400 fill-yellow-400" />
+                                            <span className="font-semibold text-gray-900">
+                                                {provider.rating?.toFixed(1) || '5.0'}
+                                            </span>
+                                            <span className="text-gray-500 text-sm">
+                                                ({provider.review_count || 0})
+                                            </span>
+                                        </div>
+                                        {provider.hourly_rate && (
+                                            <div className="text-brand-600 font-semibold">
+                                                ${(provider.hourly_rate / 100).toFixed(0)}/hr
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {provider.categories && provider.categories.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-4">
+                                            {provider.categories.slice(0, 3).map((cat, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded-full"
+                                                >
+                                                    {cat}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {provider.location && (
+                                        <div className="flex items-center gap-2 text-gray-500 text-sm">
+                                            <Icons.MapPin size={14} />
+                                            <span>{provider.location}</span>
+                                        </div>
+                                    )}
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
