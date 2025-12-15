@@ -117,7 +117,7 @@ const BookingsPage = () => {
                         <p className="text-gray-600">Manage your appointments and history</p>
                     </div>
                     <button
-                        onClick={() => navigate('/app/browse')}
+                        onClick={() => navigate('/app/booking-flow')}
                         className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition-colors flex items-center gap-2"
                     >
                         <Icons.Plus size={20} />
@@ -295,7 +295,7 @@ const BookingsPage = () => {
                         )}
                         {activeTab === 'upcoming' && (
                             <button
-                                onClick={() => navigate('/app/browse')}
+                                onClick={() => navigate('/app/booking-flow')}
                                 className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition-colors inline-flex items-center gap-2"
                             >
                                 <Icons.Plus size={20} />
