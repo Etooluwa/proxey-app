@@ -3,18 +3,19 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
-
-import { useSession } from '../../auth/authContext';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { useClientData } from '../../hooks/useClientData';
 
 const AppShell = () => {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const navigate = useNavigate();
-    const { session, profile } = useSession();
-    const { unreadCount, notifications, markAllAsRead } = useNotifications();
 
-    const displayName = (profile?.name && typeof profile.name === 'string') ? profile.name : (session?.user?.email?.split('@')[0] || 'User');
-    const displayPhoto = (profile?.photo && typeof profile.photo === 'string') ? profile.photo : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
+    // Use safe client data hook
+    const { profile, unreadCount, notifications, markAllAsRead } = useClientData();
+
+    // Display helpers with fallbacks for visuals
+    const displayName = profile.name;
+    const displayPhoto = profile.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
+    const displayCity = profile.city || 'San Francisco, CA';
 
     const handleNotificationClick = (e) => {
         e.stopPropagation();
@@ -41,11 +42,13 @@ const AppShell = () => {
                     </div>
 
                     <div className="flex items-center gap-3 md:gap-6 relative">
+                        {/* Location Badge */}
                         <div className="hidden md:flex items-center gap-2 text-gray-400 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
                             <Icons.MapPin size={16} className="text-brand-500" />
-                            <span className="text-sm text-gray-600 font-medium">{(profile?.city && typeof profile.city === 'string') ? profile.city : 'San Francisco, CA'}</span>
+                            <span className="text-sm text-gray-600 font-medium">{displayCity}</span>
                         </div>
 
+                        {/* Notifications */}
                         <div className="relative">
                             <button
                                 onClick={handleNotificationClick}
@@ -83,6 +86,7 @@ const AppShell = () => {
                             )}
                         </div>
 
+                        {/* Profile Link */}
                         <button
                             onClick={() => navigate('/app/account')}
                             className="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-100 hover:bg-gray-50 rounded-xl transition-colors p-1"

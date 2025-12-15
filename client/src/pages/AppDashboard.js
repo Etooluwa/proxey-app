@@ -1,466 +1,205 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
-import { CATEGORIES } from '../constants';
-import { fetchProviders } from '../data/providers';
-import { fetchBookings } from '../data/bookings';
-
-const safeRender = (value, fallback = '') => {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'boolean') return value ? 'true' : 'false';
-    if (typeof value === 'object') {
-        if (value.name && typeof value.name === 'string') return value.name;
-        if (value.title && typeof value.title === 'string') return value.title;
-        if (value.message && typeof value.message === 'string') return value.message;
-        if (value.value && typeof value.value === 'number') return value.value;
-        if (value.count && typeof value.count === 'number') return value.count;
-        if (value.amount && typeof value.amount === 'number') return value.amount;
-        return JSON.stringify(value);
-    }
-    return String(value);
-};
+import { useClientData } from '../hooks/useClientData';
 
 const AppDashboard = () => {
+    // Use the robust data hook instead of raw useSession/fetchProviders
+    const {
+        profile,
+        providers,
+        loadProviders,
+        isProvidersLoading,
+        notifications,
+        unreadCount
+    } = useClientData();
+
     const navigate = useNavigate();
-    const [viewState, setViewState] = useState('HOME');
-    const [selectedCategory, setSelectedCategory] = useState(null);
-    const [topSearchQuery, setTopSearchQuery] = useState('');
-    const [categorySearchQuery, setCategorySearchQuery] = useState('');
-    const [providers, setProviders] = useState([]);
-    const [bookings, setBookings] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
 
+    // Initial Load
     useEffect(() => {
-        let cancelled = false;
-        async function load() {
-            setLoading(true);
-            try {
-                const [provData, bookingData] = await Promise.all([
-                    fetchProviders(),
-                    fetchBookings(),
-                ]);
-                if (!cancelled) {
-                    setProviders(provData || []);
-                    setBookings(bookingData || []);
-                }
-            } catch (error) {
-                console.error("Failed to load dashboard data", error);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        }
-        load();
-        return () => { cancelled = true; };
-    }, []);
+        loadProviders();
+    }, [loadProviders]);
 
-    const getCategoryIcon = (name) => {
-        const safeName = safeRender(name);
-        switch (safeName) {
-            case 'Cleaning': return Icons.Sparkles;
-            case 'Repair': return Icons.Wrench;
-            case 'Beauty': return Icons.Scissors;
-            case 'Moving': return Icons.Truck;
-            case 'Painting': return Icons.Paintbrush;
-            case 'Plumbing': return Icons.Droplets;
-            case 'Electrical': return Icons.Zap;
-            case 'Gardening': return Icons.Leaf;
-            case 'Pet Care': return Icons.PawPrint;
-            case 'Photography': return Icons.Camera;
-            default: return Icons.Sparkles;
-        }
-    };
+    // Categories
+    const categories = [
+        { name: 'All', icon: Icons.Grid },
+        { name: 'Cleaning', icon: Icons.Star },
+        { name: 'Plumbing', icon: Icons.Tool }, // Changed from Wrench to Tool if Wrench is missing, or just keep Tool
+        { name: 'Electrical', icon: Icons.Zap },
+        { name: 'Moving', icon: Icons.Truck },
+        { name: 'Painting', icon: Icons.Edit }, // Using Edit as a placeholder for Brush/Roller
+        { name: 'Landscaping', icon: Icons.Sun },
+    ];
 
-    const handleCategoryClick = (category) => {
-        setSelectedCategory(category);
-        setViewState('CATEGORY_DETAIL');
-    };
+    // Filter Providers
+    const filteredProviders = providers.filter(provider => {
+        // Safe access because normalizeProvider guarantees these are strings/arrays
+        const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            provider.headline.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const handleViewAllCategories = () => {
-        setViewState('ALL_CATEGORIES');
-    };
+        const matchesCategory = selectedCategory === 'All' ||
+            provider.categories.map(c => c.toLowerCase()).includes(selectedCategory.toLowerCase());
 
-    const handleBackToHome = () => {
-        setViewState('HOME');
-        setSelectedCategory(null);
-        setTopSearchQuery('');
-    };
+        return matchesSearch && matchesCategory;
+    });
 
-    const handleProviderClick = (providerId) => {
-        navigate(`/app/provider/${providerId}`);
-    };
-
-    const handleTopSearch = (e) => {
-        e.preventDefault();
-        if (topSearchQuery.trim()) {
-            setViewState('SEARCH_RESULTS');
-        }
-    };
-
-    const renderCategoryDetail = () => {
-        if (!selectedCategory) return null;
-        const Icon = getCategoryIcon(selectedCategory.name);
-
-        const categoryProviders = providers.filter(p =>
-            (p.categories || []).some(c =>
-                safeRender(c).includes(safeRender(selectedCategory.name)) ||
-                safeRender(selectedCategory.name).includes(safeRender(c))
-            )
-        );
-
+    // Helper to render stars safely
+    const renderStars = (rating) => {
+        // Rating is guaranteed to be a number by normalizeProvider
         return (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-4 mb-8">
-                    <button
-                        onClick={handleBackToHome}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                    >
-                        <Icons.ArrowLeft size={24} className="text-gray-700" />
-                    </button>
-                    <div className={`w-12 h-12 rounded-xl ${selectedCategory.color} flex items-center justify-center`}>
-                        <Icon size={24} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{safeRender(selectedCategory.name)} Services</h1>
-                        <p className="text-gray-500 text-sm">Find the best local {safeRender(selectedCategory.name).toLowerCase()} professionals</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categoryProviders.length > 0 ? (
-                        categoryProviders.map((provider) => (
-                            <div
-                                key={provider.id}
-                                onClick={() => handleProviderClick(provider.id)}
-                                className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
-                            >
-                                <div className="flex items-start gap-4 mb-4">
-                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
-                                    <div>
-                                        <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{safeRender(provider.name, 'Provider')}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
-                                        <div className="flex items-center gap-1 mt-1">
-                                            <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
-                                            <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {(provider.categories || []).map((tag, index) => (
-                                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {safeRender(tag)}
-                                        </span>
-                                    ))}
-                                </div>
-
-                                <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                    <div className="text-lg font-bold text-gray-900">
-                                        ${safeRender(provider.hourly_rate) || safeRender(provider.hourlyRate) || '0'}<span className="text-sm font-normal text-gray-500">/hr</span>
-                                    </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleProviderClick(provider.id);
-                                        }}
-                                        className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
-                                    >
-                                        Book Now
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-                            <div className={`w-16 h-16 mx-auto rounded-full ${selectedCategory.color} bg-opacity-20 flex items-center justify-center mb-4`}>
-                                <Icon size={32} />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">No providers found</h3>
-                            <p className="text-gray-500 max-w-md mx-auto">
-                                We currently don't have any {safeRender(selectedCategory.name).toLowerCase()} providers available in your area. Please check back later!
-                            </p>
-                        </div>
-                    )}
-                </div>
+            <div className="flex items-center text-yellow-400">
+                <Icons.Star size={14} fill="currentColor" />
+                <span className="ml-1 text-xs font-bold text-gray-700">
+                    {rating.toFixed(1)}
+                </span>
             </div>
         );
     };
 
-    const renderSearchResults = () => {
-        const query = topSearchQuery.toLowerCase();
-        const matchedCategories = CATEGORIES.filter(cat =>
-            safeRender(cat.name).toLowerCase().includes(query)
-        );
-        const matchedProviders = providers.filter(p =>
-            safeRender(p.name).toLowerCase().includes(query) ||
-            safeRender(p.headline).toLowerCase().includes(query) || safeRender(p.title).toLowerCase().includes(query) ||
-            (p.categories || []).some(c => safeRender(c).toLowerCase().includes(query))
-        );
+    return (
+        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
 
-        return (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-4 mb-8">
-                    <button
-                        onClick={handleBackToHome}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                    >
-                        <Icons.ArrowLeft size={24} className="text-gray-700" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Search Results</h1>
-                        <p className="text-gray-500 text-sm">Showing results for "{topSearchQuery}"</p>
-                    </div>
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                        Welcome back, <span className="text-brand-600">{profile.name.split(' ')[0]}</span>!
+                    </h1>
+                    <p className="text-gray-500 mt-1">What service do you need today?</p>
                 </div>
 
-                {matchedCategories.length > 0 && (
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold text-gray-900">Categories</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                            {matchedCategories.map((cat) => {
-                                const Icon = getCategoryIcon(cat.name);
-                                return (
-                                    <div
-                                        key={cat.id}
-                                        onClick={() => handleCategoryClick(cat)}
-                                        className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group text-center flex flex-col items-center justify-center"
-                                    >
-                                        <div className={`w-14 h-14 rounded-full ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                            <Icon size={24} />
-                                        </div>
-                                        <span className="font-semibold text-gray-700 group-hover:text-brand-600">{safeRender(cat.name)}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                {/* Search Bar */}
+                <div className="relative w-full md:w-96 group focus-within:w-full md:focus-within:w-[500px] transition-all duration-300 ease-in-out z-20">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Icons.Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors" size={20} />
                     </div>
-                )}
-
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-gray-900">Providers</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {matchedProviders.length > 0 ? (
-                            matchedProviders.map((provider) => (
-                                <div
-                                    key={provider.id}
-                                    onClick={() => handleProviderClick(provider.id)}
-                                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer group"
-                                >
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
-                                        <div>
-                                            <h3 className="font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{safeRender(provider.name, 'Provider')}</h3>
-                                            <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                                <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
-                                                <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="col-span-full text-center py-10 text-gray-500 bg-white rounded-2xl border border-dashed border-gray-200">
-                                No providers match your search.
-                            </div>
-                        )}
-                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search for cleaners, plumbers..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-100 focus:border-brand-300 outline-none transition-all placeholder-gray-400 text-gray-700"
+                    />
                 </div>
             </div>
-        );
-    };
 
-    const renderHome = () => {
-        return (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-                <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                    <div className="space-y-3">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-bold">
-                            <Icons.Sparkles size={14} /> Welcome back
-                        </div>
-                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
-                            Book trusted pros for anything you need done.
-                        </h1>
-                        <p className="text-gray-500 max-w-2xl">
-                            Browse top providers, view your upcoming bookings, and stay on top of notifications—all in one place.
+            {/* Quick Stats / Notifications Banner */}
+            {unreadCount > 0 && (
+                <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-3xl p-6 text-white shadow-xl shadow-brand-200/50 flex items-center justify-between relative overflow-hidden">
+                    <div className="relative z-10">
+                        <h2 className="text-lg font-bold">You have new updates!</h2>
+                        <p className="text-brand-100 text-sm mt-1 mb-4 max-w-md">
+                            {notifications[0]?.message || "Check your notifications for the latest updates."}
                         </p>
-                        <form onSubmit={handleTopSearch} className="flex flex-col sm:flex-row gap-3 max-w-xl">
-                            <div className="relative flex-1">
-                                <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Search for cleaning, plumbing, painting..."
-                                    value={topSearchQuery}
-                                    onChange={(e) => setTopSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-200"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                className="px-5 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
-                            >
-                                Search
-                            </button>
-                        </form>
-                    </div>
-                    <div className="bg-gradient-to-br from-brand-50 to-white border border-gray-100 rounded-2xl p-5 shadow-inner">
-                        <div className="text-sm text-gray-500 mb-1">Upcoming bookings</div>
-                        <div className="text-4xl font-bold text-gray-900">{bookings.length}</div>
-                        <p className="text-sm text-gray-500 mt-1">Keep track of your next appointments</p>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-900">Popular categories</h2>
                         <button
-                            onClick={handleViewAllCategories}
-                            className="text-sm font-semibold text-brand-600 hover:text-brand-700"
+                            onClick={() => navigate('/app/notifications')}
+                            className="bg-white text-brand-600 px-5 py-2 rounded-xl text-sm font-bold hover:bg-brand-50 transition-colors"
                         >
-                            View all
+                            View Notifications
                         </button>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {CATEGORIES.filter(cat => safeRender(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())).map((cat) => {
-                            const Icon = getCategoryIcon(cat.name);
-                            return (
-                                <div
-                                    key={cat.id}
-                                    onClick={() => handleCategoryClick(cat)}
-                                    className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
-                                >
-                                    <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                        <Icon size={22} />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-gray-800 group-hover:text-brand-600">{safeRender(cat.name)}</span>
-                                        <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <div className="absolute right-0 top-0 h-full w-1/3 opacity-10 transform translate-x-10 -skew-x-12 bg-white"></div>
+                    <Icons.Bell size={120} className="absolute -right-6 -bottom-6 text-white opacity-20 transform rotate-12" />
+                </div>
+            )}
+
+            {/* Categories Carousel */}
+            <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4 px-1">Categories</h3>
+                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
+                    {categories.map((cat) => (
+                        <button
+                            key={cat.name}
+                            onClick={() => setSelectedCategory(cat.name)}
+                            className={`flex flex-col items-center justify-center min-w-[100px] h-[100px] rounded-2xl border transition-all snap-start ${selectedCategory === cat.name
+                                    ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-105 border-transparent'
+                                    : 'bg-white text-gray-500 border-gray-100 hover:border-brand-200 hover:bg-brand-50/50'
+                                }`}
+                        >
+                            <cat.icon size={28} className={`mb-2 ${selectedCategory === cat.name ? 'text-white' : 'text-gray-400'}`} />
+                            <span className="text-sm font-bold">{cat.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Popular Providers Grid */}
+            <div>
+                <div className="flex justify-between items-center mb-6 px-1">
+                    <h3 className="text-lg font-bold text-gray-900">Top Rated Pros</h3>
+                    <button className="text-brand-600 text-sm font-bold hover:underline">See all</button>
                 </div>
 
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-900">Recommended providers</h2>
+                {isProvidersLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 animate-pulse h-64"></div>
+                        ))}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(providers || []).slice(0, 6).map((provider) => (
+                ) : filteredProviders.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {filteredProviders.map(provider => (
                             <div
                                 key={provider.id}
-                                className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer"
-                                onClick={() => handleProviderClick(provider.id)}
+                                className="group bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-brand-100/50 hover:border-brand-200 transition-all duration-300 cursor-pointer flex flex-col h-full relative"
                             >
-                                <div className="flex items-start gap-4 mb-4">
-                                    <img src={provider.avatar || provider.avatar_url || provider.avatarUrl} alt={safeRender(provider.name)} className="w-16 h-16 rounded-full object-cover border-2 border-gray-50" />
-                                    <div>
-                                        <h3 className="font-bold text-gray-900">{safeRender(provider.name, 'Provider')}</h3>
-                                        <p className="text-sm text-brand-600 font-medium">{safeRender(provider.headline) || safeRender(provider.title)}</p>
-                                        <div className="flex items-center gap-1 mt-1">
-                                            <Icons.Star size={14} className="text-yellow-400 fill-current" />
-                                            <span className="text-sm font-bold text-gray-800">{safeRender(provider.rating, '4.8')}</span>
-                                            <span className="text-xs text-gray-400">({safeRender(provider.review_count) || safeRender(provider.reviewCount) || '0'} reviews)</span>
-                                        </div>
+                                {/* Provider Image & Badge */}
+                                <div className="relative mb-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden mx-auto shadow-sm group-hover:scale-105 transition-transform">
+                                        <img
+                                            src={provider.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.name)}&background=random`}
+                                            alt={provider.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <div className="absolute top-0 right-0 bg-white shadow-sm border border-gray-100 rounded-full px-2 py-1 flex items-center gap-1">
+                                        {renderStars(provider.rating)}
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {(provider.categories || []).map((tag, index) => (
-                                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium">
-                                            {safeRender(tag)}
-                                        </span>
-                                    ))}
+
+                                {/* Content */}
+                                <div className="text-center flex-1">
+                                    <h4 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-brand-600 transition-colors">
+                                        {provider.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-3 line-clamp-1">
+                                        {provider.categories.join(', ')}
+                                    </p>
+                                    <p className="text-sm text-gray-600 line-clamp-2 mb-4 leading-relaxed">
+                                        {provider.headline || "Experienced professional ready to help."}
+                                    </p>
                                 </div>
-                                <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                    <div className="text-lg font-bold text-gray-900">
-                                        ${safeRender(provider.hourly_rate) || safeRender(provider.hourlyRate) || '0'}<span className="text-sm font-normal text-gray-500">/hr</span>
+
+                                {/* Footer: Price & Action */}
+                                <div className="pt-4 border-t border-gray-50 flex items-center justify-between mt-auto">
+                                    <div className="text-left">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Starting at</p>
+                                        <p className="text-brand-600 font-bold text-lg">
+                                            ${provider.hourly_rate}<span className="text-xs text-gray-400 font-normal">/hr</span>
+                                        </p>
                                     </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleProviderClick(provider.id);
-                                        }}
-                                        className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
-                                    >
-                                        View Profile
+                                    <button className="bg-gray-900 text-white p-2.5 rounded-xl group-hover:bg-brand-600 transition-colors shadow-lg shadow-gray-200">
+                                        <Icons.ArrowRight size={18} />
                                     </button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    {!loading && providers.length === 0 && (
-                        <div className="text-center py-10 text-gray-500 bg-white rounded-2xl border border-dashed border-gray-200">
-                            No providers available yet.
+                ) : (
+                    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Icons.Search className="text-gray-300" size={32} />
                         </div>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    const renderAllCategories = () => {
-        return (
-            <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-4 mb-4">
-                    <button
-                        onClick={handleBackToHome}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                    >
-                        <Icons.ArrowLeft size={24} className="text-gray-700" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">All Categories</h1>
-                        <p className="text-gray-500 text-sm">Browse all available service categories</p>
+                        <h3 className="text-gray-900 font-bold text-lg">No professionals found</h3>
+                        <p className="text-gray-500">Try adjusting your mood or search terms.</p>
                     </div>
-                </div>
-                <div className="relative">
-                    <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search categories..."
-                        value={categorySearchQuery}
-                        onChange={(e) => setCategorySearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-200"
-                    />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {CATEGORIES.filter(cat =>
-                        safeRender(cat.name).toLowerCase().includes(categorySearchQuery.toLowerCase())
-                    ).map((cat) => {
-                        const Icon = getCategoryIcon(cat.name);
-                        return (
-                            <div
-                                key={cat.id}
-                                onClick={() => handleCategoryClick(cat)}
-                                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
-                            >
-                                <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                    <Icon size={22} />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-semibold text-gray-800 group-hover:text-brand-600">{safeRender(cat.name)}</span>
-                                    <Icons.ArrowRight size={16} className="text-gray-300 group-hover:text-brand-500" />
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                )}
             </div>
-        );
-    };
-
-    if (loading) {
-        return <div className="p-6">Loading...</div>;
-    }
-
-    if (viewState === 'CATEGORY_DETAIL') return renderCategoryDetail();
-    if (viewState === 'SEARCH_RESULTS') return renderSearchResults();
-    if (viewState === 'ALL_CATEGORIES') return renderAllCategories();
-
-    return renderHome();
+        </div>
+    );
 };
 
 export default AppDashboard;
