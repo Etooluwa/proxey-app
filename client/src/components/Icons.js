@@ -42,13 +42,17 @@ import {
     Eye,
     Plus,
     Edit,
-    Percent
+    Percent,
+    MoreVertical,
+    Send,
+    Paperclip
 } from 'lucide-react';
 
 export const Icons = {
     Dashboard: LayoutDashboard,
     Calendar,
     Message: MessageSquare,
+    MessageSquare,
     User,
     Settings,
     LogOut,
@@ -91,5 +95,8 @@ export const Icons = {
     Eye,
     Plus,
     Edit,
-    Percent
+    Percent,
+    MoreVertical,
+    Send,
+    Paperclip
 };
