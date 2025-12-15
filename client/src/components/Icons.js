@@ -45,7 +45,8 @@ import {
     Percent,
     MoreVertical,
     Send,
-    Paperclip
+    Paperclip,
+    Mail
 } from 'lucide-react';
 
 export const Icons = {
@@ -98,5 +99,6 @@ export const Icons = {
     Percent,
     MoreVertical,
     Send,
-    Paperclip
+    Paperclip,
+    Mail
 };
