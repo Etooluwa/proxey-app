@@ -163,6 +163,14 @@ export const useClientData = () => {
         }
     };
 
+    // -- 4. Sanitize Notifications --
+    const safeNotifications = asArray(notifications).map(n => ({
+        ...n,
+        title: asString(n.title, 'New Notification'),
+        message: asString(n.message, ''),
+        body: asString(n.body, '') // Some notifications use body
+    }));
+
     return {
         // User Data
         session,
@@ -171,7 +179,7 @@ export const useClientData = () => {
         authError: asString(authError),
 
         // Notifications
-        notifications,
+        notifications: safeNotifications,
         unreadCount,
         markAllAsRead,
 
