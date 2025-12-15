@@ -58,6 +58,7 @@ const MessagesPage = () => {
 
     // Format message time
     const formatTime = (timestamp) => {
+        if (!timestamp) return '';
         const date = new Date(timestamp);
         return date.toLocaleTimeString('en-US', {
             hour: 'numeric',
@@ -68,6 +69,7 @@ const MessagesPage = () => {
 
     // Format conversation time (relative)
     const formatConversationTime = (timestamp) => {
+        if (!timestamp) return '';
         const date = new Date(timestamp);
         const now = new Date();
         const diffMs = now - date;
@@ -83,208 +85,210 @@ const MessagesPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-            <div className="px-4 md:px-10 py-8 max-w-7xl mx-auto">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex h-[calc(100vh-180px)] min-h-[600px]">
-
-                    {/* Left Sidebar: Conversation List */}
-                    <div className={`w-full md:w-96 border-r border-gray-100 flex-col bg-white ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
-                        <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-4">Messages</h2>
-                            <div className="relative">
-                                <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Search messages..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-300 transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto">
-                            {conversations.length === 0 ? (
-                                <div className="p-8 text-center text-gray-500">
-                                    <Icons.MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
-                                    <p className="text-sm">No conversations yet</p>
-                                </div>
-                            ) : (
-                                conversations.map((chat) => (
-                                    <button
-                                        key={chat.id}
-                                        onClick={() => handleChatSelect(chat)}
-                                        className={`w-full p-4 flex gap-3 border-l-4 transition-all hover:bg-gray-50 ${
-                                            activeChat?.id === chat.id
-                                                ? 'bg-orange-50/50 border-orange-500'
-                                                : 'border-transparent'
-                                        }`}
-                                    >
-                                        <div className="relative flex-shrink-0">
-                                            <img
-                                                src={chat.avatar}
-                                                alt={chat.providerName}
-                                                className="w-12 h-12 rounded-full object-cover"
-                                            />
-                                            {chat.online && (
-                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0 text-left">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className={`text-sm font-bold truncate ${
-                                                    activeChat?.id === chat.id ? 'text-orange-900' : 'text-gray-900'
-                                                }`}>
-                                                    {chat.providerName}
-                                                </h4>
-                                                <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                                                    {formatConversationTime(chat.timestamp)}
-                                                </span>
-                                            </div>
-                                            <p className={`text-sm truncate ${
-                                                chat.unread > 0 ? 'font-semibold text-gray-800' : 'text-gray-500'
-                                            }`}>
-                                                {chat.lastMessage}
-                                            </p>
-                                        </div>
-                                        {chat.unread > 0 && (
-                                            <div className="flex items-center">
-                                                <div className="w-6 h-6 bg-orange-500 rounded-full text-[11px] text-white font-bold flex items-center justify-center">
-                                                    {chat.unread}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </button>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right Side: Chat Window */}
-                    <div className={`flex-1 flex-col bg-gray-50 ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
-                        {activeChat ? (
-                            <>
-                                {/* Chat Header */}
-                                <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        {/* Mobile Back Button */}
-                                        <button
-                                            onClick={() => setShowMobileChat(false)}
-                                            className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full"
-                                        >
-                                            <Icons.ArrowLeft size={20} />
-                                        </button>
-
-                                        <img
-                                            src={activeChat.avatar}
-                                            alt={activeChat.providerName}
-                                            className="w-10 h-10 rounded-full object-cover"
-                                        />
-                                        <div>
-                                            <h3 className="font-bold text-gray-900">
-                                                {activeChat.providerName}
-                                            </h3>
-                                            {activeChat.online && (
-                                                <p className="text-xs text-green-600 flex items-center gap-1">
-                                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                                    Online
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-colors">
-                                            <Icons.Wrench size={20} />
-                                        </button>
-                                        <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
-                                            <Icons.Menu size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Chat Messages */}
-                                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                                    {activeChatMessages.length === 0 ? (
-                                        <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                                            <p>No messages yet. Start the conversation!</p>
-                                        </div>
-                                    ) : (
-                                        activeChatMessages.map((msg) => {
-                                            const isMe = msg.sender_id === session?.user?.id;
-                                            return (
-                                                <div
-                                                    key={msg.id}
-                                                    className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                                                >
-                                                    <div className={`max-w-[85%] md:max-w-[70%] flex flex-col ${
-                                                        isMe ? 'items-end' : 'items-start'
-                                                    }`}>
-                                                        <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                                                            isMe
-                                                                ? 'bg-orange-500 text-white rounded-tr-sm'
-                                                                : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'
-                                                        }`}>
-                                                            {msg.body}
-                                                        </div>
-                                                        <span className="text-[10px] text-gray-400 mt-1 px-1">
-                                                            {formatTime(msg.created_at)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                    <div ref={messagesEndRef} />
-                                </div>
-
-                                {/* Input Area */}
-                                <div className="p-4 bg-white border-t border-gray-100">
-                                    <form onSubmit={handleSendMessage}>
-                                        <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
-                                            <button
-                                                type="button"
-                                                className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
-                                            >
-                                                <Icons.Paperclip size={20} />
-                                            </button>
-                                            <textarea
-                                                placeholder="Type a message..."
-                                                value={messageInput}
-                                                onChange={(e) => setMessageInput(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleSendMessage(e);
-                                                    }
-                                                }}
-                                                className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 resize-none py-2 max-h-32"
-                                                rows={1}
-                                                disabled={sending}
-                                            />
-                                            <button
-                                                type="submit"
-                                                disabled={!messageInput.trim() || sending}
-                                                className="p-2 bg-orange-500 text-white rounded-xl shadow-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {sending ? (
-                                                    <Icons.Loader size={20} className="animate-spin" />
-                                                ) : (
-                                                    <Icons.Send size={20} />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400">
-                                <div className="text-center">
-                                    <Icons.MessageSquare size={64} className="mx-auto mb-4 text-gray-200" />
-                                    <p className="text-lg font-semibold text-gray-600 mb-2">No conversation selected</p>
-                                    <p className="text-sm">Choose a conversation from the list to start messaging</p>
-                                </div>
-                            </div>
-                        )}
+        <div className="h-full flex bg-white">
+            {/* Left Sidebar: Conversation List */}
+            <div className={`w-full md:w-80 lg:w-96 border-r border-gray-100 flex flex-col bg-white ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+                {/* Header */}
+                <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Messages</h2>
+                    <div className="relative">
+                        <Icons.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search messages..."
+                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-300 transition-all"
+                        />
                     </div>
                 </div>
+
+                {/* Conversations List */}
+                <div className="flex-1 overflow-y-auto">
+                    {conversations.length === 0 ? (
+                        <div className="p-8 text-center text-gray-400">
+                            <Icons.MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
+                            <p className="text-sm">No conversations yet</p>
+                            <p className="text-xs mt-2">Messages will appear here</p>
+                        </div>
+                    ) : (
+                        conversations.map((chat) => (
+                            <button
+                                key={chat.id}
+                                onClick={() => handleChatSelect(chat)}
+                                className={`w-full p-4 flex gap-3 border-l-4 transition-all hover:bg-gray-50 ${
+                                    activeChat?.id === chat.id
+                                        ? 'bg-orange-50 border-orange-500'
+                                        : 'border-transparent'
+                                }`}
+                            >
+                                <div className="relative flex-shrink-0">
+                                    <img
+                                        src={chat.avatar}
+                                        alt={chat.providerName}
+                                        className="w-12 h-12 rounded-full object-cover"
+                                    />
+                                    {chat.online && (
+                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className={`text-sm font-bold truncate ${
+                                            activeChat?.id === chat.id ? 'text-gray-900' : 'text-gray-900'
+                                        }`}>
+                                            {chat.providerName}
+                                        </h4>
+                                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                                            {formatConversationTime(chat.timestamp)}
+                                        </span>
+                                    </div>
+                                    <p className={`text-sm truncate ${
+                                        chat.unread > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'
+                                    }`}>
+                                        {chat.lastMessage}
+                                    </p>
+                                </div>
+                                {chat.unread > 0 && (
+                                    <div className="flex items-center">
+                                        <div className="w-6 h-6 bg-orange-500 rounded-full text-[11px] text-white font-bold flex items-center justify-center">
+                                            {chat.unread}
+                                        </div>
+                                    </div>
+                                )}
+                            </button>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Right Side: Chat Window */}
+            <div className={`flex-1 flex flex-col bg-gray-50 ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
+                {activeChat ? (
+                    <>
+                        {/* Chat Header */}
+                        <div className="p-4 md:p-5 border-b border-gray-100 bg-white flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                {/* Mobile Back Button */}
+                                <button
+                                    onClick={() => setShowMobileChat(false)}
+                                    className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full"
+                                >
+                                    <Icons.ArrowLeft size={20} />
+                                </button>
+
+                                <img
+                                    src={activeChat.avatar}
+                                    alt={activeChat.providerName}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                />
+                                <div>
+                                    <h3 className="font-bold text-gray-900 text-base">
+                                        {activeChat.providerName}
+                                    </h3>
+                                    {activeChat.online && (
+                                        <p className="text-xs text-green-600 flex items-center gap-1">
+                                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                            Online
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex gap-1">
+                                <button className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+                                    <Icons.Wrench size={20} />
+                                </button>
+                                <button className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+                                    <Icons.MoreVertical size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Chat Messages */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {activeChatMessages.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                                    <div className="text-center">
+                                        <Icons.MessageSquare size={48} className="mx-auto mb-3 text-gray-300" />
+                                        <p>No messages yet</p>
+                                        <p className="text-xs mt-1">Start the conversation!</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                activeChatMessages.map((msg) => {
+                                    const isMe = msg.sender_id === session?.user?.id;
+                                    return (
+                                        <div
+                                            key={msg.id}
+                                            className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${
+                                                isMe ? 'items-end' : 'items-start'
+                                            }`}>
+                                                <div className={`px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed ${
+                                                    isMe
+                                                        ? 'bg-orange-500 text-white rounded-tr-md'
+                                                        : 'bg-white text-gray-800 rounded-tl-md shadow-sm'
+                                                }`}>
+                                                    {msg.body}
+                                                </div>
+                                                <span className="text-[11px] text-gray-400 mt-1 px-1 uppercase">
+                                                    {formatTime(msg.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="p-4 bg-white border-t border-gray-100">
+                            <form onSubmit={handleSendMessage}>
+                                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
+                                    <button
+                                        type="button"
+                                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <Icons.Menu size={20} />
+                                    </button>
+                                    <textarea
+                                        placeholder="Type a message..."
+                                        value={messageInput}
+                                        onChange={(e) => setMessageInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage(e);
+                                            }
+                                        }}
+                                        className="flex-1 bg-transparent border-none outline-none text-[15px] text-gray-700 placeholder-gray-400 resize-none py-1.5 max-h-32"
+                                        rows={1}
+                                        disabled={sending}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!messageInput.trim() || sending}
+                                        className="p-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {sending ? (
+                                            <Icons.Loader size={18} className="animate-spin" />
+                                        ) : (
+                                            <Icons.ChevronRight size={18} />
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 bg-white">
+                        <div className="text-center">
+                            <Icons.MessageSquare size={64} className="mx-auto mb-4 text-gray-200" />
+                            <p className="text-lg font-semibold text-gray-600 mb-2">Select a conversation</p>
+                            <p className="text-sm text-gray-500">Choose a conversation from the list to start messaging</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
