@@ -63,6 +63,7 @@ export const Icons = {
     Star,
     Clock,
     Check: CheckCircle,
+    CheckCircle,
     X: XCircle,
     Alert: AlertCircle,
     AlertCircle,
