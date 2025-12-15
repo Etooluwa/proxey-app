@@ -27,17 +27,14 @@ const AppShell = () => {
 
     return (
         <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative">
-            <Sidebar role="client" />
+            {/* <Sidebar role="client" /> */}
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
                 <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 sticky top-0 z-30 relative">
                     <div className="flex items-center gap-4">
                         <div className="md:hidden flex items-center gap-2">
-                            <div className="w-6 h-6 bg-brand-400 rounded-md transform rotate-45 flex items-center justify-center">
-                                <div className="w-3 h-3 bg-white rounded-sm transform -rotate-45"></div>
-                            </div>
-                            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Kliques</h1>
+                            {/* ... */}
                         </div>
                     </div>
 
@@ -68,19 +65,13 @@ const AppShell = () => {
                                         <button onClick={() => navigate('/app/notifications')} className="text-xs font-bold text-brand-600 hover:underline">See All</button>
                                     </div>
                                     <div className="max-h-96 overflow-y-auto">
-                                        {notifications.length > 0 ? (
-                                            notifications.slice(0, 5).map((notification) => (
-                                                <div key={notification.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}>
-                                                    <p className="text-sm text-gray-800 font-medium mb-1">{notification.title}</p>
-                                                    <p className="text-xs text-gray-500">{notification.message}</p>
-                                                    <p className="text-[10px] text-gray-400 mt-2">{new Date(notification.timestamp).toLocaleDateString()}</p>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-8 text-center text-gray-400 text-sm">
-                                                No notifications yet
+                                        {notifications.slice(0, 5).map((notification) => (
+                                            <div key={notification.id || Math.random()} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}>
+                                                <p className="text-sm text-gray-800 font-medium mb-1">{notification.title}</p>
+                                                <p className="text-xs text-gray-500">{notification.message}</p>
+                                                <p className="text-[10px] text-gray-400 mt-2">{new Date(notification.timestamp || Date.now()).toLocaleDateString()}</p>
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -108,7 +99,7 @@ const AppShell = () => {
                     <Outlet />
                 </main>
 
-                <MobileBottomNav role="client" />
+                {/* <MobileBottomNav role="client" /> */}
             </div>
         </div>
     );
