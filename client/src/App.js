@@ -20,6 +20,7 @@ import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
 // Client Pages
 import AppDashboard from './pages/AppDashboard';
 import BookingsPage from './pages/BookingsPage';
+import BookingFlowPage from './pages/BookingFlowPage';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AccountPage from './pages/AccountPage';
@@ -78,6 +79,7 @@ function App() {
                     >
                       <Route index element={<AppDashboard />} />
                       <Route path="bookings" element={<BookingsPage />} />
+                      <Route path="booking-flow" element={<BookingFlowPage />} />
                       <Route path="messages" element={<MessagesPage />} />
                       <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="account" element={<AccountPage />} />
