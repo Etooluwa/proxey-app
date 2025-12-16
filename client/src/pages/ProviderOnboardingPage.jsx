@@ -28,9 +28,8 @@ function ProviderOnboardingPage() {
 
   const completeOnboarding = async () => {
     try {
-      // In a real app, we might verify the stripe status here
-      // For now, we update the profile as complete with all form data
-      await updateProfile({
+      // Update user profile metadata
+      const profileData = {
         name: form.name,
         category: form.category,
         city: form.city,
@@ -38,7 +37,41 @@ function ProviderOnboardingPage() {
         availability: form.availability,
         isProfileComplete: true,
         onboardingCompletedAt: new Date().toISOString()
-      }, form.photo); // Pass photo file for upload
+      };
+
+      await updateProfile(profileData, form.photo);
+
+      // Sync to providers table so the provider appears in client searches
+      try {
+        const response = await fetch('/api/providers/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: session?.user?.id,
+            name: form.name,
+            email: session?.user?.email,
+            phone: session?.user?.phone,
+            category: form.category,
+            city: form.city,
+            services: form.services,
+            availability: form.availability,
+            stripeAccountId: form.stripeAccountId,
+            isProfileComplete: true,
+            onboardingCompletedAt: new Date().toISOString()
+          })
+        });
+
+        if (!response.ok) {
+          console.warn('[onboarding] Failed to sync provider profile to database');
+        } else {
+          console.log('[onboarding] Provider profile synced successfully');
+        }
+      } catch (syncError) {
+        console.error('[onboarding] Error syncing provider profile:', syncError);
+        // Don't block onboarding if sync fails
+      }
 
       toast.push({
         title: "Setup Complete!",

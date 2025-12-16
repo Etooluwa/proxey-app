@@ -423,7 +423,7 @@ app.get("/api/providers", async (req, res) => {
 
   if (supabase) {
     try {
-      let query = supabase.from("providers").select("*");
+      let query = supabase.from("providers").select("*").eq("is_active", true);
       if (category) {
         query = query.contains("categories", [category]);
       }
@@ -462,6 +462,101 @@ app.get("/api/providers", async (req, res) => {
   });
 
   res.status(200).json({ providers });
+});
+
+// Create or update provider profile
+app.post("/api/providers/profile", async (req, res) => {
+  const {
+    userId,
+    name,
+    email,
+    phone,
+    avatar,
+    photo,
+    bio,
+    headline,
+    category,
+    categories,
+    city,
+    location,
+    hourlyRate,
+    services,
+    availability,
+    stripeAccountId,
+    isProfileComplete,
+    onboardingCompletedAt
+  } = req.body;
+
+  if (!userId || !name) {
+    return res.status(400).json({
+      error: "userId and name are required to create a provider profile."
+    });
+  }
+
+  if (!supabase) {
+    return res.status(503).json({
+      error: "Database connection not available."
+    });
+  }
+
+  try {
+    // Check if provider profile already exists
+    const { data: existing } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("user_id", userId)
+      .single();
+
+    const providerData = {
+      user_id: userId,
+      name,
+      email,
+      phone,
+      avatar: avatar || photo,
+      photo: photo || avatar,
+      bio,
+      headline,
+      category,
+      categories: categories || (category ? [category] : []),
+      city,
+      location: location || city,
+      hourly_rate: hourlyRate ? Number(hourlyRate) : null,
+      services: services || [],
+      availability: availability || {},
+      stripe_account_id: stripeAccountId,
+      is_active: true,
+      is_profile_complete: isProfileComplete || false,
+      onboarding_completed_at: onboardingCompletedAt
+    };
+
+    let result;
+    if (existing) {
+      // Update existing provider
+      result = await supabase
+        .from("providers")
+        .update(providerData)
+        .eq("user_id", userId)
+        .select()
+        .single();
+    } else {
+      // Insert new provider
+      result = await supabase
+        .from("providers")
+        .insert(providerData)
+        .select()
+        .single();
+    }
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    console.log(`[providers] ${existing ? 'Updated' : 'Created'} provider profile for user ${userId}`);
+    res.status(200).json({ provider: result.data });
+  } catch (error) {
+    console.error("[providers] Failed to save provider profile", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get("/api/bookings/me", async (req, res) => {

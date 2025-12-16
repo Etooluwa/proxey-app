@@ -14,13 +14,16 @@ const CATEGORIES = [
 
 const AppDashboard = () => {
     const navigate = useNavigate();
-    const { profile } = useSession();
+    const { profile, session } = useSession();
     const [providers, setProviders] = useState([]);
+    const [upcomingBookings, setUpcomingBookings] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [bookingsLoading, setBookingsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         loadProviders();
+        loadUpcomingBookings();
     }, []);
 
     const loadProviders = async () => {
@@ -34,6 +37,38 @@ const AppDashboard = () => {
             setProviders([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadUpcomingBookings = async () => {
+        setBookingsLoading(true);
+        try {
+            const response = await fetch('/api/bookings/me', {
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const bookings = Array.isArray(data.bookings) ? data.bookings : [];
+
+                // Filter for upcoming bookings only
+                const upcoming = bookings.filter(b => {
+                    const scheduledDate = new Date(b.scheduled_at);
+                    const now = new Date();
+                    return scheduledDate >= now && b.status !== 'cancelled' && b.status !== 'completed';
+                });
+
+                // Sort by date (earliest first) and take first 3
+                upcoming.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+                setUpcomingBookings(upcoming.slice(0, 3));
+            }
+        } catch (error) {
+            console.error('Failed to load bookings:', error);
+            setUpcomingBookings([]);
+        } finally {
+            setBookingsLoading(false);
         }
     };
 
@@ -120,6 +155,110 @@ const AppDashboard = () => {
                             </button>
                         );
                     })}
+                </div>
+
+                {/* Upcoming Bookings Section */}
+                <div className="mt-16">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-2xl font-bold text-gray-900">Upcoming Bookings</h2>
+                        <button
+                            onClick={() => navigate('/app/bookings')}
+                            className="text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-2"
+                        >
+                            View all
+                            <Icons.ChevronRight size={20} />
+                        </button>
+                    </div>
+
+                    {bookingsLoading ? (
+                        <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+                            <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading bookings...</p>
+                        </div>
+                    ) : upcomingBookings.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {upcomingBookings.map((booking) => (
+                                <div
+                                    key={booking.id}
+                                    onClick={() => navigate('/app/bookings')}
+                                    className="bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:border-orange-200 cursor-pointer"
+                                >
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                            <Icons.Calendar size={24} className="text-orange-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-900 mb-1">
+                                                {booking.service_name || 'Service'}
+                                            </h3>
+                                            <p className="text-sm text-gray-600">
+                                                {booking.provider_name || 'Professional'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 text-sm text-gray-600">
+                                        <div className="flex items-center gap-2">
+                                            <Icons.Calendar size={14} className="text-gray-400" />
+                                            <span>
+                                                {booking.scheduled_at
+                                                    ? new Date(booking.scheduled_at).toLocaleDateString('en-US', {
+                                                        weekday: 'short',
+                                                        month: 'short',
+                                                        day: 'numeric'
+                                                    })
+                                                    : 'TBD'
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Icons.Clock size={14} className="text-gray-400" />
+                                            <span>
+                                                {booking.scheduled_at
+                                                    ? new Date(booking.scheduled_at).toLocaleTimeString('en-US', {
+                                                        hour: 'numeric',
+                                                        minute: '2-digit'
+                                                    })
+                                                    : 'TBD'
+                                                }
+                                            </span>
+                                        </div>
+                                        {booking.location && (
+                                            <div className="flex items-center gap-2">
+                                                <Icons.MapPin size={14} className="text-gray-400" />
+                                                <span className="truncate">{booking.location}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {booking.total_price && (
+                                        <div className="mt-4 pt-4 border-t border-gray-100">
+                                            <p className="text-orange-600 font-bold">
+                                                ${(booking.total_price / 100).toFixed(2)}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl p-16 text-center border border-gray-100">
+                            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Icons.Calendar size={32} className="text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                No upcoming bookings
+                            </h3>
+                            <p className="text-gray-600 max-w-md mx-auto mb-6">
+                                You don't have any upcoming appointments. Browse services and book your first appointment!
+                            </p>
+                            <button
+                                onClick={() => navigate('/app/browse')}
+                                className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition-colors inline-flex items-center gap-2"
+                            >
+                                Browse Services
+                                <Icons.ChevronRight size={20} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Popular Providers Section */}

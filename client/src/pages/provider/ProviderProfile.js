@@ -64,6 +64,35 @@ const ProviderProfile = () => {
             await updateProfile({
                 bio: bio
             });
+
+            // Sync to providers table so changes are visible to clients
+            try {
+                const response = await fetch('/api/providers/profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userId: session?.user?.id,
+                        name: profile?.name,
+                        email: session?.user?.email,
+                        phone: profile?.phone,
+                        bio: bio,
+                        category: profile?.category,
+                        city: profile?.city,
+                        services: profile?.services,
+                        availability: profile?.availability,
+                        isProfileComplete: profile?.isProfileComplete
+                    })
+                });
+
+                if (!response.ok) {
+                    console.warn('[profile] Failed to sync provider profile to database');
+                }
+            } catch (syncError) {
+                console.error('[profile] Error syncing provider profile:', syncError);
+            }
+
             toast.push({
                 title: "Profile updated",
                 description: "Your changes have been saved.",
