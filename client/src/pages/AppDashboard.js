@@ -277,10 +277,10 @@ const AppDashboard = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {providers.slice(0, 8).map((provider) => (
-                                <button
+                                <div
                                     key={provider.id}
                                     onClick={() => navigate(`/app/provider/${provider.id}`)}
-                                    className="bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-200 border border-gray-100 hover:border-orange-200 text-left"
+                                    className="bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-200 border border-gray-100 hover:border-orange-200 cursor-pointer"
                                 >
                                     <div className="flex items-start gap-4 mb-4">
                                         <img
@@ -303,15 +303,20 @@ const AppDashboard = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
                                         {provider.headline || 'Experienced professional'}
                                     </p>
-                                    {provider.hourly_rate && (
-                                        <p className="text-orange-600 font-bold">
-                                            ${(provider.hourly_rate / 100).toFixed(0)}/hr
-                                        </p>
-                                    )}
-                                </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/app/provider/${provider.id}`);
+                                        }}
+                                        className="w-full bg-orange-600 text-white py-2.5 px-4 rounded-xl font-semibold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Book Now
+                                        <Icons.ArrowRight size={16} />
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     </div>
