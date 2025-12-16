@@ -19,6 +19,7 @@ import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
 
 // Client Pages
 import AppDashboard from './pages/AppDashboard';
+import BrowsePage from './pages/BrowsePage';
 import BookingsPage from './pages/BookingsPage';
 import BookingFlowPage from './pages/BookingFlowPage';
 import MessagesPage from './pages/MessagesPage';
@@ -78,6 +79,7 @@ function App() {
                       }
                     >
                       <Route index element={<AppDashboard />} />
+                      <Route path="browse" element={<BrowsePage />} />
                       <Route path="bookings" element={<BookingsPage />} />
                       <Route path="booking-flow" element={<BookingFlowPage />} />
                       <Route path="messages" element={<MessagesPage />} />
