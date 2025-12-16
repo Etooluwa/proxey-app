@@ -67,7 +67,7 @@ const ProviderProfile = () => {
 
             // Sync to providers table so changes are visible to clients
             try {
-                const response = await fetch('/api/providers/profile', {
+                const response = await fetch('http://localhost:5000/api/providers/profile', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

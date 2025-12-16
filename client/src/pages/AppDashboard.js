@@ -29,7 +29,7 @@ const AppDashboard = () => {
     const loadProviders = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/providers');
+            const response = await fetch('http://localhost:5000/api/providers');
             const data = await response.json();
             setProviders(data.providers || []);
         } catch (error) {
@@ -43,7 +43,7 @@ const AppDashboard = () => {
     const loadUpcomingBookings = async () => {
         setBookingsLoading(true);
         try {
-            const response = await fetch('/api/bookings/me', {
+            const response = await fetch('http://localhost:5000/api/bookings/me', {
                 headers: {
                     'Authorization': `Bearer ${session?.access_token}`
                 }
