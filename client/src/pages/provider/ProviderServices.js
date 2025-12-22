@@ -13,7 +13,8 @@ const ProviderServices = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
-    const { role, session } = useSession();
+    const { session } = useSession();
+    const role = session?.user?.role;
     const [form, setForm] = useState({
         id: null,
         name: '',
