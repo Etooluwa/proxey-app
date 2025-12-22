@@ -55,7 +55,7 @@ const ProviderProfile = () => {
 
     const handleLogout = async () => {
         await logout();
-        navigate('/auth/sign-in');
+        navigate('/');
     };
 
     const handleSave = async () => {

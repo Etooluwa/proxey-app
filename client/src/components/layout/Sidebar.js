@@ -7,7 +7,7 @@ import { useMessages } from '../../contexts/MessageContext';
 export const Sidebar = ({ role }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { signOut } = useSession();
+    const { logout } = useSession();
     const { getUnreadCount } = useMessages();
     const unreadMessages = getUnreadCount();
 
@@ -30,7 +30,7 @@ export const Sidebar = ({ role }) => {
     const links = role === 'client' ? clientLinks : providerLinks;
 
     const handleLogout = async () => {
-        await signOut();
+        await logout();
         navigate('/');
     };
 
