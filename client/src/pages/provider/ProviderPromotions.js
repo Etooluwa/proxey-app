@@ -35,7 +35,11 @@ const ProviderPromotions = () => {
                 }
             } catch (error) {
                 console.error("Failed to load promotions", error);
-                toast.push({ title: "Error loading promotions", description: error.message, variant: "error" });
+                // Don't show error toast if backend is not available (common in deployed environment)
+                if (!cancelled) {
+                    setPromotions([]);
+                    setServices([]);
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
