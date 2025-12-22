@@ -38,11 +38,8 @@ const ProviderAppointments = () => {
             setAppointments(normalized);
         } catch (error) {
             console.error("Failed to load appointments", error);
-            toast.push({
-                title: "Error loading appointments",
-                description: error.message,
-                variant: "error",
-            });
+            // Don't show error toast if backend is not available
+            setAppointments([]);
         } finally {
             setLoading(false);
         }
