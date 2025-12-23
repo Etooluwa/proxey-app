@@ -45,12 +45,18 @@ const ProviderProfile = () => {
     const toast = useToast();
 
     const [bio, setBio] = useState(profile?.bio || "Hi! I have over 5 years of experience. I take pride in my attention to detail and treating your home with the utmost respect.");
+    const [phone, setPhone] = useState(profile?.phone || '');
+    const [profilePhoto, setProfilePhoto] = useState(profile?.photo || null);
+    const [coverPhoto, setCoverPhoto] = useState(profile?.coverPhoto || null);
+    const [portfolioImages, setPortfolioImages] = useState(profile?.portfolioImages || PORTFOLIO_IMAGES);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (profile?.bio) {
-            setBio(profile.bio);
-        }
+        if (profile?.bio) setBio(profile.bio);
+        if (profile?.phone) setPhone(profile.phone);
+        if (profile?.photo) setProfilePhoto(profile.photo);
+        if (profile?.coverPhoto) setCoverPhoto(profile.coverPhoto);
+        if (profile?.portfolioImages) setPortfolioImages(profile.portfolioImages);
     }, [profile]);
 
     const handleLogout = async () => {
@@ -58,11 +64,52 @@ const ProviderProfile = () => {
         navigate('/');
     };
 
+    const handleProfilePhotoChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfilePhoto(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleCoverPhotoChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCoverPhoto(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePortfolioAdd = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPortfolioImages([...portfolioImages, reader.result]);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePortfolioRemove = (index) => {
+        setPortfolioImages(portfolioImages.filter((_, i) => i !== index));
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
             await updateProfile({
-                bio: bio
+                bio,
+                phone,
+                photo: profilePhoto,
+                coverPhoto,
+                portfolioImages
             });
 
             // Sync to providers table so changes are visible to clients
@@ -76,13 +123,16 @@ const ProviderProfile = () => {
                         userId: session?.user?.id,
                         name: profile?.name,
                         email: session?.user?.email,
-                        phone: profile?.phone,
-                        bio: bio,
+                        phone,
+                        bio,
                         category: profile?.category,
                         city: profile?.city,
                         services: profile?.services,
                         availability: profile?.availability,
-                        isProfileComplete: profile?.isProfileComplete
+                        isProfileComplete: profile?.isProfileComplete,
+                        photo: profilePhoto,
+                        coverPhoto,
+                        portfolioImages
                     })
                 });
 
@@ -118,10 +168,29 @@ const ProviderProfile = () => {
             {/* Header / Cover Area */}
             <div className="relative bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                 {/* Cover Photo */}
-                <div className="h-48 bg-gradient-to-r from-brand-400 to-brand-600 relative">
-                    <button className="absolute top-4 right-4 bg-black/30 hover:bg-black/50 text-white px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm flex items-center gap-2 transition-colors">
+                <div
+                    className="h-48 relative"
+                    style={{
+                        backgroundImage: coverPhoto
+                            ? `url(${coverPhoto})`
+                            : 'linear-gradient(to right, rgb(251 146 60), rgb(249 115 22))',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
+                    }}
+                >
+                    <input
+                        type="file"
+                        accept="image/*"
+                        id="cover-photo-input"
+                        className="hidden"
+                        onChange={handleCoverPhotoChange}
+                    />
+                    <label
+                        htmlFor="cover-photo-input"
+                        className="absolute top-4 right-4 bg-black/30 hover:bg-black/50 text-white px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm flex items-center gap-2 transition-colors cursor-pointer"
+                    >
                         <Icons.Camera size={16} /> Edit Cover
-                    </button>
+                    </label>
                 </div>
 
                 <div className="px-8 pb-8">
@@ -129,13 +198,23 @@ const ProviderProfile = () => {
                         <div className="flex items-end gap-6">
                             <div className="relative">
                                 <img
-                                    src={profile?.photo || "https://picsum.photos/seed/jane/200/200"}
+                                    src={profilePhoto || profile?.photo || "https://picsum.photos/seed/jane/200/200"}
                                     alt="Provider"
                                     className="w-32 h-32 rounded-2xl border-4 border-white shadow-lg object-cover bg-gray-100"
                                 />
-                                <button className="absolute bottom-2 right-2 p-2 bg-white rounded-lg shadow-md text-gray-600 hover:text-brand-600 transition-colors">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    id="profile-photo-input"
+                                    className="hidden"
+                                    onChange={handleProfilePhotoChange}
+                                />
+                                <label
+                                    htmlFor="profile-photo-input"
+                                    className="absolute bottom-2 right-2 p-2 bg-white rounded-lg shadow-md text-gray-600 hover:text-brand-600 transition-colors cursor-pointer"
+                                >
                                     <Icons.Camera size={14} />
-                                </button>
+                                </label>
                             </div>
                             <div className="mb-2">
                                 <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -198,10 +277,13 @@ const ProviderProfile = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Phone</label>
-                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                    <span className="text-sm text-gray-700">{profile?.phone || 'Not provided'}</span>
-                                    {profile?.phone && <Icons.Check size={14} className="text-green-500" />}
-                                </div>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    placeholder="Enter phone number"
+                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 focus:ring-2 focus:ring-brand-100 focus:border-brand-300 outline-none"
+                                />
                             </div>
                         </div>
                     </div>
@@ -309,23 +391,41 @@ const ProviderProfile = () => {
                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-gray-900">Portfolio</h3>
-                            <button className="flex items-center gap-2 text-sm font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-xl hover:bg-brand-100 transition-colors">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                id="portfolio-input"
+                                className="hidden"
+                                onChange={handlePortfolioAdd}
+                            />
+                            <label
+                                htmlFor="portfolio-input"
+                                className="flex items-center gap-2 text-sm font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-xl hover:bg-brand-100 transition-colors cursor-pointer"
+                            >
                                 <Icons.Camera size={16} /> Add Photos
-                            </button>
+                            </label>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {PORTFOLIO_IMAGES.map((img, i) => (
-                                <div key={i} className="relative group aspect-square rounded-xl overflow-hidden cursor-pointer">
+                            {portfolioImages.map((img, i) => (
+                                <div key={i} className="relative group aspect-square rounded-xl overflow-hidden">
                                     <img src={img} alt="Portfolio" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                        <Icons.Search className="text-white" size={20} />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <button
+                                            onClick={() => handlePortfolioRemove(i)}
+                                            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                        >
+                                            <Icons.Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
-                            <div className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50 transition-all cursor-pointer">
+                            <label
+                                htmlFor="portfolio-input"
+                                className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50 transition-all cursor-pointer"
+                            >
                                 <Icons.Camera size={24} />
                                 <span className="text-xs font-bold mt-2">Add Photo</span>
-                            </div>
+                            </label>
                         </div>
                     </div>
 
