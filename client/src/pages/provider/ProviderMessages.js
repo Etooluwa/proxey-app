@@ -1,35 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../../components/Icons';
 import { useMessages } from '../../contexts/MessageContext';
-
-
-const MOCK_CHAT_HISTORY = [
-    { id: 1, sender: 'them', text: 'Hi there! I am interested in your deep cleaning service.', time: '10:00 AM' },
-    { id: 2, sender: 'me', text: 'Hello Alice! I would be happy to help. What is the square footage of your home?', time: '10:05 AM' },
-    { id: 3, sender: 'them', text: 'It is about 1200 sq ft. 2 bedrooms, 2 baths.', time: '10:08 AM' },
-    { id: 4, sender: 'me', text: 'Great. My rate for that size is usually around $150. Does that work for you?', time: '10:10 AM' },
-    { id: 5, sender: 'them', text: 'Yes, the code is #1234.', time: '10:12 AM' },
-];
+import { useSession } from '../../auth/authContext';
 
 const ProviderMessages = () => {
-    const { conversations, markAsRead } = useMessages();
-    const [activeChatId, setActiveChatId] = useState(null);
+    const { session } = useSession();
+    const { conversations, messages, currentConversation, setCurrentConversation, loadMessages, sendMessage, markAsRead, getUnreadCount } = useMessages();
     const [showMobileChat, setShowMobileChat] = useState(false);
+    const [messageInput, setMessageInput] = useState('');
+    const [sending, setSending] = useState(false);
+    const messagesEndRef = useRef(null);
 
-    // Initialize activeChatId from conversations on first load
+    // Initialize current conversation from conversations on first load
     useEffect(() => {
-        if (conversations.length > 0 && !activeChatId) {
-            setActiveChatId(conversations[0].id);
+        if (conversations.length > 0 && !currentConversation) {
+            setCurrentConversation(conversations[0].id);
+            loadMessages(conversations[0].id);
         }
-    }, [conversations, activeChatId]);
+    }, [conversations, currentConversation, setCurrentConversation, loadMessages]);
 
-    // Get the current active chat from conversations to always have fresh data
-    const activeChat = conversations.find(c => c.id === activeChatId) || conversations[0];
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    // Get the current active chat from conversations
+    const activeChat = conversations.find(c => c.id === currentConversation);
 
     const handleChatSelect = (chat) => {
         markAsRead(chat.id);
-        setActiveChatId(chat.id);
+        setCurrentConversation(chat.id);
+        loadMessages(chat.id);
         setShowMobileChat(true);
+    };
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!messageInput.trim() || !currentConversation) return;
+
+        setSending(true);
+        try {
+            await sendMessage({
+                conversationId: currentConversation,
+                content: messageInput
+            });
+            setMessageInput('');
+        } catch (error) {
+            console.error('Failed to send message:', error);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // Format message time
+    const formatTime = (timestamp) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
+    // Format conversation time
+    const formatConversationTime = (timestamp) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    // Get unread count for provider
+    const getConversationUnreadCount = (conversation) => {
+        return conversation.provider_unread_count || 0;
     };
 
     return (
@@ -50,39 +103,55 @@ const ProviderMessages = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {conversations.map((chat) => (
-                        <div
-                            key={chat.id}
-                            onClick={() => handleChatSelect(chat)}
-                            className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${activeChatId === chat.id
-                                    ? 'bg-brand-50/50 border-brand-500'
-                                    : 'border-transparent'
-                                }`}
-                        >
-                            <div className="relative">
-                                <img src={chat.avatar} alt={chat.clientName} className="w-12 h-12 rounded-full object-cover" />
-                                {chat.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex gap-2 w-full">
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="text-sm font-bold text-gray-900 truncate block">
-                                            {chat.clientName || 'Unknown'}
-                                        </h4>
-                                        <p className={`text-xs block ${chat.unread > 0 ? 'text-brand-600 font-bold' : 'text-gray-500'}`}>
-                                            Re: {chat.serviceInterest || 'Service'}
-                                        </p>
-                                        <p className={`text-xs mt-1 block ${chat.unread > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
-                                            {chat.lastMessage || 'No message'}
-                                        </p>
+                    {conversations.length === 0 ? (
+                        <div className="p-8 text-center text-gray-400">
+                            <Icons.MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
+                            <p className="text-sm">No conversations yet</p>
+                            <p className="text-xs mt-2">Messages from clients will appear here</p>
+                        </div>
+                    ) : (
+                        conversations.map((chat) => {
+                            const unreadCount = getConversationUnreadCount(chat);
+                            return (
+                                <div
+                                    key={chat.id}
+                                    onClick={() => handleChatSelect(chat)}
+                                    className={`p-4 flex gap-3 cursor-pointer border-l-4 transition-all hover:bg-gray-50 ${currentConversation === chat.id
+                                            ? 'bg-brand-50/50 border-brand-500'
+                                            : 'border-transparent'
+                                        }`}
+                                >
+                                    <div className="relative">
+                                        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                            {(chat.client_name || 'U')[0].toUpperCase()}
+                                        </div>
                                     </div>
-                                    <div className="flex-shrink-0">
-                                        <span className="text-xs text-gray-400 whitespace-nowrap">{chat.time}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex gap-2 w-full">
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-gray-900 truncate block">
+                                                    {chat.client_name || 'Unknown Client'}
+                                                </h4>
+                                                <p className={`text-xs mt-1 block truncate ${unreadCount > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                                                    {chat.last_message || 'No messages yet'}
+                                                </p>
+                                            </div>
+                                            <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                                                <span className="text-xs text-gray-400 whitespace-nowrap">
+                                                    {formatConversationTime(chat.last_message_at)}
+                                                </span>
+                                                {unreadCount > 0 && (
+                                                    <div className="w-5 h-5 bg-brand-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">
+                                                        {unreadCount}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
@@ -100,13 +169,12 @@ const ProviderMessages = () => {
                             <Icons.ArrowLeft size={20} />
                         </button>
 
-                        <img src={activeChat.avatar} alt={activeChat.clientName} className="w-10 h-10 rounded-full object-cover" />
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                            {(activeChat.client_name || 'U')[0].toUpperCase()}
+                        </div>
                         <div>
-                            <h3 className="font-bold text-gray-900">{activeChat.clientName}</h3>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md text-gray-600 font-medium">{activeChat.serviceInterest}</span>
-                                {activeChat.online && <span className="text-xs text-green-600 font-bold">• Online</span>}
-                            </div>
+                            <h3 className="font-bold text-gray-900">{activeChat.client_name || 'Unknown Client'}</h3>
+                            <span className="text-xs text-gray-500">Client</span>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -124,38 +192,76 @@ const ProviderMessages = () => {
 
                 {/* Chat Messages */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-                    {MOCK_CHAT_HISTORY.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] md:max-w-[70%] ${msg.sender === 'me' ? 'items-end' : 'items-start'} flex flex-col`}>
-                                <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.sender === 'me'
-                                        ? 'bg-brand-500 text-white rounded-tr-sm'
-                                        : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'
-                                    }`}>
-                                    {msg.text}
-                                </div>
-                                <span className="text-[10px] text-gray-400 mt-1 px-1">
-                                    {msg.time}
-                                </span>
+                    {messages.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                            <div className="text-center">
+                                <Icons.MessageSquare size={48} className="mx-auto mb-3 text-gray-300" />
+                                <p>No messages yet</p>
+                                <p className="text-xs mt-1">Start the conversation!</p>
                             </div>
                         </div>
-                    ))}
+                    ) : (
+                        <>
+                            {messages.map((msg) => {
+                                const isMe = msg.sender_id === session?.user?.id;
+                                return (
+                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] md:max-w-[70%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                                            <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${isMe
+                                                    ? 'bg-brand-500 text-white rounded-tr-sm'
+                                                    : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'
+                                                }`}>
+                                                {msg.content}
+                                                {msg.image_url && (
+                                                    <img src={msg.image_url} alt="Shared" className="mt-2 rounded-lg max-w-full" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 mt-1 px-1">
+                                                {formatTime(msg.created_at)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div ref={messagesEndRef} />
+                        </>
+                    )}
                 </div>
 
                 {/* Input Area */}
                 <div className="p-4 bg-white border-t border-gray-100">
-                    <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition-all">
-                        <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-200 transition-colors">
-                            <Icons.Wrench size={20} />
-                        </button>
-                        <textarea
-                            placeholder="Type a message..."
-                            className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 resize-none py-2 max-h-32"
-                            rows={1}
-                        />
-                        <button className="p-2 bg-brand-500 text-white rounded-xl shadow-md hover:bg-brand-600 transition-colors">
-                            <Icons.ChevronRight size={20} />
-                        </button>
-                    </div>
+                    <form onSubmit={handleSendMessage}>
+                        <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition-all">
+                            <button type="button" className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-200 transition-colors">
+                                <Icons.Paperclip size={20} />
+                            </button>
+                            <textarea
+                                placeholder="Type a message..."
+                                value={messageInput}
+                                onChange={(e) => setMessageInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSendMessage(e);
+                                    }
+                                }}
+                                className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 resize-none py-2 max-h-32"
+                                rows={1}
+                                disabled={sending}
+                            />
+                            <button
+                                type="submit"
+                                disabled={!messageInput.trim() || sending}
+                                className="p-2 bg-brand-500 text-white rounded-xl shadow-md hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {sending ? (
+                                    <Icons.Loader size={20} className="animate-spin" />
+                                ) : (
+                                    <Icons.ChevronRight size={20} />
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             )}

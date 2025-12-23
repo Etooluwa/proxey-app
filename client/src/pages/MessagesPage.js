@@ -7,8 +7,7 @@ import { useSession } from '../auth/authContext';
 const MessagesPage = () => {
     const navigate = useNavigate();
     const { session } = useSession();
-    const { conversations, messages, send, markAsRead } = useMessages();
-    const [activeChat, setActiveChat] = useState(null);
+    const { conversations, messages, currentConversation, setCurrentConversation, loadMessages, sendMessage, markAsRead } = useMessages();
     const [showMobileChat, setShowMobileChat] = useState(false);
     const [messageInput, setMessageInput] = useState('');
     const [sending, setSending] = useState(false);
@@ -16,32 +15,36 @@ const MessagesPage = () => {
 
     // Set initial active chat when conversations load
     useEffect(() => {
-        if (conversations.length > 0 && !activeChat) {
-            setActiveChat(conversations[0]);
+        if (conversations.length > 0 && !currentConversation) {
+            setCurrentConversation(conversations[0].id);
+            loadMessages(conversations[0].id);
         }
-    }, [conversations, activeChat]);
+    }, [conversations, currentConversation, setCurrentConversation, loadMessages]);
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Get the active chat from conversations
+    const activeChat = conversations.find(c => c.id === currentConversation);
+
     const handleChatSelect = (chat) => {
         markAsRead(chat.id);
-        setActiveChat(chat);
+        setCurrentConversation(chat.id);
+        loadMessages(chat.id);
         setShowMobileChat(true);
     };
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!messageInput.trim() || !activeChat) return;
+        if (!messageInput.trim() || !currentConversation) return;
 
         setSending(true);
         try {
-            await send({
-                receiverId: activeChat.otherUserId,
-                body: messageInput,
-                threadId: activeChat.id
+            await sendMessage({
+                conversationId: currentConversation,
+                content: messageInput
             });
             setMessageInput('');
         } catch (error) {
@@ -51,10 +54,10 @@ const MessagesPage = () => {
         }
     };
 
-    // Get messages for active conversation
-    const activeChatMessages = activeChat
-        ? messages.filter(msg => msg.thread_id === activeChat.id)
-        : [];
+    // Get unread count for client
+    const getConversationUnreadCount = (conversation) => {
+        return conversation.client_unread_count || 0;
+    };
 
     // Format message time
     const formatTime = (timestamp) => {
@@ -110,52 +113,48 @@ const MessagesPage = () => {
                             <p className="text-xs mt-2">Messages will appear here</p>
                         </div>
                     ) : (
-                        conversations.map((chat) => (
-                            <button
-                                key={chat.id}
-                                onClick={() => handleChatSelect(chat)}
-                                className={`w-full p-4 flex gap-3 border-l-4 transition-all hover:bg-gray-50 ${
-                                    activeChat?.id === chat.id
-                                        ? 'bg-orange-50 border-orange-500'
-                                        : 'border-transparent'
-                                }`}
-                            >
-                                <div className="relative flex-shrink-0">
-                                    <img
-                                        src={chat.avatar}
-                                        alt={chat.providerName}
-                                        className="w-12 h-12 rounded-full object-cover"
-                                    />
-                                    {chat.online && (
-                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0 text-left">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h4 className={`text-sm font-bold truncate ${
-                                            activeChat?.id === chat.id ? 'text-gray-900' : 'text-gray-900'
-                                        }`}>
-                                            {chat.providerName}
-                                        </h4>
-                                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                                            {formatConversationTime(chat.timestamp)}
-                                        </span>
-                                    </div>
-                                    <p className={`text-sm truncate ${
-                                        chat.unread > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'
-                                    }`}>
-                                        {chat.lastMessage}
-                                    </p>
-                                </div>
-                                {chat.unread > 0 && (
-                                    <div className="flex items-center">
-                                        <div className="w-6 h-6 bg-orange-500 rounded-full text-[11px] text-white font-bold flex items-center justify-center">
-                                            {chat.unread}
+                        conversations.map((chat) => {
+                            const unreadCount = getConversationUnreadCount(chat);
+                            return (
+                                <button
+                                    key={chat.id}
+                                    onClick={() => handleChatSelect(chat)}
+                                    className={`w-full p-4 flex gap-3 border-l-4 transition-all hover:bg-gray-50 ${
+                                        activeChat?.id === chat.id
+                                            ? 'bg-orange-50 border-orange-500'
+                                            : 'border-transparent'
+                                    }`}
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                            {(chat.provider_name || 'P')[0].toUpperCase()}
                                         </div>
                                     </div>
-                                )}
-                            </button>
-                        ))
+                                    <div className="flex-1 min-w-0 text-left">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="text-sm font-bold truncate text-gray-900">
+                                                {chat.provider_name || 'Provider'}
+                                            </h4>
+                                            <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                                                {formatConversationTime(chat.last_message_at)}
+                                            </span>
+                                        </div>
+                                        <p className={`text-sm truncate ${
+                                            unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'
+                                        }`}>
+                                            {chat.last_message || 'No messages yet'}
+                                        </p>
+                                    </div>
+                                    {unreadCount > 0 && (
+                                        <div className="flex items-center">
+                                            <div className="w-6 h-6 bg-orange-500 rounded-full text-[11px] text-white font-bold flex items-center justify-center">
+                                                {unreadCount}
+                                            </div>
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })
                     )}
                 </div>
             </div>
@@ -175,21 +174,14 @@ const MessagesPage = () => {
                                     <Icons.ArrowLeft size={20} />
                                 </button>
 
-                                <img
-                                    src={activeChat.avatar}
-                                    alt={activeChat.providerName}
-                                    className="w-10 h-10 rounded-full object-cover"
-                                />
+                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                    {(activeChat.provider_name || 'P')[0].toUpperCase()}
+                                </div>
                                 <div>
                                     <h3 className="font-bold text-gray-900 text-base">
-                                        {activeChat.providerName}
+                                        {activeChat.provider_name || 'Provider'}
                                     </h3>
-                                    {activeChat.online && (
-                                        <p className="text-xs text-green-600 flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                            Online
-                                        </p>
-                                    )}
+                                    <p className="text-xs text-gray-500">Provider</p>
                                 </div>
                             </div>
                             <div className="flex gap-1">
@@ -204,7 +196,7 @@ const MessagesPage = () => {
 
                         {/* Chat Messages */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            {activeChatMessages.length === 0 ? (
+                            {messages.length === 0 ? (
                                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                                     <div className="text-center">
                                         <Icons.MessageSquare size={48} className="mx-auto mb-3 text-gray-300" />
@@ -213,32 +205,37 @@ const MessagesPage = () => {
                                     </div>
                                 </div>
                             ) : (
-                                activeChatMessages.map((msg) => {
-                                    const isMe = msg.sender_id === session?.user?.id;
-                                    return (
-                                        <div
-                                            key={msg.id}
-                                            className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                                        >
-                                            <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${
-                                                isMe ? 'items-end' : 'items-start'
-                                            }`}>
-                                                <div className={`px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed ${
-                                                    isMe
-                                                        ? 'bg-orange-500 text-white rounded-tr-md'
-                                                        : 'bg-white text-gray-800 rounded-tl-md shadow-sm'
+                                <>
+                                    {messages.map((msg) => {
+                                        const isMe = msg.sender_id === session?.user?.id;
+                                        return (
+                                            <div
+                                                key={msg.id}
+                                                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div className={`max-w-[75%] md:max-w-[65%] flex flex-col ${
+                                                    isMe ? 'items-end' : 'items-start'
                                                 }`}>
-                                                    {msg.body}
+                                                    <div className={`px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed ${
+                                                        isMe
+                                                            ? 'bg-orange-500 text-white rounded-tr-md'
+                                                            : 'bg-white text-gray-800 rounded-tl-md shadow-sm'
+                                                    }`}>
+                                                        {msg.content}
+                                                        {msg.image_url && (
+                                                            <img src={msg.image_url} alt="Shared" className="mt-2 rounded-lg max-w-full" />
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[11px] text-gray-400 mt-1 px-1 uppercase">
+                                                        {formatTime(msg.created_at)}
+                                                    </span>
                                                 </div>
-                                                <span className="text-[11px] text-gray-400 mt-1 px-1 uppercase">
-                                                    {formatTime(msg.created_at)}
-                                                </span>
                                             </div>
-                                        </div>
-                                    );
-                                })
+                                        );
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Input Area */}
