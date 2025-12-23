@@ -32,7 +32,38 @@ const supabase =
     : null;
 
 const app = express();
-app.use(cors());
+
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://proxey-app-git-feature-prototype-migration-eto-seguns-projects.vercel.app',
+  'https://proxey-app.vercel.app',
+  /\.vercel\.app$/ // Allow all Vercel preview deployments
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Check if origin is in allowed list or matches regex
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 
 const jsonMiddleware = express.json();
 app.use((req, res, next) => {

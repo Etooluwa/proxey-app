@@ -97,12 +97,17 @@ const ProviderPublicProfile = () => {
                 setSelectedService(serviceOptions[0]);
             } else {
                 // Otherwise, fetch from API
+                console.log('[ProviderPublicProfile] Fetching providers, looking for ID:', providerId);
                 const providers = await fetchProviders();
+                console.log('[ProviderPublicProfile] Fetched providers:', providers);
+                console.log('[ProviderPublicProfile] Provider IDs:', providers.map(p => p.id));
                 const found = providers.find((p) => p.id === providerId);
+                console.log('[ProviderPublicProfile] Found provider:', found);
                 if (found) {
                     setProvider(found);
                     setSelectedService(serviceOptions[0]);
                 } else {
+                    console.error('[ProviderPublicProfile] Provider not found. Looking for:', providerId);
                     setProvider(null);
                 }
             }
