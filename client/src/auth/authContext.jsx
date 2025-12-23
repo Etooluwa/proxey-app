@@ -368,13 +368,29 @@ export function AuthProvider({ children }) {
 
         if (supabase) {
             try {
-                const { error } = await supabase.auth.updateUser({
+                // Update auth user metadata
+                const { error: authError } = await supabase.auth.updateUser({
                     data: {
                         profile: nextProfile,
                     },
                 });
-                if (error) {
-                    throw error;
+                if (authError) {
+                    console.warn("[auth] Failed to update user metadata", authError);
+                }
+
+                // Also update the profiles table directly
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: session.user.id,
+                        ...nextProfile,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'id'
+                    });
+
+                if (profileError) {
+                    console.warn("[auth] Failed to update profiles table", profileError);
                 }
             } catch (error) {
                 console.warn("[auth] Failed to update profile via Supabase", error);
