@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { fetchProviders } from '../data/providers';
+import { useSession } from '../auth/authContext';
 
 // Mock data for reviews
 const MOCK_REVIEWS = [
@@ -45,6 +46,7 @@ const MOCK_PORTFOLIO = [
 const ProviderPublicProfile = () => {
     const { providerId } = useParams();
     const navigate = useNavigate();
+    const { session, profile } = useSession();
     const [provider, setProvider] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedService, setSelectedService] = useState(null);
@@ -78,11 +80,29 @@ const ProviderPublicProfile = () => {
     const loadProvider = async () => {
         setLoading(true);
         try {
-            const providers = await fetchProviders();
-            const found = providers.find((p) => p.id === providerId) || providers[0];
-            if (found) {
-                setProvider(found);
+            // If viewing own profile (preview mode), use session profile data
+            if (session?.user?.id === providerId && session?.user?.role === 'provider' && profile) {
+                setProvider({
+                    id: profile.id || session.user.id,
+                    name: profile.name || profile.fullName || 'Provider',
+                    avatar: profile.avatar || profile.profilePhoto,
+                    headline: profile.headline || profile.bio,
+                    location: profile.city || profile.location,
+                    rating: 4.9,
+                    jobs_completed: 127,
+                    repeat_percentage: '89%',
+                    bio: profile.bio,
+                    review_count: 48
+                });
                 setSelectedService(serviceOptions[0]);
+            } else {
+                // Otherwise, fetch from API
+                const providers = await fetchProviders();
+                const found = providers.find((p) => p.id === providerId) || providers[0];
+                if (found) {
+                    setProvider(found);
+                    setSelectedService(serviceOptions[0]);
+                }
             }
         } catch (error) {
             console.error('Failed to load provider:', error);
