@@ -236,7 +236,10 @@ const ProviderDashboard = () => {
                             <p className="text-gray-500 text-xs mb-6 max-w-[200px]">
                                 You have no pending booking requests. Improve your profile to attract more clients.
                             </p>
-                            <button className="text-xs font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-lg hover:bg-brand-100 transition-colors">
+                            <button
+                                onClick={() => navigate('/provider/services')}
+                                className="text-xs font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-lg hover:bg-brand-100 transition-colors"
+                            >
                                 View Services
                             </button>
                         </div>
