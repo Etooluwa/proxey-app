@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icons } from '../../components/Icons';
 import { StatCard } from '../../components/StatCard';
 import { EARNINGS_DATA } from '../../constants';
+import { useSession } from '../../auth/authContext';
 import {
     BarChart,
     Bar,
@@ -43,9 +44,12 @@ const MONTHLY_DATA = [
 ];
 
 const ProviderEarnings = () => {
+    const { profile } = useSession();
     const [viewMode, setViewMode] = useState('OVERVIEW');
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    const [dateRange, setDateRange] = useState('THIS_MONTH');
+    const [dateRange, setDateRange] = useState('LAST_30_DAYS');
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
     const [fileFormat, setFileFormat] = useState('CSV');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDownloaded, setIsDownloaded] = useState(false);
@@ -53,6 +57,13 @@ const ProviderEarnings = () => {
     // Filter states for View All
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('ALL');
+
+    // Get provider signup date (fallback to 1 year ago if not available)
+    const signupDate = profile?.createdAt
+        ? new Date(profile.createdAt).toISOString().split('T')[0]
+        : new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0];
+
+    const today = new Date().toISOString().split('T')[0];
 
     const handleDownload = () => {
         setIsGenerating(true);
@@ -115,31 +126,54 @@ const ProviderEarnings = () => {
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Date Range</label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    {['THIS_MONTH', 'LAST_MONTH', 'YTD', 'CUSTOM'].map((range) => (
+                                    {[
+                                        { value: 'LAST_30_DAYS', label: 'Last 30 Days' },
+                                        { value: 'LAST_3_MONTHS', label: 'Last 3 Months' },
+                                        { value: 'LAST_YEAR', label: 'Last Year' },
+                                        { value: 'CUSTOM', label: 'Custom Range' }
+                                    ].map((range) => (
                                         <button
-                                            key={range}
-                                            onClick={() => setDateRange(range)}
-                                            className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${dateRange === range
+                                            key={range.value}
+                                            onClick={() => setDateRange(range.value)}
+                                            className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${dateRange === range.value
                                                 ? 'bg-brand-50 border-brand-500 text-brand-700 shadow-sm'
                                                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            {range === 'THIS_MONTH' ? 'Current Month' :
-                                                range === 'LAST_MONTH' ? 'Last Month' :
-                                                    range === 'YTD' ? 'Year to Date' : 'Custom Range'}
+                                            {range.label}
                                         </button>
                                     ))}
                                 </div>
                                 {dateRange === 'CUSTOM' && (
-                                    <div className="grid grid-cols-2 gap-3 mt-3 animate-in fade-in slide-in-from-top-2">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Start</label>
-                                            <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-300" />
+                                    <div className="mt-3 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3 animate-in fade-in slide-in-from-top-2">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={customStartDate}
+                                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                                    min={signupDate}
+                                                    max={customEndDate || today}
+                                                    className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">End Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={customEndDate}
+                                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                                    min={customStartDate || signupDate}
+                                                    max={today}
+                                                    className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">End</label>
-                                            <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-300" />
-                                        </div>
+                                        <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                                            <Icons.Info size={12} />
+                                            Reports are available from your signup date onwards
+                                        </p>
                                     </div>
                                 )}
                             </div>
@@ -385,9 +419,9 @@ const ProviderEarnings = () => {
                     </div>
                     <button
                         onClick={() => setIsExportModalOpen(true)}
-                        className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors hover:border-gray-300"
+                        className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 transition-all hover:shadow-xl"
                     >
-                        <Icons.Search size={16} /> Export Report
+                        <Icons.Download size={18} /> Download Report
                     </button>
                 </div>
 
@@ -509,13 +543,16 @@ const ProviderEarnings = () => {
     // --- VIEW: OVERVIEW ---
     return (
         <div className="max-w-6xl mx-auto space-y-8 relative">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
+                    <p className="text-gray-500 text-sm mt-1">Track your earnings and download transaction reports</p>
+                </div>
                 <button
                     onClick={() => setIsExportModalOpen(true)}
-                    className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors hover:border-gray-300"
+                    className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 transition-all hover:shadow-xl"
                 >
-                    <Icons.Search size={16} /> Export Report
+                    <Icons.Download size={18} /> Download Report
                 </button>
             </div>
 
