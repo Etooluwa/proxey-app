@@ -4,6 +4,7 @@ import { Icons } from '../../components/Icons';
 import { useSession } from '../../auth/authContext';
 import { SERVICE_CATEGORIES } from '../../utils/categories';
 import { useToast } from '../../components/ui/ToastProvider';
+import { supabase } from '../../utils/supabase';
 
 const REVIEWS = [
     {
@@ -104,6 +105,7 @@ const ProviderProfile = () => {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            // Update the profiles table (user profile)
             await updateProfile({
                 bio,
                 phone,
@@ -112,35 +114,37 @@ const ProviderProfile = () => {
                 portfolioImages
             });
 
-            // Sync to providers table so changes are visible to clients
-            try {
-                const response = await fetch('http://localhost:5000/api/providers/profile', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        userId: session?.user?.id,
-                        name: profile?.name,
-                        email: session?.user?.email,
-                        phone,
-                        bio,
-                        category: profile?.category,
-                        city: profile?.city,
-                        services: profile?.services,
-                        availability: profile?.availability,
-                        isProfileComplete: profile?.isProfileComplete,
-                        photo: profilePhoto,
-                        coverPhoto,
-                        portfolioImages
-                    })
-                });
+            // Update the providers table (for client-facing provider data)
+            if (supabase && session?.user?.id) {
+                const providerData = {
+                    user_id: session.user.id,
+                    name: profile?.name,
+                    email: session?.user?.email,
+                    phone,
+                    bio,
+                    photo: profilePhoto,
+                    avatar: profilePhoto, // Store in both fields for compatibility
+                    cover_photo: coverPhoto,
+                    portfolio_images: portfolioImages,
+                    category: profile?.category,
+                    city: profile?.city,
+                    location: profile?.city,
+                    services: profile?.services || [],
+                    availability: profile?.availability || {},
+                    is_profile_complete: profile?.isProfileComplete ?? true,
+                    is_active: true
+                };
 
-                if (!response.ok) {
-                    console.warn('[profile] Failed to sync provider profile to database');
+                // Try to update existing provider record, or insert if it doesn't exist
+                const { error } = await supabase
+                    .from('providers')
+                    .upsert(providerData, {
+                        onConflict: 'user_id'
+                    });
+
+                if (error) {
+                    console.error('[profile] Failed to sync provider profile to database:', error);
                 }
-            } catch (syncError) {
-                console.error('[profile] Error syncing provider profile:', syncError);
             }
 
             toast.push({
