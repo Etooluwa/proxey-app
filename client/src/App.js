@@ -120,17 +120,15 @@ function App() {
                       <Route path="profile" element={<ProviderProfile />} />
                     </Route>
 
-                    {/* Shared/Preview Routes */}
+                    {/* Shared/Preview Routes - Standalone without AppShell */}
                     <Route
-                      path="/preview"
+                      path="/preview/provider/:providerId"
                       element={
                         <ProtectedRoute allowedRoles={['client', 'provider']}>
-                          <AppShell />
+                          <ProviderPublicProfile />
                         </ProtectedRoute>
                       }
-                    >
-                      <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
-                    </Route>
+                    />
 
                     {/* Catch all - Redirect to root which handles role redirection */}
                     <Route path="*" element={<Navigate to="/" replace />} />
