@@ -98,14 +98,17 @@ const ProviderPublicProfile = () => {
             } else {
                 // Otherwise, fetch from API
                 const providers = await fetchProviders();
-                const found = providers.find((p) => p.id === providerId) || providers[0];
+                const found = providers.find((p) => p.id === providerId);
                 if (found) {
                     setProvider(found);
                     setSelectedService(serviceOptions[0]);
+                } else {
+                    setProvider(null);
                 }
             }
         } catch (error) {
             console.error('Failed to load provider:', error);
+            setProvider(null);
         } finally {
             setLoading(false);
         }
