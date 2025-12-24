@@ -655,9 +655,9 @@ const ProviderPublicProfile = () => {
 
             {/* Time Request Modal */}
             {showTimeRequestModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full">
-                        <div className="p-6 border-b border-gray-100">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl max-w-lg w-full my-8 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-xl font-bold text-gray-900">Request a Time</h3>
                                 <button
@@ -668,7 +668,7 @@ const ProviderPublicProfile = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="p-6">
+                        <div className="p-6 pb-8">
                             <p className="text-gray-600 mb-6">
                                 Can't find a time that works for you? Request your preferred date and time. The provider will review your request and let you know if they can accommodate it.
                             </p>
