@@ -51,12 +51,36 @@ const ProviderPublicProfile = () => {
     const [loading, setLoading] = useState(true);
     const [selectedService, setSelectedService] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
+    const [closestAvailability, setClosestAvailability] = useState([]);
+    const [showCalendarModal, setShowCalendarModal] = useState(false);
+    const [showTimeRequestModal, setShowTimeRequestModal] = useState(false);
+    const [timeRequestForm, setTimeRequestForm] = useState({
+        requestedDate: '',
+        requestedTime: '',
+        notes: ''
+    });
+    const [submittingRequest, setSubmittingRequest] = useState(false);
 
-    // Mock service options
+    // Service options with descriptions
     const serviceOptions = [
-        { id: 1, name: 'Deep Home Cleaning', price: 60 },
-        { id: 2, name: 'Move-out Clean', price: 250 },
-        { id: 3, name: 'Standard Weekly Clean', price: 40 }
+        {
+            id: 1,
+            name: 'Deep Home Cleaning',
+            price: 60,
+            description: 'Comprehensive deep cleaning service including kitchens, bathrooms, bedrooms, and living areas. Perfect for spring cleaning or move-in preparation.'
+        },
+        {
+            id: 2,
+            name: 'Move-out Clean',
+            price: 250,
+            description: 'Thorough end-of-tenancy cleaning to ensure you get your deposit back. Includes all rooms, appliances, and fixtures cleaned to spotless standards.'
+        },
+        {
+            id: 3,
+            name: 'Standard Weekly Clean',
+            price: 40,
+            description: 'Regular maintenance cleaning to keep your home fresh. Includes vacuuming, dusting, bathroom and kitchen cleaning - perfect for busy households.'
+        }
     ];
 
     // Generate calendar dates (next 7 days)
@@ -76,6 +100,12 @@ const ProviderPublicProfile = () => {
     useEffect(() => {
         loadProvider();
     }, [providerId]);
+
+    useEffect(() => {
+        if (provider?.id) {
+            loadClosestAvailability();
+        }
+    }, [provider]);
 
     const loadProvider = async () => {
         setLoading(true);
@@ -117,6 +147,95 @@ const ProviderPublicProfile = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const loadClosestAvailability = async () => {
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/provider/${provider.id}/availability/closest`,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                setClosestAvailability(data.availability || []);
+            }
+        } catch (error) {
+            console.error('Failed to load availability:', error);
+            setClosestAvailability([]);
+        }
+    };
+
+    const handleRequestTime = async () => {
+        if (!timeRequestForm.requestedDate || !timeRequestForm.requestedTime) {
+            alert('Please select both date and time for your request');
+            return;
+        }
+
+        if (!session?.user?.id) {
+            alert('Please sign in to request an appointment');
+            return;
+        }
+
+        setSubmittingRequest(true);
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/time-requests`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        clientId: session.user.id,
+                        clientName: session.user.user_metadata?.full_name || profile?.name,
+                        clientEmail: session.user.email,
+                        providerId: provider.id,
+                        requestedDate: timeRequestForm.requestedDate,
+                        requestedTime: timeRequestForm.requestedTime,
+                        serviceId: selectedService?.id,
+                        serviceName: selectedService?.name,
+                        notes: timeRequestForm.notes
+                    })
+                }
+            );
+
+            if (response.ok) {
+                alert('Your time request has been sent! The provider will review and respond soon.');
+                setShowTimeRequestModal(false);
+                setTimeRequestForm({ requestedDate: '', requestedTime: '', notes: '' });
+            } else {
+                const error = await response.json();
+                alert(`Failed to send request: ${error.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Failed to submit time request:', error);
+            alert('Failed to send time request. Please try again.');
+        } finally {
+            setSubmittingRequest(false);
+        }
+    };
+
+    const formatAvailabilityDate = (datetime) => {
+        const date = new Date(datetime);
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const formatAvailabilityTime = (datetime) => {
+        const date = new Date(datetime);
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
     };
 
     const handleCheckAvailability = () => {
@@ -358,28 +477,81 @@ const ProviderPublicProfile = () => {
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             Select Service
                                         </label>
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             {serviceOptions.map((service) => (
                                                 <button
                                                     key={service.id}
                                                     onClick={() => setSelectedService(service)}
-                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
+                                                    className={`w-full flex flex-col items-start p-4 rounded-xl border-2 transition-all ${
                                                         selectedService?.id === service.id
                                                             ? 'border-orange-500 bg-orange-50'
                                                             : 'border-gray-200 hover:border-gray-300 bg-white'
                                                     }`}
                                                 >
-                                                    <div className="text-left">
+                                                    <div className="flex items-center justify-between w-full mb-2">
                                                         <p className="font-semibold text-gray-900">
                                                             {service.name}
                                                         </p>
+                                                        <span className="font-bold text-gray-900">
+                                                            ${service.price}
+                                                        </span>
                                                     </div>
-                                                    <span className="font-bold text-gray-900">
-                                                        ${service.price}
-                                                    </span>
+                                                    <p className="text-sm text-gray-600 text-left">
+                                                        {service.description}
+                                                    </p>
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+
+                                    {/* Closest Available Dates */}
+                                    {closestAvailability.length > 0 && (
+                                        <div className="mb-6">
+                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
+                                                Next Available
+                                            </label>
+                                            <div className="space-y-2">
+                                                {closestAvailability.map((slot) => (
+                                                    <div
+                                                        key={slot.id}
+                                                        className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <Icons.Calendar size={18} className="text-green-600" />
+                                                            <div>
+                                                                <p className="font-semibold text-gray-900 text-sm">
+                                                                    {formatAvailabilityDate(slot.datetime)}
+                                                                </p>
+                                                                <p className="text-xs text-gray-600">
+                                                                    {formatAvailabilityTime(slot.datetime)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <Icons.CheckCircle size={18} className="text-green-600" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowCalendarModal(true)}
+                                                className="w-full mt-3 py-2 text-sm text-orange-600 font-semibold border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors"
+                                            >
+                                                View Full Calendar
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Request Custom Time */}
+                                    <div className="mb-6">
+                                        <button
+                                            onClick={() => setShowTimeRequestModal(true)}
+                                            className="w-full py-3 flex items-center justify-center gap-2 bg-white text-orange-600 font-semibold border-2 border-orange-200 rounded-xl hover:bg-orange-50 transition-colors"
+                                        >
+                                            <Icons.Clock size={18} />
+                                            Request a Specific Time
+                                        </button>
+                                        <p className="text-xs text-gray-500 mt-2 text-center">
+                                            Can't find a time that works? Request your preferred time slot.
+                                        </p>
                                     </div>
 
                                     {/* Availability Calendar */}
@@ -447,6 +619,141 @@ const ProviderPublicProfile = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Calendar Modal */}
+            {showCalendarModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-gray-900">Full Availability Calendar</h3>
+                                <button
+                                    onClick={() => setShowCalendarModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    <Icons.X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 mb-6">
+                                Full calendar view coming soon. For now, you can see the next available slots above or request a custom time.
+                            </p>
+                            <button
+                                onClick={() => {
+                                    setShowCalendarModal(false);
+                                    setShowTimeRequestModal(true);
+                                }}
+                                className="w-full py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors"
+                            >
+                                Request a Specific Time Instead
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Time Request Modal */}
+            {showTimeRequestModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-lg w-full">
+                        <div className="p-6 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-gray-900">Request a Time</h3>
+                                <button
+                                    onClick={() => setShowTimeRequestModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    <Icons.X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 mb-6">
+                                Can't find a time that works for you? Request your preferred date and time. The provider will review your request and let you know if they can accommodate it.
+                            </p>
+
+                            <div className="space-y-4">
+                                {/* Selected Service Display */}
+                                {selectedService && (
+                                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Service</p>
+                                        <p className="font-semibold text-gray-900">{selectedService.name}</p>
+                                    </div>
+                                )}
+
+                                {/* Date Input */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        Preferred Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        min={new Date().toISOString().split('T')[0]}
+                                        value={timeRequestForm.requestedDate}
+                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedDate: e.target.value })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Time Input */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        Preferred Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={timeRequestForm.requestedTime}
+                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedTime: e.target.value })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Notes Input */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        Additional Notes (Optional)
+                                    </label>
+                                    <textarea
+                                        value={timeRequestForm.notes}
+                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, notes: e.target.value })}
+                                        placeholder="Any special requests or information for the provider..."
+                                        rows={3}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+
+                                {/* Info Banner */}
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <Icons.Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                        <p className="text-sm text-gray-700">
+                                            This is a request, not a confirmed booking. The provider will review and either accept or decline your request. Even if they have an appointment at this time, they may choose to accommodate you.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowTimeRequestModal(false)}
+                                    className="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRequestTime}
+                                    disabled={submittingRequest}
+                                    className="flex-1 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {submittingRequest ? 'Sending...' : 'Send Request'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

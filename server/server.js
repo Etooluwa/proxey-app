@@ -2441,5 +2441,366 @@ app.get("/api/provider/account/:accountId", async (req, res) => {
   }
 });
 
+// ============================================================================
+// TIME REQUESTS & AVAILABILITY ENDPOINTS
+// ============================================================================
+
+// POST /api/time-requests
+// Create a new time request from client to provider
+app.post("/api/time-requests", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const {
+    clientId,
+    clientName,
+    clientEmail,
+    clientPhone,
+    providerId,
+    requestedDate,
+    requestedTime,
+    serviceId,
+    serviceName,
+    durationMinutes = 60,
+    notes
+  } = req.body;
+
+  if (!clientId || !providerId || !requestedDate || !requestedTime) {
+    return res.status(400).json({
+      error: "clientId, providerId, requestedDate, and requestedTime are required."
+    });
+  }
+
+  try {
+    // Combine date and time into a timestamp
+    const requestedDatetime = new Date(`${requestedDate}T${requestedTime}`).toISOString();
+
+    const payload = {
+      client_id: clientId,
+      client_name: clientName,
+      client_email: clientEmail,
+      client_phone: clientPhone,
+      provider_id: providerId,
+      requested_date: requestedDate,
+      requested_time: requestedTime,
+      requested_datetime: requestedDatetime,
+      service_id: serviceId,
+      service_name: serviceName,
+      duration_minutes: durationMinutes,
+      notes: notes || null,
+      status: 'pending'
+    };
+
+    const { data, error } = await supabase
+      .from("time_requests")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({ timeRequest: data });
+  } catch (err) {
+    console.error("[supabase] Failed to create time request", err);
+    res.status(500).json({ error: "Failed to create time request." });
+  }
+});
+
+// GET /api/time-requests/client/:clientId
+// Get all time requests for a client
+app.get("/api/time-requests/client/:clientId", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { clientId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("time_requests")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("requested_datetime", { ascending: true });
+
+    if (error) throw error;
+
+    res.status(200).json({ timeRequests: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load client time requests", err);
+    res.status(500).json({ error: "Failed to load time requests." });
+  }
+});
+
+// GET /api/time-requests/provider/:providerId
+// Get all time requests for a provider
+app.get("/api/time-requests/provider/:providerId", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { providerId } = req.params;
+  const { status } = req.query;
+
+  try {
+    let query = supabase
+      .from("time_requests")
+      .select("*")
+      .eq("provider_id", providerId);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    query = query.order("requested_datetime", { ascending: true });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.status(200).json({ timeRequests: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider time requests", err);
+    res.status(500).json({ error: "Failed to load time requests." });
+  }
+});
+
+// PATCH /api/time-requests/:id
+// Update a time request (accept/decline/cancel)
+app.patch("/api/time-requests/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { id } = req.params;
+  const { status, providerResponse } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: "status is required." });
+  }
+
+  if (!['pending', 'accepted', 'declined', 'cancelled'].includes(status)) {
+    return res.status(400).json({
+      error: "status must be one of: pending, accepted, declined, cancelled"
+    });
+  }
+
+  try {
+    const updates = {
+      status,
+      provider_response: providerResponse || null
+    };
+
+    if (status === 'accepted' || status === 'declined') {
+      updates.responded_at = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from("time_requests")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: "Time request not found." });
+    }
+
+    res.status(200).json({ timeRequest: data });
+  } catch (err) {
+    console.error("[supabase] Failed to update time request", err);
+    res.status(500).json({ error: "Failed to update time request." });
+  }
+});
+
+// GET /api/provider/:providerId/availability
+// Get provider's availability slots
+app.get("/api/provider/:providerId/availability", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { providerId } = req.params;
+  const { startDate, endDate, limit = 10 } = req.query;
+
+  try {
+    let query = supabase
+      .from("provider_availability")
+      .select("*")
+      .eq("provider_id", providerId)
+      .eq("is_available", true)
+      .eq("is_booked", false)
+      .gte("datetime", new Date().toISOString());
+
+    if (startDate) {
+      query = query.gte("date", startDate);
+    }
+
+    if (endDate) {
+      query = query.lte("date", endDate);
+    }
+
+    query = query.order("datetime", { ascending: true }).limit(parseInt(limit));
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.status(200).json({ availability: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider availability", err);
+    res.status(500).json({ error: "Failed to load availability." });
+  }
+});
+
+// GET /api/provider/:providerId/availability/closest
+// Get the 3 closest available time slots for a provider
+app.get("/api/provider/:providerId/availability/closest", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { providerId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_availability")
+      .select("*")
+      .eq("provider_id", providerId)
+      .eq("is_available", true)
+      .eq("is_booked", false)
+      .gte("datetime", new Date().toISOString())
+      .order("datetime", { ascending: true })
+      .limit(3);
+
+    if (error) throw error;
+
+    res.status(200).json({ availability: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load closest availability", err);
+    res.status(500).json({ error: "Failed to load availability." });
+  }
+});
+
+// POST /api/provider/availability
+// Provider creates/updates their availability
+app.post("/api/provider/availability", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const { slots = [] } = req.body;
+
+  if (!Array.isArray(slots)) {
+    return res.status(400).json({ error: "slots must be an array." });
+  }
+
+  try {
+    const payload = slots.map(slot => ({
+      provider_id: providerId,
+      date: slot.date,
+      time_slot: slot.timeSlot || slot.time_slot,
+      datetime: slot.datetime,
+      duration_minutes: slot.durationMinutes || slot.duration_minutes || 60,
+      is_available: slot.isAvailable !== undefined ? slot.isAvailable : true,
+      is_booked: slot.isBooked || false,
+      notes: slot.notes || null
+    }));
+
+    const { data, error } = await supabase
+      .from("provider_availability")
+      .upsert(payload, { onConflict: 'provider_id,datetime' })
+      .select();
+
+    if (error) throw error;
+
+    res.status(201).json({ availability: data });
+  } catch (err) {
+    console.error("[supabase] Failed to save provider availability", err);
+    res.status(500).json({ error: "Failed to save availability." });
+  }
+});
+
+// POST /api/provider/:providerId/availability/generate
+// Generate availability slots for a provider
+app.post("/api/provider/:providerId/availability/generate", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { providerId } = req.params;
+  const {
+    startDate,
+    endDate,
+    startTime = '09:00:00',
+    endTime = '17:00:00',
+    slotDurationMinutes = 60,
+    daysOfWeek = [1, 2, 3, 4, 5] // Monday to Friday
+  } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      error: "startDate and endDate are required."
+    });
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('generate_provider_availability', {
+      p_provider_id: providerId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_start_time: startTime,
+      p_end_time: endTime,
+      p_slot_duration_minutes: slotDurationMinutes,
+      p_days_of_week: daysOfWeek
+    });
+
+    if (error) throw error;
+
+    res.status(201).json({
+      slotsCreated: data,
+      message: `Successfully generated ${data} availability slots.`
+    });
+  } catch (err) {
+    console.error("[supabase] Failed to generate availability", err);
+    res.status(500).json({ error: "Failed to generate availability." });
+  }
+});
+
+// DELETE /api/provider/availability/:id
+// Delete an availability slot
+app.delete("/api/provider/availability/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_availability")
+      .delete()
+      .eq("id", id)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: "Availability slot not found." });
+    }
+
+    res.status(200).json({ availability: data });
+  } catch (err) {
+    console.error("[supabase] Failed to delete availability slot", err);
+    res.status(500).json({ error: "Failed to delete availability slot." });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
