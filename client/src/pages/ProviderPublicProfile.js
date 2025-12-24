@@ -762,17 +762,17 @@ const ProviderPublicProfile = () => {
                     <div className="min-h-screen px-4 py-8 flex items-start justify-center">
                         <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl mb-8">
                             <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-gray-900">Request a Time</h3>
-                                <button
-                                    onClick={() => setShowTimeRequestModal(false)}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                >
-                                    <Icons.X size={20} />
-                                </button>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-gray-900">Request a Time</h3>
+                                    <button
+                                        onClick={() => setShowTimeRequestModal(false)}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    >
+                                        <Icons.X size={20} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="p-6 pb-8">
+                            <div className="p-6 pb-8">
                             <p className="text-gray-600 mb-6">
                                 Can't find a time that works for you? Request your preferred date and time. The provider will review your request and let you know if they can accommodate it.
                             </p>
