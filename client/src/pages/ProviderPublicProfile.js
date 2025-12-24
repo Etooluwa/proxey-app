@@ -52,6 +52,8 @@ const ProviderPublicProfile = () => {
     const [selectedService, setSelectedService] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
     const [closestAvailability, setClosestAvailability] = useState([]);
+    const [allAvailability, setAllAvailability] = useState([]);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
     const [showCalendarModal, setShowCalendarModal] = useState(false);
     const [showTimeRequestModal, setShowTimeRequestModal] = useState(false);
     const [timeRequestForm, setTimeRequestForm] = useState({
@@ -238,13 +240,52 @@ const ProviderPublicProfile = () => {
         });
     };
 
+    const loadAllAvailability = async () => {
+        setLoadingAvailability(true);
+        try {
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 30); // Next 30 days
+
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/provider/${provider.id}/availability?limit=100&endDate=${endDate.toISOString().split('T')[0]}`,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                setAllAvailability(data.availability || []);
+            }
+        } catch (error) {
+            console.error('Failed to load availability:', error);
+            setAllAvailability([]);
+        } finally {
+            setLoadingAvailability(false);
+        }
+    };
+
     const handleCheckAvailability = () => {
+        if (!selectedService) {
+            alert('Please select a service first');
+            return;
+        }
+        loadAllAvailability();
+        setShowCalendarModal(true);
+    };
+
+    const handleSelectAvailableSlot = (slot) => {
+        // Navigate to booking flow with selected slot
         navigate('/app/booking-flow', {
             state: {
                 providerId: provider?.id,
                 providerName: provider?.name,
                 service: selectedService,
-                selectedDate
+                selectedDate: new Date(slot.datetime),
+                selectedTime: slot.time_slot,
+                slotId: slot.id
             }
         });
     };
@@ -622,32 +663,94 @@ const ProviderPublicProfile = () => {
 
             {/* Calendar Modal */}
             {showCalendarModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-gray-900">Full Availability Calendar</h3>
-                                <button
-                                    onClick={() => setShowCalendarModal(false)}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                >
-                                    <Icons.X size={20} />
-                                </button>
+                <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+                    <div className="min-h-screen px-4 py-8 flex items-start justify-center">
+                        <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl mb-8">
+                            <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900">Available Time Slots</h3>
+                                        <p className="text-sm text-gray-600 mt-1">Select a time to continue booking</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowCalendarModal(false)}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    >
+                                        <Icons.X size={20} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-600 mb-6">
-                                Full calendar view coming soon. For now, you can see the next available slots above or request a custom time.
-                            </p>
-                            <button
-                                onClick={() => {
-                                    setShowCalendarModal(false);
-                                    setShowTimeRequestModal(true);
-                                }}
-                                className="w-full py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors"
-                            >
-                                Request a Specific Time Instead
-                            </button>
+                            <div className="p-6">
+                                {loadingAvailability ? (
+                                    <div className="text-center py-12">
+                                        <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
+                                        <p className="text-gray-600">Loading available time slots...</p>
+                                    </div>
+                                ) : allAvailability.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <Icons.Calendar size={48} className="mx-auto mb-4 text-gray-300" />
+                                        <p className="text-gray-600 mb-2">No available slots found</p>
+                                        <p className="text-sm text-gray-500 mb-6">
+                                            The provider hasn't set up their availability yet.
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                setShowCalendarModal(false);
+                                                setShowTimeRequestModal(true);
+                                            }}
+                                            className="px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors"
+                                        >
+                                            Request a Specific Time
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Group slots by date */}
+                                        {Object.entries(
+                                            allAvailability.reduce((acc, slot) => {
+                                                const date = new Date(slot.datetime).toLocaleDateString('en-US', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                });
+                                                if (!acc[date]) acc[date] = [];
+                                                acc[date].push(slot);
+                                                return acc;
+                                            }, {})
+                                        ).map(([date, slots]) => (
+                                            <div key={date} className="mb-6 last:mb-0">
+                                                <h4 className="font-bold text-gray-900 mb-3 text-sm uppercase tracking-wide">
+                                                    {date}
+                                                </h4>
+                                                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                                                    {slots.map((slot) => (
+                                                        <button
+                                                            key={slot.id}
+                                                            onClick={() => handleSelectAvailableSlot(slot)}
+                                                            className="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-all font-semibold text-sm text-gray-900"
+                                                        >
+                                                            {formatAvailabilityTime(slot.datetime)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div className="mt-6 pt-6 border-t border-gray-200">
+                                            <button
+                                                onClick={() => {
+                                                    setShowCalendarModal(false);
+                                                    setShowTimeRequestModal(true);
+                                                }}
+                                                className="w-full py-3 text-orange-600 font-semibold border-2 border-orange-200 rounded-xl hover:bg-orange-50 transition-colors"
+                                            >
+                                                Don't see a time that works? Request a Custom Time
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -655,9 +758,10 @@ const ProviderPublicProfile = () => {
 
             {/* Time Request Modal */}
             {showTimeRequestModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl max-w-lg w-full my-8 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+                    <div className="min-h-screen px-4 py-8 flex items-start justify-center">
+                        <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl mb-8">
+                            <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-xl font-bold text-gray-900">Request a Time</h3>
                                 <button
