@@ -854,6 +854,7 @@ const ProviderPublicProfile = () => {
                                     {submittingRequest ? 'Sending...' : 'Send Request'}
                                 </button>
                             </div>
+                            </div>
                         </div>
                     </div>
                 </div>
