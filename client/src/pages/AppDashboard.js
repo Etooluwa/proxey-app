@@ -123,42 +123,10 @@ const AppDashboard = () => {
                 </div>
             </div>
 
-            {/* Browse Categories Section */}
+            {/* Main Content */}
             <div className="max-w-6xl mx-auto px-6 md:px-12 py-12">
-                <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900">Browse Categories</h2>
-                    <button
-                        onClick={() => navigate('/app/browse')}
-                        className="text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-2"
-                    >
-                        View all
-                        <Icons.ChevronRight size={20} />
-                    </button>
-                </div>
-
-                {/* Category Cards Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                    {CATEGORIES.map((category) => {
-                        const IconComponent = getCategoryIcon(category.icon);
-                        return (
-                            <button
-                                key={category.id}
-                                onClick={() => handleCategoryClick(category)}
-                                className="bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-200 border border-gray-100 hover:border-orange-200 group flex flex-col items-center"
-                            >
-                                <div className={`w-16 h-16 rounded-full ${category.bgColor} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <IconComponent size={28} className={category.textColor} />
-                                </div>
-                                <p className="font-semibold text-gray-900 text-center">
-                                    {category.name}
-                                </p>
-                            </button>
-                        );
-                    })}
-                </div>
-
                 {/* Upcoming Bookings Section */}
-                <div className="mt-16">
+                <div>
                     <div className="flex items-center justify-between mb-8">
                         <h2 className="text-2xl font-bold text-gray-900">Upcoming Bookings</h2>
                         <button
