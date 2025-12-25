@@ -162,7 +162,7 @@ const AccountPage = () => {
                     type: pm.card.brand.toUpperCase(),
                     last4: pm.card.last4,
                     expiry: `${pm.card.exp_month}/${pm.card.exp_year.toString().slice(-2)}`,
-                    isDefault: false
+                    isDefault: pm.isDefault || false
                 }));
                 setPaymentMethods(methods);
             }
@@ -170,6 +170,84 @@ const AccountPage = () => {
             console.error('Failed to load payment methods:', error);
         } finally {
             setLoadingPaymentMethods(false);
+        }
+    };
+
+    const handleSetDefaultPaymentMethod = async (paymentMethodId) => {
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/client/set-default-payment-method`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paymentMethodId,
+                        customerId: profile.stripeCustomerId
+                    })
+                }
+            );
+
+            if (response.ok) {
+                toast.push({
+                    title: 'Default Card Updated',
+                    description: 'Your default payment method has been updated',
+                    variant: 'success'
+                });
+
+                // Reload payment methods to reflect the change
+                loadPaymentMethods(profile.stripeCustomerId);
+            } else {
+                throw new Error('Failed to set default payment method');
+            }
+        } catch (error) {
+            console.error('Failed to set default payment method:', error);
+            toast.push({
+                title: 'Error',
+                description: 'Failed to update default payment method',
+                variant: 'error'
+            });
+        }
+    };
+
+    const handleRemovePaymentMethod = async (paymentMethodId, isDefault) => {
+        if (isDefault) {
+            toast.push({
+                title: 'Cannot Remove',
+                description: 'Please set another card as default before removing this one',
+                variant: 'error'
+            });
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/client/payment-methods/${paymentMethodId}`,
+                {
+                    method: 'DELETE'
+                }
+            );
+
+            if (response.ok) {
+                toast.push({
+                    title: 'Card Removed',
+                    description: 'Your payment method has been removed',
+                    variant: 'success'
+                });
+
+                // Reload payment methods
+                loadPaymentMethods(profile.stripeCustomerId);
+            } else {
+                throw new Error('Failed to remove payment method');
+            }
+        } catch (error) {
+            console.error('Failed to remove payment method:', error);
+            toast.push({
+                title: 'Error',
+                description: 'Failed to remove payment method',
+                variant: 'error'
+            });
         }
     };
 
@@ -437,7 +515,7 @@ const AccountPage = () => {
                                     </div>
                                 ) : paymentMethods.length > 0 ? (
                                     paymentMethods.map((method) => (
-                                        <div key={method.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                                        <div key={method.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-8 bg-gray-900 rounded flex items-center justify-center text-white text-xs font-bold">
                                                     {method.type}
@@ -447,11 +525,29 @@ const AccountPage = () => {
                                                     <p className="text-sm text-gray-500">Expires {method.expiry}</p>
                                                 </div>
                                             </div>
-                                            {method.isDefault && (
-                                                <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                                                    DEFAULT
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-3">
+                                                {method.isDefault ? (
+                                                    <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                                        DEFAULT
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleSetDefaultPaymentMethod(method.id)}
+                                                        className="text-xs font-semibold text-orange-600 hover:text-orange-700 px-3 py-1 hover:bg-orange-50 rounded-full transition-colors"
+                                                    >
+                                                        Set as Default
+                                                    </button>
+                                                )}
+                                                {!method.isDefault && (
+                                                    <button
+                                                        onClick={() => handleRemovePaymentMethod(method.id, method.isDefault)}
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Remove card"
+                                                    >
+                                                        <Icons.Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))
                                 ) : (

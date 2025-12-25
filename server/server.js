@@ -2281,6 +2281,10 @@ app.post("/api/client/payment-methods", async (req, res) => {
   }
 
   try {
+    // Get customer to find default payment method
+    const customer = await stripe.customers.retrieve(customerId);
+    const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
       type: "card",
@@ -2289,6 +2293,7 @@ app.post("/api/client/payment-methods", async (req, res) => {
     res.json({
       paymentMethods: paymentMethods.data.map((pm) => ({
         id: pm.id,
+        isDefault: pm.id === defaultPaymentMethodId,
         card: {
           brand: pm.card.brand,
           last4: pm.card.last4,
@@ -2306,7 +2311,7 @@ app.post("/api/client/payment-methods", async (req, res) => {
 // POST /api/client/attach-payment-method
 // Attach a payment method to a customer
 app.post("/api/client/attach-payment-method", async (req, res) => {
-  const { paymentMethodId, customerId } = req.body;
+  const { paymentMethodId, customerId, setAsDefault } = req.body;
 
   if (!paymentMethodId || !customerId) {
     return res.status(400).json({ error: "paymentMethodId and customerId required" });
@@ -2318,10 +2323,26 @@ app.post("/api/client/attach-payment-method", async (req, res) => {
       customer: customerId,
     });
 
+    // Check if this is the first payment method or if setAsDefault is true
+    const existingMethods = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: "card",
+    });
+
+    // Set as default if it's the first card or explicitly requested
+    if (existingMethods.data.length === 1 || setAsDefault) {
+      await stripe.customers.update(customerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+    }
+
     res.json({
       success: true,
       paymentMethod: {
         id: paymentMethod.id,
+        isDefault: existingMethods.data.length === 1 || setAsDefault,
         card: {
           brand: paymentMethod.card.brand,
           last4: paymentMethod.card.last4,
@@ -2332,6 +2353,32 @@ app.post("/api/client/attach-payment-method", async (req, res) => {
     });
   } catch (error) {
     console.error("Attach payment method error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/client/set-default-payment-method
+// Set a payment method as the default for a customer
+app.post("/api/client/set-default-payment-method", async (req, res) => {
+  const { paymentMethodId, customerId } = req.body;
+
+  if (!paymentMethodId || !customerId) {
+    return res.status(400).json({ error: "paymentMethodId and customerId required" });
+  }
+
+  try {
+    await stripe.customers.update(customerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Default payment method updated successfully",
+    });
+  } catch (error) {
+    console.error("Set default payment method error:", error);
     res.status(500).json({ error: error.message });
   }
 });
