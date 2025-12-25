@@ -247,16 +247,9 @@ const AppDashboard = () => {
                             <h3 className="text-xl font-bold text-gray-900 mb-2">
                                 No upcoming bookings
                             </h3>
-                            <p className="text-gray-600 max-w-md mx-auto mb-6">
+                            <p className="text-gray-600 max-w-md mx-auto">
                                 You don't have any upcoming appointments. Browse services and book your first appointment!
                             </p>
-                            <button
-                                onClick={() => navigate('/app/browse')}
-                                className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition-colors inline-flex items-center gap-2"
-                            >
-                                Browse Services
-                                <Icons.ChevronRight size={20} />
-                            </button>
                         </div>
                     )}
                 </div>
