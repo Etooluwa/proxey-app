@@ -17,7 +17,6 @@ const AccountPage = () => {
         lastName: '',
         email: '',
         phone: '',
-        bio: '',
     });
 
     // Mock data for demo (in production, fetch from Supabase)
@@ -45,7 +44,6 @@ const AccountPage = () => {
                 lastName: nameParts.slice(1).join(' ') || '',
                 email: session?.user?.email || '',
                 phone: profile.phone || '',
-                bio: profile.bio || '',
             });
         }
     }, [profile, session]);
@@ -91,7 +89,6 @@ const AccountPage = () => {
                         user_id: userId,
                         name: fullName,
                         phone: formData.phone,
-                        bio: formData.bio || '',
                         email: session.user.email,
                         updated_at: new Date().toISOString()
                     });
@@ -102,7 +99,6 @@ const AccountPage = () => {
             await updateProfile({
                 name: fullName,
                 phone: formData.phone,
-                bio: formData.bio,
                 isProfileComplete: true
             });
 
@@ -312,24 +308,6 @@ const AccountPage = () => {
                                         <p className="text-gray-900 py-2.5">{formData.phone || 'Not set'}</p>
                                     )}
                                 </div>
-
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                                        Bio
-                                    </label>
-                                    {isEditing ? (
-                                        <textarea
-                                            name="bio"
-                                            value={formData.bio}
-                                            onChange={handleInputChange}
-                                            rows={3}
-                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-100 focus:border-orange-500 outline-none resize-none"
-                                            placeholder="Tell us about yourself..."
-                                        />
-                                    ) : (
-                                        <p className="text-gray-900 py-2.5">{formData.bio || 'No bio added'}</p>
-                                    )}
-                                </div>
                             </div>
 
                             {isEditing && (
@@ -350,7 +328,6 @@ const AccountPage = () => {
                                                 lastName: nameParts.slice(1).join(' ') || '',
                                                 email: session?.user?.email || '',
                                                 phone: profile?.phone || '',
-                                                bio: profile?.bio || '',
                                             });
                                         }}
                                         disabled={isSaving}
