@@ -4,6 +4,7 @@ import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 import { useToast } from '../components/ui/ToastProvider';
 import supabase from '../utils/supabase';
+import PaymentMethodModal from '../components/PaymentMethodModal';
 
 const AccountPage = () => {
     const navigate = useNavigate();
@@ -12,6 +13,8 @@ const AccountPage = () => {
 
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -26,9 +29,7 @@ const AccountPage = () => {
         promotionalOffers: false,
     });
 
-    const [paymentMethods] = useState([
-        { id: 1, type: 'VISA', last4: '4242', expiry: '12/25', isDefault: true }
-    ]);
+    const [paymentMethods, setPaymentMethods] = useState([]);
 
     const [transactions] = useState([
         { id: 1, service: 'Deep Home Cleaning', date: 'Oct 24, 2023', provider: 'Sarah Jenkins', amount: -120.00, status: 'completed' },
@@ -45,6 +46,11 @@ const AccountPage = () => {
                 email: session?.user?.email || '',
                 phone: profile.phone || '',
             });
+
+            // Load payment methods when profile loads
+            if (profile.stripeCustomerId) {
+                loadPaymentMethods(profile.stripeCustomerId);
+            }
         }
     }, [profile, session]);
 
@@ -130,6 +136,77 @@ const AccountPage = () => {
             toast.push({
                 title: 'Error',
                 description: 'Failed to sign out',
+                variant: 'error'
+            });
+        }
+    };
+
+    const loadPaymentMethods = async (customerId) => {
+        setLoadingPaymentMethods(true);
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/client/payment-methods`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ customerId })
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                const methods = (data.paymentMethods || []).map((pm) => ({
+                    id: pm.id,
+                    type: pm.card.brand.toUpperCase(),
+                    last4: pm.card.last4,
+                    expiry: `${pm.card.exp_month}/${pm.card.exp_year.toString().slice(-2)}`,
+                    isDefault: false
+                }));
+                setPaymentMethods(methods);
+            }
+        } catch (error) {
+            console.error('Failed to load payment methods:', error);
+        } finally {
+            setLoadingPaymentMethods(false);
+        }
+    };
+
+    const handleAddPaymentMethod = async (cardData) => {
+        try {
+            // Attach payment method to customer
+            const response = await fetch(
+                `${process.env.REACT_APP_API_BASE || '/api'}/client/attach-payment-method`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paymentMethodId: cardData.id,
+                        customerId: profile.stripeCustomerId
+                    })
+                }
+            );
+
+            if (response.ok) {
+                toast.push({
+                    title: 'Payment Method Added',
+                    description: 'Your card has been added successfully',
+                    variant: 'success'
+                });
+
+                // Reload payment methods
+                loadPaymentMethods(profile.stripeCustomerId);
+            } else {
+                throw new Error('Failed to attach payment method');
+            }
+        } catch (error) {
+            console.error('Failed to add payment method:', error);
+            toast.push({
+                title: 'Error',
+                description: 'Failed to add payment method',
                 variant: 'error'
             });
         }
@@ -343,31 +420,46 @@ const AccountPage = () => {
                         <div className="bg-white rounded-2xl p-8 border border-gray-100">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-xl font-bold text-gray-900">Payment Methods</h3>
-                                <button className="text-orange-600 font-semibold text-sm hover:text-orange-700 flex items-center gap-1">
+                                <button
+                                    onClick={() => setShowPaymentModal(true)}
+                                    className="text-orange-600 font-semibold text-sm hover:text-orange-700 flex items-center gap-1"
+                                >
                                     <Icons.Plus size={16} />
                                     Add New
                                 </button>
                             </div>
 
                             <div className="space-y-4">
-                                {paymentMethods.map((method) => (
-                                    <div key={method.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-8 bg-gray-900 rounded flex items-center justify-center text-white text-xs font-bold">
-                                                {method.type}
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-900">•••• •••• •••• {method.last4}</p>
-                                                <p className="text-sm text-gray-500">Expires {method.expiry}</p>
-                                            </div>
-                                        </div>
-                                        {method.isDefault && (
-                                            <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                                                DEFAULT
-                                            </span>
-                                        )}
+                                {loadingPaymentMethods ? (
+                                    <div className="text-center py-8">
+                                        <div className="w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                        <p className="text-gray-500 text-sm">Loading payment methods...</p>
                                     </div>
-                                ))}
+                                ) : paymentMethods.length > 0 ? (
+                                    paymentMethods.map((method) => (
+                                        <div key={method.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-8 bg-gray-900 rounded flex items-center justify-center text-white text-xs font-bold">
+                                                    {method.type}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-900">•••• •••• •••• {method.last4}</p>
+                                                    <p className="text-sm text-gray-500">Expires {method.expiry}</p>
+                                                </div>
+                                            </div>
+                                            {method.isDefault && (
+                                                <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                                    DEFAULT
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <Icons.CreditCard size={32} className="mx-auto mb-2 text-gray-400" />
+                                        <p className="text-sm">No payment methods added yet</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -428,6 +520,13 @@ const AccountPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Payment Method Modal */}
+            <PaymentMethodModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                onSuccess={handleAddPaymentMethod}
+            />
         </div>
     );
 };

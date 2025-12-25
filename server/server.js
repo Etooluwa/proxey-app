@@ -2289,14 +2289,49 @@ app.post("/api/client/payment-methods", async (req, res) => {
     res.json({
       paymentMethods: paymentMethods.data.map((pm) => ({
         id: pm.id,
-        brand: pm.card.brand,
-        last4: pm.card.last4,
-        expMonth: pm.card.exp_month,
-        expYear: pm.card.exp_year,
+        card: {
+          brand: pm.card.brand,
+          last4: pm.card.last4,
+          exp_month: pm.card.exp_month,
+          exp_year: pm.card.exp_year,
+        },
       })),
     });
   } catch (error) {
     console.error("Payment methods error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/client/attach-payment-method
+// Attach a payment method to a customer
+app.post("/api/client/attach-payment-method", async (req, res) => {
+  const { paymentMethodId, customerId } = req.body;
+
+  if (!paymentMethodId || !customerId) {
+    return res.status(400).json({ error: "paymentMethodId and customerId required" });
+  }
+
+  try {
+    // Attach the payment method to the customer
+    const paymentMethod = await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customerId,
+    });
+
+    res.json({
+      success: true,
+      paymentMethod: {
+        id: paymentMethod.id,
+        card: {
+          brand: paymentMethod.card.brand,
+          last4: paymentMethod.card.last4,
+          exp_month: paymentMethod.card.exp_month,
+          exp_year: paymentMethod.card.exp_year,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Attach payment method error:", error);
     res.status(500).json({ error: error.message });
   }
 });
