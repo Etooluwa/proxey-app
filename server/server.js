@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
+import PDFDocument from "pdfkit";
 
 dotenv.config();
 
@@ -2428,6 +2429,143 @@ app.post("/api/charge", async (req, res) => {
   } catch (error) {
     console.error("Charge error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/bookings/:bookingId/invoice
+// Generate and download invoice PDF for a booking
+app.get("/api/bookings/:bookingId/invoice", async (req, res) => {
+  const { bookingId } = req.params;
+
+  try {
+    // Get booking details from database
+    const { data: booking, error } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .single();
+
+    if (error || !booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    // Only generate invoice if payment is completed
+    if (booking.payment_status !== 'succeeded' && booking.payment_status !== 'completed') {
+      return res.status(400).json({ error: "Payment not completed for this booking" });
+    }
+
+    // Create PDF document
+    const doc = new PDFDocument({ margin: 50 });
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${bookingId}.pdf`);
+
+    // Pipe the PDF to response
+    doc.pipe(res);
+
+    // Add content to PDF
+    const invoiceNumber = `INV-${booking.id.substring(0, 8).toUpperCase()}`;
+    const invoiceDate = new Date(booking.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Header - Company Info
+    doc.fontSize(24).font('Helvetica-Bold').text('PROXEY', 50, 50);
+    doc.fontSize(10).font('Helvetica').text('Service Booking Platform', 50, 80);
+    doc.text('proxey@example.com', 50, 95);
+
+    // Invoice Title
+    doc.fontSize(20).font('Helvetica-Bold').text('INVOICE', 400, 50);
+    doc.fontSize(10).font('Helvetica').text(`Invoice #: ${invoiceNumber}`, 400, 80);
+    doc.text(`Date: ${invoiceDate}`, 400, 95);
+
+    // Line separator
+    doc.moveTo(50, 130).lineTo(550, 130).stroke();
+
+    // Bill To Section
+    doc.fontSize(12).font('Helvetica-Bold').text('BILL TO:', 50, 150);
+    doc.fontSize(10).font('Helvetica')
+      .text(booking.client_name || 'Client', 50, 170)
+      .text(booking.client_email || '', 50, 185)
+      .text(booking.client_phone || '', 50, 200);
+
+    // Service Provider Section
+    doc.fontSize(12).font('Helvetica-Bold').text('SERVICE PROVIDER:', 350, 150);
+    doc.fontSize(10).font('Helvetica')
+      .text(booking.provider_name || 'Provider', 350, 170);
+
+    // Service Details Section
+    doc.fontSize(12).font('Helvetica-Bold').text('SERVICE DETAILS', 50, 250);
+
+    // Table headers
+    const tableTop = 280;
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Description', 50, tableTop);
+    doc.text('Date & Time', 250, tableTop);
+    doc.text('Amount', 450, tableTop, { align: 'right' });
+
+    // Line under headers
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+    // Service details
+    doc.font('Helvetica');
+    const serviceDate = new Date(booking.scheduled_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    doc.text(booking.service_name, 50, tableTop + 25, { width: 190 });
+    if (booking.service_description) {
+      doc.fontSize(9).fillColor('#666')
+        .text(booking.service_description, 50, tableTop + 40, { width: 190 });
+      doc.fillColor('#000').fontSize(10);
+    }
+    doc.text(serviceDate, 250, tableTop + 25);
+    doc.text(`$${((booking.price || 0) / 100).toFixed(2)}`, 450, tableTop + 25, { align: 'right' });
+
+    // Total section
+    const totalTop = tableTop + 80;
+    doc.moveTo(350, totalTop).lineTo(550, totalTop).stroke();
+
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Subtotal:', 350, totalTop + 10);
+    doc.text(`$${((booking.price || 0) / 100).toFixed(2)}`, 450, totalTop + 10, { align: 'right' });
+
+    doc.text('TOTAL:', 350, totalTop + 35);
+    doc.fontSize(14).text(`$${((booking.price || 0) / 100).toFixed(2)}`, 450, totalTop + 35, { align: 'right' });
+
+    // Payment status
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#16a34a')
+      .text('PAID', 350, totalTop + 60);
+    doc.fillColor('#000').font('Helvetica')
+      .text(`Payment Method: Card ending in ****`, 350, totalTop + 75);
+
+    // Footer
+    doc.fontSize(9).fillColor('#666')
+      .text('Thank you for your business!', 50, 700, { align: 'center', width: 500 })
+      .text('This is a computer-generated invoice.', 50, 715, { align: 'center', width: 500 });
+
+    // Additional booking info if available
+    if (booking.location) {
+      doc.fontSize(10).fillColor('#000').font('Helvetica-Bold')
+        .text('Location:', 50, totalTop + 10);
+      doc.font('Helvetica').text(booking.location, 50, totalTop + 25, { width: 250 });
+    }
+
+    // Finalize PDF
+    doc.end();
+
+  } catch (error) {
+    console.error("Invoice generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate invoice" });
+    }
   }
 });
 

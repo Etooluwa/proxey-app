@@ -107,6 +107,41 @@ const BookingsPage = () => {
         }
     };
 
+    // Download invoice for a booking
+    const handleDownloadInvoice = async (bookingId) => {
+        try {
+            const response = await fetch(`${process.env.REACT_APP_API_BASE || '/api'}/bookings/${bookingId}/invoice`, {
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate invoice');
+            }
+
+            // Create a blob from the response
+            const blob = await response.blob();
+
+            // Create a temporary URL for the blob
+            const url = window.URL.createObjectURL(blob);
+
+            // Create a temporary anchor element and trigger download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `invoice-${bookingId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Failed to download invoice:', error);
+            alert('Failed to download invoice. Please try again.');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 pb-24 md:pb-8">
             <div className="px-4 md:px-10 py-8 max-w-7xl mx-auto">
@@ -250,6 +285,15 @@ const BookingsPage = () => {
                                         >
                                             View Details
                                         </button>
+                                        {(booking.payment_status === 'succeeded' || booking.payment_status === 'completed') && (
+                                            <button
+                                                onClick={() => handleDownloadInvoice(booking.id)}
+                                                className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl font-semibold hover:bg-orange-100 transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Icons.Download size={16} />
+                                                Download Invoice
+                                            </button>
+                                        )}
                                         {activeTab === 'upcoming' && booking.status !== 'cancelled' && (
                                             <button
                                                 onClick={() => {
