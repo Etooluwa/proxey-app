@@ -48,7 +48,8 @@ import {
     Send,
     Paperclip,
     Mail,
-    Info
+    Info,
+    CreditCard
 } from 'lucide-react';
 
 export const Icons = {
@@ -105,5 +106,6 @@ export const Icons = {
     Send,
     Paperclip,
     Mail,
-    Info
+    Info,
+    CreditCard
 };
