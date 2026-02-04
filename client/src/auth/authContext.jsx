@@ -213,17 +213,8 @@ export function AuthProvider({ children }) {
             throw new Error("Email and password are required.");
         }
 
-        const existingRole = getLocalRole(email);
-        if (existingRole && existingRole !== role) {
-            const roleLabel = existingRole === 'provider' ? 'Service Provider' : 'Client';
-            const switchToRole = existingRole === 'provider' ? 'Service Provider tab' : 'Client tab';
-            const err = new Error(
-                `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
-            );
-            setAuthError(err.message);
-            throw err;
-        }
-
+        // When using Supabase, authenticate first and check the actual stored role
+        // Don't rely on localStorage alone as it can get out of sync
         if (supabase) {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
@@ -239,13 +230,22 @@ export function AuthProvider({ children }) {
                 setAuthError(err.message);
                 throw err;
             }
-            const storedRole = data.session.user?.user_metadata?.role;
-            if (storedRole && storedRole !== role) {
-                const roleLabel = storedRole === 'provider' ? 'Service Provider' : 'Client';
-                const switchToRole = storedRole === 'provider' ? 'Service Provider tab' : 'Client tab';
+            // Get the role from Supabase user metadata, or fall back to localStorage
+            const supabaseRole = data.session.user?.user_metadata?.role;
+            const localRole = getLocalRole(email);
+
+            // Determine the actual role - prefer Supabase metadata, then localStorage
+            const actualRole = supabaseRole || localRole;
+
+            // If user has a stored role and it doesn't match what they selected, show error
+            if (actualRole && actualRole !== role) {
+                const roleLabel = actualRole === 'provider' ? 'Service Provider' : 'Client';
+                const switchToRole = actualRole === 'provider' ? 'Service Provider tab' : 'Client tab';
                 const err = new Error(
                     `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
                 );
+                // Sync localStorage with the actual role to prevent future confusion
+                setLocalRole(email, actualRole);
                 try {
                     await supabase.auth.signOut();
                 } catch (signOutError) {
@@ -257,7 +257,9 @@ export function AuthProvider({ children }) {
                 setAuthError(err.message);
                 throw err;
             }
-            if (!storedRole && role) {
+
+            // If no role stored in Supabase, save the selected role
+            if (!supabaseRole && role) {
                 try {
                     await supabase.auth.updateUser({
                         data: {
@@ -269,7 +271,7 @@ export function AuthProvider({ children }) {
                 }
             }
             const mapped = mapSupabaseSession(data.session);
-            mapped.user.role = storedRole || role;
+            mapped.user.role = actualRole || role;
             setSession(mapped);
             persistSession(mapped);
             setLocalRole(email, mapped.user.role || role);
