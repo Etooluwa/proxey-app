@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import supabase from "../utils/supabase";
 import { uploadProfilePhoto } from "../utils/photoUpload";
 
@@ -388,7 +388,7 @@ export function AuthProvider({ children }) {
         return data;
     };
 
-    const updateProfile = async (partialProfile, photoFile = null) => {
+    const updateProfile = useCallback(async (partialProfile, photoFile = null) => {
         if (!session?.user) {
             throw new Error("No authenticated user.");
         }
@@ -450,7 +450,7 @@ export function AuthProvider({ children }) {
         persistProfile(session.user.id, nextProfile);
 
         return nextProfile;
-    };
+    }, [session, profile]);
 
     const clearAuthError = () => setAuthError(null);
 
