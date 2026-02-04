@@ -290,6 +290,8 @@ export function AuthProvider({ children }) {
             return { session: mapped, profile: null };
         }
 
+        // Fallback for non-Supabase mode - check localStorage for existing role
+        const existingRole = getLocalRole(email);
         const chosenRole = existingRole || role;
         const fallbackSession = {
             user: {
