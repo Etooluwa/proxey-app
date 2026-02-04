@@ -1,4 +1,4 @@
-import React from 'react';
+// React import not needed with modern JSX transform
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/authContext';
 import { ToastProvider } from './components/ui/ToastProvider';
@@ -15,6 +15,7 @@ import ProviderShell from './components/layout/ProviderShell';
 // Auth Pages
 import SignIn from './pages/auth/SignInPage';
 import SignUp from './pages/auth/SignUpPage';
+import AuthCallback from './pages/AuthCallback';
 import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
 
 // Client Pages
@@ -55,6 +56,7 @@ function App() {
                     {/* Public Routes */}
                     <Route path="/auth/sign-in" element={<SignIn />} />
                     <Route path="/auth/sign-up" element={<SignUp />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
 
                     {/* Root Redirect */}
                     <Route path="/" element={<RoleRedirect />} />

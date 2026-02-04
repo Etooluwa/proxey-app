@@ -145,9 +145,26 @@ export function AuthProvider({ children }) {
                 } catch (error) {
                     console.warn("[auth] Failed to fetch Supabase session", error);
                 }
-                const { data } = supabase.auth.onAuthStateChange((_event, sbSession) => {
+                const { data } = supabase.auth.onAuthStateChange(async (_event, sbSession) => {
                     if (sbSession) {
                         const mapped = mapSupabaseSession(sbSession);
+
+                        // Check if there's a pending role from OAuth sign-in
+                        const pendingRole = window.localStorage.getItem('proxey.pending_role');
+                        if (pendingRole && !sbSession.user?.user_metadata?.role) {
+                            // Set the role for OAuth users
+                            try {
+                                await supabase.auth.updateUser({
+                                    data: { role: pendingRole },
+                                });
+                                mapped.user.role = pendingRole;
+                                setLocalRole(sbSession.user.email, pendingRole);
+                            } catch (err) {
+                                console.warn("[auth] Failed to set role for OAuth user", err);
+                            }
+                            window.localStorage.removeItem('proxey.pending_role');
+                        }
+
                         setSession(mapped);
                         persistSession(mapped);
                         const storedProfile = loadProfile(mapped.user.id);
@@ -342,6 +359,35 @@ export function AuthProvider({ children }) {
         persistSession(null);
     };
 
+    const loginWithGoogle = async (role = "client") => {
+        setAuthError(null);
+        if (!supabase) {
+            throw new Error("Supabase is not configured");
+        }
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent',
+                },
+            },
+        });
+
+        if (error) {
+            const msg = SAFE_STRING(error.message || error);
+            setAuthError(msg);
+            throw error;
+        }
+
+        // Store the intended role in localStorage so we can set it after redirect
+        window.localStorage.setItem('proxey.pending_role', role);
+
+        return data;
+    };
+
     const updateProfile = async (partialProfile, photoFile = null) => {
         if (!session?.user) {
             throw new Error("No authenticated user.");
@@ -416,6 +462,7 @@ export function AuthProvider({ children }) {
             authError,
             clearAuthError,
             login,
+            loginWithGoogle,
             register,
             logout,
             updateProfile,

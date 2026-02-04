@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
+import { useAuth } from "../auth/authContext";
 import "./LoginSignup.css";
 
 /**
@@ -16,6 +17,7 @@ import "./LoginSignup.css";
  */
 
 export default function LoginSignup({ onLogin, onSignup, globalError, onClearError }) {
+  const { loginWithGoogle } = useAuth();
   const [role, setRole] = useState("client");
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -99,9 +101,12 @@ export default function LoginSignup({ onLogin, onSignup, globalError, onClearErr
     }
   };
 
-  const handleGoogle = () => {
-    // eslint-disable-next-line no-console
-    console.log("Continue with Google", { role });
+  const handleGoogle = async () => {
+    try {
+      await loginWithGoogle(role);
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+    }
   };
 
   const handlePhone = () => {
