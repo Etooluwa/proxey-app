@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { fetchProviderJobs, updateProviderJobStatus } from '../../data/provider';
@@ -43,7 +43,8 @@ const ProviderAppointments = () => {
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         load();

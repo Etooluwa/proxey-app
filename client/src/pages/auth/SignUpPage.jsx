@@ -45,7 +45,7 @@ function SignUpPage() {
 
     setSubmitting(true);
     try {
-      const result = await register({ email, password, role });
+      await register({ email, password, role });
       toast.push({
         title: "Account created",
         description:

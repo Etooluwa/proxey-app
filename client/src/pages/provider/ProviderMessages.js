@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icons } from '../../components/Icons';
 import { useMessages } from '../../contexts/MessageContext';
 import { useSession } from '../../auth/authContext';
 
 const ProviderMessages = () => {
     const { session } = useSession();
-    const { conversations, messages, currentConversation, setCurrentConversation, loadMessages, sendMessage, markAsRead, getUnreadCount } = useMessages();
+    const { conversations, messages, currentConversation, setCurrentConversation, loadMessages, sendMessage, markAsRead } = useMessages();
     const [showMobileChat, setShowMobileChat] = useState(false);
     const [messageInput, setMessageInput] = useState('');
     const [sending, setSending] = useState(false);

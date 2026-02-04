@@ -11,7 +11,7 @@ import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
-  const { updateProfile, session } = useSession();
+  const { updateProfile } = useSession();
   const { addNotification } = useNotifications();
   const toast = useToast();
   const navigate = useNavigate();

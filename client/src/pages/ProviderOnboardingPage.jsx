@@ -24,6 +24,7 @@ function ProviderOnboardingPage() {
     if (params.get("completed") === "true") {
       completeOnboarding();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
   const completeOnboarding = async () => {
@@ -125,7 +126,6 @@ function ProviderOnboardingPage() {
     duration: "",
   });
   const [applyToAll, setApplyToAll] = useState(false);
-  const [stripeConnected, setStripeConnected] = useState(false);
 
   const handleNameChange = (event) => {
     setForm((prev) => ({ ...prev, name: event.target.value }));
@@ -828,7 +828,6 @@ function ProviderOnboardingPage() {
           <div className="provider-onboarding__days-list">
             {days.map((day) => {
               const dayData = form.availability[day.key];
-              const isWeekend = day.key === "saturday" || day.key === "sunday";
 
               return (
                 <div key={day.key} className="provider-onboarding__day-card">

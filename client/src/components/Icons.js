@@ -39,7 +39,6 @@ import {
     Download,
     Loader2,
     Trash2,
-    X,
     Eye,
     Plus,
     Edit,

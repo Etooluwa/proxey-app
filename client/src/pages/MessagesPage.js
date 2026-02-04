@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { Icons } from '../components/Icons';
 import { useMessages } from '../contexts/MessageContext';
 import { useSession } from '../auth/authContext';
 
 const MessagesPage = () => {
-    const navigate = useNavigate();
     const { session } = useSession();
     const { conversations, messages, currentConversation, setCurrentConversation, loadMessages, sendMessage, markAsRead } = useMessages();
     const [showMobileChat, setShowMobileChat] = useState(false);

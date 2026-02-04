@@ -134,7 +134,7 @@ export const MessageProvider = ({ children }) => {
 
         try {
             // Check if conversation exists
-            const { data: existing, error: fetchError } = await supabase
+            const { data: existing } = await supabase
                 .from('conversations')
                 .select('*')
                 .eq('client_id', clientId)

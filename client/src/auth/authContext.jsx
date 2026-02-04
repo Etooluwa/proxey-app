@@ -469,7 +469,7 @@ export function AuthProvider({ children }) {
             isProfileComplete,
             isProfileCompleteShape,
         }),
-        [session, profile, loading, authError, isProfileComplete]
+        [session, profile, loading, authError, isProfileComplete, updateProfile]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

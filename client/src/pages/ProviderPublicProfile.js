@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { fetchProviders } from '../data/providers';
@@ -101,12 +101,14 @@ const ProviderPublicProfile = () => {
 
     useEffect(() => {
         loadProvider();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [providerId]);
 
     useEffect(() => {
         if (provider?.id) {
             loadClosestAvailability();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provider]);
 
     const loadProvider = async () => {

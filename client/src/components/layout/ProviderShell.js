@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
-import { SERVICE_CATEGORIES } from '../../utils/categories';
-
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -15,7 +13,6 @@ const ProviderShell = () => {
     const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'Provider';
-    const displayRole = profile?.category ? SERVICE_CATEGORIES.find(c => c.id === profile.category)?.label || 'Provider' : 'Provider';
     const displayPhoto = profile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
 
     return (

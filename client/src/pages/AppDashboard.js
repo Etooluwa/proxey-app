@@ -1,20 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 
-const CATEGORIES = [
-    { id: '1', name: 'Cleaning', bgColor: 'bg-blue-100', textColor: 'text-blue-600', icon: 'Sparkles' },
-    { id: '2', name: 'Repair', bgColor: 'bg-orange-100', textColor: 'text-orange-600', icon: 'Wrench' },
-    { id: '3', name: 'Beauty', bgColor: 'bg-pink-100', textColor: 'text-pink-600', icon: 'Scissors' },
-    { id: '4', name: 'Moving', bgColor: 'bg-green-100', textColor: 'text-green-600', icon: 'Truck' },
-    { id: '5', name: 'Painting', bgColor: 'bg-purple-100', textColor: 'text-purple-600', icon: 'Paintbrush' },
-    { id: '6', name: 'Plumbing', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', icon: 'Droplets' },
-];
-
 const AppDashboard = () => {
     const navigate = useNavigate();
-    const { profile, session } = useSession();
+    const { session } = useSession();
     const [providers, setProviders] = useState([]);
     const [upcomingBookings, setUpcomingBookings] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -24,6 +15,7 @@ const AppDashboard = () => {
     useEffect(() => {
         loadProviders();
         loadUpcomingBookings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadProviders = async () => {
@@ -72,19 +64,11 @@ const AppDashboard = () => {
         }
     };
 
-    const handleCategoryClick = (category) => {
-        navigate(`/app/browse?category=${encodeURIComponent(category.name)}`);
-    };
-
     const handleSearch = (e) => {
         e.preventDefault();
         if (searchQuery.trim()) {
             navigate(`/app/browse?search=${encodeURIComponent(searchQuery)}`);
         }
-    };
-
-    const getCategoryIcon = (iconName) => {
-        return Icons[iconName] || Icons.Sparkles;
     };
 
     return (

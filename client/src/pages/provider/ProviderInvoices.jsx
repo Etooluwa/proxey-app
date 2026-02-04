@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Skeleton from "../../components/ui/Skeleton";
@@ -9,7 +8,6 @@ import { fetchProviderInvoices, createProviderInvoice, fetchProviderJobs } from 
 import "../../styles/provider/providerInvoices.css";
 
 function ProviderInvoices() {
-  const navigate = useNavigate();
   const toast = useToast();
   const { profile } = useSession();
   const [invoices, setInvoices] = useState([]);

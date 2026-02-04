@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/ToastProvider';
 import { Icons } from '../../components/Icons';
-import { fetchProviderInvoices, fetchProviderTimeBlocks, fetchProviderJobs, fetchProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
 
 const ProviderPromotions = () => {

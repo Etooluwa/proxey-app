@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from '../auth/authContext';
 import { fetchClientNotifications, createClientNotification, markClientNotificationRead } from '../data/notifications';
 
@@ -7,7 +7,7 @@ const NotificationContext = createContext();
 export const useNotifications = () => useContext(NotificationContext);
 
 export const NotificationProvider = ({ children }) => {
-    const { session, profile } = useSession();
+    const { session } = useSession();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
 

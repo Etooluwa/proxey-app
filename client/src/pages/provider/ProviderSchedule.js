@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { ALL_PROVIDER_APPOINTMENTS } from '../../constants';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DATES = Array.from({ length: 35 }, (_, i) => i + 1); // Mock 35 days
 
 const InvoiceGeneratorModal = ({ appointment, onClose }) => {
     const [items, setItems] = useState([

@@ -1,8 +1,6 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Icons } from '../components/Icons';
-import { PENDING_APPOINTMENT_REQUESTS } from '../constants';
 
 const NotificationsPage = () => {
     const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
@@ -12,6 +12,7 @@ const BookingsPage = () => {
 
     useEffect(() => {
         loadBookings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadBookings = async () => {
