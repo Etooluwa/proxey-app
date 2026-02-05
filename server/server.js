@@ -1153,31 +1153,175 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
 app.get("/api/provider/earnings", async (req, res) => {
   const providerId = getProviderId(req);
 
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("provider_earnings")
-        .select("*")
-        .eq("provider_id", providerId)
-        .single();
-      if (error) {
-        console.warn("[supabase] Failed to load provider earnings, using stub.", error);
-      } else {
-        return res.status(200).json({ earnings: data });
-      }
-    } catch (error) {
-      console.warn("[supabase] Unexpected error fetching provider earnings", error);
-    }
+  // Default response structure
+  const defaultEarnings = {
+    availableBalance: 0,
+    pendingClearance: 0,
+    totalEarningsThisMonth: 0,
+    totalEarningsLastMonth: 0,
+    monthlyTrend: 0, // percentage change from last month
+    weeklyData: [], // for weekly chart
+    monthlyData: [], // for yearly chart
+    transactions: [], // recent transactions
+    payoutMethod: {
+      type: 'bank',
+      name: 'Bank Account',
+      last4: '••••',
+      status: 'inactive'
+    },
+    nextPayoutDate: null
+  };
+
+  if (!supabase) {
+    return res.status(200).json({ earnings: defaultEarnings });
   }
 
-  const earnings =
-    memoryStore.providerEarnings.find((item) => item.providerId === providerId) || {
-      providerId,
-      totalEarned: 0,
-      pendingPayout: 0,
-      transactions: [],
+  try {
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+
+    // Fetch all completed bookings for this provider
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("scheduled_at", { ascending: false });
+
+    if (error) {
+      console.warn("[supabase] Failed to fetch bookings for earnings:", error);
+      return res.status(200).json({ earnings: defaultEarnings });
+    }
+
+    const allBookings = bookings || [];
+
+    // Calculate available balance (completed + paid)
+    const completedPaid = allBookings.filter(b =>
+      b.status === 'completed' && b.payment_status === 'paid'
+    );
+    const availableBalance = completedPaid.reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // Calculate pending clearance (completed but payment pending)
+    const completedPendingPayment = allBookings.filter(b =>
+      b.status === 'completed' && b.payment_status === 'pending'
+    );
+    const pendingClearance = completedPendingPayment.reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // Calculate this month's earnings
+    const thisMonthBookings = allBookings.filter(b => {
+      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      return b.status === 'completed' && bookingDate >= currentMonthStart;
+    });
+    const totalEarningsThisMonth = thisMonthBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // Calculate last month's earnings for trend
+    const lastMonthBookings = allBookings.filter(b => {
+      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      return b.status === 'completed' && bookingDate >= lastMonthStart && bookingDate <= lastMonthEnd;
+    });
+    const totalEarningsLastMonth = lastMonthBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // Calculate monthly trend percentage
+    const monthlyTrend = totalEarningsLastMonth > 0
+      ? Math.round(((totalEarningsThisMonth - totalEarningsLastMonth) / totalEarningsLastMonth) * 100)
+      : (totalEarningsThisMonth > 0 ? 100 : 0);
+
+    // Generate weekly data (last 7 days)
+    const weeklyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+
+      const dayBookings = allBookings.filter(b => {
+        const bookingDate = new Date(b.scheduled_at || b.created_at);
+        return b.status === 'completed' && bookingDate >= dayStart && bookingDate < dayEnd;
+      });
+
+      weeklyData.push({
+        name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        value: dayBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100 // Convert cents to dollars
+      });
+    }
+
+    // Generate monthly data (current year)
+    const monthlyData = [];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let m = 0; m < 12; m++) {
+      const monthStart = new Date(now.getFullYear(), m, 1);
+      const monthEnd = new Date(now.getFullYear(), m + 1, 0);
+
+      const monthBookings = allBookings.filter(b => {
+        const bookingDate = new Date(b.scheduled_at || b.created_at);
+        return b.status === 'completed' && bookingDate >= monthStart && bookingDate <= monthEnd;
+      });
+
+      const income = monthBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100;
+      const jobCount = monthBookings.length;
+      // Estimate expenses as 10% of income (platform fee)
+      const expense = Math.round(income * 0.1);
+
+      monthlyData.push({
+        name: months[m],
+        income: Math.round(income),
+        expense,
+        jobs: jobCount
+      });
+    }
+
+    // Generate transactions list from bookings
+    const transactions = allBookings.slice(0, 20).map(b => {
+      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      const isCompleted = b.status === 'completed';
+      const isPaid = b.payment_status === 'paid';
+
+      return {
+        id: b.id,
+        date: bookingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        description: `Payment from ${b.client_name || 'Client'} - ${b.service_name || 'Service'}`,
+        amount: (b.price || 0) / 100, // Convert cents to dollars
+        type: 'INCOME',
+        status: isPaid ? 'COMPLETED' : (isCompleted ? 'PENDING' : b.status.toUpperCase())
+      };
+    });
+
+    // Calculate next payout (next Monday)
+    const nextMonday = new Date(now);
+    nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+
+    const earnings = {
+      availableBalance: availableBalance / 100, // Convert cents to dollars
+      pendingClearance: pendingClearance / 100,
+      totalEarningsThisMonth: totalEarningsThisMonth / 100,
+      totalEarningsLastMonth: totalEarningsLastMonth / 100,
+      monthlyTrend,
+      weeklyData,
+      monthlyData,
+      transactions,
+      payoutMethod: {
+        type: 'bank',
+        name: 'Bank Account',
+        last4: '••••',
+        status: 'pending_setup' // Will be updated when Stripe Connect is fully integrated
+      },
+      nextPayoutDate: nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      stats: {
+        totalJobs: allBookings.filter(b => b.status === 'completed').length,
+        thisMonthJobs: thisMonthBookings.length,
+        averageJobValue: thisMonthBookings.length > 0
+          ? Math.round(totalEarningsThisMonth / thisMonthBookings.length / 100)
+          : 0
+      }
     };
-  res.status(200).json({ earnings });
+
+    return res.status(200).json({ earnings });
+  } catch (error) {
+    console.error("[earnings] Unexpected error:", error);
+    return res.status(200).json({ earnings: defaultEarnings });
+  }
 });
 
 app.get("/api/provider/me", async (req, res) => {

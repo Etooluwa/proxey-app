@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../../components/Icons';
 import { StatCard } from '../../components/StatCard';
-import { EARNINGS_DATA } from '../../constants';
 import { useSession } from '../../auth/authContext';
+import { request } from '../../data/apiClient';
 import {
     BarChart,
     Bar,
@@ -15,30 +15,28 @@ import {
     Legend
 } from 'recharts';
 
-const ALL_TRANSACTIONS = [
-    { id: '1', date: 'Oct 24, 2023', description: 'Automatic Payout to Chase ••8842', amount: 450.00, type: 'PAYOUT', status: 'COMPLETED' },
-    { id: '2', date: 'Oct 23, 2023', description: 'Payment from Alice Cooper', amount: 120.00, type: 'INCOME', status: 'COMPLETED' },
-    { id: '3', date: 'Oct 23, 2023', description: 'Payment from Bob Smith', amount: 85.00, type: 'INCOME', status: 'COMPLETED' },
-    { id: '4', date: 'Oct 21, 2023', description: 'Platform Fee', amount: -12.00, type: 'FEE', status: 'COMPLETED' },
-    { id: '5', date: 'Oct 20, 2023', description: 'Payment from Carol Danvers', amount: 150.00, type: 'INCOME', status: 'PENDING' },
-    { id: '6', date: 'Oct 18, 2023', description: 'Payment from John Doe', amount: 200.00, type: 'INCOME', status: 'COMPLETED' },
-    { id: '7', date: 'Oct 17, 2023', description: 'Supply Reimbursement', amount: 45.00, type: 'ADJUSTMENT', status: 'COMPLETED' },
-    { id: '8', date: 'Oct 15, 2023', description: 'Automatic Payout to Chase ••8842', amount: 620.00, type: 'PAYOUT', status: 'COMPLETED' },
-    { id: '9', date: 'Oct 12, 2023', description: 'Payment from Sarah Conner', amount: 180.00, type: 'INCOME', status: 'REFUNDED' },
-    { id: '10', date: 'Oct 10, 2023', description: 'Platform Fee', amount: -18.00, type: 'FEE', status: 'COMPLETED' },
+// Default fallback data
+const DEFAULT_TRANSACTIONS = [];
+const DEFAULT_WEEKLY_DATA = [
+    { name: 'Mon', value: 0 },
+    { name: 'Tue', value: 0 },
+    { name: 'Wed', value: 0 },
+    { name: 'Thu', value: 0 },
+    { name: 'Fri', value: 0 },
+    { name: 'Sat', value: 0 },
+    { name: 'Sun', value: 0 },
 ];
-
-const MONTHLY_DATA = [
-    { name: 'Jan', income: 3200, expense: 450, jobs: 24 },
-    { name: 'Feb', income: 4100, expense: 520, jobs: 31 },
-    { name: 'Mar', income: 3800, expense: 480, jobs: 28 },
-    { name: 'Apr', income: 5200, expense: 600, jobs: 42 },
-    { name: 'May', income: 4900, expense: 550, jobs: 39 },
-    { name: 'Jun', income: 5800, expense: 700, jobs: 45 },
-    { name: 'Jul', income: 6100, expense: 800, jobs: 48 },
-    { name: 'Aug', income: 5400, expense: 650, jobs: 41 },
-    { name: 'Sep', income: 4800, expense: 500, jobs: 36 },
-    { name: 'Oct', income: 1240, expense: 120, jobs: 12 }, // Current Month (Partial)
+const DEFAULT_MONTHLY_DATA = [
+    { name: 'Jan', income: 0, expense: 0, jobs: 0 },
+    { name: 'Feb', income: 0, expense: 0, jobs: 0 },
+    { name: 'Mar', income: 0, expense: 0, jobs: 0 },
+    { name: 'Apr', income: 0, expense: 0, jobs: 0 },
+    { name: 'May', income: 0, expense: 0, jobs: 0 },
+    { name: 'Jun', income: 0, expense: 0, jobs: 0 },
+    { name: 'Jul', income: 0, expense: 0, jobs: 0 },
+    { name: 'Aug', income: 0, expense: 0, jobs: 0 },
+    { name: 'Sep', income: 0, expense: 0, jobs: 0 },
+    { name: 'Oct', income: 0, expense: 0, jobs: 0 },
     { name: 'Nov', income: 0, expense: 0, jobs: 0 },
     { name: 'Dec', income: 0, expense: 0, jobs: 0 },
 ];
@@ -57,6 +55,45 @@ const ProviderEarnings = () => {
     // Filter states for View All
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('ALL');
+
+    // Earnings data from API
+    const [earningsData, setEarningsData] = useState(null);
+    const [loadingEarnings, setLoadingEarnings] = useState(true);
+    const [earningsError, setEarningsError] = useState(null);
+
+    // Fetch earnings data on mount
+    useEffect(() => {
+        loadEarnings();
+    }, []);
+
+    const loadEarnings = async () => {
+        setLoadingEarnings(true);
+        setEarningsError(null);
+        try {
+            const data = await request('/provider/earnings');
+            setEarningsData(data.earnings);
+        } catch (error) {
+            console.error('[earnings] Failed to load:', error);
+            setEarningsError('Failed to load earnings data');
+        } finally {
+            setLoadingEarnings(false);
+        }
+    };
+
+    // Extract data from API response or use defaults
+    const availableBalance = earningsData?.availableBalance || 0;
+    const pendingClearance = earningsData?.pendingClearance || 0;
+    const totalEarningsThisMonth = earningsData?.totalEarningsThisMonth || 0;
+    const monthlyTrend = earningsData?.monthlyTrend || 0;
+    const weeklyData = earningsData?.weeklyData || DEFAULT_WEEKLY_DATA;
+    const monthlyData = earningsData?.monthlyData || DEFAULT_MONTHLY_DATA;
+    const transactions = earningsData?.transactions || DEFAULT_TRANSACTIONS;
+    const payoutMethod = earningsData?.payoutMethod || { type: 'bank', name: 'Not Set Up', last4: '••••', status: 'inactive' };
+    const nextPayoutDate = earningsData?.nextPayoutDate || 'Not scheduled';
+    const stats = earningsData?.stats || { totalJobs: 0, thisMonthJobs: 0, averageJobValue: 0 };
+
+    // Get current month name
+    const currentMonthName = new Date().toLocaleDateString('en-US', { month: 'short' });
 
     // Get provider signup date (fallback to 1 year ago if not available)
     const signupDate = profile?.createdAt
@@ -79,8 +116,8 @@ const ProviderEarnings = () => {
         }, 2000);
     };
 
-    // Filter Logic
-    const filteredTransactions = ALL_TRANSACTIONS.filter(tx => {
+    // Filter Logic - use real transactions
+    const filteredTransactions = transactions.filter(tx => {
         const matchesSearch = tx.description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesType = filterType === 'ALL'
             ? true
@@ -90,6 +127,18 @@ const ProviderEarnings = () => {
 
         return matchesSearch && matchesType;
     });
+
+    // Loading state
+    if (loadingEarnings) {
+        return (
+            <div className="max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading earnings data...</p>
+                </div>
+            </div>
+        );
+    }
 
     // --- Helper to render export modal to avoid duplication ---
     const renderExportModal = () => (
@@ -255,8 +304,8 @@ const ProviderEarnings = () => {
 
     // --- VIEW: MONTHLY INCOME ANALYTICS ---
     if (viewMode === 'MONTHLY_INCOME') {
-        const totalRevenue = MONTHLY_DATA.reduce((acc, curr) => acc + curr.income, 0);
-        const totalExpense = MONTHLY_DATA.reduce((acc, curr) => acc + curr.expense, 0);
+        const totalRevenue = monthlyData.reduce((acc, curr) => acc + curr.income, 0);
+        const totalExpense = monthlyData.reduce((acc, curr) => acc + curr.expense, 0);
         const netIncome = totalRevenue - totalExpense;
 
         return (
@@ -272,12 +321,12 @@ const ProviderEarnings = () => {
                         </button>
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Monthly Income</h1>
-                            <p className="text-gray-500 text-sm">Year to Date Performance (2023)</p>
+                            <p className="text-gray-500 text-sm">Year to Date Performance ({new Date().getFullYear()})</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
                         <button className="px-3 py-1.5 bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed"><Icons.ChevronRight className="rotate-180" size={16} /></button>
-                        <span className="px-2 text-sm font-bold text-gray-700">2023</span>
+                        <span className="px-2 text-sm font-bold text-gray-700">{new Date().getFullYear()}</span>
                         <button className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors border border-gray-100"><Icons.ChevronRight size={16} /></button>
                     </div>
                 </div>
@@ -325,7 +374,7 @@ const ProviderEarnings = () => {
                     </div>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={MONTHLY_DATA} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis
                                     dataKey="name"
@@ -371,16 +420,16 @@ const ProviderEarnings = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {MONTHLY_DATA.filter(d => d.income > 0).map((item, idx) => (
+                                {monthlyData.filter(d => d.income > 0).map((item, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="p-5 font-bold text-gray-900">{item.name} 2023</td>
+                                        <td className="p-5 font-bold text-gray-900">{item.name} {new Date().getFullYear()}</td>
                                         <td className="p-5 text-gray-600 text-sm">{item.jobs} Completed</td>
                                         <td className="p-5 text-right font-medium text-gray-900">${item.income.toLocaleString()}</td>
                                         <td className="p-5 text-right font-medium text-red-500">-${item.expense.toLocaleString()}</td>
                                         <td className="p-5 text-right font-bold text-emerald-600">${(item.income - item.expense).toLocaleString()}</td>
                                     </tr>
                                 ))}
-                                {MONTHLY_DATA.filter(d => d.income === 0).length > 0 && (
+                                {monthlyData.filter(d => d.income === 0).length > 0 && (
                                     <tr>
                                         <td colSpan={5} className="p-4 text-center text-xs text-gray-400 font-medium bg-gray-50/30">
                                             Future months or no data available
@@ -560,21 +609,21 @@ const ProviderEarnings = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard
                     label="Available Balance"
-                    value="$324.50"
+                    value={`$${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     icon={Icons.Wallet}
                     colorClass="bg-emerald-500 text-emerald-500"
                 />
                 <StatCard
                     label="Pending Clearance"
-                    value="$150.00"
+                    value={`$${pendingClearance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     icon={Icons.Clock}
                     colorClass="bg-yellow-500 text-yellow-500"
                 />
                 <StatCard
-                    label="Total Earnings (Oct)"
-                    value="$1,240.00"
-                    trend="12%"
-                    trendUp={true}
+                    label={`Total Earnings (${currentMonthName})`}
+                    value={`$${totalEarningsThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    trend={monthlyTrend !== 0 ? `${Math.abs(monthlyTrend)}%` : null}
+                    trendUp={monthlyTrend > 0}
                     icon={Icons.Trending}
                     colorClass="bg-brand-500 text-brand-500"
                 />
@@ -604,7 +653,7 @@ const ProviderEarnings = () => {
 
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={EARNINGS_DATA}>
+                            <BarChart data={weeklyData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis
                                     dataKey="name"
@@ -622,10 +671,11 @@ const ProviderEarnings = () => {
                                 <Tooltip
                                     cursor={{ fill: '#f8fafc' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                    formatter={(value) => [`$${value.toFixed(2)}`, 'Earnings']}
                                 />
                                 <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                                    {EARNINGS_DATA.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={index === 6 ? '#0d9488' : '#cbd5e1'} />
+                                    {weeklyData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={index === weeklyData.length - 1 ? '#0d9488' : '#cbd5e1'} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -642,21 +692,31 @@ const ProviderEarnings = () => {
                             <div className="p-3 bg-gray-50 rounded-xl text-gray-600 border border-gray-100">
                                 <Icons.Landmark size={24} />
                             </div>
-                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">Active</span>
+                            <span className={`px-3 py-1 text-xs font-bold rounded-full ${payoutMethod.status === 'active'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                {payoutMethod.status === 'active' ? 'Active' : 'Setup Required'}
+                            </span>
                         </div>
 
                         <div className="mb-6">
                             <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Primary Payout Method</p>
                             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                Chase Checking
+                                {payoutMethod.name || 'Bank Account'}
                             </h3>
-                            <p className="text-gray-400 font-mono text-sm mt-1">•••• •••• 8842</p>
+                            <p className="text-gray-400 font-mono text-sm mt-1">{payoutMethod.last4}</p>
                         </div>
 
                         <div className="flex items-center justify-between pt-6 border-t border-gray-50">
                             <div className="flex items-center gap-2">
-                                <div className="bg-[#635BFF]/10 text-[#635BFF] px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 bg-[#635BFF] rounded-full"></span> Stripe Connected
+                                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${payoutMethod.status === 'active'
+                                    ? 'bg-[#635BFF]/10 text-[#635BFF]'
+                                    : 'bg-gray-100 text-gray-500'
+                                    }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${payoutMethod.status === 'active' ? 'bg-[#635BFF]' : 'bg-gray-400'
+                                        }`}></span>
+                                    {payoutMethod.status === 'active' ? 'Stripe Connected' : 'Setup Stripe'}
                                 </div>
                             </div>
                             <button className="text-brand-600 text-xs font-bold hover:underline">
@@ -675,7 +735,7 @@ const ProviderEarnings = () => {
                         </p>
                         <div className="flex items-center justify-between text-sm bg-white p-3 rounded-xl border border-gray-100">
                             <span className="text-gray-500 font-medium">Next Payout</span>
-                            <span className="font-bold text-gray-900">Oct 30, 2023</span>
+                            <span className="font-bold text-gray-900">{nextPayoutDate}</span>
                         </div>
                     </div>
 
@@ -694,32 +754,42 @@ const ProviderEarnings = () => {
                         View All
                     </button>
                 </div>
-                <div className="space-y-4">
-                    {ALL_TRANSACTIONS.slice(0, 5).map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'PAYOUT' ? 'bg-gray-100 text-gray-600' :
-                                    tx.type === 'FEE' ? 'bg-red-50 text-red-500' :
-                                        tx.type === 'REFUNDED' ? 'bg-orange-50 text-orange-500' :
-                                            'bg-green-50 text-green-600'
+                {transactions.length > 0 ? (
+                    <div className="space-y-4">
+                        {transactions.slice(0, 5).map((tx) => (
+                            <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'PAYOUT' ? 'bg-gray-100 text-gray-600' :
+                                        tx.type === 'FEE' ? 'bg-red-50 text-red-500' :
+                                            tx.status === 'REFUNDED' ? 'bg-orange-50 text-orange-500' :
+                                                'bg-green-50 text-green-600'
+                                        }`}>
+                                        {tx.type === 'PAYOUT' ? <Icons.Check size={18} /> :
+                                            tx.type === 'FEE' ? <Icons.Trending className="transform rotate-180" size={18} /> :
+                                                tx.status === 'REFUNDED' ? <Icons.Alert size={18} /> :
+                                                    <Icons.Trending size={18} />}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-900">{tx.description}</p>
+                                        <p className="text-xs text-gray-500">{tx.date} • {tx.status}</p>
+                                    </div>
+                                </div>
+                                <span className={`font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-gray-900'
                                     }`}>
-                                    {tx.type === 'PAYOUT' ? <Icons.Check size={18} /> :
-                                        tx.type === 'FEE' ? <Icons.Trending className="transform rotate-180" size={18} /> :
-                                            tx.type === 'REFUNDED' ? <Icons.Alert size={18} /> :
-                                                <Icons.Trending size={18} />}
-                                </div>
-                                <div>
-                                    <p className="font-bold text-gray-900">{tx.description}</p>
-                                    <p className="text-xs text-gray-500">{tx.date} • {tx.status}</p>
-                                </div>
+                                    {tx.amount > 0 ? '+' : ''}${tx.amount.toFixed(2)}
+                                </span>
                             </div>
-                            <span className={`font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-gray-900'
-                                }`}>
-                                {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)}
-                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Icons.Wallet className="text-gray-300" size={32} />
                         </div>
-                    ))}
-                </div>
+                        <h3 className="text-gray-900 font-bold text-lg">No transactions yet</h3>
+                        <p className="text-gray-500 text-sm mt-1">Complete bookings to see your earnings here.</p>
+                    </div>
+                )}
             </div>
 
             {/* EXPORT MODAL (Dashboard) */}
