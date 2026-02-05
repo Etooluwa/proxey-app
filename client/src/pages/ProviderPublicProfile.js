@@ -57,26 +57,16 @@ const ProviderPublicProfile = () => {
     const [submittingRequest, setSubmittingRequest] = useState(false);
     const [portfolioItems, setPortfolioItems] = useState([]);
     const [promotions, setPromotions] = useState([]);
+    const [providerServices, setProviderServices] = useState([]);
+    const [loadingServices, setLoadingServices] = useState(false);
 
-    // Service options with descriptions
-    const serviceOptions = [
+    // Fallback service options (used when no real services exist)
+    const fallbackServices = [
         {
-            id: 1,
-            name: 'Deep Home Cleaning',
-            price: 60,
-            description: 'Comprehensive deep cleaning service including kitchens, bathrooms, bedrooms, and living areas. Perfect for spring cleaning or move-in preparation.'
-        },
-        {
-            id: 2,
-            name: 'Move-out Clean',
-            price: 250,
-            description: 'Thorough end-of-tenancy cleaning to ensure you get your deposit back. Includes all rooms, appliances, and fixtures cleaned to spotless standards.'
-        },
-        {
-            id: 3,
-            name: 'Standard Weekly Clean',
-            price: 40,
-            description: 'Regular maintenance cleaning to keep your home fresh. Includes vacuuming, dusting, bathroom and kitchen cleaning - perfect for busy households.'
+            id: 'fallback-1',
+            name: 'Standard Service',
+            price: 5000,
+            description: 'Contact the provider for service details and pricing.'
         }
     ];
 
@@ -104,9 +94,29 @@ const ProviderPublicProfile = () => {
             loadClosestAvailability();
             loadPortfolio();
             loadPromotions();
+            loadProviderServices();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provider]);
+
+    const loadProviderServices = async () => {
+        if (!provider?.id) return;
+        setLoadingServices(true);
+        try {
+            const data = await request(`/provider/${provider.id}/services`);
+            const services = data.services || [];
+            setProviderServices(services);
+            // Auto-select first service if available
+            if (services.length > 0 && !selectedService) {
+                setSelectedService(services[0]);
+            }
+        } catch (error) {
+            console.error('[services] Failed to load provider services:', error);
+            setProviderServices([]);
+        } finally {
+            setLoadingServices(false);
+        }
+    };
 
     const loadPortfolio = async () => {
         if (!provider?.id) return;
@@ -147,7 +157,7 @@ const ProviderPublicProfile = () => {
                     bio: profile.bio,
                     review_count: 48
                 });
-                setSelectedService(serviceOptions[0]);
+                // Don't set selectedService here - let loadProviderServices handle it
             } else {
                 // Otherwise, fetch from API
                 console.log('[ProviderPublicProfile] Fetching providers, looking for ID:', providerId);
@@ -158,7 +168,7 @@ const ProviderPublicProfile = () => {
                 console.log('[ProviderPublicProfile] Found provider:', found);
                 if (found) {
                     setProvider(found);
-                    setSelectedService(serviceOptions[0]);
+                    // Don't set selectedService here - let loadProviderServices handle it
                 } else {
                     console.error('[ProviderPublicProfile] Provider not found. Looking for:', providerId);
                     setProvider(null);
@@ -560,7 +570,9 @@ const ProviderPublicProfile = () => {
                                     {/* Pricing */}
                                     <div className="mb-6">
                                         <div className="flex items-baseline gap-2 mb-2">
-                                            <span className="text-3xl font-bold text-gray-900">$35</span>
+                                            <span className="text-3xl font-bold text-gray-900">
+                                                ${provider.hourly_rate ? Math.floor(provider.hourly_rate / 100) : (provider.hourlyRate ? Math.floor(provider.hourlyRate / 100) : 35)}
+                                            </span>
                                             <span className="text-gray-600">per hour</span>
                                         </div>
                                         <p className="text-sm text-gray-500">Starting rate</p>
@@ -571,31 +583,55 @@ const ProviderPublicProfile = () => {
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             Select Service
                                         </label>
-                                        <div className="space-y-3">
-                                            {serviceOptions.map((service) => (
-                                                <button
-                                                    key={service.id}
-                                                    onClick={() => setSelectedService(service)}
-                                                    className={`w-full flex flex-col items-start p-4 rounded-xl border-2 transition-all ${
-                                                        selectedService?.id === service.id
-                                                            ? 'border-orange-500 bg-orange-50'
-                                                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between w-full mb-2">
-                                                        <p className="font-semibold text-gray-900">
-                                                            {service.name}
-                                                        </p>
-                                                        <span className="font-bold text-gray-900">
-                                                            ${service.price}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-gray-600 text-left">
-                                                        {service.description}
-                                                    </p>
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {loadingServices ? (
+                                            <div className="text-center py-4">
+                                                <div className="w-6 h-6 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-2"></div>
+                                                <p className="text-sm text-gray-500">Loading services...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {(providerServices.length > 0 ? providerServices : fallbackServices).map((service) => {
+                                                    // Price is in cents, convert to dollars for display
+                                                    const displayPrice = typeof service.price === 'number'
+                                                        ? (service.price >= 100 ? (service.price / 100).toFixed(0) : service.price)
+                                                        : service.price;
+
+                                                    return (
+                                                        <button
+                                                            key={service.id}
+                                                            onClick={() => setSelectedService(service)}
+                                                            className={`w-full flex flex-col items-start p-4 rounded-xl border-2 transition-all ${selectedService?.id === service.id
+                                                                ? 'border-orange-500 bg-orange-50'
+                                                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center justify-between w-full mb-2">
+                                                                <p className="font-semibold text-gray-900">
+                                                                    {service.name}
+                                                                </p>
+                                                                <span className="font-bold text-gray-900">
+                                                                    ${displayPrice}
+                                                                    {service.unit && <span className="text-sm font-normal text-gray-500">/{service.unit}</span>}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-600 text-left">
+                                                                {service.description}
+                                                            </p>
+                                                            {service.duration && (
+                                                                <p className="text-xs text-gray-400 mt-1">
+                                                                    Duration: {service.duration} mins
+                                                                </p>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {!loadingServices && providerServices.length === 0 && (
+                                            <p className="text-xs text-gray-500 mt-2 text-center">
+                                                This provider hasn't added their services yet. Contact them for details.
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Closest Available Dates */}
@@ -663,11 +699,10 @@ const ProviderPublicProfile = () => {
                                                     <button
                                                         key={index}
                                                         onClick={() => setSelectedDate(date)}
-                                                        className={`flex flex-col items-center p-2 rounded-lg border transition-all ${
-                                                            isSelected
-                                                                ? 'border-orange-500 bg-orange-500 text-white'
-                                                                : 'border-gray-200 hover:border-gray-300 bg-white text-gray-900'
-                                                        }`}
+                                                        className={`flex flex-col items-center p-2 rounded-lg border transition-all ${isSelected
+                                                            ? 'border-orange-500 bg-orange-500 text-white'
+                                                            : 'border-gray-200 hover:border-gray-300 bg-white text-gray-900'
+                                                            }`}
                                                     >
                                                         <span className={`text-xs mb-1 ${isSelected ? 'text-white' : 'text-gray-600'}`}>
                                                             {dayName}
@@ -826,87 +861,87 @@ const ProviderPublicProfile = () => {
                                 </div>
                             </div>
                             <div className="p-6 pb-8">
-                            <p className="text-gray-600 mb-6">
-                                Can't find a time that works for you? Request your preferred date and time. The provider will review your request and let you know if they can accommodate it.
-                            </p>
+                                <p className="text-gray-600 mb-6">
+                                    Can't find a time that works for you? Request your preferred date and time. The provider will review your request and let you know if they can accommodate it.
+                                </p>
 
-                            <div className="space-y-4">
-                                {/* Selected Service Display */}
-                                {selectedService && (
-                                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                                        <p className="text-sm text-gray-600 mb-1">Service</p>
-                                        <p className="font-semibold text-gray-900">{selectedService.name}</p>
+                                <div className="space-y-4">
+                                    {/* Selected Service Display */}
+                                    {selectedService && (
+                                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                            <p className="text-sm text-gray-600 mb-1">Service</p>
+                                            <p className="font-semibold text-gray-900">{selectedService.name}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Date Input */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                            Preferred Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            min={new Date().toISOString().split('T')[0]}
+                                            value={timeRequestForm.requestedDate}
+                                            onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedDate: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
                                     </div>
-                                )}
 
-                                {/* Date Input */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                        Preferred Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        min={new Date().toISOString().split('T')[0]}
-                                        value={timeRequestForm.requestedDate}
-                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedDate: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    />
-                                </div>
+                                    {/* Time Input */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                            Preferred Time
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={timeRequestForm.requestedTime}
+                                            onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedTime: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
 
-                                {/* Time Input */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                        Preferred Time
-                                    </label>
-                                    <input
-                                        type="time"
-                                        value={timeRequestForm.requestedTime}
-                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, requestedTime: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    />
-                                </div>
+                                    {/* Notes Input */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                            Additional Notes (Optional)
+                                        </label>
+                                        <textarea
+                                            value={timeRequestForm.notes}
+                                            onChange={(e) => setTimeRequestForm({ ...timeRequestForm, notes: e.target.value })}
+                                            placeholder="Any special requests or information for the provider..."
+                                            rows={3}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                        />
+                                    </div>
 
-                                {/* Notes Input */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                        Additional Notes (Optional)
-                                    </label>
-                                    <textarea
-                                        value={timeRequestForm.notes}
-                                        onChange={(e) => setTimeRequestForm({ ...timeRequestForm, notes: e.target.value })}
-                                        placeholder="Any special requests or information for the provider..."
-                                        rows={3}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                                    />
-                                </div>
-
-                                {/* Info Banner */}
-                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <div className="flex items-start gap-2">
-                                        <Icons.Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                                        <p className="text-sm text-gray-700">
-                                            This is a request, not a confirmed booking. The provider will review and either accept or decline your request. Even if they have an appointment at this time, they may choose to accommodate you.
-                                        </p>
+                                    {/* Info Banner */}
+                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div className="flex items-start gap-2">
+                                            <Icons.Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                            <p className="text-sm text-gray-700">
+                                                This is a request, not a confirmed booking. The provider will review and either accept or decline your request. Even if they have an appointment at this time, they may choose to accommodate you.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    onClick={() => setShowTimeRequestModal(false)}
-                                    className="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleRequestTime}
-                                    disabled={submittingRequest}
-                                    className="flex-1 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {submittingRequest ? 'Sending...' : 'Send Request'}
-                                </button>
-                            </div>
+                                {/* Action Buttons */}
+                                <div className="flex gap-3 mt-6">
+                                    <button
+                                        onClick={() => setShowTimeRequestModal(false)}
+                                        className="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleRequestTime}
+                                        disabled={submittingRequest}
+                                        className="flex-1 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {submittingRequest ? 'Sending...' : 'Send Request'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

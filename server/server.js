@@ -21,15 +21,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 const supabase =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
-      )
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    )
     : null;
 
 const app = express();
@@ -441,6 +441,55 @@ app.post("/api/create-checkout-session", async (req, res) => {
     console.error("[stripe] Failed to create checkout session", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Get services for a specific provider (for public profile)
+app.get("/api/provider/:providerId/services", async (req, res) => {
+  const { providerId } = req.params;
+
+  if (!providerId) {
+    return res.status(400).json({ error: "providerId is required." });
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("services")
+        .select("*")
+        .eq("provider_id", providerId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.warn("[supabase] Failed to load provider services, using stub.", error);
+      } else {
+        // Transform to client-friendly format
+        const services = data.map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          category: s.category,
+          price: s.base_price,
+          basePrice: s.base_price,
+          base_price: s.base_price,
+          unit: s.unit || 'visit',
+          duration: s.duration || 60,
+          provider_id: s.provider_id
+        }));
+        return res.status(200).json({ services });
+      }
+    } catch (error) {
+      console.warn("[supabase] Unexpected error fetching provider services", error);
+    }
+  }
+
+  // Fallback to mock data filtered by provider
+  const mockServices = memoryStore.services.map(s => ({
+    ...s,
+    price: s.basePrice,
+    base_price: s.basePrice
+  }));
+  res.status(200).json({ services: mockServices });
 });
 
 app.get("/api/services", async (req, res) => {
@@ -2451,15 +2500,15 @@ app.get("/api/provider/invoices/:invoiceId/pdf", async (req, res) => {
     // Format dates
     const invoiceDate = invoice.issued_at
       ? new Date(invoice.issued_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
       : new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
 
     // Header - Company/Provider Info
     doc.fontSize(24).font('Helvetica-Bold').fillColor('#F58027').text('PROXEY', 50, 50);
@@ -2738,8 +2787,8 @@ function normalizeBooking(record) {
     typeof amountCandidate === "number"
       ? amountCandidate
       : record.amount
-      ? Number(record.amount)
-      : 0;
+        ? Number(record.amount)
+        : 0;
 
   let amountInCents = 0;
   if (numericAmount > 0) {
