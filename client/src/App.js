@@ -28,6 +28,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import AccountPage from './pages/AccountPage';
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
+import ClientInvoices from './pages/ClientInvoices';
 
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -87,6 +88,7 @@ function App() {
                       <Route path="messages" element={<MessagesPage />} />
                       <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="account" element={<AccountPage />} />
+                      <Route path="invoices" element={<ClientInvoices />} />
                       <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
                     </Route>
 

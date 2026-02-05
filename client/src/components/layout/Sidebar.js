@@ -14,6 +14,7 @@ export const Sidebar = ({ role }) => {
     const clientLinks = [
         { id: 'home', path: '/app', label: 'Home', icon: Icons.Dashboard },
         { id: 'bookings', path: '/app/bookings', label: 'My Bookings', icon: Icons.Calendar },
+        { id: 'invoices', path: '/app/invoices', label: 'Invoices', icon: Icons.FileText },
         { id: 'messages', path: '/app/messages', label: 'Messages', icon: Icons.Message, badge: unreadMessages },
         { id: 'profile', path: '/app/account', label: 'Profile', icon: Icons.User },
     ];

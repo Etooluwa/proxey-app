@@ -2530,6 +2530,72 @@ app.post("/api/provider/time-blocks", async (req, res) => {
   }
 });
 
+// ============================================
+// Client Invoices
+// ============================================
+
+// GET /api/client/invoices - Fetch all invoices for the current client
+app.get("/api/client/invoices", async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ invoices: [] });
+  }
+
+  const clientId = getClientId(req);
+
+  if (!clientId) {
+    return res.status(401).json({ error: "Client not authenticated" });
+  }
+
+  try {
+    // Fetch all bookings for this client - these serve as invoices
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[supabase] Failed to fetch client invoices:", error);
+      return res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+
+    // Transform bookings to invoice format
+    const invoices = (bookings || []).map(booking => ({
+      id: booking.id,
+      booking_id: booking.id,
+      invoice_number: `INV-${booking.id.substring(0, 8).toUpperCase()}`,
+      client_id: booking.client_id,
+      client_name: booking.client_name,
+      client_email: booking.client_email,
+      provider_id: booking.provider_id,
+      provider_name: booking.provider_name,
+      service_id: booking.service_id,
+      service_name: booking.service_name,
+      service_description: booking.service_description,
+      scheduled_at: booking.scheduled_at,
+      duration: booking.duration,
+      location: booking.location,
+      address: booking.address,
+      price: booking.price,
+      total_amount: booking.price,
+      currency: booking.currency || 'USD',
+      status: booking.status,
+      payment_status: booking.payment_status,
+      payment_intent_id: booking.payment_intent_id,
+      notes: booking.notes,
+      created_at: booking.created_at,
+      issued_at: booking.created_at,
+      updated_at: booking.updated_at,
+      completed_at: booking.completed_at
+    }));
+
+    res.status(200).json({ invoices });
+  } catch (err) {
+    console.error("[client invoices] Unexpected error:", err);
+    res.status(500).json({ error: "Failed to fetch invoices" });
+  }
+});
+
 // Provider invoices
 app.get("/api/provider/invoices", async (req, res) => {
   if (!supabase) {
