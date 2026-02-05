@@ -5,36 +5,18 @@ import { fetchProviders } from '../data/providers';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
 
-// Mock data for reviews
-const MOCK_REVIEWS = [
-    {
-        id: 1,
-        clientName: 'Sarah Johnson',
-        clientAvatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=f97316&color=fff',
-        rating: 5,
-        date: '2 weeks ago',
-        comment: 'Exceptional service! Very thorough and professional. My home has never looked better. Highly recommend!',
-        verified: true
-    },
-    {
-        id: 2,
-        clientName: 'Michael Chen',
-        clientAvatar: 'https://ui-avatars.com/api/?name=Michael+Chen&background=3b82f6&color=fff',
-        rating: 5,
-        date: '1 month ago',
-        comment: 'Always on time and does an amazing job. I have been using this service for 6 months now.',
-        verified: true
-    },
-    {
-        id: 3,
-        clientName: 'Emily Rodriguez',
-        clientAvatar: 'https://ui-avatars.com/api/?name=Emily+Rodriguez&background=ec4899&color=fff',
-        rating: 4,
-        date: '1 month ago',
-        comment: 'Great attention to detail. Very satisfied with the quality of work.',
-        verified: true
-    }
-];
+const formatReviewDate = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 1) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 const ProviderPublicProfile = () => {
     const { providerId } = useParams();
@@ -57,6 +39,8 @@ const ProviderPublicProfile = () => {
     const [submittingRequest, setSubmittingRequest] = useState(false);
     const [portfolioItems, setPortfolioItems] = useState([]);
     const [promotions, setPromotions] = useState([]);
+    const [reviews, setReviews] = useState([]);
+    const [providerStats, setProviderStats] = useState(null);
     const [providerServices, setProviderServices] = useState([]);
     const [loadingServices, setLoadingServices] = useState(false);
 
@@ -95,6 +79,8 @@ const ProviderPublicProfile = () => {
             loadPortfolio();
             loadPromotions();
             loadProviderServices();
+            loadReviews();
+            loadStats();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provider]);
@@ -140,6 +126,27 @@ const ProviderPublicProfile = () => {
         }
     };
 
+    const loadReviews = async () => {
+        if (!provider?.id) return;
+        try {
+            const data = await request(`/provider/${provider.id}/reviews`);
+            setReviews(data.reviews || []);
+        } catch (error) {
+            console.error('[reviews] Failed to load reviews:', error);
+            setReviews([]);
+        }
+    };
+
+    const loadStats = async () => {
+        if (!provider?.id) return;
+        try {
+            const data = await request(`/provider/${provider.id}/stats`);
+            setProviderStats(data.stats || null);
+        } catch (error) {
+            console.error('[stats] Failed to load stats:', error);
+        }
+    };
+
     const loadProvider = async () => {
         setLoading(true);
         try {
@@ -151,11 +158,7 @@ const ProviderPublicProfile = () => {
                     avatar: profile.avatar || profile.profilePhoto,
                     headline: profile.headline || profile.bio,
                     location: profile.city || profile.location,
-                    rating: 4.9,
-                    jobs_completed: 127,
-                    repeat_percentage: '89%',
                     bio: profile.bio,
-                    review_count: 48
                 });
                 // Don't set selectedService here - let loadProviderServices handle it
             } else {
@@ -429,20 +432,20 @@ const ProviderPublicProfile = () => {
                                         <div className="flex items-center justify-center gap-1 mb-1">
                                             <Icons.Star size={20} className="text-yellow-400 fill-yellow-400" />
                                             <span className="text-2xl font-bold text-gray-900">
-                                                {provider.rating?.toFixed(1) || '4.9'}
+                                                {providerStats?.rating?.toFixed(1) || provider.rating?.toFixed(1) || 'New'}
                                             </span>
                                         </div>
                                         <p className="text-sm text-gray-600">Rating</p>
                                     </div>
                                     <div className="text-center border-l border-r border-gray-100">
                                         <div className="text-2xl font-bold text-gray-900 mb-1">
-                                            {provider.jobs_completed || 127}
+                                            {providerStats?.jobs_completed ?? provider.jobs_completed ?? 0}
                                         </div>
                                         <p className="text-sm text-gray-600">Jobs</p>
                                     </div>
                                     <div className="text-center">
                                         <div className="text-2xl font-bold text-gray-900 mb-1">
-                                            {provider.repeat_percentage || '89%'}
+                                            {providerStats ? `${providerStats.repeat_percentage}%` : (provider.repeat_percentage || '0%')}
                                         </div>
                                         <p className="text-sm text-gray-600">Repeat %</p>
                                     </div>
@@ -522,44 +525,52 @@ const ProviderPublicProfile = () => {
                                 <div className="flex items-center justify-between mb-6">
                                     <h2 className="text-xl font-bold text-gray-900">Client Reviews</h2>
                                     <span className="text-sm text-gray-600">
-                                        {provider.review_count || 48} reviews
+                                        {providerStats?.review_count || reviews.length} review{(providerStats?.review_count || reviews.length) !== 1 ? 's' : ''}
                                     </span>
                                 </div>
 
-                                <div className="space-y-6">
-                                    {MOCK_REVIEWS.map((review) => (
-                                        <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
-                                            <div className="flex items-start gap-4">
-                                                <img
-                                                    src={review.clientAvatar}
-                                                    alt={review.clientName}
-                                                    className="w-12 h-12 rounded-full"
-                                                />
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <h4 className="font-semibold text-gray-900">
-                                                                    {review.clientName}
-                                                                </h4>
-                                                                {review.verified && (
-                                                                    <Icons.CheckCircle size={16} className="text-green-600" />
-                                                                )}
+                                {reviews.length > 0 ? (
+                                    <div className="space-y-6">
+                                        {reviews.map((review) => (
+                                            <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                                                <div className="flex items-start gap-4">
+                                                    <img
+                                                        src={review.client_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.client_name || 'Client')}&background=f97316&color=fff`}
+                                                        alt={review.client_name || 'Client'}
+                                                        className="w-12 h-12 rounded-full"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <h4 className="font-semibold text-gray-900">
+                                                                        {review.client_name || 'Client'}
+                                                                    </h4>
+                                                                    {review.is_verified && (
+                                                                        <Icons.CheckCircle size={16} className="text-green-600" />
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-sm text-gray-500">{formatReviewDate(review.created_at)}</p>
                                                             </div>
-                                                            <p className="text-sm text-gray-500">{review.date}</p>
                                                         </div>
+                                                        <div className="flex gap-1 mb-2">
+                                                            {renderStars(review.rating)}
+                                                        </div>
+                                                        <p className="text-gray-600 leading-relaxed">
+                                                            {review.comment}
+                                                        </p>
                                                     </div>
-                                                    <div className="flex gap-1 mb-2">
-                                                        {renderStars(review.rating)}
-                                                    </div>
-                                                    <p className="text-gray-600 leading-relaxed">
-                                                        {review.comment}
-                                                    </p>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-400">
+                                        <Icons.Star size={32} className="mx-auto mb-3 text-gray-300" />
+                                        <p className="text-sm">No reviews yet</p>
+                                        <p className="text-xs mt-1">Be the first to leave a review after booking!</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

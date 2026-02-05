@@ -1674,6 +1674,63 @@ app.post("/api/messages", async (req, res) => {
   }
 });
 
+// Public provider stats (jobs completed, rating, review count)
+app.get("/api/provider/:id/stats", async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ stats: { jobs_completed: 0, rating: 0, review_count: 0, repeat_percentage: 0 } });
+  }
+
+  const providerId = req.params.id;
+
+  try {
+    // Get completed bookings count
+    const { count: jobsCount } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("provider_id", providerId)
+      .eq("status", "completed");
+
+    // Get reviews stats
+    const { data: reviews } = await supabase
+      .from("reviews")
+      .select("rating")
+      .eq("provider_id", providerId);
+
+    const reviewCount = reviews?.length || 0;
+    const avgRating = reviewCount > 0
+      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1)
+      : 0;
+
+    // Get repeat client percentage
+    const { data: allBookings } = await supabase
+      .from("bookings")
+      .select("client_id")
+      .eq("provider_id", providerId)
+      .eq("status", "completed");
+
+    let repeatPercentage = 0;
+    if (allBookings && allBookings.length > 1) {
+      const clientCounts = {};
+      allBookings.forEach(b => { clientCounts[b.client_id] = (clientCounts[b.client_id] || 0) + 1; });
+      const repeatClients = Object.values(clientCounts).filter(c => c > 1).length;
+      const totalClients = Object.keys(clientCounts).length;
+      repeatPercentage = totalClients > 0 ? Math.round((repeatClients / totalClients) * 100) : 0;
+    }
+
+    res.status(200).json({
+      stats: {
+        jobs_completed: jobsCount || 0,
+        rating: Number(avgRating),
+        review_count: reviewCount,
+        repeat_percentage: repeatPercentage,
+      }
+    });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider stats", err);
+    res.status(200).json({ stats: { jobs_completed: 0, rating: 0, review_count: 0, repeat_percentage: 0 } });
+  }
+});
+
 app.get("/api/provider/:id/reviews", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });

@@ -59,7 +59,7 @@ const ProviderEarnings = () => {
     // Earnings data from API
     const [earningsData, setEarningsData] = useState(null);
     const [loadingEarnings, setLoadingEarnings] = useState(true);
-    const [earningsError, setEarningsError] = useState(null);
+    const [, setEarningsError] = useState(null);
 
     // Fetch earnings data on mount
     useEffect(() => {
@@ -90,7 +90,7 @@ const ProviderEarnings = () => {
     const transactions = earningsData?.transactions || DEFAULT_TRANSACTIONS;
     const payoutMethod = earningsData?.payoutMethod || { type: 'bank', name: 'Not Set Up', last4: '••••', status: 'inactive' };
     const nextPayoutDate = earningsData?.nextPayoutDate || 'Not scheduled';
-    const stats = earningsData?.stats || { totalJobs: 0, thisMonthJobs: 0, averageJobValue: 0 };
+    const _stats = earningsData?.stats || { totalJobs: 0, thisMonthJobs: 0, averageJobValue: 0 }; // eslint-disable-line no-unused-vars
 
     // Get current month name
     const currentMonthName = new Date().toLocaleDateString('en-US', { month: 'short' });

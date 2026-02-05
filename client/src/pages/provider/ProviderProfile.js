@@ -9,32 +9,10 @@ import { uploadPortfolioImage, deletePortfolioImage } from '../../utils/portfoli
 import { uploadProfilePhoto } from '../../utils/photoUpload';
 import { request } from '../../data/apiClient';
 
-const REVIEWS = [
-    {
-        id: 1,
-        client: 'Michael Scott',
-        rating: 5,
-        date: 'Oct 20, 2023',
-        text: 'Jane did a fantastic job! The house has never been cleaner. Highly recommended.',
-        avatar: 'https://picsum.photos/seed/michael/100/100'
-    },
-    {
-        id: 2,
-        client: 'Pam Beesly',
-        rating: 5,
-        date: 'Oct 15, 2023',
-        text: 'Very professional and punctual. Will book again.',
-        avatar: 'https://picsum.photos/seed/pam/100/100'
-    },
-    {
-        id: 3,
-        client: 'Dwight Schrute',
-        rating: 4,
-        date: 'Sep 28, 2023',
-        text: 'Acceptable performance. Missed a spot on the beet shelf.',
-        avatar: 'https://picsum.photos/seed/dwight/100/100'
-    }
-];
+const formatReviewDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 const ProviderProfile = () => {
     const { profile, session, logout, updateProfile } = useSession();
@@ -50,6 +28,8 @@ const ProviderProfile = () => {
     const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
     const [isUploadingCover, setIsUploadingCover] = useState(false);
     const [activePromotions, setActivePromotions] = useState([]);
+    const [providerReviews, setProviderReviews] = useState([]);
+    const [providerStats, setProviderStats] = useState(null);
 
     useEffect(() => {
         if (profile?.bio) setBio(profile.bio);
@@ -79,12 +59,36 @@ const ProviderProfile = () => {
         }
     }, []);
 
+    // Load reviews for this provider
+    const loadReviews = useCallback(async () => {
+        if (!session?.user?.id) return;
+        try {
+            const data = await request(`/provider/${session.user.id}/reviews`);
+            setProviderReviews(data.reviews || []);
+        } catch (error) {
+            console.error('[reviews] Failed to load reviews:', error);
+        }
+    }, [session?.user?.id]);
+
+    // Load provider stats
+    const loadStats = useCallback(async () => {
+        if (!session?.user?.id) return;
+        try {
+            const data = await request(`/provider/${session.user.id}/stats`);
+            setProviderStats(data.stats || null);
+        } catch (error) {
+            console.error('[stats] Failed to load stats:', error);
+        }
+    }, [session?.user?.id]);
+
     useEffect(() => {
         if (session?.user?.id) {
             loadPortfolio();
             loadPromotions();
+            loadReviews();
+            loadStats();
         }
-    }, [session?.user?.id, loadPortfolio, loadPromotions]);
+    }, [session?.user?.id, loadPortfolio, loadPromotions, loadReviews, loadStats]);
 
     const handleLogout = async () => {
         await logout();
@@ -294,7 +298,7 @@ const ProviderProfile = () => {
                                 <p className="text-brand-600 font-medium">{categoryLabel}</p>
                                 <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
                                     <span className="flex items-center gap-1"><Icons.MapPin size={14} /> {profile?.city || 'Location'}</span>
-                                    <span className="flex items-center gap-1"><Icons.Star size={14} className="text-yellow-400 fill-current" /> 4.9 (128 reviews)</span>
+                                    <span className="flex items-center gap-1"><Icons.Star size={14} className="text-yellow-400 fill-current" /> {providerStats?.rating?.toFixed(1) || 'New'} ({providerStats?.review_count || 0} reviews)</span>
                                 </div>
                             </div>
                         </div>
@@ -530,36 +534,44 @@ const ProviderProfile = () => {
                     <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-gray-900">Recent Reviews</h3>
-                            <button className="text-sm font-bold text-gray-400 hover:text-gray-600">View All</button>
+                            <span className="text-sm text-gray-400">{providerReviews.length} review{providerReviews.length !== 1 ? 's' : ''}</span>
                         </div>
-                        <div className="space-y-6">
-                            {REVIEWS.map((review) => (
-                                <div key={review.id} className="border-b border-gray-50 last:border-0 pb-6 last:pb-0">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <img src={review.avatar} alt={review.client} className="w-10 h-10 rounded-full object-cover" />
-                                            <div>
-                                                <h4 className="font-bold text-gray-900 text-sm">{review.client}</h4>
-                                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                                    <div className="flex text-yellow-400">
-                                                        {[...Array(5)].map((_, i) => (
-                                                            <Icons.Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-gray-300"} />
-                                                        ))}
+                        {providerReviews.length > 0 ? (
+                            <div className="space-y-6">
+                                {providerReviews.map((review) => (
+                                    <div key={review.id} className="border-b border-gray-50 last:border-0 pb-6 last:pb-0">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <img
+                                                    src={review.client_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.client_name || 'Client')}&background=f97316&color=fff`}
+                                                    alt={review.client_name || 'Client'}
+                                                    className="w-10 h-10 rounded-full object-cover"
+                                                />
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900 text-sm">{review.client_name || 'Client'}</h4>
+                                                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                                                        <div className="flex text-yellow-400">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <Icons.Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-gray-300"} />
+                                                            ))}
+                                                        </div>
+                                                        <span>• {formatReviewDate(review.created_at)}</span>
                                                     </div>
-                                                    <span>• {review.date}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <Icons.Message size={16} />
-                                        </button>
+                                        <p className="text-sm text-gray-600 leading-relaxed pl-[52px]">
+                                            "{review.comment}"
+                                        </p>
                                     </div>
-                                    <p className="text-sm text-gray-600 leading-relaxed pl-[52px]">
-                                        "{review.text}"
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-6 text-gray-400">
+                                <Icons.Star size={28} className="mx-auto mb-2 text-gray-300" />
+                                <p className="text-sm">No reviews yet</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Account Actions - Moved to bottom */}
