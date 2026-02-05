@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 import Skeleton from "../../components/ui/Skeleton";
 import { useToast } from "../../components/ui/ToastProvider";
 import { useSession } from "../../auth/authContext";
-import { fetchProviderInvoices, createProviderInvoice, fetchProviderJobs } from "../../data/provider";
+import { fetchProviderInvoices, createProviderInvoice, fetchProviderJobs, downloadInvoicePDF } from "../../data/provider";
 import "../../styles/provider/providerInvoices.css";
 
 function ProviderInvoices() {
@@ -140,23 +140,22 @@ function ProviderInvoices() {
     address: inv.address || "N/A",
   });
 
-  const handleDownloadInvoice = (invoice) => {
-    const invoiceHTML = generateInvoiceHTML(invoice);
-    const blob = new Blob([invoiceHTML], { type: "text/html" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${invoice.invoiceNumber}.html`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    toast.push({
-      title: "Invoice downloaded",
-      description: `${invoice.invoiceNumber} has been downloaded`,
-      variant: "success",
-    });
+  const handleDownloadInvoice = async (invoice) => {
+    try {
+      await downloadInvoicePDF(invoice.id);
+      toast.push({
+        title: "Invoice downloaded",
+        description: `${invoice.invoiceNumber} has been downloaded as PDF`,
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Failed to download invoice:", error);
+      toast.push({
+        title: "Download failed",
+        description: "Could not download the invoice. Please try again.",
+        variant: "error",
+      });
+    }
   };
 
   const handlePrintInvoice = (invoice) => {

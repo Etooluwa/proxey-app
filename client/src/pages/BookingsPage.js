@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
+import ReviewModal from '../components/ui/ReviewModal';
+import { submitReview } from '../data/bookings';
 
 const BookingsPage = () => {
     const navigate = useNavigate();
-    const { session } = useSession();
+    const { session, profile } = useSession();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('upcoming');
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [reviewLoading, setReviewLoading] = useState(false);
 
     useEffect(() => {
         loadBookings();
@@ -140,6 +145,48 @@ const BookingsPage = () => {
         } catch (error) {
             console.error('Failed to download invoice:', error);
             alert('Failed to download invoice. Please try again.');
+        }
+    };
+
+    // Open review modal for a booking
+    const handleOpenReview = (booking) => {
+        setSelectedBooking(booking);
+        setReviewModalOpen(true);
+    };
+
+    // Submit review
+    const handleSubmitReview = async ({ rating, comment }) => {
+        if (!selectedBooking) return;
+
+        setReviewLoading(true);
+        try {
+            await submitReview({
+                bookingId: selectedBooking.id,
+                providerId: selectedBooking.provider_id,
+                userId: profile?.id || session?.user?.id,
+                rating,
+                comment,
+            });
+
+            // Mark booking as reviewed locally
+            setBookings(prev => prev.map(b =>
+                b.id === selectedBooking.id
+                    ? { ...b, has_review: true }
+                    : b
+            ));
+
+            setReviewModalOpen(false);
+            setSelectedBooking(null);
+            alert('Thank you for your review!');
+        } catch (error) {
+            console.error('Failed to submit review:', error);
+            if (error.message?.includes('409') || error.message?.includes('already exists')) {
+                alert('You have already reviewed this booking.');
+            } else {
+                alert('Failed to submit review. Please try again.');
+            }
+        } finally {
+            setReviewLoading(false);
         }
     };
 
@@ -306,6 +353,21 @@ const BookingsPage = () => {
                                                 Cancel Booking
                                             </button>
                                         )}
+                                        {activeTab === 'past' && (booking.status === 'completed' || new Date(booking.scheduled_at) < new Date()) && !booking.has_review && (
+                                            <button
+                                                onClick={() => handleOpenReview(booking)}
+                                                className="px-4 py-2 bg-green-50 text-green-600 rounded-xl font-semibold hover:bg-green-100 transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Icons.Star size={16} />
+                                                Leave Review
+                                            </button>
+                                        )}
+                                        {booking.has_review && (
+                                            <span className="px-4 py-2 text-green-600 text-sm flex items-center justify-center gap-2">
+                                                <Icons.Check size={16} />
+                                                Reviewed
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -350,6 +412,18 @@ const BookingsPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Review Modal */}
+            <ReviewModal
+                open={reviewModalOpen}
+                onClose={() => {
+                    setReviewModalOpen(false);
+                    setSelectedBooking(null);
+                }}
+                onSubmit={handleSubmitReview}
+                booking={selectedBooking}
+                loading={reviewLoading}
+            />
         </div>
     );
 };

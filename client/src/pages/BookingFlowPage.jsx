@@ -10,6 +10,7 @@ import useServices from "../data/useServices";
 import useProviders from "../data/useProviders";
 import { createBooking } from "../data/bookings";
 import { loadDraft, saveDraft, clearDraft } from "../bookings/draftStore";
+import { request } from "../data/apiClient";
 import "../styles/bookingFlow.css";
 
 const STEPS = ["service", "schedule", "location", "custom", "notes", "review"];
@@ -36,6 +37,10 @@ function BookingFlowPage() {
   const [stepIndex, setStepIndex] = useState(existingDraft?.stepIndex || 0);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoError, setPromoError] = useState("");
+  const [validatingPromo, setValidatingPromo] = useState(false);
 
   useEffect(() => {
     saveDraft({ ...form, stepIndex });
@@ -67,6 +72,49 @@ function BookingFlowPage() {
 
   const selectedService = services.find((service) => service.id === form.serviceId);
   const selectedProvider = providers.find((provider) => provider.id === form.providerId);
+
+  const discountAmount = useMemo(() => {
+    if (!appliedPromo || !selectedService?.basePrice) return 0;
+    if (appliedPromo.discountType === "percentage") {
+      return Math.round((selectedService.basePrice * appliedPromo.discountValue) / 100);
+    }
+    // Fixed amount discount (stored in dollars, basePrice in cents)
+    return Math.min(appliedPromo.discountValue * 100, selectedService.basePrice);
+  }, [appliedPromo, selectedService]);
+
+  const finalPrice = selectedService?.basePrice ? selectedService.basePrice - discountAmount : null;
+
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) {
+      setPromoError("Enter a promo code.");
+      return;
+    }
+    setValidatingPromo(true);
+    setPromoError("");
+    try {
+      const result = await request("/promotions/validate", {
+        method: "POST",
+        body: JSON.stringify({
+          promoCode: promoCode.trim(),
+          providerId: form.providerId,
+          serviceName: selectedService?.name || "",
+        }),
+      });
+      setAppliedPromo(result.promotion);
+      setPromoError("");
+    } catch (err) {
+      setAppliedPromo(null);
+      setPromoError(err.payload?.error || err.message || "Invalid promo code.");
+    } finally {
+      setValidatingPromo(false);
+    }
+  };
+
+  const removePromoCode = () => {
+    setAppliedPromo(null);
+    setPromoCode("");
+    setPromoError("");
+  };
 
   const validateStep = () => {
     const nextErrors = {};
@@ -114,6 +162,8 @@ function BookingFlowPage() {
     setSubmitting(true);
     const scheduledAt = new Date(`${form.scheduledDate}T${form.scheduledTime}`);
     try {
+      const effectivePrice = discountAmount > 0 ? finalPrice : (selectedService?.basePrice || null);
+
       const bookingData = {
         serviceId: form.serviceId,
         providerId: form.providerId,
@@ -121,12 +171,21 @@ function BookingFlowPage() {
         location: form.location,
         notes: form.notes,
         status: "upcoming",
-        price: selectedService?.basePrice || null,
+        price: effectivePrice,
+        originalPrice: selectedService?.basePrice || null,
       };
 
+      if (appliedPromo) {
+        bookingData.promotionId = appliedPromo.id;
+        bookingData.promoCode = appliedPromo.promoCode;
+        bookingData.discountType = appliedPromo.discountType;
+        bookingData.discountValue = appliedPromo.discountValue;
+        bookingData.discountAmount = discountAmount;
+      }
+
       if (selectedService?.requiresDeposit) {
-        bookingData.depositAmount = (selectedService.basePrice * selectedService.depositPercentage) / 100;
-        bookingData.finalAmount = selectedService.basePrice - bookingData.depositAmount;
+        bookingData.depositAmount = (effectivePrice * selectedService.depositPercentage) / 100;
+        bookingData.finalAmount = effectivePrice - bookingData.depositAmount;
         bookingData.depositPercentage = selectedService.depositPercentage;
       }
 
@@ -135,6 +194,12 @@ function BookingFlowPage() {
       }
 
       const booking = await createBooking(bookingData);
+
+      // Increment promo code usage after successful booking
+      if (appliedPromo?.id) {
+        request(`/promotions/${appliedPromo.id}/increment-usage`, { method: "PATCH" }).catch(() => {});
+      }
+
       clearDraft();
       toast.push({
         title: "Booking confirmed",
@@ -403,18 +468,69 @@ function BookingFlowPage() {
                 <p>{form.notes}</p>
               </div>
             ) : null}
-            <div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <h3>Promo Code</h3>
+              {appliedPromo ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.25rem" }}>
+                  <span style={{ padding: "0.25rem 0.75rem", background: "rgba(34,197,94,0.1)", color: "#15803d", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 600 }}>
+                    {appliedPromo.promoCode} — {appliedPromo.discountType === "percentage" ? `${appliedPromo.discountValue}% off` : `$${appliedPromo.discountValue} off`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removePromoCode}
+                    style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "0.875rem", textDecoration: "underline" }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginTop: "0.25rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <Input
+                      id="promo-code"
+                      value={promoCode}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoError(""); }}
+                      placeholder="Enter promo code"
+                      error={promoError}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={validatePromoCode}
+                    disabled={validatingPromo}
+                    style={{ whiteSpace: "nowrap", marginTop: "2px" }}
+                  >
+                    {validatingPromo ? "Checking…" : "Apply"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
               <h3>Pricing</h3>
               {selectedService?.basePrice ? (
-                <>
-                  <p>Total: ${(selectedService.basePrice / 100).toFixed(2)}</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  {discountAmount > 0 ? (
+                    <>
+                      <p style={{ color: "#6B7280", textDecoration: "line-through" }}>
+                        Subtotal: ${(selectedService.basePrice / 100).toFixed(2)}
+                      </p>
+                      <p style={{ color: "#15803d", fontSize: "0.875rem" }}>
+                        Discount: -${(discountAmount / 100).toFixed(2)}
+                      </p>
+                      <p style={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                        Total: ${(finalPrice / 100).toFixed(2)}
+                      </p>
+                    </>
+                  ) : (
+                    <p>Total: ${(selectedService.basePrice / 100).toFixed(2)}</p>
+                  )}
                   {selectedService?.requiresDeposit && (
                     <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", color: "#6B7280" }}>
-                      <p>Deposit ({selectedService.depositPercentage}%): ${((selectedService.basePrice * selectedService.depositPercentage) / 100 / 100).toFixed(2)}</p>
-                      <p>Final payment: ${((selectedService.basePrice * (100 - selectedService.depositPercentage)) / 100 / 100).toFixed(2)}</p>
+                      <p>Deposit ({selectedService.depositPercentage}%): ${(((finalPrice || selectedService.basePrice) * selectedService.depositPercentage) / 100 / 100).toFixed(2)}</p>
+                      <p>Final payment: ${(((finalPrice || selectedService.basePrice) * (100 - selectedService.depositPercentage)) / 100 / 100).toFixed(2)}</p>
                     </div>
                   )}
-                </>
+                </div>
               ) : (
                 <p>Provided after confirmation</p>
               )}

@@ -79,6 +79,86 @@ app.get("/", (req, res) => {
   res.send("Booking App Backend Running 🚀");
 });
 
+// ============================================
+// NOTIFICATION HELPERS
+// ============================================
+
+/**
+ * Create a notification for a provider
+ * @param {string} providerId - Provider's user ID
+ * @param {object} notification - { type, title, body, data, request_id, booking_id }
+ */
+async function createProviderNotification(providerId, notification) {
+  if (!supabase || !providerId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .insert({
+        provider_id: providerId,
+        type: notification.type || 'general',
+        title: notification.title,
+        body: notification.body || null,
+        data: notification.data || {},
+        request_id: notification.request_id || null,
+        booking_id: notification.booking_id || null,
+        is_read: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[notifications] Failed to create provider notification:", error);
+      return null;
+    }
+
+    console.log("[notifications] Created provider notification:", data.id);
+    return data;
+  } catch (error) {
+    console.error("[notifications] Error creating provider notification:", error);
+    return null;
+  }
+}
+
+/**
+ * Create a notification for a client
+ * @param {string} userId - Client's user ID
+ * @param {object} notification - { type, title, body, data, request_id, booking_id }
+ */
+async function createClientNotification(userId, notification) {
+  if (!supabase || !userId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from("client_notifications")
+      .insert({
+        user_id: userId,
+        type: notification.type || 'general',
+        title: notification.title,
+        body: notification.body || null,
+        data: notification.data || {},
+        request_id: notification.request_id || null,
+        booking_id: notification.booking_id || null,
+        is_read: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[notifications] Failed to create client notification:", error);
+      return null;
+    }
+
+    console.log("[notifications] Created client notification:", data.id);
+    return data;
+  } catch (error) {
+    console.error("[notifications] Error creating client notification:", error);
+    return null;
+  }
+}
+
+// ============================================
+
 // Service categories endpoint
 const SERVICE_CATEGORIES = [
   { id: "home-cleaning", label: "Home & Cleaning" },
@@ -599,7 +679,7 @@ app.get("/api/bookings/me", async (req, res) => {
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
-        .eq("user_id", userId);
+        .eq("client_id", userId);
       if (error) {
         console.warn("[supabase] Failed to load bookings, using stub.", error);
       } else {
@@ -626,6 +706,12 @@ app.post("/api/bookings", async (req, res) => {
     notes,
     status = "draft",
     price,
+    originalPrice,
+    promotionId,
+    promoCode,
+    discountType,
+    discountValue,
+    discountAmount,
   } = req.body || {};
 
   if (!serviceId || !providerId || !scheduledAt) {
@@ -635,6 +721,20 @@ app.post("/api/bookings", async (req, res) => {
   }
 
   const now = new Date().toISOString();
+
+  // Build metadata for promo/discount info
+  const metadata = {};
+  if (promotionId) {
+    metadata.promotion = {
+      id: promotionId,
+      promoCode,
+      discountType,
+      discountValue,
+      discountAmount,
+      originalPrice: originalPrice ?? null,
+    };
+  }
+
   const booking = {
     id: crypto.randomUUID(),
     userId,
@@ -651,25 +751,53 @@ app.post("/api/bookings", async (req, res) => {
 
   if (supabase) {
     try {
+      const insertData = {
+        id: booking.id,
+        client_id: booking.userId,
+        service_id: booking.serviceId,
+        provider_id: booking.providerId,
+        scheduled_at: booking.scheduledAt,
+        location: booking.location,
+        notes: booking.notes,
+        status: booking.status,
+        price: booking.price,
+      };
+
+      if (Object.keys(metadata).length > 0) {
+        insertData.metadata = metadata;
+      }
+
       const { data, error } = await supabase
         .from("bookings")
-        .insert({
-          id: booking.id,
-          user_id: booking.userId,
-          service_id: booking.serviceId,
-          provider_id: booking.providerId,
-          scheduled_at: booking.scheduledAt,
-          location: booking.location,
-          notes: booking.notes,
-          status: booking.status,
-          price: booking.price,
-        })
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
         console.warn("[supabase] Failed to create booking, using stub.", error);
       } else {
+        // Send notification to provider about new booking request
+        if (data.status === 'pending' || data.status === 'confirmed') {
+          const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          });
+
+          await createProviderNotification(data.provider_id, {
+            type: 'booking_request',
+            title: 'New Booking Request',
+            body: `You have a new booking request for ${scheduledDate}`,
+            booking_id: data.id,
+            data: {
+              service_id: data.service_id,
+              scheduled_at: data.scheduled_at,
+              price: data.price
+            }
+          });
+        }
         return res.status(201).json({ booking: data });
       }
     } catch (error) {
@@ -691,7 +819,7 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
         .from("bookings")
         .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
         .eq("id", bookingId)
-        .eq("user_id", userId)
+        .eq("client_id", userId)
         .select()
         .single();
 
@@ -700,6 +828,27 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
       } else if (!data) {
         return res.status(404).json({ error: "Booking not found." });
       } else {
+        // Notify provider about the cancelled booking
+        if (data.provider_id) {
+          const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          });
+          await createProviderNotification(data.provider_id, {
+            type: 'booking_cancelled',
+            title: 'Booking Cancelled',
+            body: `A booking for ${scheduledDate} has been cancelled by the client`,
+            booking_id: data.id,
+            data: {
+              client_id: data.client_id,
+              scheduled_at: data.scheduled_at,
+              status: 'cancelled'
+            }
+          });
+        }
         return res.status(200).json({ booking: data });
       }
     } catch (error) {
@@ -900,6 +1049,40 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
       if (error) {
         console.warn("[supabase] Failed to update provider job, using stub.", error);
       } else {
+        // Send notification to client about booking status change
+        // Handle both client_id (bookings table) and user_id (if used)
+        const clientId = data.client_id || data.user_id;
+        if (clientId && (status === 'accepted' || status === 'confirmed')) {
+          const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          });
+          await createClientNotification(clientId, {
+            type: 'booking_accepted',
+            title: 'Booking Confirmed!',
+            body: `Your booking for ${scheduledDate} has been confirmed`,
+            booking_id: data.id,
+            data: {
+              provider_id: data.provider_id,
+              scheduled_at: data.scheduled_at,
+              status: 'accepted'
+            }
+          });
+        } else if (clientId && (status === 'declined' || status === 'cancelled')) {
+          await createClientNotification(clientId, {
+            type: 'booking_declined',
+            title: 'Booking Update',
+            body: `Your booking request was not accepted. Please try another time or provider.`,
+            booking_id: data.id,
+            data: {
+              provider_id: data.provider_id,
+              status: 'declined'
+            }
+          });
+        }
         return res.status(200).json({ job: data });
       }
     } catch (error) {
@@ -1145,6 +1328,60 @@ app.patch("/api/notifications/:id/read", async (req, res) => {
   }
 });
 
+// Mark all provider notifications as read
+app.patch("/api/provider/notifications/read-all", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("provider_id", providerId)
+      .eq("is_read", false)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ updated: data?.length || 0 });
+  } catch (err) {
+    console.error("[supabase] Failed to mark all provider notifications read", err);
+    res.status(500).json({ error: "Failed to update notifications." });
+  }
+});
+
+// Delete a provider notification
+app.delete("/api/provider/notifications/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const notificationId = req.params.id;
+  const providerId = getProviderId(req);
+
+  try {
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notificationId)
+      .eq("provider_id", providerId);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[supabase] Failed to delete provider notification", err);
+    res.status(500).json({ error: "Failed to delete notification." });
+  }
+});
+
 app.get("/api/messages/:threadId", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -1200,6 +1437,40 @@ app.post("/api/messages", async (req, res) => {
 
     if (error) {
       throw error;
+    }
+
+    // Send notification to the receiver about the new message
+    // Try to determine if receiver is a provider or client
+    const { data: providerCheck } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("user_id", receiverId)
+      .single();
+
+    if (providerCheck) {
+      // Receiver is a provider
+      await createProviderNotification(receiverId, {
+        type: 'new_message',
+        title: 'New Message',
+        body: body.length > 50 ? body.substring(0, 50) + '...' : body,
+        data: {
+          thread_id: data.thread_id,
+          sender_id: senderId,
+          message_id: data.id
+        }
+      });
+    } else {
+      // Receiver is a client
+      await createClientNotification(receiverId, {
+        type: 'new_message',
+        title: 'New Message',
+        body: body.length > 50 ? body.substring(0, 50) + '...' : body,
+        data: {
+          thread_id: data.thread_id,
+          sender_id: senderId,
+          message_id: data.id
+        }
+      });
     }
 
     const enriched = (await attachProfilesToMessages([data]))?.[0] || data;
@@ -1439,6 +1710,134 @@ app.patch("/api/provider/promotions/:id", async (req, res) => {
   }
 });
 
+// Validate and apply a promo code for a provider
+app.post("/api/promotions/validate", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const { promoCode, providerId, serviceName } = req.body || {};
+
+  if (!promoCode || !providerId) {
+    return res.status(400).json({ error: "promoCode and providerId are required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("promotions")
+      .select("*")
+      .eq("provider_id", providerId)
+      .ilike("promo_code", promoCode)
+      .eq("is_active", true)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: "Invalid promo code." });
+    }
+
+    // Check date validity
+    const now = new Date();
+    if (data.start_at && new Date(data.start_at) > now) {
+      return res.status(400).json({ error: "This promotion has not started yet." });
+    }
+    if (data.end_at && new Date(data.end_at) < now) {
+      return res.status(400).json({ error: "This promotion has expired." });
+    }
+
+    // Check usage limit
+    if (data.usage_limit && data.usage_count >= data.usage_limit) {
+      return res.status(400).json({ error: "This promotion has reached its usage limit." });
+    }
+
+    // Check if service is applicable
+    const applicableServices = data.applicable_services || [];
+    if (applicableServices.length > 0 && serviceName) {
+      const isApplicable = applicableServices.some(
+        (s) => s.toLowerCase() === serviceName.toLowerCase() || s.toLowerCase() === 'all services'
+      );
+      if (!isApplicable) {
+        return res.status(400).json({ error: "This promo code does not apply to the selected service." });
+      }
+    }
+
+    res.status(200).json({
+      valid: true,
+      promotion: {
+        id: data.id,
+        promoCode: data.promo_code,
+        discountType: data.discount_type,
+        discountValue: Number(data.discount_value),
+        applicableServices: data.applicable_services,
+      }
+    });
+  } catch (err) {
+    console.error("[supabase] Failed to validate promo code", err);
+    res.status(500).json({ error: "Failed to validate promo code." });
+  }
+});
+
+// Get active promotions for a specific provider (public)
+app.get("/api/provider/:providerId/promotions", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = req.params.providerId;
+
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("promotions")
+      .select("id, promo_code, discount_type, discount_value, applicable_services, start_at, end_at")
+      .eq("provider_id", providerId)
+      .eq("is_active", true)
+      .or(`end_at.is.null,end_at.gte.${now}`)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ promotions: data || [] });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider promotions", err);
+    res.status(500).json({ error: "Failed to load promotions." });
+  }
+});
+
+// Increment promo code usage after successful booking
+app.patch("/api/promotions/:id/increment-usage", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const promotionId = req.params.id;
+
+  try {
+    const { error } = await supabase.rpc('increment_promotion_usage', { promo_id: promotionId });
+    if (error) {
+      // Fallback: manual increment
+      const { data: promo } = await supabase
+        .from("promotions")
+        .select("usage_count")
+        .eq("id", promotionId)
+        .single();
+
+      if (promo) {
+        await supabase
+          .from("promotions")
+          .update({ usage_count: (promo.usage_count || 0) + 1 })
+          .eq("id", promotionId);
+      }
+    }
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[supabase] Failed to increment promotion usage", err);
+    res.status(200).json({ success: false });
+  }
+});
+
+// Get own portfolio (authenticated provider)
 app.get("/api/provider/portfolio", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -1461,6 +1860,32 @@ app.get("/api/provider/portfolio", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to load portfolio media", err);
     res.status(500).json({ error: "Failed to load portfolio media." });
+  }
+});
+
+// Get portfolio for a specific provider (public)
+app.get("/api/provider/:providerId/portfolio", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = req.params.providerId;
+
+  try {
+    const { data, error } = await supabase
+      .from("portfolio_media")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ media: data });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider portfolio", err);
+    res.status(500).json({ error: "Failed to load portfolio." });
   }
 });
 
@@ -1699,6 +2124,60 @@ app.patch("/api/client/notifications/:id/read", async (req, res) => {
   }
 });
 
+// Mark all client notifications as read
+app.patch("/api/client/notifications/read-all", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    const { data, error } = await supabase
+      .from("client_notifications")
+      .update({ is_read: true })
+      .eq("user_id", userId)
+      .eq("is_read", false)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ updated: data?.length || 0 });
+  } catch (err) {
+    console.error("[supabase] Failed to mark all client notifications read", err);
+    res.status(500).json({ error: "Failed to update notifications." });
+  }
+});
+
+// Delete a client notification
+app.delete("/api/client/notifications/:id", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const notificationId = req.params.id;
+  const userId = getUserId(req);
+
+  try {
+    const { error } = await supabase
+      .from("client_notifications")
+      .delete()
+      .eq("id", notificationId)
+      .eq("user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[supabase] Failed to delete client notification", err);
+    res.status(500).json({ error: "Failed to delete notification." });
+  }
+});
+
 app.get("/api/client/transactions", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -1927,6 +2406,182 @@ app.post("/api/provider/invoices", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to create provider invoice", err);
     res.status(500).json({ error: "Failed to create invoice." });
+  }
+});
+
+// GET /api/provider/invoices/:invoiceId/pdf
+// Generate and download PDF for a provider invoice
+app.get("/api/provider/invoices/:invoiceId/pdf", async (req, res) => {
+  const { invoiceId } = req.params;
+
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  try {
+    // Get invoice details from database
+    const { data: invoice, error } = await supabase
+      .from("provider_invoices")
+      .select("*")
+      .eq("id", invoiceId)
+      .single();
+
+    if (error || !invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    // Get provider details for the invoice header
+    const { data: provider } = await supabase
+      .from("providers")
+      .select("name, email, phone")
+      .eq("user_id", invoice.provider_id)
+      .single();
+
+    // Create PDF document
+    const doc = new PDFDocument({ margin: 50 });
+
+    // Set response headers for PDF download
+    const safeInvoiceNumber = (invoice.invoice_number || invoiceId).replace(/[^a-zA-Z0-9-_]/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${safeInvoiceNumber}.pdf`);
+
+    // Pipe the PDF to response
+    doc.pipe(res);
+
+    // Format dates
+    const invoiceDate = invoice.issued_at
+      ? new Date(invoice.issued_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      : new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+    // Header - Company/Provider Info
+    doc.fontSize(24).font('Helvetica-Bold').fillColor('#F58027').text('PROXEY', 50, 50);
+    doc.fontSize(10).font('Helvetica').fillColor('#333')
+      .text(provider?.name || 'Service Provider', 50, 80)
+      .text(provider?.email || '', 50, 95)
+      .text(provider?.phone || '', 50, 110);
+
+    // Invoice Title
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#333').text('INVOICE', 400, 50);
+    doc.fontSize(10).font('Helvetica')
+      .text(`Invoice #: ${invoice.invoice_number || invoiceId.substring(0, 8).toUpperCase()}`, 400, 80)
+      .text(`Date: ${invoiceDate}`, 400, 95);
+
+    // Status badge
+    const statusColor = invoice.status === 'paid' ? '#16a34a' : '#eab308';
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(statusColor)
+      .text(invoice.status?.toUpperCase() || 'PENDING', 400, 110);
+
+    // Line separator
+    doc.fillColor('#333').moveTo(50, 140).lineTo(550, 140).stroke();
+
+    // Bill To Section
+    doc.fontSize(12).font('Helvetica-Bold').text('BILL TO:', 50, 160);
+    doc.fontSize(10).font('Helvetica')
+      .text(invoice.client_name || 'Client', 50, 180)
+      .text(invoice.client_email || '', 50, 195)
+      .text(invoice.client_phone || '', 50, 210)
+      .text(invoice.address || '', 50, 225);
+
+    // Service Details Section
+    doc.fontSize(12).font('Helvetica-Bold').text('SERVICE DETAILS', 50, 270);
+
+    // Table headers
+    const tableTop = 295;
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Description', 50, tableTop);
+    doc.text('Amount', 450, tableTop, { align: 'right' });
+
+    // Line under headers
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+    // Service details
+    doc.font('Helvetica');
+    doc.text(invoice.service || 'Service', 50, tableTop + 25, { width: 350 });
+
+    if (invoice.description) {
+      doc.fontSize(9).fillColor('#666')
+        .text(invoice.description, 50, tableTop + 40, { width: 350 });
+      doc.fillColor('#333').fontSize(10);
+    }
+
+    const totalAmount = (invoice.total_amount || 0) / 100;
+    doc.text(`$${totalAmount.toFixed(2)}`, 450, tableTop + 25, { align: 'right' });
+
+    // Payment Summary section
+    const summaryTop = tableTop + 100;
+    doc.moveTo(300, summaryTop).lineTo(550, summaryTop).stroke();
+
+    doc.fontSize(10).font('Helvetica');
+    doc.text('Service Amount:', 300, summaryTop + 15);
+    doc.text(`$${totalAmount.toFixed(2)}`, 450, summaryTop + 15, { align: 'right' });
+
+    let currentY = summaryTop + 35;
+
+    // Show deposit if applicable
+    if (invoice.deposit_amount && invoice.deposit_amount > 0) {
+      const depositAmount = invoice.deposit_amount / 100;
+      const finalAmount = (invoice.final_amount || invoice.total_amount - invoice.deposit_amount) / 100;
+
+      doc.text('Deposit Paid:', 300, currentY);
+      doc.text(`-$${depositAmount.toFixed(2)}`, 450, currentY, { align: 'right' });
+      currentY += 20;
+
+      doc.text('Balance Due:', 300, currentY);
+      doc.text(`$${finalAmount.toFixed(2)}`, 450, currentY, { align: 'right' });
+      currentY += 20;
+    }
+
+    // Total line
+    doc.moveTo(300, currentY).lineTo(550, currentY).stroke();
+    currentY += 10;
+
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('TOTAL:', 300, currentY);
+    doc.text(`$${totalAmount.toFixed(2)}`, 450, currentY, { align: 'right' });
+
+    // Payment status indicator
+    currentY += 30;
+    if (invoice.status === 'paid') {
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#16a34a')
+        .text('✓ PAID', 300, currentY);
+      if (invoice.paid_at) {
+        doc.fillColor('#666').font('Helvetica').fontSize(9)
+          .text(`Paid on: ${new Date(invoice.paid_at).toLocaleDateString()}`, 300, currentY + 15);
+      }
+    } else {
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#eab308')
+        .text('⏳ PAYMENT PENDING', 300, currentY);
+    }
+
+    // Notes section
+    if (invoice.notes) {
+      doc.fillColor('#333').fontSize(10).font('Helvetica-Bold')
+        .text('Notes:', 50, summaryTop + 15);
+      doc.font('Helvetica').fontSize(9)
+        .text(invoice.notes, 50, summaryTop + 30, { width: 200 });
+    }
+
+    // Footer
+    doc.fontSize(9).fillColor('#666')
+      .text('Thank you for your business!', 50, 700, { align: 'center', width: 500 })
+      .text('This invoice was generated by Proxey', 50, 715, { align: 'center', width: 500 });
+
+    // Finalize PDF
+    doc.end();
+
+  } catch (error) {
+    console.error("Invoice PDF generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate invoice PDF" });
+    }
   }
 });
 
@@ -2720,6 +3375,27 @@ app.post("/api/time-requests", async (req, res) => {
 
     if (error) throw error;
 
+    // Notify provider about the new time request
+    const requestDateTime = new Date(`${requestedDate}T${requestedTime}`).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+    await createProviderNotification(providerId, {
+      type: 'time_request',
+      title: 'New Time Request',
+      body: `A client is requesting an appointment for ${requestDateTime}`,
+      request_id: data.id,
+      data: {
+        client_id: clientId,
+        client_name: clientName,
+        service_name: serviceName,
+        requested_datetime: data.requested_datetime
+      }
+    });
+
     res.status(201).json({ timeRequest: data });
   } catch (err) {
     console.error("[supabase] Failed to create time request", err);
@@ -2826,6 +3502,44 @@ app.patch("/api/time-requests/:id", async (req, res) => {
 
     if (!data) {
       return res.status(404).json({ error: "Time request not found." });
+    }
+
+    // Notify client about the time request status change
+    if (data.client_id && (status === 'accepted' || status === 'declined')) {
+      const requestDateTime = new Date(data.requested_datetime).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+      if (status === 'accepted') {
+        await createClientNotification(data.client_id, {
+          type: 'time_request_accepted',
+          title: 'Request Accepted!',
+          body: `Your time request for ${requestDateTime} has been accepted`,
+          request_id: data.id,
+          data: {
+            provider_id: data.provider_id,
+            requested_datetime: data.requested_datetime,
+            service_name: data.service_name,
+            status: 'accepted'
+          }
+        });
+      } else if (status === 'declined') {
+        await createClientNotification(data.client_id, {
+          type: 'time_request_declined',
+          title: 'Request Declined',
+          body: `Your time request for ${requestDateTime} was not accepted`,
+          request_id: data.id,
+          data: {
+            provider_id: data.provider_id,
+            provider_response: data.provider_response,
+            status: 'declined'
+          }
+        });
+      }
     }
 
     res.status(200).json({ timeRequest: data });

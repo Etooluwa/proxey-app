@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { useSession } from '../../auth/authContext';
 import { SERVICE_CATEGORIES } from '../../utils/categories';
 import { useToast } from '../../components/ui/ToastProvider';
 import { supabase } from '../../utils/supabase';
+import { uploadPortfolioImage, deletePortfolioImage } from '../../utils/portfolioUpload';
+import { uploadProfilePhoto } from '../../utils/photoUpload';
+import { request } from '../../data/apiClient';
 
 const REVIEWS = [
     {
@@ -33,88 +36,145 @@ const REVIEWS = [
     }
 ];
 
-const PORTFOLIO_IMAGES = [
-    'https://picsum.photos/seed/clean1/300/200',
-    'https://picsum.photos/seed/clean2/300/200',
-    'https://picsum.photos/seed/clean3/300/200',
-    'https://picsum.photos/seed/clean4/300/200',
-];
-
 const ProviderProfile = () => {
     const { profile, session, logout, updateProfile } = useSession();
     const navigate = useNavigate();
     const toast = useToast();
 
-    const [bio, setBio] = useState(profile?.bio || "Hi! I have over 5 years of experience. I take pride in my attention to detail and treating your home with the utmost respect.");
+    const [bio, setBio] = useState(profile?.bio || '');
     const [phone, setPhone] = useState(profile?.phone || '');
     const [profilePhoto, setProfilePhoto] = useState(profile?.photo || null);
     const [coverPhoto, setCoverPhoto] = useState(profile?.coverPhoto || null);
-    const [portfolioImages, setPortfolioImages] = useState(profile?.portfolioImages || PORTFOLIO_IMAGES);
+    const [portfolioItems, setPortfolioItems] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
+    const [isUploadingCover, setIsUploadingCover] = useState(false);
+    const [activePromotions, setActivePromotions] = useState([]);
 
     useEffect(() => {
         if (profile?.bio) setBio(profile.bio);
         if (profile?.phone) setPhone(profile.phone);
         if (profile?.photo) setProfilePhoto(profile.photo);
         if (profile?.coverPhoto) setCoverPhoto(profile.coverPhoto);
-        if (profile?.portfolioImages) setPortfolioImages(profile.portfolioImages);
     }, [profile]);
+
+    // Load portfolio items from API
+    const loadPortfolio = useCallback(async () => {
+        try {
+            const data = await request('/provider/portfolio');
+            setPortfolioItems(data.media || []);
+        } catch (error) {
+            console.error('[portfolio] Failed to load portfolio:', error);
+        }
+    }, []);
+
+    // Load active promotions
+    const loadPromotions = useCallback(async () => {
+        try {
+            const data = await request('/provider/promotions');
+            const active = (data.promotions || []).filter(p => p.is_active);
+            setActivePromotions(active);
+        } catch (error) {
+            console.error('[promotions] Failed to load promotions:', error);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (session?.user?.id) {
+            loadPortfolio();
+            loadPromotions();
+        }
+    }, [session?.user?.id, loadPortfolio, loadPromotions]);
 
     const handleLogout = async () => {
         await logout();
         navigate('/');
     };
 
-    const handleProfilePhotoChange = (e) => {
+    const handleProfilePhotoChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProfilePhoto(reader.result);
-            };
-            reader.readAsDataURL(file);
+        if (!file || !session?.user?.id) return;
+        try {
+            const url = await uploadProfilePhoto(file, session.user.id);
+            setProfilePhoto(url);
+        } catch (error) {
+            console.error('[profile] Photo upload failed:', error);
+            toast.push({ title: "Upload failed", description: "Could not upload photo.", variant: "error" });
         }
     };
 
-    const handleCoverPhotoChange = (e) => {
+    const handleCoverPhotoChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setCoverPhoto(reader.result);
-            };
-            reader.readAsDataURL(file);
+        if (!file || !session?.user?.id) return;
+        setIsUploadingCover(true);
+        try {
+            const url = await uploadPortfolioImage(file, session.user.id);
+            setCoverPhoto(url);
+        } catch (error) {
+            console.error('[profile] Cover photo upload failed:', error);
+            toast.push({ title: "Upload failed", description: "Could not upload cover photo.", variant: "error" });
+        } finally {
+            setIsUploadingCover(false);
         }
     };
 
-    const handlePortfolioAdd = (e) => {
+    const handlePortfolioAdd = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPortfolioImages([...portfolioImages, reader.result]);
-            };
-            reader.readAsDataURL(file);
+        if (!file || !session?.user?.id) return;
+        setIsUploadingPortfolio(true);
+        try {
+            // Upload image to Supabase Storage
+            const imageUrl = await uploadPortfolioImage(file, session.user.id);
+
+            // Save to portfolio_media table via API
+            const data = await request('/provider/portfolio', {
+                method: 'POST',
+                body: JSON.stringify({
+                    mediaUrl: imageUrl,
+                    mediaType: 'image',
+                }),
+            });
+
+            setPortfolioItems((prev) => [data.media, ...prev]);
+            toast.push({ title: "Photo added", description: "Portfolio image uploaded.", variant: "success" });
+        } catch (error) {
+            console.error('[portfolio] Upload failed:', error);
+            toast.push({ title: "Upload failed", description: "Could not upload portfolio image.", variant: "error" });
+        } finally {
+            setIsUploadingPortfolio(false);
+            // Reset file input
+            e.target.value = '';
         }
     };
 
-    const handlePortfolioRemove = (index) => {
-        setPortfolioImages(portfolioImages.filter((_, i) => i !== index));
+    const handlePortfolioRemove = async (item) => {
+        try {
+            // Delete from API
+            await request(`/provider/portfolio/${item.id}`, { method: 'DELETE' });
+
+            // Delete from storage
+            if (item.media_url) {
+                await deletePortfolioImage(item.media_url);
+            }
+
+            setPortfolioItems((prev) => prev.filter((p) => p.id !== item.id));
+            toast.push({ title: "Photo removed", description: "Portfolio image deleted.", variant: "success" });
+        } catch (error) {
+            console.error('[portfolio] Delete failed:', error);
+            toast.push({ title: "Delete failed", description: "Could not remove image.", variant: "error" });
+        }
     };
 
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            // Update the profiles table (user profile)
             await updateProfile({
                 bio,
                 phone,
                 photo: profilePhoto,
                 coverPhoto,
-                portfolioImages
             });
 
-            // Update the providers table (for client-facing provider data)
             if (supabase && session?.user?.id) {
                 const providerData = {
                     user_id: session.user.id,
@@ -123,9 +183,8 @@ const ProviderProfile = () => {
                     phone,
                     bio,
                     photo: profilePhoto,
-                    avatar: profilePhoto, // Store in both fields for compatibility
+                    avatar: profilePhoto,
                     cover_photo: coverPhoto,
-                    portfolio_images: portfolioImages,
                     category: profile?.category,
                     city: profile?.city,
                     location: profile?.city,
@@ -135,7 +194,6 @@ const ProviderProfile = () => {
                     is_active: true
                 };
 
-                // Try to update existing provider record, or insert if it doesn't exist
                 const { error } = await supabase
                     .from('providers')
                     .upsert(providerData, {
@@ -191,9 +249,18 @@ const ProviderProfile = () => {
                     />
                     <label
                         htmlFor="cover-photo-input"
-                        className="absolute top-4 right-4 bg-black/30 hover:bg-black/50 text-white px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm flex items-center gap-2 transition-colors cursor-pointer"
+                        className={`absolute top-4 right-4 bg-black/30 hover:bg-black/50 text-white px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm flex items-center gap-2 transition-colors cursor-pointer ${isUploadingCover ? 'opacity-50 pointer-events-none' : ''}`}
                     >
-                        <Icons.Camera size={16} /> Edit Cover
+                        {isUploadingCover ? (
+                            <>
+                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                Uploading...
+                            </>
+                        ) : (
+                            <>
+                                <Icons.Camera size={16} /> Edit Cover
+                            </>
+                        )}
                     </label>
                 </div>
 
@@ -357,21 +424,37 @@ const ProviderProfile = () => {
                             <h3 className="font-bold text-gray-900">Promotions</h3>
                             <button onClick={() => navigate('/provider/promotions')} className="text-brand-600 text-xs font-bold hover:underline">Manage</button>
                         </div>
-                        <div className="p-4 bg-gradient-to-br from-brand-50 to-orange-50 rounded-xl border border-brand-100">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 bg-white rounded-lg text-brand-600 shadow-sm">
-                                    <Icons.Tag size={18} />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold text-brand-800 uppercase tracking-wide">Active Deal</p>
-                                    <p className="font-bold text-gray-900">Summer Special</p>
-                                </div>
+                        {activePromotions.length > 0 ? (
+                            <div className="space-y-3">
+                                {activePromotions.map((promo) => (
+                                    <div key={promo.id} className="p-4 bg-gradient-to-br from-brand-50 to-orange-50 rounded-xl border border-brand-100">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="p-2 bg-white rounded-lg text-brand-600 shadow-sm">
+                                                <Icons.Tag size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-brand-800 uppercase tracking-wide">Active Deal</p>
+                                                <p className="font-bold text-gray-900">{promo.promo_code}</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-600 mb-3">
+                                            {promo.discount_type === 'percentage' ? `${promo.discount_value}% Off` : `$${promo.discount_value} Off`}
+                                            {promo.end_at ? ` • Expires ${new Date(promo.end_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                                        </p>
+                                        <button onClick={() => navigate('/provider/promotions')} className="w-full py-2 bg-white text-brand-600 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
+                                            View Details
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
-                            <p className="text-xs text-gray-600 mb-3">20% Off • Expires Aug 31</p>
-                            <button onClick={() => navigate('/provider/promotions')} className="w-full py-2 bg-white text-brand-600 text-xs font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
-                                View Details
-                            </button>
-                        </div>
+                        ) : (
+                            <div className="text-center py-4 text-gray-400 text-sm">
+                                <p>No active promotions</p>
+                                <button onClick={() => navigate('/provider/promotions')} className="text-brand-600 text-xs font-bold mt-2 hover:underline">
+                                    Create one
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -397,25 +480,35 @@ const ProviderProfile = () => {
                             <h3 className="text-xl font-bold text-gray-900">Portfolio</h3>
                             <input
                                 type="file"
-                                accept="image/*"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
                                 id="portfolio-input"
                                 className="hidden"
                                 onChange={handlePortfolioAdd}
+                                disabled={isUploadingPortfolio}
                             />
                             <label
                                 htmlFor="portfolio-input"
-                                className="flex items-center gap-2 text-sm font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-xl hover:bg-brand-100 transition-colors cursor-pointer"
+                                className={`flex items-center gap-2 text-sm font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-xl hover:bg-brand-100 transition-colors cursor-pointer ${isUploadingPortfolio ? 'opacity-50 pointer-events-none' : ''}`}
                             >
-                                <Icons.Camera size={16} /> Add Photos
+                                {isUploadingPortfolio ? (
+                                    <>
+                                        <div className="animate-spin w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full"></div>
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icons.Camera size={16} /> Add Photos
+                                    </>
+                                )}
                             </label>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {portfolioImages.map((img, i) => (
-                                <div key={i} className="relative group aspect-square rounded-xl overflow-hidden">
-                                    <img src={img} alt="Portfolio" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                            {portfolioItems.map((item) => (
+                                <div key={item.id} className="relative group aspect-square rounded-xl overflow-hidden">
+                                    <img src={item.media_url} alt={item.title || 'Portfolio'} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                                         <button
-                                            onClick={() => handlePortfolioRemove(i)}
+                                            onClick={() => handlePortfolioRemove(item)}
                                             className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                                         >
                                             <Icons.Trash2 size={16} />
@@ -425,7 +518,7 @@ const ProviderProfile = () => {
                             ))}
                             <label
                                 htmlFor="portfolio-input"
-                                className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50 transition-all cursor-pointer"
+                                className={`aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50 transition-all cursor-pointer ${isUploadingPortfolio ? 'opacity-50 pointer-events-none' : ''}`}
                             >
                                 <Icons.Camera size={24} />
                                 <span className="text-xs font-bold mt-2">Add Photo</span>

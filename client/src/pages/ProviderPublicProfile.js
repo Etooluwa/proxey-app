@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { fetchProviders } from '../data/providers';
 import { useSession } from '../auth/authContext';
+import { request } from '../data/apiClient';
 
 // Mock data for reviews
 const MOCK_REVIEWS = [
@@ -35,14 +36,6 @@ const MOCK_REVIEWS = [
     }
 ];
 
-// Mock data for portfolio images
-const MOCK_PORTFOLIO = [
-    'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400&h=300&fit=crop'
-];
-
 const ProviderPublicProfile = () => {
     const { providerId } = useParams();
     const navigate = useNavigate();
@@ -62,6 +55,8 @@ const ProviderPublicProfile = () => {
         notes: ''
     });
     const [submittingRequest, setSubmittingRequest] = useState(false);
+    const [portfolioItems, setPortfolioItems] = useState([]);
+    const [promotions, setPromotions] = useState([]);
 
     // Service options with descriptions
     const serviceOptions = [
@@ -107,9 +102,33 @@ const ProviderPublicProfile = () => {
     useEffect(() => {
         if (provider?.id) {
             loadClosestAvailability();
+            loadPortfolio();
+            loadPromotions();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provider]);
+
+    const loadPortfolio = async () => {
+        if (!provider?.id) return;
+        try {
+            const data = await request(`/provider/${provider.id}/portfolio`);
+            setPortfolioItems(data.media || []);
+        } catch (error) {
+            console.error('[portfolio] Failed to load portfolio:', error);
+            setPortfolioItems([]);
+        }
+    };
+
+    const loadPromotions = async () => {
+        if (!provider?.id) return;
+        try {
+            const data = await request(`/provider/${provider.id}/promotions`);
+            setPromotions(data.promotions || []);
+        } catch (error) {
+            console.error('[promotions] Failed to load promotions:', error);
+            setPromotions([]);
+        }
+    };
 
     const loadProvider = async () => {
         setLoading(true);
@@ -440,21 +459,53 @@ const ProviderPublicProfile = () => {
                                 </div>
                             </div>
 
-                            {/* Work Portfolio */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 mb-4">Work Portfolio</h2>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {MOCK_PORTFOLIO.map((image, index) => (
-                                        <div key={index} className="aspect-video rounded-xl overflow-hidden">
-                                            <img
-                                                src={image}
-                                                alt={`Portfolio ${index + 1}`}
-                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                                            />
-                                        </div>
-                                    ))}
+                            {/* Active Promotions */}
+                            {promotions.length > 0 && (
+                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                                    <h2 className="text-xl font-bold text-gray-900 mb-4">Current Promotions</h2>
+                                    <div className="space-y-3">
+                                        {promotions.map((promo) => (
+                                            <div key={promo.id} className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-100">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <div className="p-2 bg-white rounded-lg text-orange-600 shadow-sm">
+                                                        <Icons.Tag size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900">{promo.promo_code}</p>
+                                                        <p className="text-sm text-gray-600">
+                                                            {promo.discount_type === 'percentage' ? `${promo.discount_value}% Off` : `$${promo.discount_value} Off`}
+                                                            {promo.end_at ? ` · Expires ${new Date(promo.end_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {promo.applicable_services && promo.applicable_services.length > 0 && (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Applies to: {promo.applicable_services.join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Work Portfolio */}
+                            {portfolioItems.length > 0 && (
+                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                                    <h2 className="text-xl font-bold text-gray-900 mb-4">Work Portfolio</h2>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {portfolioItems.map((item) => (
+                                            <div key={item.id} className="aspect-video rounded-xl overflow-hidden">
+                                                <img
+                                                    src={item.media_url}
+                                                    alt={item.title || 'Portfolio'}
+                                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Client Reviews */}
                             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">

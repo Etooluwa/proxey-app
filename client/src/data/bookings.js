@@ -54,3 +54,32 @@ export async function fetchBookingById(id) {
   const bookings = await fetchBookings();
   return bookings.find((booking) => booking.id === id);
 }
+
+export async function submitReview({ bookingId, providerId, userId, rating, comment }) {
+  try {
+    const data = await request("/reviews", {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId,
+        providerId,
+        userId,
+        rating,
+        comment,
+      }),
+    });
+    return data.review;
+  } catch (error) {
+    console.error("[bookings] Failed to submit review", error);
+    throw error;
+  }
+}
+
+export async function fetchProviderReviews(providerId) {
+  try {
+    const data = await request(`/provider/${providerId}/reviews`);
+    return data.reviews || [];
+  } catch (error) {
+    console.error("[bookings] Failed to fetch reviews", error);
+    return [];
+  }
+}

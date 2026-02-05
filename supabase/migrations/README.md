@@ -64,6 +64,32 @@ SELECT * FROM information_schema.tables WHERE table_name = 'providers';
 SELECT id, name, category, is_active FROM providers;
 ```
 
+### `20250108000000_create_services_table.sql`
+
+Creates the `services` table to store individual services offered by providers.
+
+**What it does:**
+- Creates a `services` table with essential fields (name, description, category, base_price, unit, duration)
+- Links services to providers via `provider_id`
+- Sets up indexes for efficient querying (by provider, category, price, full-text search)
+- Enables Row Level Security (RLS)
+- Adds policies so that:
+  - Anyone can view active services
+  - Providers can only manage their own services
+  - Backend has full access for admin operations
+- Creates an auto-update trigger for the `updated_at` timestamp
+
+**This migration is CRITICAL - it fixes:**
+1. Service management (ProviderServices.js CRUD operations)
+2. Booking flow service selection
+3. Provider public profile service listings
+4. Browse/search functionality with real data
+
+**After running this migration:**
+- Providers can create, edit, and delete their services
+- Services are persisted to the database instead of falling back to mock data
+- Clients can browse and select real services for booking
+
 ## Troubleshooting
 
 **Error: "relation already exists"**
