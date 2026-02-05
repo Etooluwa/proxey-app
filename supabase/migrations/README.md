@@ -90,6 +90,30 @@ Creates the `services` table to store individual services offered by providers.
 - Services are persisted to the database instead of falling back to mock data
 - Clients can browse and select real services for booking
 
+### `20250109000000_create_reviews_table.sql`
+
+Creates the `reviews` table to store client reviews for providers.
+
+**What it does:**
+- Creates a `reviews` table with fields for rating, comment, client/provider info, and optional booking link
+- Sets up indexes for efficient querying (by provider, client, booking, rating)
+- Enables Row Level Security (RLS) with appropriate policies
+- **Auto-calculates provider rating**: Triggers automatically update the provider's `rating` and `review_count` when reviews are added, modified, or deleted
+- Supports verified reviews linked to actual bookings
+- Allows providers to respond to reviews
+
+**This migration enables:**
+1. Real reviews on provider public profiles (replacing MOCK_REVIEWS)
+2. Automatic provider rating calculation
+3. Review management for clients
+4. Provider responses to reviews
+
+**After running this migration:**
+- Provider profiles will display real reviews instead of hardcoded mock data
+- Provider ratings are automatically calculated from actual reviews
+- Clients can leave reviews for completed bookings
+- Providers can respond to reviews
+
 ## Troubleshooting
 
 **Error: "relation already exists"**
