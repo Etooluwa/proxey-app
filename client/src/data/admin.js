@@ -66,3 +66,8 @@ export async function fetchAdminPromotions() {
 export async function fetchAdminActivity() {
   return request("/admin/activity");
 }
+
+// Admin Analytics
+export async function fetchAdminAnalytics({ period = "month" } = {}) {
+  return request(`/admin/analytics?period=${period}`);
+}

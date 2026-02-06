@@ -120,3 +120,8 @@ export async function downloadInvoicePDF(invoiceId) {
 
   return true;
 }
+
+// Provider Analytics
+export async function fetchProviderAnalytics({ period = "month" } = {}) {
+  return request(`/provider/analytics?period=${period}`);
+}

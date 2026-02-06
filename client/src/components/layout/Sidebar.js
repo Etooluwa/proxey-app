@@ -23,6 +23,7 @@ export const Sidebar = ({ role }) => {
         { id: 'dashboard', path: '/provider', label: 'Dashboard', icon: Icons.Dashboard },
         { id: 'schedule', path: '/provider/schedule', label: 'Schedule', icon: Icons.Calendar },
         { id: 'earnings', path: '/provider/earnings', label: 'Earnings', icon: Icons.Wallet },
+        { id: 'analytics', path: '/provider/analytics', label: 'Analytics', icon: Icons.TrendingUp },
         { id: 'messages', path: '/provider/messages', label: 'Messages', icon: Icons.Message },
         { id: 'services', path: '/provider/services', label: 'My Services', icon: Icons.Wrench },
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
@@ -30,6 +31,7 @@ export const Sidebar = ({ role }) => {
 
     const adminLinks = [
         { id: 'dashboard', path: '/admin', label: 'Dashboard', icon: Icons.Dashboard },
+        { id: 'analytics', path: '/admin/analytics', label: 'Analytics', icon: Icons.TrendingUp },
         { id: 'users', path: '/admin/users', label: 'Users', icon: Icons.Users },
         { id: 'bookings', path: '/admin/bookings', label: 'Bookings', icon: Icons.Calendar },
         { id: 'services', path: '/admin/services', label: 'Services', icon: Icons.Wrench },

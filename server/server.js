@@ -4457,5 +4457,276 @@ app.get("/api/admin/activity", requireAdmin, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN ANALYTICS ENDPOINT
+// ─────────────────────────────────────────────────────────────────────────────
+app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({
+      userGrowth: [],
+      categoryPerformance: [],
+      topProviders: [],
+      bookingsByStatus: { pending: 0, confirmed: 0, completed: 0, cancelled: 0 },
+      revenueByCategory: []
+    });
+  }
+
+  const period = req.query.period || "month";
+  let startDate = new Date();
+
+  switch (period) {
+    case "week":
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case "month":
+      startDate.setMonth(startDate.getMonth() - 1);
+      break;
+    case "quarter":
+      startDate.setMonth(startDate.getMonth() - 3);
+      break;
+    case "year":
+      startDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+    default:
+      startDate.setMonth(startDate.getMonth() - 1);
+  }
+
+  try {
+    // User growth - count users created per day/week
+    const { data: providers } = await supabase
+      .from("providers")
+      .select("id, created_at")
+      .gte("created_at", startDate.toISOString());
+
+    const { data: clients } = await supabase
+      .from("client_profiles")
+      .select("id, created_at")
+      .gte("created_at", startDate.toISOString());
+
+    // Group by date for user growth chart
+    const userGrowthMap = {};
+    (providers || []).forEach(p => {
+      const date = new Date(p.created_at).toISOString().split('T')[0];
+      if (!userGrowthMap[date]) userGrowthMap[date] = { date, providers: 0, clients: 0 };
+      userGrowthMap[date].providers++;
+    });
+    (clients || []).forEach(c => {
+      const date = new Date(c.created_at).toISOString().split('T')[0];
+      if (!userGrowthMap[date]) userGrowthMap[date] = { date, providers: 0, clients: 0 };
+      userGrowthMap[date].clients++;
+    });
+    const userGrowth = Object.values(userGrowthMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Bookings by status
+    const { data: allBookings } = await supabase
+      .from("bookings")
+      .select("id, status, price, service_name, scheduled_at")
+      .gte("created_at", startDate.toISOString());
+
+    const bookingsByStatus = { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
+    (allBookings || []).forEach(b => {
+      const status = (b.status || "pending").toLowerCase();
+      if (bookingsByStatus.hasOwnProperty(status)) {
+        bookingsByStatus[status]++;
+      }
+    });
+
+    // Category performance
+    const { data: services } = await supabase
+      .from("services")
+      .select("id, name, category");
+
+    const serviceMap = {};
+    (services || []).forEach(s => {
+      serviceMap[s.name] = s.category || "Uncategorized";
+    });
+
+    const categoryStats = {};
+    (allBookings || []).forEach(b => {
+      const category = serviceMap[b.service_name] || "Uncategorized";
+      if (!categoryStats[category]) {
+        categoryStats[category] = { category, bookings: 0, revenue: 0 };
+      }
+      categoryStats[category].bookings++;
+      categoryStats[category].revenue += b.price || 0;
+    });
+    const categoryPerformance = Object.values(categoryStats).sort((a, b) => b.revenue - a.revenue);
+    const revenueByCategory = categoryPerformance.map(c => ({ category: c.category, revenue: c.revenue }));
+
+    // Top providers
+    const { data: providerList } = await supabase
+      .from("providers")
+      .select("id, name, photo, rating, review_count")
+      .eq("is_active", true)
+      .order("rating", { ascending: false })
+      .limit(10);
+
+    const { data: providerBookings } = await supabase
+      .from("bookings")
+      .select("provider_id, price")
+      .gte("created_at", startDate.toISOString());
+
+    const providerStatsMap = {};
+    (providerBookings || []).forEach(b => {
+      if (!b.provider_id) return;
+      if (!providerStatsMap[b.provider_id]) {
+        providerStatsMap[b.provider_id] = { bookings: 0, revenue: 0 };
+      }
+      providerStatsMap[b.provider_id].bookings++;
+      providerStatsMap[b.provider_id].revenue += b.price || 0;
+    });
+
+    const topProviders = (providerList || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      photo: p.photo,
+      rating: p.rating || 0,
+      bookings: providerStatsMap[p.id]?.bookings || 0,
+      revenue: providerStatsMap[p.id]?.revenue || 0
+    })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
+    res.status(200).json({
+      userGrowth,
+      categoryPerformance,
+      topProviders,
+      bookingsByStatus,
+      revenueByCategory
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load analytics", err);
+    res.status(500).json({ error: "Failed to load analytics." });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVIDER ANALYTICS ENDPOINT
+// ─────────────────────────────────────────────────────────────────────────────
+app.get("/api/provider/analytics", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!supabase) {
+    return res.status(200).json({
+      servicePerformance: [],
+      clientInsights: { totalClients: 0, repeatClients: 0, repeatRate: 0, avgSatisfaction: 0 },
+      peakTimes: [],
+      bookingTrends: [],
+      completionRate: { completed: 0, cancelled: 0, total: 0, rate: 0 }
+    });
+  }
+
+  const period = req.query.period || "month";
+  let startDate = new Date();
+
+  switch (period) {
+    case "week":
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case "month":
+      startDate.setMonth(startDate.getMonth() - 1);
+      break;
+    case "quarter":
+      startDate.setMonth(startDate.getMonth() - 3);
+      break;
+    case "year":
+      startDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+    default:
+      startDate.setMonth(startDate.getMonth() - 1);
+  }
+
+  try {
+    // Get provider's bookings
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("id, client_id, client_name, service_id, service_name, price, status, scheduled_at, created_at")
+      .eq("provider_id", userId)
+      .gte("created_at", startDate.toISOString());
+
+    // Service performance
+    const serviceStats = {};
+    (bookings || []).forEach(b => {
+      const key = b.service_name || "Unknown";
+      if (!serviceStats[key]) {
+        serviceStats[key] = { serviceId: b.service_id, name: key, bookings: 0, revenue: 0 };
+      }
+      serviceStats[key].bookings++;
+      serviceStats[key].revenue += b.price || 0;
+    });
+    const servicePerformance = Object.values(serviceStats).sort((a, b) => b.revenue - a.revenue);
+
+    // Client insights
+    const clientSet = new Set();
+    const clientBookingCount = {};
+    (bookings || []).forEach(b => {
+      if (b.client_id) {
+        clientSet.add(b.client_id);
+        clientBookingCount[b.client_id] = (clientBookingCount[b.client_id] || 0) + 1;
+      }
+    });
+    const totalClients = clientSet.size;
+    const repeatClients = Object.values(clientBookingCount).filter(c => c > 1).length;
+    const repeatRate = totalClients > 0 ? Math.round((repeatClients / totalClients) * 100) : 0;
+
+    // Get average satisfaction from reviews
+    const { data: reviews } = await supabase
+      .from("reviews")
+      .select("rating")
+      .eq("provider_id", userId)
+      .gte("created_at", startDate.toISOString());
+
+    const avgSatisfaction = reviews && reviews.length > 0
+      ? Math.round((reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length) * 10) / 10
+      : 0;
+
+    const clientInsights = { totalClients, repeatClients, repeatRate, avgSatisfaction };
+
+    // Peak times (day of week + hour)
+    const peakMap = {};
+    (bookings || []).forEach(b => {
+      if (!b.scheduled_at) return;
+      const date = new Date(b.scheduled_at);
+      const dayOfWeek = date.getDay(); // 0-6
+      const hour = date.getHours(); // 0-23
+      const key = `${dayOfWeek}-${hour}`;
+      peakMap[key] = (peakMap[key] || 0) + 1;
+    });
+    const peakTimes = Object.entries(peakMap).map(([key, count]) => {
+      const [day, hour] = key.split("-").map(Number);
+      return { dayOfWeek: day, hour, bookings: count };
+    });
+
+    // Booking trends (by date)
+    const trendMap = {};
+    (bookings || []).forEach(b => {
+      const date = new Date(b.created_at).toISOString().split('T')[0];
+      if (!trendMap[date]) trendMap[date] = { date, bookings: 0, revenue: 0 };
+      trendMap[date].bookings++;
+      trendMap[date].revenue += b.price || 0;
+    });
+    const bookingTrends = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Completion rate
+    const completed = (bookings || []).filter(b => (b.status || "").toLowerCase() === "completed").length;
+    const cancelled = (bookings || []).filter(b => (b.status || "").toLowerCase() === "cancelled").length;
+    const total = (bookings || []).length;
+    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const completionRate = { completed, cancelled, total, rate };
+
+    res.status(200).json({
+      servicePerformance,
+      clientInsights,
+      peakTimes,
+      bookingTrends,
+      completionRate
+    });
+  } catch (err) {
+    console.error("[provider] Failed to load analytics", err);
+    res.status(500).json({ error: "Failed to load analytics." });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -17,17 +17,16 @@ export const MobileBottomNav = ({ role }) => {
         { id: 'dashboard', path: '/provider', label: 'Home', icon: Icons.Dashboard },
         { id: 'schedule', path: '/provider/schedule', label: 'Schedule', icon: Icons.Calendar },
         { id: 'earnings', path: '/provider/earnings', label: 'Earn', icon: Icons.Wallet },
-        { id: 'messages', path: '/provider/messages', label: 'Chat', icon: Icons.Message },
-        { id: 'services', path: '/provider/services', label: 'Services', icon: Icons.Wrench },
+        { id: 'analytics', path: '/provider/analytics', label: 'Analytics', icon: Icons.TrendingUp },
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
     ];
 
     const adminLinks = [
         { id: 'dashboard', path: '/admin', label: 'Home', icon: Icons.Dashboard },
+        { id: 'analytics', path: '/admin/analytics', label: 'Analytics', icon: Icons.TrendingUp },
         { id: 'users', path: '/admin/users', label: 'Users', icon: Icons.Users },
         { id: 'bookings', path: '/admin/bookings', label: 'Bookings', icon: Icons.Calendar },
         { id: 'revenue', path: '/admin/revenue', label: 'Revenue', icon: Icons.Wallet },
-        { id: 'reviews', path: '/admin/reviews', label: 'Reviews', icon: Icons.Star },
     ];
 
     const links = role === 'admin' ? adminLinks : role === 'client' ? clientLinks : providerLinks;

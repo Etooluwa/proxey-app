@@ -45,12 +45,16 @@ import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcc
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBookings from './pages/admin/AdminBookings';
 import AdminServices from './pages/admin/AdminServices';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminPromotions from './pages/admin/AdminPromotions';
+
+// Provider Analytics
+import ProviderAnalytics from './pages/provider/ProviderAnalytics';
 
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -128,6 +132,7 @@ function App() {
                       <Route path="appointments" element={<ProviderAppointments />} />
                       <Route path="promotions" element={<ProviderPromotions />} />
                       <Route path="earnings" element={<ProviderEarnings />} />
+                      <Route path="analytics" element={<ProviderAnalytics />} />
                       <Route path="invoices" element={<ProviderInvoices />} />
                       <Route path="messages" element={<ProviderMessages />} />
                       <Route path="services" element={<ProviderServices />} />
@@ -144,6 +149,7 @@ function App() {
                       }
                     >
                       <Route index element={<AdminDashboard />} />
+                      <Route path="analytics" element={<AdminAnalytics />} />
                       <Route path="users" element={<AdminUsers />} />
                       <Route path="bookings" element={<AdminBookings />} />
                       <Route path="services" element={<AdminServices />} />
