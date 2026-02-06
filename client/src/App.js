@@ -11,6 +11,7 @@ import RoleRedirect from './routes/RoleRedirect';
 // Layouts
 import AppShell from './components/layout/AppShell';
 import ProviderShell from './components/layout/ProviderShell';
+import AdminShell from './components/layout/AdminShell';
 
 // Auth Pages
 import SignIn from './pages/auth/SignInPage';
@@ -41,6 +42,15 @@ import ProviderServices from './pages/provider/ProviderServices';
 import ProviderProfile from './pages/provider/ProviderProfile';
 import ProviderPromotions from './pages/provider/ProviderPromotions';
 import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcceptance';
+
+// Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminBookings from './pages/admin/AdminBookings';
+import AdminServices from './pages/admin/AdminServices';
+import AdminReviews from './pages/admin/AdminReviews';
+import AdminRevenue from './pages/admin/AdminRevenue';
+import AdminPromotions from './pages/admin/AdminPromotions';
 
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -122,6 +132,24 @@ function App() {
                       <Route path="messages" element={<ProviderMessages />} />
                       <Route path="services" element={<ProviderServices />} />
                       <Route path="profile" element={<ProviderProfile />} />
+                    </Route>
+
+                    {/* Admin Routes */}
+                    <Route
+                      path="/admin"
+                      element={
+                        <ProtectedRoute allowedRoles={['admin']} requireProfile={false}>
+                          <AdminShell />
+                        </ProtectedRoute>
+                      }
+                    >
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="users" element={<AdminUsers />} />
+                      <Route path="bookings" element={<AdminBookings />} />
+                      <Route path="services" element={<AdminServices />} />
+                      <Route path="reviews" element={<AdminReviews />} />
+                      <Route path="revenue" element={<AdminRevenue />} />
+                      <Route path="promotions" element={<AdminPromotions />} />
                     </Route>
 
                     {/* Shared/Preview Routes - Standalone without AppShell */}

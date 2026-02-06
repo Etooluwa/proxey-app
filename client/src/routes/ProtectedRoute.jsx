@@ -34,7 +34,7 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    const fallbackPath = userRole === "provider" ? "/provider" : "/app";
+    const fallbackPath = userRole === "admin" ? "/admin" : userRole === "provider" ? "/provider" : "/app";
     return <Navigate to={fallbackPath} replace />;
   }
 

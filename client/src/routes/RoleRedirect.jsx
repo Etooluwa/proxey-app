@@ -46,6 +46,12 @@ function RoleRedirect() {
   }
 
   const userRole = resolveUserRole(session);
+
+  // Admin users skip onboarding and go directly to admin panel
+  if (userRole === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
   const onboardingPath =
     userRole === "provider" ? "/provider/onboarding" : "/onboarding";
 

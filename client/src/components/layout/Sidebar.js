@@ -28,7 +28,17 @@ export const Sidebar = ({ role }) => {
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
     ];
 
-    const links = role === 'client' ? clientLinks : providerLinks;
+    const adminLinks = [
+        { id: 'dashboard', path: '/admin', label: 'Dashboard', icon: Icons.Dashboard },
+        { id: 'users', path: '/admin/users', label: 'Users', icon: Icons.Users },
+        { id: 'bookings', path: '/admin/bookings', label: 'Bookings', icon: Icons.Calendar },
+        { id: 'services', path: '/admin/services', label: 'Services', icon: Icons.Wrench },
+        { id: 'reviews', path: '/admin/reviews', label: 'Reviews', icon: Icons.Star },
+        { id: 'revenue', path: '/admin/revenue', label: 'Revenue', icon: Icons.Wallet },
+        { id: 'promotions', path: '/admin/promotions', label: 'Promotions', icon: Icons.Tag },
+    ];
+
+    const links = role === 'admin' ? adminLinks : role === 'client' ? clientLinks : providerLinks;
 
     const handleLogout = async () => {
         await logout();
@@ -52,8 +62,8 @@ export const Sidebar = ({ role }) => {
                 {links.map((link) => {
                     const Icon = link.icon;
                     // Check if current path starts with link path (for active state)
-                    // Exact match for root /app or /provider, startsWith for others
-                    const isActive = link.path === '/app' || link.path === '/provider'
+                    // Exact match for root /app, /provider, or /admin, startsWith for others
+                    const isActive = link.path === '/app' || link.path === '/provider' || link.path === '/admin'
                         ? location.pathname === link.path
                         : location.pathname.startsWith(link.path);
 

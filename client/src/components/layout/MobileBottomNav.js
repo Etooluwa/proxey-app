@@ -22,14 +22,22 @@ export const MobileBottomNav = ({ role }) => {
         { id: 'profile', path: '/provider/profile', label: 'Profile', icon: Icons.User },
     ];
 
-    const links = role === 'client' ? clientLinks : providerLinks;
+    const adminLinks = [
+        { id: 'dashboard', path: '/admin', label: 'Home', icon: Icons.Dashboard },
+        { id: 'users', path: '/admin/users', label: 'Users', icon: Icons.Users },
+        { id: 'bookings', path: '/admin/bookings', label: 'Bookings', icon: Icons.Calendar },
+        { id: 'revenue', path: '/admin/revenue', label: 'Revenue', icon: Icons.Wallet },
+        { id: 'reviews', path: '/admin/reviews', label: 'Reviews', icon: Icons.Star },
+    ];
+
+    const links = role === 'admin' ? adminLinks : role === 'client' ? clientLinks : providerLinks;
 
     return (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe-area safe-area-bottom">
             <div className="flex justify-around items-center h-16 px-1">
                 {links.map((link) => {
                     const Icon = link.icon;
-                    const isActive = link.path === '/app' || link.path === '/provider'
+                    const isActive = link.path === '/app' || link.path === '/provider' || link.path === '/admin'
                         ? location.pathname === link.path
                         : location.pathname.startsWith(link.path);
 

@@ -335,6 +335,17 @@ function getProviderId(req) {
   return req.headers["x-provider-id"] || getUserId(req);
 }
 
+// Admin user IDs from environment variable (comma-separated UUIDs)
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
+
+function requireAdmin(req, res, next) {
+  const userId = getUserId(req);
+  if (!ADMIN_USER_IDS.includes(userId)) {
+    return res.status(403).json({ error: "Admin access required." });
+  }
+  next();
+}
+
 function hoursFromNow(hours) {
   const date = new Date();
   date.setHours(date.getHours() + hours);
@@ -4049,6 +4060,400 @@ app.delete("/api/provider/availability/:id", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to delete availability slot", err);
     res.status(500).json({ error: "Failed to delete availability slot." });
+  }
+});
+
+// ============================================================
+// ADMIN API ENDPOINTS
+// ============================================================
+
+// Admin: Dashboard stats
+app.get("/api/admin/stats", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({
+      stats: { total_providers: 0, total_clients: 0, total_bookings: 0, total_revenue: 0 }
+    });
+  }
+
+  try {
+    const { count: providerCount } = await supabase
+      .from("providers")
+      .select("*", { count: "exact", head: true });
+
+    const { count: clientCount } = await supabase
+      .from("client_profiles")
+      .select("*", { count: "exact", head: true });
+
+    const { count: bookingCount } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true });
+
+    const { data: transactions } = await supabase
+      .from("client_transactions")
+      .select("amount")
+      .eq("status", "completed");
+
+    const totalRevenue = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    res.status(200).json({
+      stats: {
+        total_providers: providerCount || 0,
+        total_clients: clientCount || 0,
+        total_bookings: bookingCount || 0,
+        total_revenue: totalRevenue,
+      }
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load stats", err);
+    res.status(500).json({ error: "Failed to load admin stats." });
+  }
+});
+
+// Admin: List all users (providers + clients)
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ users: [], total: 0 });
+  }
+
+  const { role, search, page = 1, limit = 20 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  try {
+    let users = [];
+
+    // Fetch providers if role is not 'client'
+    if (!role || role === "provider" || role === "all") {
+      let providerQuery = supabase
+        .from("providers")
+        .select("user_id, name, email, phone, city, is_active, created_at", { count: "exact" })
+        .order("created_at", { ascending: false });
+
+      if (search) {
+        providerQuery = providerQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const { data: providers, count: providerTotal } = await providerQuery;
+      users = users.concat((providers || []).map(p => ({ ...p, role: "provider" })));
+    }
+
+    // Fetch clients if role is not 'provider'
+    if (!role || role === "client" || role === "all") {
+      let clientQuery = supabase
+        .from("client_profiles")
+        .select("user_id, name, email, phone, city, is_profile_complete, updated_at", { count: "exact" })
+        .order("updated_at", { ascending: false });
+
+      if (search) {
+        clientQuery = clientQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const { data: clients } = await clientQuery;
+      users = users.concat((clients || []).map(c => ({
+        ...c,
+        role: "client",
+        is_active: c.is_profile_complete !== false,
+        created_at: c.updated_at
+      })));
+    }
+
+    // Sort by created_at descending
+    users.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    // Paginate
+    const paginatedUsers = users.slice(offset, offset + parseInt(limit));
+
+    res.status(200).json({ users: paginatedUsers, total: users.length });
+  } catch (err) {
+    console.error("[admin] Failed to load users", err);
+    res.status(500).json({ error: "Failed to load users." });
+  }
+});
+
+// Admin: Toggle user active status
+app.patch("/api/admin/users/:id/toggle-active", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Database not configured." });
+  }
+
+  const userId = req.params.id;
+
+  try {
+    // First get current status
+    const { data: provider, error: fetchError } = await supabase
+      .from("providers")
+      .select("is_active")
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError || !provider) {
+      return res.status(404).json({ error: "Provider not found." });
+    }
+
+    // Toggle the status
+    const { data, error } = await supabase
+      .from("providers")
+      .update({ is_active: !provider.is_active, updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({ user: data, message: `Provider ${data.is_active ? "activated" : "deactivated"}.` });
+  } catch (err) {
+    console.error("[admin] Failed to toggle user status", err);
+    res.status(500).json({ error: "Failed to update user status." });
+  }
+});
+
+// Admin: List all bookings
+app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ bookings: [], total: 0 });
+  }
+
+  const { status, from, to, page = 1, limit = 20 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  try {
+    let query = supabase
+      .from("bookings")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + parseInt(limit) - 1);
+
+    if (status && status !== "all") {
+      query = query.eq("status", status);
+    }
+    if (from) {
+      query = query.gte("scheduled_at", from);
+    }
+    if (to) {
+      query = query.lte("scheduled_at", to);
+    }
+
+    const { data, count, error } = await query;
+    if (error) throw error;
+
+    res.status(200).json({ bookings: data || [], total: count || 0 });
+  } catch (err) {
+    console.error("[admin] Failed to load bookings", err);
+    res.status(500).json({ error: "Failed to load bookings." });
+  }
+});
+
+// Admin: List all services with category breakdown
+app.get("/api/admin/services", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ services: [], categories: {} });
+  }
+
+  try {
+    const { data: services, error } = await supabase
+      .from("services")
+      .select("*, providers(name)")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Calculate category breakdown
+    const categories = {};
+    (services || []).forEach(s => {
+      const cat = s.category || "Uncategorized";
+      categories[cat] = (categories[cat] || 0) + 1;
+    });
+
+    res.status(200).json({
+      services: (services || []).map(s => ({
+        ...s,
+        provider_name: s.providers?.name || "Unknown"
+      })),
+      categories
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load services", err);
+    res.status(500).json({ error: "Failed to load services." });
+  }
+});
+
+// Admin: List all reviews
+app.get("/api/admin/reviews", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ reviews: [], total: 0 });
+  }
+
+  const { rating, is_visible, page = 1, limit = 20 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  try {
+    let query = supabase
+      .from("reviews")
+      .select("*, providers(name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + parseInt(limit) - 1);
+
+    if (rating) {
+      query = query.eq("rating", parseInt(rating));
+    }
+    if (is_visible !== undefined && is_visible !== "") {
+      query = query.eq("is_visible", is_visible === "true");
+    }
+
+    const { data, count, error } = await query;
+    if (error) throw error;
+
+    res.status(200).json({
+      reviews: (data || []).map(r => ({
+        ...r,
+        provider_name: r.providers?.name || "Unknown"
+      })),
+      total: count || 0
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load reviews", err);
+    res.status(500).json({ error: "Failed to load reviews." });
+  }
+});
+
+// Admin: Update review (toggle visibility/featured)
+app.patch("/api/admin/reviews/:id", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Database not configured." });
+  }
+
+  const reviewId = req.params.id;
+  const { is_visible, is_featured } = req.body;
+
+  try {
+    const updates = { updated_at: new Date().toISOString() };
+    if (is_visible !== undefined) updates.is_visible = is_visible;
+    if (is_featured !== undefined) updates.is_featured = is_featured;
+
+    const { data, error } = await supabase
+      .from("reviews")
+      .update(updates)
+      .eq("id", reviewId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({ review: data });
+  } catch (err) {
+    console.error("[admin] Failed to update review", err);
+    res.status(500).json({ error: "Failed to update review." });
+  }
+});
+
+// Admin: Revenue overview
+app.get("/api/admin/revenue", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({
+      summary: { total: 0, this_month: 0, avg_per_booking: 0 },
+      monthly: [],
+      transactions: []
+    });
+  }
+
+  try {
+    // Get all completed transactions
+    const { data: transactions } = await supabase
+      .from("client_transactions")
+      .select("*")
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+
+    const allTx = transactions || [];
+    const total = allTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    // This month's revenue
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const thisMonthTx = allTx.filter(t => t.created_at >= startOfMonth);
+    const thisMonth = thisMonthTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    // Average per booking
+    const avgPerBooking = allTx.length > 0 ? Math.round(total / allTx.length) : 0;
+
+    // Monthly breakdown (last 6 months)
+    const monthly = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = date.toISOString();
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const monthTx = allTx.filter(t => t.created_at >= monthStart && t.created_at <= monthEnd);
+      const monthTotal = monthTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+      monthly.push({
+        month: date.toLocaleDateString("en-US", { month: "short" }),
+        revenue: monthTotal
+      });
+    }
+
+    res.status(200).json({
+      summary: { total, this_month: thisMonth, avg_per_booking: avgPerBooking },
+      monthly,
+      transactions: allTx.slice(0, 50) // Latest 50 transactions
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load revenue", err);
+    res.status(500).json({ error: "Failed to load revenue data." });
+  }
+});
+
+// Admin: List all promotions
+app.get("/api/admin/promotions", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ promotions: [] });
+  }
+
+  try {
+    const { data: promotions, error } = await supabase
+      .from("promotions")
+      .select("*, providers(name)")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({
+      promotions: (promotions || []).map(p => ({
+        ...p,
+        provider_name: p.providers?.name || "Unknown"
+      }))
+    });
+  } catch (err) {
+    console.error("[admin] Failed to load promotions", err);
+    res.status(500).json({ error: "Failed to load promotions." });
+  }
+});
+
+// Admin: Recent activity feed
+app.get("/api/admin/activity", requireAdmin, async (req, res) => {
+  if (!supabase) {
+    return res.status(200).json({ activity: [] });
+  }
+
+  try {
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("id, client_name, provider_name, service_name, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    const activity = (bookings || []).map(b => ({
+      id: b.id,
+      type: "booking",
+      title: `${b.client_name || "Client"} booked ${b.service_name || "a service"}`,
+      subtitle: `with ${b.provider_name || "Provider"}`,
+      status: b.status,
+      timestamp: b.created_at
+    }));
+
+    res.status(200).json({ activity });
+  } catch (err) {
+    console.error("[admin] Failed to load activity", err);
+    res.status(500).json({ error: "Failed to load activity." });
   }
 });
 

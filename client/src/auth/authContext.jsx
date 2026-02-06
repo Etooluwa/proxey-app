@@ -238,7 +238,8 @@ export function AuthProvider({ children }) {
             const actualRole = supabaseRole || localRole;
 
             // If user has a stored role and it doesn't match what they selected, show error
-            if (actualRole && actualRole !== role) {
+            // Admin users bypass this check - they can sign in from any tab
+            if (actualRole && actualRole !== role && actualRole !== 'admin') {
                 const roleLabel = actualRole === 'provider' ? 'Service Provider' : 'Client';
                 const switchToRole = actualRole === 'provider' ? 'Service Provider tab' : 'Client tab';
                 const err = new Error(
