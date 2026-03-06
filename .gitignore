@@ -1,3 +1,61 @@
-server/.env
+# ============================================
+# Environment Variables - NEVER commit these
+# ============================================
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+.env*.local
 
+# Server
+server/.env
+server/.env.*
+
+# Client
+client/.env
+client/.env.*
+!client/.env.example
+
+# Root
+*.env
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# ============================================
+# Build outputs
+# ============================================
+build/
+client/build/
+dist/
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# OS & Editor files
+# ============================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ============================================
+# Misc
+# ============================================
+.cache/
+*.pem
+*.key
+*.cert
