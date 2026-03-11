@@ -48,6 +48,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBookings from './pages/admin/AdminBookings';
+import AdminDisputes from './pages/admin/AdminDisputes';
 import AdminServices from './pages/admin/AdminServices';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminRevenue from './pages/admin/AdminRevenue';
@@ -152,6 +153,7 @@ function App() {
                       <Route path="analytics" element={<AdminAnalytics />} />
                       <Route path="users" element={<AdminUsers />} />
                       <Route path="bookings" element={<AdminBookings />} />
+                      <Route path="disputes" element={<AdminDisputes />} />
                       <Route path="services" element={<AdminServices />} />
                       <Route path="reviews" element={<AdminReviews />} />
                       <Route path="revenue" element={<AdminRevenue />} />

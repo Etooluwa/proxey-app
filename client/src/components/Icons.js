@@ -14,6 +14,7 @@ import {
     CheckCircle,
     XCircle,
     AlertCircle,
+    AlertTriangle,
     Wallet,
     TrendingUp,
     ChevronRight,
@@ -49,7 +50,9 @@ import {
     Paperclip,
     Mail,
     Info,
-    CreditCard
+    CreditCard,
+    X,
+    Filter
 } from 'lucide-react';
 
 export const Icons = {
@@ -68,7 +71,7 @@ export const Icons = {
     Clock,
     Check: CheckCircle,
     CheckCircle,
-    X: XCircle,
+    X,
     Alert: AlertCircle,
     AlertCircle,
     Wallet,
@@ -108,5 +111,8 @@ export const Icons = {
     Paperclip,
     Mail,
     Info,
-    CreditCard
+    CreditCard,
+    AlertTriangle,
+    XCircle,
+    Filter
 };

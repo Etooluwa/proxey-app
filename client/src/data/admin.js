@@ -71,3 +71,27 @@ export async function fetchAdminActivity() {
 export async function fetchAdminAnalytics({ period = "month" } = {}) {
   return request(`/admin/analytics?period=${period}`);
 }
+
+// Admin Disputes
+export async function fetchAdminDisputes({ status, page = 1, limit = 20 } = {}) {
+  const params = new URLSearchParams();
+  if (status && status !== "all") params.set("status", status);
+  params.set("page", page);
+  params.set("limit", limit);
+  return request(`/admin/disputes?${params.toString()}`);
+}
+
+export async function fetchAdminDispute(id) {
+  return request(`/admin/disputes/${id}`);
+}
+
+export async function resolveDispute(id, { status, resolution, resolution_amount, resolution_notes }) {
+  return request(`/admin/disputes/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, resolution, resolution_amount, resolution_notes }),
+  });
+}
+
+export async function fetchDisputeStats() {
+  return request("/admin/disputes/stats");
+}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
 import ReviewModal from '../components/ui/ReviewModal';
+import DisputeModal from '../components/ui/DisputeModal';
 import { submitReview } from '../data/bookings';
 
 const BookingsPage = () => {
@@ -14,6 +15,8 @@ const BookingsPage = () => {
     const [reviewModalOpen, setReviewModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [reviewLoading, setReviewLoading] = useState(false);
+    const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+    const [disputeBooking, setDisputeBooking] = useState(null);
 
     useEffect(() => {
         loadBookings();
@@ -368,6 +371,29 @@ const BookingsPage = () => {
                                                 Reviewed
                                             </span>
                                         )}
+                                        {/* Dispute button for completed bookings within 7 days */}
+                                        {activeTab === 'past' && booking.status === 'completed' && !booking.has_dispute && (() => {
+                                            const completedDate = new Date(booking.completed_at || booking.scheduled_at);
+                                            const daysSinceCompletion = (Date.now() - completedDate.getTime()) / (1000 * 60 * 60 * 24);
+                                            return daysSinceCompletion <= 7;
+                                        })() && (
+                                            <button
+                                                onClick={() => {
+                                                    setDisputeBooking(booking);
+                                                    setDisputeModalOpen(true);
+                                                }}
+                                                className="px-4 py-2 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Icons.AlertTriangle size={16} />
+                                                Open Dispute
+                                            </button>
+                                        )}
+                                        {booking.has_dispute && (
+                                            <span className="px-4 py-2 text-yellow-600 text-sm flex items-center justify-center gap-2">
+                                                <Icons.AlertCircle size={16} />
+                                                Dispute Open
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -423,6 +449,18 @@ const BookingsPage = () => {
                 onSubmit={handleSubmitReview}
                 booking={selectedBooking}
                 loading={reviewLoading}
+            />
+
+            {/* Dispute Modal */}
+            <DisputeModal
+                open={disputeModalOpen}
+                onClose={() => {
+                    setDisputeModalOpen(false);
+                    setDisputeBooking(null);
+                    loadBookings(); // Refresh to show dispute status
+                }}
+                booking={disputeBooking}
+                userRole="client"
             />
         </div>
     );

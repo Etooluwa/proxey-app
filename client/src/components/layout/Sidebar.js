@@ -34,6 +34,7 @@ export const Sidebar = ({ role }) => {
         { id: 'analytics', path: '/admin/analytics', label: 'Analytics', icon: Icons.TrendingUp },
         { id: 'users', path: '/admin/users', label: 'Users', icon: Icons.Users },
         { id: 'bookings', path: '/admin/bookings', label: 'Bookings', icon: Icons.Calendar },
+        { id: 'disputes', path: '/admin/disputes', label: 'Disputes', icon: Icons.AlertTriangle },
         { id: 'services', path: '/admin/services', label: 'Services', icon: Icons.Wrench },
         { id: 'reviews', path: '/admin/reviews', label: 'Reviews', icon: Icons.Star },
         { id: 'revenue', path: '/admin/revenue', label: 'Revenue', icon: Icons.Wallet },

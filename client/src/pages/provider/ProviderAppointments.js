@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icons } from '../../components/Icons';
 import { fetchProviderJobs, updateProviderJobStatus } from '../../data/provider';
 import { useToast } from '../../components/ui/ToastProvider';
+import DisputeModal from '../../components/ui/DisputeModal';
 
 const ProviderAppointments = () => {
     const navigate = useNavigate();
@@ -13,6 +14,8 @@ const ProviderAppointments = () => {
     const [appointments, setAppointments] = useState([]);
     const [actionModal, setActionModal] = useState(null); // { type: 'accept'|'decline', appointment: apt, declineReason: '' }
     const [loading, setLoading] = useState(false);
+    const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+    const [disputeAppointment, setDisputeAppointment] = useState(null);
 
     const normalizeStatus = (status) => {
         const val = (status || "").toUpperCase();
@@ -292,6 +295,24 @@ const ProviderAppointments = () => {
                                         View
                                     </button>
                                 )}
+                                {apt.statusLabel === 'COMPLETED' && !apt.has_dispute && (
+                                    <button
+                                        onClick={() => {
+                                            setDisputeAppointment(apt);
+                                            setDisputeModalOpen(true);
+                                        }}
+                                        className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors flex items-center gap-1"
+                                    >
+                                        <Icons.AlertTriangle size={14} />
+                                        Dispute
+                                    </button>
+                                )}
+                                {apt.has_dispute && (
+                                    <span className="px-3 py-2 text-yellow-600 text-sm flex items-center gap-1">
+                                        <Icons.AlertCircle size={14} />
+                                        Disputed
+                                    </span>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -397,6 +418,18 @@ const ProviderAppointments = () => {
                     </div>
                 </div>
             )}
+
+            {/* Dispute Modal */}
+            <DisputeModal
+                open={disputeModalOpen}
+                onClose={() => {
+                    setDisputeModalOpen(false);
+                    setDisputeAppointment(null);
+                    load(); // Refresh to show dispute status
+                }}
+                booking={disputeAppointment}
+                userRole="provider"
+            />
         </div>
     );
 };

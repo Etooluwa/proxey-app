@@ -4728,5 +4728,486 @@ app.get("/api/provider/analytics", async (req, res) => {
   }
 });
 
+// ============================================
+// DISPUTE ENDPOINTS
+// ============================================
+
+// Reason labels for display
+const DISPUTE_REASON_LABELS = {
+  service_not_provided: 'Service Not Provided',
+  poor_quality: 'Poor Quality',
+  no_show_provider: 'Provider No-Show',
+  no_show_client: 'Client No-Show',
+  wrong_service: 'Wrong Service',
+  billing_issue: 'Billing Issue',
+  other: 'Other',
+};
+
+// Create a dispute (client or provider)
+app.post("/api/disputes", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const userId = getUserId(req);
+  const { bookingId, reason, description, evidenceUrls } = req.body;
+
+  if (!bookingId || !reason || !description) {
+    return res.status(400).json({ error: "bookingId, reason, and description are required." });
+  }
+
+  try {
+    // Verify booking exists and user is involved
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, client_id, provider_id, status, payment_intent_id, price")
+      .eq("id", bookingId)
+      .single();
+
+    if (bookingError || !booking) {
+      return res.status(404).json({ error: "Booking not found." });
+    }
+
+    // Determine user's role in this booking
+    let openedByRole = null;
+    if (booking.client_id === userId) {
+      openedByRole = 'client';
+    } else if (booking.provider_id === userId) {
+      openedByRole = 'provider';
+    } else {
+      return res.status(403).json({ error: "You are not part of this booking." });
+    }
+
+    // Check if dispute already exists for this booking
+    const { data: existingDispute } = await supabase
+      .from("disputes")
+      .select("id, status")
+      .eq("booking_id", bookingId)
+      .in("status", ["open", "under_review"])
+      .single();
+
+    if (existingDispute) {
+      return res.status(400).json({ error: "An open dispute already exists for this booking." });
+    }
+
+    // Create the dispute
+    const { data: dispute, error: createError } = await supabase
+      .from("disputes")
+      .insert({
+        booking_id: bookingId,
+        opened_by: userId,
+        opened_by_role: openedByRole,
+        reason,
+        description,
+        evidence_urls: evidenceUrls || [],
+        status: 'open'
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("[disputes] Failed to create dispute", createError);
+      return res.status(500).json({ error: "Failed to create dispute." });
+    }
+
+    res.status(201).json(dispute);
+  } catch (err) {
+    console.error("[disputes] Error creating dispute", err);
+    res.status(500).json({ error: "Failed to create dispute." });
+  }
+});
+
+// Respond to a dispute (other party)
+app.post("/api/disputes/:id/respond", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const userId = getUserId(req);
+  const disputeId = req.params.id;
+  const { description, evidenceUrls } = req.body;
+
+  if (!description) {
+    return res.status(400).json({ error: "description is required." });
+  }
+
+  try {
+    // Get the dispute with booking info
+    const { data: dispute, error: disputeError } = await supabase
+      .from("disputes")
+      .select(`
+        *,
+        bookings:booking_id (client_id, provider_id)
+      `)
+      .eq("id", disputeId)
+      .single();
+
+    if (disputeError || !dispute) {
+      return res.status(404).json({ error: "Dispute not found." });
+    }
+
+    if (dispute.status !== 'open') {
+      return res.status(400).json({ error: "Dispute is no longer open for responses." });
+    }
+
+    // Check if user is the other party
+    const booking = dispute.bookings;
+    const isOtherParty =
+      (dispute.opened_by_role === 'client' && booking.provider_id === userId) ||
+      (dispute.opened_by_role === 'provider' && booking.client_id === userId);
+
+    if (!isOtherParty) {
+      return res.status(403).json({ error: "Only the other party can respond to this dispute." });
+    }
+
+    // Update with response
+    const { data: updated, error: updateError } = await supabase
+      .from("disputes")
+      .update({
+        response_description: description,
+        response_evidence_urls: evidenceUrls || [],
+        responded_at: new Date().toISOString()
+      })
+      .eq("id", disputeId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("[disputes] Failed to update dispute", updateError);
+      return res.status(500).json({ error: "Failed to respond to dispute." });
+    }
+
+    res.status(200).json(updated);
+  } catch (err) {
+    console.error("[disputes] Error responding to dispute", err);
+    res.status(500).json({ error: "Failed to respond to dispute." });
+  }
+});
+
+// Get my disputes (client or provider)
+app.get("/api/disputes", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const userId = getUserId(req);
+
+  try {
+    // Get bookings where user is client or provider
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("id")
+      .or(`client_id.eq.${userId},provider_id.eq.${userId}`);
+
+    if (bookingsError) {
+      console.error("[disputes] Failed to fetch bookings", bookingsError);
+      return res.status(500).json({ error: "Failed to fetch disputes." });
+    }
+
+    const bookingIds = (bookings || []).map(b => b.id);
+
+    if (bookingIds.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    // Get disputes for these bookings
+    const { data: disputes, error: disputesError } = await supabase
+      .from("disputes")
+      .select(`
+        *,
+        bookings:booking_id (
+          id, scheduled_at, price, status,
+          services:service_id (name),
+          client:client_id (id, raw_user_meta_data),
+          provider:provider_id (id, raw_user_meta_data)
+        )
+      `)
+      .in("booking_id", bookingIds)
+      .order("created_at", { ascending: false });
+
+    if (disputesError) {
+      console.error("[disputes] Failed to fetch disputes", disputesError);
+      return res.status(500).json({ error: "Failed to fetch disputes." });
+    }
+
+    res.status(200).json(disputes || []);
+  } catch (err) {
+    console.error("[disputes] Error fetching disputes", err);
+    res.status(500).json({ error: "Failed to fetch disputes." });
+  }
+});
+
+// Admin: List all disputes with filters
+app.get("/api/admin/disputes", requireAdmin, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const { status, page = 1, limit = 20 } = req.query;
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  try {
+    let query = supabase
+      .from("disputes")
+      .select(`
+        *,
+        bookings:booking_id (
+          id, scheduled_at, price, status, payment_intent_id,
+          services:service_id (name)
+        )
+      `, { count: 'exact' });
+
+    if (status && status !== 'all') {
+      query = query.eq("status", status);
+    }
+
+    query = query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + parseInt(limit) - 1);
+
+    const { data: disputes, count, error } = await query;
+
+    if (error) {
+      console.error("[admin/disputes] Failed to fetch disputes", error);
+      return res.status(500).json({ error: "Failed to fetch disputes." });
+    }
+
+    // Fetch user details for each dispute
+    const userIds = new Set();
+    (disputes || []).forEach(d => {
+      if (d.opened_by) userIds.add(d.opened_by);
+      if (d.resolved_by) userIds.add(d.resolved_by);
+    });
+
+    // Also get client and provider from bookings
+    const bookingIds = [...new Set((disputes || []).map(d => d.booking_id))];
+
+    let clientProviderMap = {};
+    if (bookingIds.length > 0) {
+      const { data: bookingUsers } = await supabase
+        .from("bookings")
+        .select("id, client_id, provider_id")
+        .in("id", bookingIds);
+
+      (bookingUsers || []).forEach(b => {
+        clientProviderMap[b.id] = { clientId: b.client_id, providerId: b.provider_id };
+        userIds.add(b.client_id);
+        userIds.add(b.provider_id);
+      });
+    }
+
+    let usersMap = {};
+    if (userIds.size > 0) {
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, raw_user_meta_data")
+        .in("id", [...userIds]);
+
+      (users || []).forEach(u => {
+        usersMap[u.id] = u.raw_user_meta_data || {};
+      });
+    }
+
+    // Enrich disputes with user info
+    const enrichedDisputes = (disputes || []).map(d => {
+      const bp = clientProviderMap[d.booking_id] || {};
+      return {
+        ...d,
+        opener_name: usersMap[d.opened_by]?.full_name || usersMap[d.opened_by]?.name || 'Unknown',
+        client_name: usersMap[bp.clientId]?.full_name || usersMap[bp.clientId]?.name || 'Unknown',
+        provider_name: usersMap[bp.providerId]?.full_name || usersMap[bp.providerId]?.name || 'Unknown',
+        reason_label: DISPUTE_REASON_LABELS[d.reason] || d.reason
+      };
+    });
+
+    res.status(200).json({
+      data: enrichedDisputes,
+      total: count || 0,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil((count || 0) / parseInt(limit))
+    });
+  } catch (err) {
+    console.error("[admin/disputes] Error fetching disputes", err);
+    res.status(500).json({ error: "Failed to fetch disputes." });
+  }
+});
+
+// Admin: Get single dispute with full details
+app.get("/api/admin/disputes/:id", requireAdmin, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const disputeId = req.params.id;
+
+  try {
+    const { data: dispute, error } = await supabase
+      .from("disputes")
+      .select(`
+        *,
+        bookings:booking_id (
+          id, scheduled_at, price, status, payment_intent_id, payment_status,
+          services:service_id (name, price),
+          client_id, provider_id
+        )
+      `)
+      .eq("id", disputeId)
+      .single();
+
+    if (error || !dispute) {
+      return res.status(404).json({ error: "Dispute not found." });
+    }
+
+    // Get user details
+    const userIds = [dispute.opened_by, dispute.bookings?.client_id, dispute.bookings?.provider_id].filter(Boolean);
+    let usersMap = {};
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, email, raw_user_meta_data")
+        .in("id", userIds);
+
+      (users || []).forEach(u => {
+        usersMap[u.id] = { ...u.raw_user_meta_data, email: u.email };
+      });
+    }
+
+    const enriched = {
+      ...dispute,
+      opener: usersMap[dispute.opened_by] || {},
+      client: usersMap[dispute.bookings?.client_id] || {},
+      provider: usersMap[dispute.bookings?.provider_id] || {},
+      reason_label: DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason
+    };
+
+    res.status(200).json(enriched);
+  } catch (err) {
+    console.error("[admin/disputes] Error fetching dispute", err);
+    res.status(500).json({ error: "Failed to fetch dispute." });
+  }
+});
+
+// Admin: Resolve/update dispute
+app.patch("/api/admin/disputes/:id", requireAdmin, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  const adminId = getUserId(req);
+  const disputeId = req.params.id;
+  const { status, resolution, resolution_amount, resolution_notes } = req.body;
+
+  try {
+    // Get dispute with booking info
+    const { data: dispute, error: disputeError } = await supabase
+      .from("disputes")
+      .select(`
+        *,
+        bookings:booking_id (payment_intent_id, price)
+      `)
+      .eq("id", disputeId)
+      .single();
+
+    if (disputeError || !dispute) {
+      return res.status(404).json({ error: "Dispute not found." });
+    }
+
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (resolution_notes !== undefined) updateData.resolution_notes = resolution_notes;
+
+    // Handle resolution with potential refund
+    if (resolution) {
+      updateData.resolution = resolution;
+      updateData.resolved_by = adminId;
+      updateData.resolved_at = new Date().toISOString();
+      updateData.status = 'resolved';
+
+      // Process Stripe refund if needed
+      if ((resolution === 'full_refund' || resolution === 'partial_refund') && dispute.bookings?.payment_intent_id) {
+        try {
+          const refundParams = {
+            payment_intent: dispute.bookings.payment_intent_id,
+            reason: 'requested_by_customer',
+            metadata: { dispute_id: disputeId }
+          };
+
+          if (resolution === 'partial_refund' && resolution_amount) {
+            refundParams.amount = resolution_amount;
+            updateData.resolution_amount = resolution_amount;
+          }
+
+          const refund = await stripe.refunds.create(refundParams);
+          updateData.refund_id = refund.id;
+        } catch (stripeErr) {
+          console.error("[admin/disputes] Stripe refund failed", stripeErr);
+          return res.status(500).json({ error: `Refund failed: ${stripeErr.message}` });
+        }
+      }
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from("disputes")
+      .update(updateData)
+      .eq("id", disputeId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("[admin/disputes] Failed to update dispute", updateError);
+      return res.status(500).json({ error: "Failed to update dispute." });
+    }
+
+    res.status(200).json(updated);
+  } catch (err) {
+    console.error("[admin/disputes] Error updating dispute", err);
+    res.status(500).json({ error: "Failed to update dispute." });
+  }
+});
+
+// Admin: Get dispute stats
+app.get("/api/admin/disputes/stats", requireAdmin, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+  try {
+    const { data: disputes, error } = await supabase
+      .from("disputes")
+      .select("status, created_at, resolved_at");
+
+    if (error) {
+      console.error("[admin/disputes] Failed to fetch stats", error);
+      return res.status(500).json({ error: "Failed to fetch stats." });
+    }
+
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const stats = {
+      open: 0,
+      under_review: 0,
+      resolved_this_week: 0,
+      total_resolved: 0,
+      avg_resolution_hours: 0
+    };
+
+    let totalResolutionTime = 0;
+    let resolvedCount = 0;
+
+    (disputes || []).forEach(d => {
+      if (d.status === 'open') stats.open++;
+      if (d.status === 'under_review') stats.under_review++;
+      if (d.status === 'resolved') {
+        stats.total_resolved++;
+        if (new Date(d.resolved_at) >= weekAgo) {
+          stats.resolved_this_week++;
+        }
+        if (d.resolved_at && d.created_at) {
+          const resolutionTime = new Date(d.resolved_at) - new Date(d.created_at);
+          totalResolutionTime += resolutionTime;
+          resolvedCount++;
+        }
+      }
+    });
+
+    if (resolvedCount > 0) {
+      stats.avg_resolution_hours = Math.round(totalResolutionTime / resolvedCount / (1000 * 60 * 60));
+    }
+
+    res.status(200).json(stats);
+  } catch (err) {
+    console.error("[admin/disputes] Error fetching stats", err);
+    res.status(500).json({ error: "Failed to fetch stats." });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
