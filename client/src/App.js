@@ -1,5 +1,7 @@
 // React import not needed with modern JSX transform
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { API_BASE } from './data/apiClient';
 import { AuthProvider } from './auth/authContext';
 import { ToastProvider } from './components/ui/ToastProvider';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -69,6 +71,11 @@ import ProviderAnalytics from './pages/provider/ProviderAnalytics';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
+  // Warm up the Render server on app load so it's ready when the user needs it
+  useEffect(() => {
+    fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+  }, []);
+
   return (
     <ErrorBoundary>
       <Router>

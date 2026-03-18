@@ -319,7 +319,10 @@ const ProviderServiceEditor = () => {
       navigate("/provider/services");
     } catch (err) {
       console.error("Failed to save service:", err);
-      toast.push({ title: "Failed to save", description: err.message, variant: "error" });
+      const description = err.isTimeout
+        ? "Server is waking up — please try again in a moment."
+        : err.message;
+      toast.push({ title: "Failed to save", description, variant: "error" });
     } finally {
       setSaving(false);
     }

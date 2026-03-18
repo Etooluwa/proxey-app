@@ -39,7 +39,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://proxey-app-git-feature-prototype-migration-eto-seguns-projects.vercel.app',
   'https://proxey-app.vercel.app',
-  /\.vercel\.app$/ // Allow all Vercel preview deployments
+  /\.vercel\.app$/,      // Allow all Vercel preview deployments
+  /\.onrender\.com$/,    // Allow all Render deployments
 ];
 
 app.use(cors({
@@ -77,6 +78,11 @@ app.use((req, res, next) => {
 
 app.get("/", (req, res) => {
   res.send("Booking App Backend Running 🚀");
+});
+
+// Health check — used by frontend to warm up the server on cold start
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true });
 });
 
 // ============================================
