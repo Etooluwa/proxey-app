@@ -9,8 +9,8 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRedirect from './routes/RoleRedirect';
 
 // Layouts
-import AppShell from './components/layout/AppShell';
-import ProviderShell from './components/layout/ProviderShell';
+import AppLayout from './components/layout/AppLayout';
+import ProviderLayout from './components/layout/ProviderLayout';
 import AdminShell from './components/layout/AdminShell';
 
 // Auth Pages
@@ -18,6 +18,8 @@ import SignIn from './pages/auth/SignInPage';
 import SignUp from './pages/auth/SignUpPage';
 import AuthCallback from './pages/AuthCallback';
 import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
+import InviteFlow from './pages/InviteFlow';
+import PublicBookingFlow from './pages/PublicBookingFlow';
 
 // Client Pages
 import AppDashboard from './pages/AppDashboard';
@@ -30,6 +32,8 @@ import AccountPage from './pages/AccountPage';
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
 import ClientInvoices from './pages/ClientInvoices';
+import RelationshipPage from './pages/RelationshipPage';
+import BookingConfirmPage from './pages/BookingConfirmPage';
 
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -41,7 +45,12 @@ import ProviderMessages from './pages/provider/ProviderMessages';
 import ProviderServices from './pages/provider/ProviderServices';
 import ProviderProfile from './pages/provider/ProviderProfile';
 import ProviderPromotions from './pages/provider/ProviderPromotions';
+import ProviderClients from './pages/provider/ProviderClients';
+import ProviderClientTimeline from './pages/provider/ProviderClientTimeline';
+import ProviderServiceEditor from './pages/provider/ProviderServiceEditor';
 import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcceptance';
+import ProviderNotifications from './pages/provider/ProviderNotifications';
+import ProviderAppointmentDetail from './pages/provider/ProviderAppointmentDetail';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -73,6 +82,8 @@ function App() {
                     <Route path="/auth/sign-in" element={<SignIn />} />
                     <Route path="/auth/sign-up" element={<SignUp />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
+                    <Route path="/join/:code" element={<InviteFlow />} />
+                    <Route path="/book/:handle" element={<PublicBookingFlow />} />
 
                     {/* Root Redirect */}
                     <Route path="/" element={<RoleRedirect />} />
@@ -92,7 +103,7 @@ function App() {
                       path="/app"
                       element={
                         <ProtectedRoute allowedRoles={['client']}>
-                          <AppShell />
+                          <AppLayout />
                         </ProtectedRoute>
                       }
                     >
@@ -105,6 +116,8 @@ function App() {
                       <Route path="account" element={<AccountPage />} />
                       <Route path="invoices" element={<ClientInvoices />} />
                       <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
+                      <Route path="relationship/:providerId" element={<RelationshipPage />} />
+                      <Route path="book/confirm" element={<BookingConfirmPage />} />
                     </Route>
 
                     {/* Provider Onboarding */}
@@ -122,21 +135,26 @@ function App() {
                       path="/provider"
                       element={
                         <ProtectedRoute allowedRoles={['provider']}>
-                          <ProviderShell />
+                          <ProviderLayout />
                         </ProtectedRoute>
                       }
                     >
                       <Route index element={<ProviderDashboard />} />
-                      <Route path="notifications" element={<NotificationsPage />} />
+                      <Route path="notifications" element={<ProviderNotifications />} />
                       <Route path="requests/:requestId" element={<AppointmentRequestAcceptance />} />
                       <Route path="schedule" element={<ProviderSchedule />} />
                       <Route path="appointments" element={<ProviderAppointments />} />
+                      <Route path="appointments/:id" element={<ProviderAppointmentDetail />} />
+                      <Route path="clients" element={<ProviderClients />} />
+                      <Route path="client/:clientId" element={<ProviderClientTimeline />} />
                       <Route path="promotions" element={<ProviderPromotions />} />
                       <Route path="earnings" element={<ProviderEarnings />} />
                       <Route path="analytics" element={<ProviderAnalytics />} />
                       <Route path="invoices" element={<ProviderInvoices />} />
                       <Route path="messages" element={<ProviderMessages />} />
                       <Route path="services" element={<ProviderServices />} />
+                      <Route path="services/new" element={<ProviderServiceEditor />} />
+                      <Route path="services/:id" element={<ProviderServiceEditor />} />
                       <Route path="profile" element={<ProviderProfile />} />
                     </Route>
 

@@ -1,302 +1,365 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { useSession } from "../../auth/authContext";
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell
-} from 'recharts';
-import { Icons } from '../../components/Icons';
-import { StatCard } from '../../components/StatCard';
-import { EARNINGS_DATA } from '../../constants';
+  fetchProviderJobs,
+  fetchProviderEarnings,
+} from "../../data/provider";
+import GradientHeader from "../../components/ui/GradientHeader";
+import Avatar from "../../components/ui/Avatar";
+import Card from "../../components/ui/Card";
+import Footer from "../../components/ui/Footer";
 
-import { useSession } from '../../auth/authContext';
-import { fetchProviderJobs } from '../../data/provider';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtCurrency(cents) {
+  if (!cents && cents !== 0) return "$0";
+  return `$${(cents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function getInitials(name) {
+  if (!name) return "C";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function isToday(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderDashboard = () => {
-    const navigate = useNavigate();
-    const { profile } = useSession();
-    const [requests, setRequests] = useState([]);
-    const [loadingRequests, setLoadingRequests] = useState(true);
+  const navigate = useNavigate();
+  const { onMenu } = useOutletContext() || {};
+  const { profile } = useSession();
 
-    useEffect(() => {
-        let cancelled = false;
-        async function load() {
-            setLoadingRequests(true);
-            try {
-                const jobs = await fetchProviderJobs();
-                if (!cancelled) {
-                    // Show only pending/active/upcoming
-                    const filtered = (jobs || []).filter((job) => {
-                        const status = (job.status || '').toLowerCase();
-                        return status === 'pending' || status === 'upcoming' || status === 'active' || status === 'confirmed';
-                    });
-                    setRequests(filtered);
-                }
-            } catch (error) {
-                console.error("Failed to load provider requests", error);
-                if (!cancelled) setRequests([]);
-            } finally {
-                if (!cancelled) setLoadingRequests(false);
-            }
+  const [allJobs, setAllJobs] = useState([]);
+  const [earnings, setEarnings] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const [jobs, earn] = await Promise.all([
+          fetchProviderJobs(),
+          fetchProviderEarnings(),
+        ]);
+        if (!cancelled) {
+          setAllJobs(jobs || []);
+          setEarnings(earn || null);
         }
-        load();
-        return () => { cancelled = true; };
-    }, []);
-
-    const handleDateClick = (date) => {
-        const formattedDate = date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-        navigate(`/provider/schedule?date=${encodeURIComponent(formattedDate)}`);
+      } catch (err) {
+        console.error("ProviderDashboard load error:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    const firstName = profile?.name?.split(' ')[0] || 'Provider';
+  const firstName = profile?.name?.split(" ")[0] || "there";
+  const initials = getInitials(profile?.name);
 
-    return (
-        <div className="max-w-7xl mx-auto space-y-8">
+  // Derived counts
+  const todayJobs = allJobs.filter(
+    (j) => isToday(j.scheduled_at) && j.status !== "cancelled"
+  );
+  const pendingJobs = allJobs.filter(
+    (j) => (j.status || "").toLowerCase() === "pending"
+  );
 
-            {/* Header Greeting */}
-            <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-                    <p className="text-gray-500 mt-1">Welcome, {firstName}! You have {requests.length} new requests.</p>
-                </div>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => navigate('/provider/schedule')}
-                        className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 shadow-sm transition-colors flex items-center gap-2"
-                    >
-                        <Icons.Clock size={16} />
-                        Edit Availability
-                    </button>
-                    <button
-                        onClick={() => navigate('/provider/promotions')}
-                        className="px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 shadow-md shadow-brand-200"
-                    >
-                        + Create Promotion
-                    </button>
-                </div>
-            </div>
+  // This-week revenue: sum of completed jobs in the current Mon–Sun week
+  const weekStart = (() => {
+    const d = new Date();
+    const day = d.getDay(); // 0=Sun
+    d.setDate(d.getDate() - ((day + 6) % 7)); // back to Monday
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
 
-            {/* Stats Row - Fresh Account State */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    label="Total Earnings"
-                    value="$0.00"
-                    icon={Icons.Wallet}
-                    colorClass="bg-emerald-500 text-emerald-500"
+  const weekRevenue = allJobs
+    .filter((j) => {
+      const d = new Date(j.scheduled_at || j.created_at);
+      return (
+        d >= weekStart &&
+        d < weekEnd &&
+        (j.status === "completed" || j.status === "confirmed")
+      );
+    })
+    .reduce((sum, j) => sum + (j.price || 0), 0);
+
+  // ─── Notification bell (right slot) ────────────────────────────────────────
+  const hasNotifications = pendingJobs.length > 0;
+  const NotifBell = (
+    <button
+      onClick={() => navigate("/provider/appointments")}
+      className="relative flex items-center justify-center focus:outline-none"
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        background: "rgba(255,255,255,0.2)",
+        backdropFilter: "blur(10px)",
+        border: "none",
+        cursor: "pointer",
+      }}
+    >
+      <svg
+        width="18"
+        height="18"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {hasNotifications && (
+        <div
+          className="absolute"
+          style={{
+            top: 4,
+            right: 4,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#FF751F",
+            border: "2px solid rgba(255,255,255,0.9)",
+          }}
+        />
+      )}
+    </button>
+  );
+
+  // ─── Frosted stat cards (inside gradient) ──────────────────────────────────
+  const StatCards = (
+    <div className="flex gap-2.5 mt-4">
+      {/* Today */}
+      <div
+        className="flex-1 px-3 py-3.5 rounded-xl"
+        style={{
+          background: "rgba(255,255,255,0.2)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <p
+          className="font-manrope text-[12px] m-0 mb-1.5"
+          style={{ color: "rgba(255,255,255,0.75)" }}
+        >
+          Today
+        </p>
+        <p className="font-manrope text-[22px] font-bold text-white m-0 mb-0.5">
+          {loading ? "—" : todayJobs.length}
+        </p>
+        <p
+          className="font-manrope text-[12px] font-semibold m-0"
+          style={{ color: "rgba(255,255,255,0.9)" }}
+        >
+          bookings
+        </p>
+      </div>
+
+      {/* This week */}
+      <div
+        className="flex-1 px-3 py-3.5 rounded-xl"
+        style={{
+          background: "rgba(255,255,255,0.2)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <p
+          className="font-manrope text-[12px] m-0 mb-1.5"
+          style={{ color: "rgba(255,255,255,0.75)" }}
+        >
+          This week
+        </p>
+        <p className="font-manrope text-[22px] font-bold text-white m-0 mb-0.5">
+          {loading ? "—" : fmtCurrency(weekRevenue)}
+        </p>
+        <p
+          className="font-manrope text-[12px] font-semibold m-0"
+          style={{ color: "rgba(255,255,255,0.9)" }}
+        >
+          {earnings?.weekChangePercent != null
+            ? `${earnings.weekChangePercent > 0 ? "+" : ""}${earnings.weekChangePercent}%`
+            : "revenue"}
+        </p>
+      </div>
+    </div>
+  );
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
+      <GradientHeader
+        onMenu={onMenu}
+        right={NotifBell}
+      >
+        <p
+          className="font-manrope text-[14px] m-0 mt-3 mb-0.5"
+          style={{ color: "rgba(255,255,255,0.7)" }}
+        >
+          {todayLabel()}
+        </p>
+        <h1 className="font-manrope text-[28px] font-bold text-white m-0">
+          Hi, {firstName}
+        </h1>
+        {StatCards}
+      </GradientHeader>
+
+      {/* ── Body ──────────────────────────────────────────────────────────── */}
+      <div className="flex-1 px-4 pt-8 pb-4 flex flex-col">
+
+        {/* Pending bookings banner */}
+        {!loading && pendingJobs.length > 0 && (
+          <button
+            onClick={() => navigate("/provider/appointments")}
+            className="w-full text-left focus:outline-none mb-2"
+          >
+            <Card
+              className="flex items-center gap-3"
+              style={{ background: "#FFF0E6" }}
+            >
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "#FF751F",
+                }}
+              >
+                <span className="font-manrope text-[16px] font-bold text-white">
+                  {pendingJobs.length}
+                </span>
+              </div>
+              <div>
+                <p className="font-manrope text-[15px] font-semibold text-foreground m-0">
+                  Pending booking requests
+                </p>
+                <p className="font-manrope text-[13px] text-muted m-0 mt-0.5">
+                  Tap to review and accept
+                </p>
+              </div>
+            </Card>
+          </button>
+        )}
+
+        {/* Today's schedule */}
+        <p className="font-manrope text-[18px] font-bold text-foreground mt-2 mb-3.5 px-1">
+          Today's schedule
+        </p>
+
+        {loading ? (
+          /* Loading skeletons */
+          [1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="w-full h-[72px] rounded-card mb-2 animate-pulse"
+              style={{ background: "#E5E5EA" }}
+            />
+          ))
+        ) : todayJobs.length === 0 ? (
+          <Card className="flex flex-col items-center py-8 gap-2">
+            <svg
+              width="40"
+              height="40"
+              fill="none"
+              stroke="#D1D5DB"
+              strokeWidth="1.5"
+              viewBox="0 0 24 24"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <p className="font-manrope text-[15px] font-semibold text-foreground">
+              No appointments today
+            </p>
+            <p className="font-manrope text-[13px] text-muted text-center">
+              Your schedule is clear for today
+            </p>
+          </Card>
+        ) : (
+          todayJobs.map((job) => (
+            <button
+              key={job.id}
+              onClick={() =>
+                navigate(`/provider/appointments/${job.id}`)
+              }
+              className="w-full text-left focus:outline-none"
+            >
+              <Card className="flex items-center gap-3.5 mb-2">
+                <Avatar
+                  initials={getInitials(job.client_name)}
+                  size={44}
+                  bg="#FFF0E6"
+                  color="#FF751F"
                 />
-                <StatCard
-                    label="Bookings"
-                    value="0"
-                    icon={Icons.Calendar}
-                    colorClass="bg-blue-500 text-blue-500"
-                />
-                <StatCard
-                    label="Avg Rating"
-                    value="New"
-                    icon={Icons.Star}
-                    colorClass="bg-gray-300 text-gray-400"
-                />
-                <StatCard
-                    label="Profile Views"
-                    value="2"
-                    trend="100%"
-                    trendUp={true}
-                    icon={Icons.Trending}
-                    colorClass="bg-purple-500 text-purple-500"
-                />
-            </div>
-
-            {/* Main Content Area: Chart & Requests */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                {/* Earnings Chart */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-gray-900">Weekly Earnings</h3>
-                        <select className="text-sm border-gray-200 border rounded-lg px-2 py-1 text-gray-500 outline-none">
-                            <option>This Week</option>
-                        </select>
-                    </div>
-                    <div className="h-80 w-full relative">
-                        {/* Overlay for empty state chart to make it look intentional */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
-                            <p className="text-gray-400 text-sm font-medium bg-white/80 px-3 py-1 rounded-full backdrop-blur-sm">No earnings data to display yet</p>
-                        </div>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={EARNINGS_DATA}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    tickFormatter={(value) => `$${value}`}
-                                />
-                                <Tooltip
-                                    cursor={{ fill: '#f8fafc' }}
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                />
-                                <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                                    {EARNINGS_DATA.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill="#e2e8f0" />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-manrope text-[16px] font-semibold text-foreground m-0 truncate">
+                    {job.client_name || "Client"}
+                  </p>
+                  <p className="font-manrope text-[14px] text-muted m-0 mt-0.5 truncate">
+                    {job.service_name || "Service"}
+                  </p>
                 </div>
+                <span className="font-manrope text-[14px] font-semibold text-foreground flex-shrink-0">
+                  {fmtTime(job.scheduled_at)}
+                </span>
+              </Card>
+            </button>
+          ))
+        )}
+      </div>
 
-                {/* Recent Requests */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-w-0">
-                    <div className="mb-4">
-                        <h3 className="text-lg font-bold text-gray-900 mb-3">Booking Requests</h3>
-                        <div className="flex items-center justify-between gap-3">
-                            {requests.length > 0 && (
-                                <span className="bg-blue-100 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse flex-shrink-0">
-                                    {requests.length} New
-                                </span>
-                            )}
-                            <button
-                                onClick={() => navigate('/provider/appointments')}
-                                className="text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors whitespace-nowrap ml-auto"
-                            >
-                                See All →
-                            </button>
-                        </div>
-                    </div>
-
-                    {loadingRequests ? (
-                        <div className="text-sm text-gray-500">Loading requests...</div>
-                    ) : requests.length > 0 ? (
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-                            {requests.map((request) => {
-                                const dateLabel = request.scheduled_at
-                                    ? new Date(request.scheduled_at).toLocaleString()
-                                    : 'TBD';
-                                const priceLabel = typeof request.price === 'number'
-                                    ? `$${(request.price / 100).toFixed(2)}`
-                                    : request.price
-                                    ? `$${request.price}`
-                                    : '';
-                                return (
-                                    <div key={request.id} className="p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors overflow-hidden">
-                                        <div className="flex items-center gap-2 mb-2 min-w-0">
-                                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
-                                                {(request.client_name || 'C')[0]}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-bold text-gray-900 text-xs truncate">{request.client_name || 'Client'}</h4>
-                                                <p className="text-xs text-gray-500 truncate">{request.location || 'Location not set'}</p>
-                                            </div>
-                                            {priceLabel && (
-                                                <span className="text-xs font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded flex-shrink-0 whitespace-nowrap">
-                                                    {priceLabel}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="mb-2 px-1">
-                                            <p className="font-bold text-gray-800 text-xs mb-0.5 truncate">{request.service_name || 'Service'}</p>
-                                            <p className="text-xs text-gray-500 truncate">{dateLabel}</p>
-                                        </div>
-
-                                        <div className="flex gap-1.5">
-                                            <button className="flex-1 bg-gray-900 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-800 transition-colors">
-                                                Accept
-                                            </button>
-                                            <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-1.5 rounded text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
-                                                Decline
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-gray-100 rounded-xl bg-gray-50/50">
-                            <div className="w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-brand-200">
-                                <Icons.Bell size={28} className="text-gray-300" />
-                            </div>
-                            <h4 className="text-gray-900 font-bold mb-1">All caught up!</h4>
-                            <p className="text-gray-500 text-xs mb-6 max-w-[200px]">
-                                You have no pending booking requests. Improve your profile to attract more clients.
-                            </p>
-                            <button
-                                onClick={() => navigate('/provider/services')}
-                                className="text-xs font-bold text-brand-600 bg-brand-50 px-4 py-2 rounded-lg hover:bg-brand-100 transition-colors"
-                            >
-                                View Services
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Upcoming Schedule Preview */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Upcoming Schedule</h3>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <p className="text-sm text-gray-500">Available</p>
-                    </div>
-                </div>
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                    {[...Array(7)].map((_, i) => {
-                        const date = new Date();
-                        date.setDate(date.getDate() + i);
-                        const isToday = i === 0;
-                        return (
-                            <div
-                                key={i}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => handleDateClick(date)}
-                                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleDateClick(date)}
-                                className={`flex-shrink-0 w-28 p-4 rounded-xl border text-center cursor-pointer transition-all group ${isToday ? 'bg-gray-800 border-gray-800 text-white shadow-md' : 'bg-white border-gray-100 hover:border-brand-300'}`}
-                            >
-                                <div className={`text-xs mb-1 ${isToday ? 'text-gray-400' : 'text-gray-400'}`}>
-                                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                                </div>
-                                <div className={`text-xl font-bold mb-2 ${isToday ? 'text-white' : 'text-gray-800'}`}>
-                                    {date.getDate()}
-                                </div>
-
-                                {/* Empty State Dots or content */}
-                                <div className="flex justify-center gap-1">
-                                    <div className={`w-1 h-1 rounded-full ${isToday ? 'bg-gray-600' : 'bg-gray-200 group-hover:bg-brand-200'}`}></div>
-                                    <div className={`w-1 h-1 rounded-full ${isToday ? 'bg-gray-600' : 'bg-gray-200 group-hover:bg-brand-200'}`}></div>
-                                </div>
-                            </div>
-                        )
-                    })}
-                    <div
-                        onClick={() => navigate('/provider/schedule')}
-                        className="flex-shrink-0 w-28 p-4 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-50 hover:text-brand-500 hover:border-brand-200 transition-colors"
-                    >
-                        <Icons.Calendar size={20} className="mb-1" />
-                        <span className="text-xs font-medium">View All</span>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    );
+      <Footer />
+    </div>
+  );
 };
 
 export default ProviderDashboard;

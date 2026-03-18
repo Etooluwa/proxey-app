@@ -1,24 +1,47 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Card from "../components/ui/Card";
-import Input from "../components/ui/Input";
-import Button from "../components/ui/Button";
-import Badge from "../components/ui/Badge";
+import { useEffect } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { useSession } from "../auth/authContext";
-import { useToast } from "../components/ui/ToastProvider";
-import "../styles/account.css";
+import Avatar from "../components/ui/Avatar";
+import Card from "../components/ui/Card";
+import MenuBtn from "../components/ui/MenuBtn";
+import Footer from "../components/ui/Footer";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function memberSince(createdAt) {
+  if (!createdAt) return null;
+  return new Date(createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// ─── Settings rows ─────────────────────────────────────────────────────────
+
+const SETTINGS = [
+  { label: "Personal details",   sub: "Name, email, phone" },
+  { label: "Payment methods",    sub: "Manage your cards" },
+  { label: "Notifications",      sub: "Email, push, SMS" },
+  { label: "Privacy & security", sub: "Password, data" },
+  { label: "Help & support",     sub: "FAQ, contact us" },
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 function AccountPage() {
-  const { session, profile, updateProfile, logout } = useSession();
+  const { onMenu } = useOutletContext() || {};
+  const { session, profile, logout } = useSession();
   const navigate = useNavigate();
-  const toast = useToast();
-  const [form, setForm] = useState({
-    name: profile?.name || "",
-    phone: profile?.phone || "",
-    defaultLocation: profile?.defaultLocation || "",
-  });
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   // Redirect providers to their dedicated profile page
   useEffect(() => {
@@ -27,128 +50,98 @@ function AccountPage() {
     }
   }, [session?.user?.role, navigate]);
 
-  const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await updateProfile({ ...form, isComplete: true });
-      setEditing(false);
-      toast.push({
-        title: "Profile updated",
-        description: "Your account details were saved successfully.",
-        variant: "success",
-      });
-    } catch (error) {
-      toast.push({
-        title: "Unable to update profile",
-        description: error.message,
-        variant: "error",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const displayName = profile?.name || session?.user?.email?.split("@")[0] || "You";
+  const initials    = getInitials(profile?.name || session?.user?.email || "");
+  const since       = memberSince(session?.user?.created_at || profile?.created_at);
 
   return (
-    <div className="account">
-      <header className="account__header">
-        <h1 className="account__title">Account</h1>
-        <p className="account__subtitle">
-          Manage your profile details, default service location, and notification preferences.
+    <div
+      className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto"
+    >
+      {/* ── Gradient header ──────────────────────────────────────────────── */}
+      <div
+        className="relative flex flex-col items-center pb-13"
+        style={{
+          background:
+            "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#F2F2F7 100%)",
+          borderRadius: "0 0 28px 28px",
+          marginBottom: "-20px",
+          zIndex: 1,
+          paddingBottom: "52px",
+        }}
+      >
+        {/* Menu button */}
+        <div className="w-full px-5 pt-1 mb-4">
+          <MenuBtn onClick={onMenu} white />
+        </div>
+
+        {/* Avatar + name + since */}
+        <Avatar initials={initials} size={80} />
+        <p
+          className="font-manrope text-[22px] font-bold text-white m-0 mt-3"
+        >
+          {displayName}
         </p>
-      </header>
-
-      <div className="account__grid">
-        <Card className="account__card">
-          <div className="account__card-header">
-            <div>
-              <h2 className="card__title">Profile</h2>
-              <p className="card__support">
-                This information appears on your bookings and invoices.
-              </p>
-            </div>
-            <Badge variant="default">{session?.user?.role || "client"}</Badge>
-          </div>
-          <div className="account__form">
-            <Input
-              id="account-name"
-              label="Full name"
-              value={form.name}
-              onChange={handleChange("name")}
-              disabled={!editing}
-            />
-            <Input
-              id="account-email"
-              label="Email"
-              value={session?.user?.email}
-              onChange={() => {}}
-              disabled
-              helperText="Email changes are managed through auth settings."
-            />
-            <Input
-              id="account-phone"
-              label="Phone number"
-              value={form.phone}
-              onChange={handleChange("phone")}
-              disabled={!editing}
-            />
-            <Input
-              id="account-location"
-              label="Default location"
-              value={form.defaultLocation}
-              onChange={handleChange("defaultLocation")}
-              disabled={!editing}
-            />
-          </div>
-          <div className="account__actions">
-            {editing ? (
-              <>
-                <Button variant="ghost" onClick={() => setEditing(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} loading={saving}>
-                  Save changes
-                </Button>
-              </>
-            ) : (
-              <Button variant="secondary" onClick={() => setEditing(true)}>
-                Edit profile
-              </Button>
-            )}
-          </div>
-        </Card>
-
-        <Card className="account__card">
-          <h2 className="card__title">Notifications</h2>
-          <p className="card__support">
-            Email notifications are enabled by default. Mobile push notifications will be available
-            soon.
-          </p>
-          <Button
-            variant="ghost"
-            onClick={() =>
-              toast.push({
-                title: "Coming soon",
-                description: "Notification preferences will be configurable in a future update.",
-                variant: "info",
-              })
-            }
+        {since && (
+          <p
+            className="font-manrope text-[14px] m-0 mt-0.5"
+            style={{ color: "rgba(255,255,255,0.8)" }}
           >
-            Manage notifications
-          </Button>
-        </Card>
+            Member since {since}
+          </p>
+        )}
       </div>
 
-      <Card className="account__card">
-        <h2 className="card__title">Sign out</h2>
-        <p className="card__support">We’ll clear your session from this device.</p>
-        <Button variant="danger" onClick={logout}>
+      {/* ── Settings list ─────────────────────────────────────────────────── */}
+      <div className="flex-1 px-4 pt-8 pb-4 flex flex-col" style={{ zIndex: 0 }}>
+        {SETTINGS.map(({ label, sub }) => (
+          <button
+            key={label}
+            className="w-full text-left focus:outline-none"
+          >
+            <Card className="flex items-center gap-3.5 mb-2">
+              <div className="flex-1">
+                <p className="font-manrope text-[16px] font-semibold text-foreground m-0">
+                  {label}
+                </p>
+                <p className="font-manrope text-[14px] text-muted m-0 mt-0.5">
+                  {sub}
+                </p>
+              </div>
+              {/* Chevron */}
+              <svg
+                width="20"
+                height="20"
+                fill="none"
+                stroke="#6B7280"
+                strokeWidth="1.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M9 5l7 7-7 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Card>
+          </button>
+        ))}
+
+        {/* Sign out */}
+        <button
+          onClick={logout}
+          className="w-full mt-2 py-3.5 rounded-card font-manrope text-[15px] font-semibold focus:outline-none active:scale-[0.98] transition-transform"
+          style={{
+            background: "#FEF2F2",
+            color: "#EF4444",
+            border: "none",
+          }}
+        >
           Sign out
-        </Button>
-      </Card>
+        </button>
+
+        <Footer />
+      </div>
     </div>
   );
 }

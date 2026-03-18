@@ -1,1109 +1,1133 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import Button from "../components/ui/Button";
-import StepIndicator from "../components/ui/StepIndicator";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
-import { useNotifications } from "../contexts/NotificationContext";
 import { useToast } from "../components/ui/ToastProvider";
-import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
-import "../styles/providerOnboarding.css";
+import { request } from "../data/apiClient";
+import Card from "../components/ui/Card";
+import Footer from "../components/ui/Footer";
+import Logo from "../components/ui/Logo";
 
-function ProviderOnboardingPage() {
-  const { updateProfile, session } = useSession();
-  const { addNotification } = useNotifications();
-  const toast = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const ACCENT      = "#FF751F";
+const ACCENT_LIGHT = "#FFF0E6";
+const BG          = "#F2F2F7";
+const FG          = "#0D1619";
+const MUTED       = "#6B7280";
+const DIVIDER     = "#E5E5EA";
+const SUCCESS_BG  = "#F0FDF4";
+const SUCCESS_FG  = "#15803D";
+const DANGER      = "#EF4444";
+
+// ─── Categories ───────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id: "barber",         emoji: "✂️",  label: "Barber" },
+  { id: "nails",          emoji: "💅",  label: "Nails" },
+  { id: "vocal_coach",    emoji: "🎤",  label: "Vocal Coach" },
+  { id: "wellness",       emoji: "🧘",  label: "Wellness" },
+  { id: "personal_trainer", emoji: "💪", label: "Personal Trainer" },
+  { id: "cleaning",       emoji: "🧹",  label: "Cleaning" },
+  { id: "auto",           emoji: "🚗",  label: "Auto" },
+  { id: "other",          emoji: "⭐",  label: "Other" },
+];
+
+// ─── Duration options ─────────────────────────────────────────────────────────
+const DURATIONS = [
+  { value: 15,  label: "15 min" },
+  { value: 30,  label: "30 min" },
+  { value: 45,  label: "45 min" },
+  { value: 60,  label: "1 hr" },
+  { value: 90,  label: "1 hr 30 min" },
+  { value: 120, label: "2 hr" },
+];
+
+const TIME_OPTIONS = [
+  "6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM",
+  "9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
+  "12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM",
+  "3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM",
+  "6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM",
+  "9:00 PM","9:30 PM","10:00 PM",
+];
+
+const BUFFER_OPTIONS = [
+  { value: 0,  label: "None" },
+  { value: 10, label: "10 min" },
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+];
+
+const WINDOW_OPTIONS = [
+  { value: 1, label: "1 week ahead" },
+  { value: 2, label: "2 weeks ahead" },
+  { value: 4, label: "4 weeks ahead" },
+  { value: 8, label: "8 weeks ahead" },
+];
+
+const DAYS = [
+  { key: "monday",    label: "Mon" },
+  { key: "tuesday",   label: "Tue" },
+  { key: "wednesday", label: "Wed" },
+  { key: "thursday",  label: "Thu" },
+  { key: "friday",    label: "Fri" },
+  { key: "saturday",  label: "Sat" },
+  { key: "sunday",    label: "Sun" },
+];
+
+const DEFAULT_AVAILABILITY = DAYS.reduce((acc, d) => {
+  const isWeekend = d.key === "saturday" || d.key === "sunday";
+  acc[d.key] = { enabled: !isWeekend, from: "9:00 AM", to: "5:00 PM" };
+  return acc;
+}, {});
+
+const STEP_TITLES = ["Category", "Profile", "Services", "Availability", "Go Live"];
+const TOTAL_STEPS = 5;
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+function StepBar({ step }) {
+  return (
+    <div className="flex gap-1.5 px-5 pt-4 pb-2">
+      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-1 rounded-full transition-all"
+          style={{
+            height: 4,
+            background: i < step ? ACCENT : DIVIDER,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Reusable inline label + field ───────────────────────────────────────────
+function Field({ label, children }) {
+  return (
+    <div className="mb-4">
+      <p className="font-manrope text-[13px] font-semibold text-foreground mb-1.5 m-0"
+         style={{ color: MUTED }}>
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function TextInput({ value, onChange, placeholder, maxLength, type = "text", onBlur, ...rest }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      className="w-full font-manrope text-[15px] focus:outline-none"
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: `1px solid ${DIVIDER}`,
+        background: "#fff",
+        color: FG,
+      }}
+      {...rest}
+    />
+  );
+}
+
+function NativeSelect({ value, onChange, children }) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full font-manrope text-[15px] focus:outline-none appearance-none"
+        style={{
+          padding: "12px 40px 12px 14px",
+          borderRadius: 12,
+          border: `1px solid ${DIVIDER}`,
+          background: "#fff",
+          color: FG,
+        }}
+      >
+        {children}
+      </select>
+      <svg className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+           width="18" height="18" fill="none" stroke={MUTED} strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
+// ─── Continue button ──────────────────────────────────────────────────────────
+function ContinueBtn({ onClick, disabled, loading, label = "Continue" }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+      style={{
+        background: disabled || loading ? "#B0B0B0" : FG,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
+      }}
+    >
+      {loading && (
+        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+      )}
+      {label}
+    </button>
+  );
+}
+
+// ─── Step 1 — Category ────────────────────────────────────────────────────────
+function StepCategory({ selected, onChange }) {
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <h2 className="font-manrope text-[26px] font-bold text-foreground m-0 mb-1" style={{ color: FG }}>
+        What do you offer?
+      </h2>
+      <p className="font-manrope text-[15px] m-0 mb-6" style={{ color: MUTED }}>
+        Choose the category that best describes your services.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        {CATEGORIES.map((cat) => {
+          const isSel = selected === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => onChange(cat.id)}
+              className="flex flex-col items-center py-5 rounded-card font-manrope focus:outline-none active:scale-[0.97] transition-transform"
+              style={{
+                background: isSel ? ACCENT_LIGHT : "#fff",
+                border: isSel ? `2px solid ${ACCENT}` : `1px solid ${DIVIDER}`,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <span style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }}>{cat.emoji}</span>
+              <span
+                className="font-manrope text-[14px] font-semibold"
+                style={{ color: isSel ? ACCENT : FG }}
+              >
+                {cat.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 2 — Profile ─────────────────────────────────────────────────────────
+function StepProfile({ data, onChange }) {
   const fileInputRef = useRef(null);
+  const bioMax = 160;
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const handlePhotoClick = () => fileInputRef.current?.click();
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    onChange("photoFile", file);
+    onChange("photoPreview", previewUrl);
+  };
 
-  // Handle return from Stripe
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+        Your profile
+      </h2>
+      <p className="font-manrope text-[15px] m-0 mb-6" style={{ color: MUTED }}>
+        This is what clients will see when they find you.
+      </p>
+
+      {/* Photo upload */}
+      <div className="flex flex-col items-center mb-6">
+        <button
+          onClick={handlePhotoClick}
+          className="relative focus:outline-none"
+          style={{ width: 96, height: 96 }}
+          aria-label="Upload photo"
+        >
+          <div
+            className="w-full h-full rounded-full overflow-hidden flex items-center justify-center"
+            style={{
+              background: data.photoPreview ? "transparent" : ACCENT_LIGHT,
+              border: `2px dashed ${data.photoPreview ? "transparent" : ACCENT}`,
+            }}
+          >
+            {data.photoPreview ? (
+              <img
+                src={data.photoPreview}
+                alt="Preview"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <svg width="28" height="28" fill="none" stroke={ACCENT} strokeWidth="1.8" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            )}
+          </div>
+          {/* Edit badge */}
+          <div
+            className="absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: ACCENT }}
+          >
+            <svg width="13" height="13" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        <p className="font-manrope text-[13px] mt-2 m-0" style={{ color: MUTED }}>
+          {data.photoPreview ? "Tap to change photo" : "Tap to add photo"}
+        </p>
+      </div>
+
+      <Card>
+        <Field label="Business / Display Name">
+          <TextInput
+            value={data.businessName}
+            onChange={(e) => onChange("businessName", e.target.value)}
+            placeholder="e.g., Anny Wong Vocal Studio"
+          />
+        </Field>
+
+        <Field label="City">
+          <TextInput
+            value={data.city}
+            onChange={(e) => onChange("city", e.target.value)}
+            placeholder="e.g., Toronto"
+          />
+        </Field>
+
+        <Field label={`Short Bio (${data.bio.length}/${bioMax})`}>
+          <textarea
+            value={data.bio}
+            onChange={(e) => onChange("bio", e.target.value)}
+            maxLength={bioMax}
+            placeholder="Tell clients a little about yourself and your experience…"
+            rows={4}
+            className="w-full font-manrope text-[15px] focus:outline-none resize-none"
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: `1px solid ${DIVIDER}`,
+              background: "#fff",
+              color: FG,
+              lineHeight: 1.55,
+            }}
+          />
+        </Field>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Service modal ────────────────────────────────────────────────────────────
+const EMPTY_SERVICE = {
+  name: "", duration: 60, price: "", paymentType: "full",
+  depositType: "percent", depositValue: "",
+};
+
+function ServiceModal({ initial, onSave, onClose }) {
+  const [svc, setSvc] = useState(initial || EMPTY_SERVICE);
+  const set = (k, v) => setSvc((p) => ({ ...p, [k]: v }));
+
+  const canSave = svc.name.trim() && svc.price && parseFloat(svc.price) > 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end font-manrope"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+    >
+      <div
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className="relative flex flex-col"
+        style={{
+          background: "#fff",
+          borderRadius: "20px 20px 0 0",
+          maxHeight: "90vh",
+          overflow: "hidden",
+        }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-2.5 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: DIVIDER }} />
+        </div>
+        {/* Header */}
+        <div className="flex justify-between items-center px-5 pt-3 pb-2 flex-shrink-0">
+          <h2 className="font-manrope text-[20px] font-bold m-0" style={{ color: FG }}>
+            {initial ? "Edit service" : "Add service"}
+          </h2>
+          <button onClick={onClose} className="focus:outline-none -m-1 p-1">
+            <svg width="22" height="22" fill="none" stroke={MUTED} strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-5 pb-8">
+          <Field label="Service name">
+            <TextInput
+              value={svc.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="e.g., Vocal Lesson"
+            />
+          </Field>
+
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1">
+              <p className="font-manrope text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Duration</p>
+              <NativeSelect value={svc.duration} onChange={(e) => set("duration", Number(e.target.value))}>
+                {DURATIONS.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="flex-1">
+              <p className="font-manrope text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Price ($)</p>
+              <TextInput
+                type="number"
+                value={svc.price}
+                onChange={(e) => set("price", e.target.value)}
+                placeholder="85"
+                min="0"
+              />
+            </div>
+          </div>
+
+          {/* Payment model */}
+          <p className="font-manrope text-[13px] font-semibold mb-3 m-0" style={{ color: MUTED }}>
+            Payment model
+          </p>
+          {[
+            { id: "full",    label: "Full payment at booking",      desc: null },
+            { id: "deposit_fixed",   label: "Fixed deposit amount", desc: "deposit_fixed" },
+            { id: "deposit_percent", label: "Percentage deposit",   desc: "deposit_percent" },
+          ].map((opt) => {
+            const isActive = svc.paymentType === opt.id;
+            return (
+              <div
+                key={opt.id}
+                onClick={() => set("paymentType", opt.id)}
+                className="mb-3 rounded-card p-4 cursor-pointer transition-all"
+                style={{
+                  border: isActive ? `2px solid ${ACCENT}` : `1px solid ${DIVIDER}`,
+                  background: isActive ? ACCENT_LIGHT : "#fff",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center justify-center flex-shrink-0"
+                    style={{
+                      width: 20, height: 20, borderRadius: "50%",
+                      background: isActive ? ACCENT : "transparent",
+                      border: isActive ? "none" : `2px solid ${DIVIDER}`,
+                    }}
+                  >
+                    {isActive && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                  <span
+                    className="font-manrope text-[15px] font-semibold"
+                    style={{ color: isActive ? ACCENT : FG }}
+                  >
+                    {opt.label}
+                  </span>
+                </div>
+
+                {isActive && opt.id === "deposit_fixed" && (
+                  <div className="mt-3 ml-8">
+                    <TextInput
+                      type="number"
+                      value={svc.depositValue}
+                      onChange={(e) => set("depositValue", e.target.value)}
+                      placeholder="e.g., 25"
+                      min="0"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <p className="font-manrope text-[12px] mt-1 m-0" style={{ color: MUTED }}>
+                      Fixed deposit amount in $
+                    </p>
+                  </div>
+                )}
+                {isActive && opt.id === "deposit_percent" && (
+                  <div className="mt-3 ml-8">
+                    <TextInput
+                      type="number"
+                      value={svc.depositValue}
+                      onChange={(e) => set("depositValue", e.target.value)}
+                      placeholder="e.g., 30"
+                      min="0"
+                      max="100"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <p className="font-manrope text-[12px] mt-1 m-0" style={{ color: MUTED }}>
+                      Percentage of total price
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            onClick={() => canSave && onSave(svc)}
+            disabled={!canSave}
+            className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white mt-2 focus:outline-none active:scale-[0.98] transition-transform"
+            style={{ background: canSave ? FG : "#B0B0B0", cursor: canSave ? "pointer" : "not-allowed" }}
+          >
+            {initial ? "Save changes" : "Add service"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 3 — Services ────────────────────────────────────────────────────────
+function StepServices({ services, onAdd, onEdit, onDelete }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingIdx, setEditingIdx] = useState(null);
+
+  const fmtPrice = (p) => `$${parseFloat(p).toFixed(0)}`;
+  const fmtDuration = (m) => {
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60), r = m % 60;
+    return r ? `${h} hr ${r} min` : `${h} hr`;
+  };
+  const payLabel = (s) => {
+    if (s.paymentType === "deposit_fixed")   return `$${s.depositValue} deposit`;
+    if (s.paymentType === "deposit_percent") return `${s.depositValue}% deposit`;
+    return "Full at booking";
+  };
+
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+        Your services
+      </h2>
+      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+        Add the services you offer. You can edit these any time.
+      </p>
+
+      {/* Service cards */}
+      {services.map((svc, i) => (
+        <Card key={i} className="mb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-manrope text-[16px] font-semibold m-0 mb-0.5 truncate" style={{ color: FG }}>
+                {svc.name}
+              </p>
+              <p className="font-manrope text-[13px] m-0" style={{ color: MUTED }}>
+                {fmtDuration(svc.duration)} · {fmtPrice(svc.price)} · {payLabel(svc)}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => { setEditingIdx(i); setModalOpen(true); }}
+                className="focus:outline-none"
+                style={{ padding: 6 }}
+                aria-label="Edit"
+              >
+                <svg width="18" height="18" fill="none" stroke={MUTED} strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onDelete(i)}
+                className="focus:outline-none"
+                style={{ padding: 6 }}
+                aria-label="Delete"
+              >
+                <svg width="18" height="18" fill="none" stroke={DANGER} strokeWidth="1.8" viewBox="0 0 24 24">
+                  <polyline points="3 6 5 6 21 6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {/* Add service dashed button */}
+      <button
+        onClick={() => { setEditingIdx(null); setModalOpen(true); }}
+        className="w-full flex items-center justify-center gap-2 font-manrope text-[15px] font-semibold focus:outline-none active:scale-[0.98] transition-transform"
+        style={{
+          padding: "14px",
+          borderRadius: 14,
+          border: `1.5px dashed ${ACCENT}`,
+          background: ACCENT_LIGHT,
+          color: ACCENT,
+          cursor: "pointer",
+        }}
+      >
+        <svg width="18" height="18" fill="none" stroke={ACCENT} strokeWidth="2.2" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Add a service
+      </button>
+
+      {services.length === 0 && (
+        <p className="font-manrope text-[13px] text-center mt-3 m-0" style={{ color: MUTED }}>
+          Add at least one service to continue.
+        </p>
+      )}
+
+      {modalOpen && (
+        <ServiceModal
+          initial={editingIdx !== null ? services[editingIdx] : null}
+          onSave={(svc) => {
+            if (editingIdx !== null) onEdit(editingIdx, svc);
+            else onAdd(svc);
+            setModalOpen(false);
+            setEditingIdx(null);
+          }}
+          onClose={() => { setModalOpen(false); setEditingIdx(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Step 4 — Availability ────────────────────────────────────────────────────
+function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+        Your availability
+      </h2>
+      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+        Set your working hours. You can always update this later.
+      </p>
+
+      <Card className="mb-3">
+        {DAYS.map((day, idx) => {
+          const d = availability[day.key];
+          return (
+            <div key={day.key}>
+              {idx > 0 && <div style={{ height: 1, background: DIVIDER, margin: "0 -16px" }} />}
+              <div className="py-3">
+                {/* Day row */}
+                <div className="flex items-center justify-between mb-0">
+                  <span
+                    className="font-manrope text-[15px] font-semibold"
+                    style={{ color: d.enabled ? FG : MUTED }}
+                  >
+                    {day.label}
+                  </span>
+                  {/* Toggle */}
+                  <button
+                    onClick={() => onChange(day.key, "enabled", !d.enabled)}
+                    className="focus:outline-none flex-shrink-0 relative"
+                    style={{
+                      width: 44, height: 26, borderRadius: 13,
+                      background: d.enabled ? ACCENT : DIVIDER,
+                      transition: "background 0.2s",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    aria-label={`Toggle ${day.label}`}
+                  >
+                    <span
+                      className="absolute top-[3px] rounded-full bg-white"
+                      style={{
+                        width: 20, height: 20,
+                        left: d.enabled ? 21 : 3,
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                {/* Time pickers */}
+                {d.enabled && (
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <NativeSelect
+                      value={d.from}
+                      onChange={(e) => onChange(day.key, "from", e.target.value)}
+                    >
+                      {TIME_OPTIONS.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </NativeSelect>
+                    <span className="font-manrope text-[13px]" style={{ color: MUTED, flexShrink: 0 }}>to</span>
+                    <NativeSelect
+                      value={d.to}
+                      onChange={(e) => onChange(day.key, "to", e.target.value)}
+                    >
+                      {TIME_OPTIONS.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      <Card>
+        <Field label="Buffer between appointments">
+          <NativeSelect value={buffer} onChange={(e) => onBuffer(Number(e.target.value))}>
+            {BUFFER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field label="Booking window">
+          <NativeSelect value={bookingWindow} onChange={(e) => onBookingWindow(Number(e.target.value))}>
+            {WINDOW_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </NativeSelect>
+        </Field>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Step 5 — Handle + Stripe ─────────────────────────────────────────────────
+function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConnected, onStripeConnect, stripeLoading }) {
+  // handleStatus: null | "checking" | "available" | "taken" | "invalid"
+
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+        Go live
+      </h2>
+      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+        Claim your booking link and connect your payout account.
+      </p>
+
+      {/* Handle */}
+      <Card className="mb-4">
+        <Field label="Your public handle">
+          <div className="relative">
+            <TextInput
+              value={handle}
+              onChange={(e) => onHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+              onBlur={onCheckHandle}
+              placeholder="e.g., anny-wong"
+            />
+            {/* Status icon */}
+            {handleStatus === "checking" && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin inline-block"
+                      style={{ borderColor: MUTED, borderTopColor: "transparent" }} />
+              </div>
+            )}
+            {handleStatus === "available" && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg width="20" height="20" fill="none" stroke={SUCCESS_FG} strokeWidth="2.2" viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+            {(handleStatus === "taken" || handleStatus === "invalid") && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg width="20" height="20" fill="none" stroke={DANGER} strokeWidth="2.2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* URL preview */}
+          {handle && (
+            <p className="font-manrope text-[13px] mt-2 m-0" style={{ color: MUTED }}>
+              mykliques.com/book/
+              <span style={{ color: handleStatus === "available" ? SUCCESS_FG : handleStatus === "taken" || handleStatus === "invalid" ? DANGER : FG, fontWeight: 600 }}>
+                {handle}
+              </span>
+            </p>
+          )}
+
+          {handleStatus === "taken" && (
+            <p className="font-manrope text-[13px] mt-1 m-0" style={{ color: DANGER }}>
+              That handle is already taken. Try another.
+            </p>
+          )}
+          {handleStatus === "invalid" && (
+            <p className="font-manrope text-[13px] mt-1 m-0" style={{ color: DANGER }}>
+              Only lowercase letters, numbers, and hyphens allowed.
+            </p>
+          )}
+        </Field>
+      </Card>
+
+      {/* Stripe Connect */}
+      <Card>
+        <div className="flex items-start gap-3 mb-4">
+          <div
+            className="flex items-center justify-center flex-shrink-0 rounded-xl"
+            style={{ width: 44, height: 44, background: "#635BFF" }}
+          >
+            <svg width="22" height="22" viewBox="0 0 60 25" fill="white">
+              <path d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v3.32a8.33 8.33 0 0 1-4.56 1.1c-4.01 0-6.83-2.5-6.83-7.48 0-4.19 2.39-7.52 6.3-7.52 3.92 0 5.96 3.28 5.96 7.5 0 .4-.04 1.26-.06 1.48zm-5.92-5.62c-1.03 0-2.17.73-2.17 2.58h4.25c0-1.85-1.07-2.58-2.08-2.58zM40.95 20.3c-1.44 0-2.32-.6-2.9-1.04l-.02 4.63-4.12.87V5.57h3.76l.08 1.02a4.7 4.7 0 0 1 3.23-1.29c2.9 0 5.62 2.6 5.62 7.4 0 5.23-2.7 7.6-5.65 7.6zM40 8.95c-.95 0-1.54.34-1.97.81l.02 6.12c.4.44.98.78 1.95.78 1.52 0 2.54-1.65 2.54-3.87 0-2.15-1.04-3.84-2.54-3.84zM28.24 5.57h4.13v14.44h-4.13V5.57zm0-4.7L32.37 0v3.36l-4.13.88V.88zm-4.32 9.35v9.79H19.8V5.57h3.7l.12 1.22c1-1.77 3.07-1.41 3.62-1.22v3.79c-.52-.17-2.29-.43-3.32.86zm-8.55 4.72c0 2.43 2.6 1.68 3.12 1.46v3.36c-.55.3-1.54.54-2.89.54a4.15 4.15 0 0 1-4.27-4.24l.01-13.17 4.02-.86v3.54h3.14V9.1h-3.13v5.85zm-4.91.7c0 2.97-2.31 4.66-5.73 4.66a11.2 11.2 0 0 1-4.46-.93v-3.93c1.38.75 3.1 1.31 4.46 1.31.92 0 1.53-.24 1.53-1C6.26 13.77 0 14.51 0 9.95 0 7.04 2.28 5.3 5.62 5.3c1.36 0 2.72.2 4.09.75v3.88a9.23 9.23 0 0 0-4.1-1.06c-.86 0-1.44.25-1.44.93 0 1.85 6.29.97 6.29 5.88z" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-manrope text-[16px] font-semibold m-0 mb-0.5" style={{ color: FG }}>
+              Connect with Stripe
+            </p>
+            <p className="font-manrope text-[13px] m-0" style={{ color: MUTED }}>
+              Receive payouts directly to your bank account.
+            </p>
+          </div>
+        </div>
+
+        {stripeConnected ? (
+          <div
+            className="flex items-center gap-2.5 rounded-xl px-4 py-3"
+            style={{ background: SUCCESS_BG }}
+          >
+            <svg width="20" height="20" fill="none" stroke={SUCCESS_FG} strokeWidth="2.2" viewBox="0 0 24 24">
+              <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="font-manrope text-[14px] font-semibold" style={{ color: SUCCESS_FG }}>
+              Stripe account connected
+            </span>
+          </div>
+        ) : (
+          <button
+            onClick={onStripeConnect}
+            disabled={stripeLoading}
+            className="w-full py-3.5 rounded-xl font-manrope text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            style={{ background: stripeLoading ? "#B0B0B0" : "#635BFF", cursor: stripeLoading ? "not-allowed" : "pointer" }}
+          >
+            {stripeLoading && (
+              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            )}
+            {stripeLoading ? "Connecting…" : "Connect Stripe"}
+          </button>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── Parent: ProviderOnboardingPage ──────────────────────────────────────────
+function ProviderOnboardingPage() {
+  const navigate    = useNavigate();
+  const location    = useLocation();
+  const { session } = useSession();
+  const toast       = useToast();
+
+  // ── Form state (starts at defaults; overwritten once draft loads) ────────
+  const [draftLoading, setDraftLoading]   = useState(true);
+  const [step, setStep]                   = useState(1);
+
+  // Step 1
+  const [category, setCategory]           = useState("");
+  // Step 2
+  const [profile, setProfile]             = useState({
+    businessName: "", city: "", bio: "", photoFile: null, photoPreview: null,
+  });
+  // Step 3
+  const [services, setServices]           = useState([]);
+  // Step 4
+  const [availability, setAvailability]   = useState(DEFAULT_AVAILABILITY);
+  const [bufferMins, setBufferMins]       = useState(0);
+  const [bookingWindow, setBookingWindow] = useState(4);
+  // Step 5
+  const [handle, setHandle]               = useState("");
+  const [handleStatus, setHandleStatus]   = useState(null); // null|checking|available|taken|invalid
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [submitting, setSubmitting]       = useState(false);
+
+  // ── Load draft from Supabase on mount ────────────────────────────────────
+  useEffect(() => {
+    if (!session) return;
+    async function loadDraft() {
+      try {
+        const { draft } = await request("/provider/onboarding/draft");
+        if (draft) {
+          if (draft.step)         setStep(draft.step);
+          if (draft.category)     setCategory(draft.category);
+          if (draft.profile)      setProfile((p) => ({ ...p, ...draft.profile, photoFile: null }));
+          if (draft.services)     setServices(draft.services);
+          if (draft.availability) setAvailability(draft.availability);
+          if (draft.bufferMins   != null) setBufferMins(draft.bufferMins);
+          if (draft.bookingWindow != null) setBookingWindow(draft.bookingWindow);
+          if (draft.handle)       setHandle(draft.handle);
+          if (draft.stripeConnected) setStripeConnected(draft.stripeConnected);
+        }
+      } catch {
+        // Non-critical — just start fresh
+      } finally {
+        setDraftLoading(false);
+      }
+    }
+    loadDraft();
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Handle Stripe return ─────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("completed") === "true") {
-      completeOnboarding();
+    if (params.get("stripe") === "done") {
+      setStripeConnected(true);
+      setStep(5);
+      toast.push({ title: "Stripe connected!", variant: "success" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const completeOnboarding = async () => {
+  // ── Debounced draft save to Supabase ─────────────────────────────────────
+  // We use a ref-based debounce: 1.5 s after the last change fires the PUT.
+  const saveTimer = useRef(null);
+  useEffect(() => {
+    if (draftLoading) return; // don't save while we're still loading
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      request("/provider/onboarding/draft", {
+        method: "PUT",
+        body: JSON.stringify({
+          step,
+          category,
+          profile: { ...profile, photoFile: null, photoPreview: null },
+          services,
+          availability,
+          bufferMins,
+          bookingWindow,
+          handle,
+          stripeConnected,
+        }),
+      }).catch(() => {}); // fire-and-forget; errors are non-critical
+    }, 1500);
+    return () => clearTimeout(saveTimer.current);
+  }, [step, category, profile, services, availability, bufferMins, bookingWindow, handle, stripeConnected, draftLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Availability helper ──────────────────────────────────────────────────
+  const updateAvailability = (dayKey, field, value) => {
+    setAvailability((prev) => ({
+      ...prev,
+      [dayKey]: { ...prev[dayKey], [field]: value },
+    }));
+  };
+
+  // ── Profile helper ────────────────────────────────────────────────────────
+  const updateProfile = (key, val) => setProfile((prev) => ({ ...prev, [key]: val }));
+
+  // ── Handle check ─────────────────────────────────────────────────────────
+  const checkHandle = async () => {
+    if (!handle.trim()) return;
+    if (!/^[a-z0-9-]+$/.test(handle)) {
+      setHandleStatus("invalid");
+      return;
+    }
+    setHandleStatus("checking");
     try {
-      // Update user profile metadata
-      const profileData = {
-        name: form.name,
-        category: form.category,
-        city: form.city,
-        services: form.services,
-        availability: form.availability,
-        isProfileComplete: true,
-        onboardingCompletedAt: new Date().toISOString()
-      };
-
-      await updateProfile(profileData, form.photo);
-
-      // Sync to providers table so the provider appears in client searches
-      try {
-        const response = await fetch('http://localhost:5000/api/providers/profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: session?.user?.id,
-            name: form.name,
-            email: session?.user?.email,
-            phone: session?.user?.phone,
-            category: form.category,
-            city: form.city,
-            services: form.services,
-            availability: form.availability,
-            stripeAccountId: form.stripeAccountId,
-            isProfileComplete: true,
-            onboardingCompletedAt: new Date().toISOString()
-          })
-        });
-
-        if (!response.ok) {
-          console.warn('[onboarding] Failed to sync provider profile to database');
-        } else {
-          console.log('[onboarding] Provider profile synced successfully');
-        }
-      } catch (syncError) {
-        console.error('[onboarding] Error syncing provider profile:', syncError);
-        // Don't block onboarding if sync fails
-      }
-
-      toast.push({
-        title: "Setup Complete!",
-        description: "Your provider profile is now active.",
-        variant: "success",
-      });
-
-      // Add Welcome Notification
-      addNotification({
-        title: "Welcome to Kliques Pro!",
-        message: "Your provider profile is live. Start managing your services and bookings.",
-        type: "welcome"
-      });
-
-      navigate("/provider");
-    } catch (error) {
-      console.error("Failed to complete onboarding", error);
-      toast.push({
-        title: "Error",
-        description: "Failed to finalize profile setup.",
-        variant: "error",
-      });
-    }
-  };
-  const [form, setForm] = useState({
-    name: "",
-    category: "",
-    city: "",
-    photo: null,
-    photoPreview: null,
-    services: [],
-    availability: {
-      monday: { enabled: true, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      tuesday: { enabled: true, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      wednesday: { enabled: true, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      thursday: { enabled: true, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      friday: { enabled: true, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      saturday: { enabled: false, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-      sunday: { enabled: false, from: "9:00 AM", to: "5:00 PM", breakFrom: "12:00 PM", breakTo: "1:00 PM" },
-    },
-    stripeAccountId: null,
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [cityInputFocused, setCityInputFocused] = useState(false);
-  const [citySuggestions, setCitySuggestions] = useState([]);
-  const [serviceModalOpen, setServiceModalOpen] = useState(false);
-  const [editingServiceIndex, setEditingServiceIndex] = useState(null);
-  const [serviceForm, setServiceForm] = useState({
-    name: "",
-    price: "",
-    duration: "",
-  });
-  const [applyToAll, setApplyToAll] = useState(false);
-
-  const handleNameChange = (event) => {
-    setForm((prev) => ({ ...prev, name: event.target.value }));
-  };
-
-  const handleCategoryChange = (event) => {
-    setForm((prev) => ({ ...prev, category: event.target.value }));
-  };
-
-  const handleCityChange = (event) => {
-    const value = event.target.value;
-    setForm((prev) => ({ ...prev, city: value }));
-
-    // Update suggestions
-    if (value.trim().length > 0) {
-      const suggestions = filterCities(value);
-      setCitySuggestions(suggestions);
-    } else {
-      setCitySuggestions([]);
+      const data = await request(`/provider/check-handle?handle=${encodeURIComponent(handle)}`);
+      setHandleStatus(data.available ? "available" : "taken");
+    } catch {
+      setHandleStatus(null);
     }
   };
 
-  const handleCitySelect = (city) => {
-    setForm((prev) => ({ ...prev, city }));
-    setCitySuggestions([]);
-    setCityInputFocused(false);
-  };
-
-  const handlePhotoClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handlePhotoChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const preview = URL.createObjectURL(file);
-      setForm((prev) => ({
-        ...prev,
-        photo: file,
-        photoPreview: preview,
-      }));
-    }
-  };
-
-  const handleSkipPhoto = () => {
-    setCurrentStep(3);
-  };
-
-  const handleAddService = () => {
-    setServiceForm({ name: "", price: "", duration: "" });
-    setEditingServiceIndex(null);
-    setServiceModalOpen(true);
-  };
-
-  const handleEditService = (index) => {
-    const service = form.services[index];
-    setServiceForm(service);
-    setEditingServiceIndex(index);
-    setServiceModalOpen(true);
-  };
-
-  const handleDeleteService = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      services: prev.services.filter((_, i) => i !== index),
-    }));
-    toast.push({
-      title: "Service removed",
-      description: "The service has been removed from your list.",
-      variant: "success",
-    });
-  };
-
-  const handleSaveService = () => {
-    if (!serviceForm.name.trim()) {
-      toast.push({
-        title: "Service name required",
-        description: "Please enter a service name.",
-        variant: "error",
-      });
-      return;
-    }
-
-    if (!serviceForm.price || parseFloat(serviceForm.price) <= 0) {
-      toast.push({
-        title: "Valid price required",
-        description: "Please enter a valid price.",
-        variant: "error",
-      });
-      return;
-    }
-
-    if (!serviceForm.duration || parseInt(serviceForm.duration) <= 0) {
-      toast.push({
-        title: "Valid duration required",
-        description: "Please enter a valid duration in minutes.",
-        variant: "error",
-      });
-      return;
-    }
-
-    if (editingServiceIndex !== null) {
-      // Edit existing service
-      setForm((prev) => ({
-        ...prev,
-        services: prev.services.map((service, index) =>
-          index === editingServiceIndex ? serviceForm : service
-        ),
-      }));
-      toast.push({
-        title: "Service updated",
-        description: "Your service has been updated.",
-        variant: "success",
-      });
-    } else {
-      // Add new service
-      setForm((prev) => ({
-        ...prev,
-        services: [...prev.services, serviceForm],
-      }));
-      toast.push({
-        title: "Service added",
-        description: "Your service has been added.",
-        variant: "success",
-      });
-    }
-
-    setServiceModalOpen(false);
-    setServiceForm({ name: "", price: "", duration: "" });
-    setEditingServiceIndex(null);
-  };
-
-  const handleDayToggle = (day) => {
-    setForm((prev) => ({
-      ...prev,
-      availability: {
-        ...prev.availability,
-        [day]: {
-          ...prev.availability[day],
-          enabled: !prev.availability[day].enabled,
-        },
-      },
-    }));
-  };
-
-  const handleTimeChange = (day, field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      availability: {
-        ...prev.availability,
-        [day]: {
-          ...prev.availability[day],
-          [field]: value,
-        },
-      },
-    }));
-  };
-
-  const handleApplyToAll = () => {
-    const newApplyToAll = !applyToAll;
-    setApplyToAll(newApplyToAll);
-
-    if (newApplyToAll) {
-      // Get Monday's times as the template
-      const template = form.availability.monday;
-      const workingDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
-
-      setForm((prev) => ({
-        ...prev,
-        availability: {
-          ...prev.availability,
-          ...workingDays.reduce((acc, day) => {
-            acc[day] = {
-              ...prev.availability[day],
-              from: template.from,
-              to: template.to,
-              breakFrom: template.breakFrom,
-              breakTo: template.breakTo,
-            };
-            return acc;
-          }, {}),
-        },
-      }));
-    }
-  };
-
+  // ── Stripe connect ────────────────────────────────────────────────────────
   const handleStripeConnect = async () => {
-    setSubmitting(true);
-
+    setStripeLoading(true);
     try {
-      // Validate required fields
-      if (!session?.user?.id || !session?.user?.email) {
-        throw new Error("User information is missing. Please log in again.");
-      }
-
-      if (!form.name) {
-        throw new Error("Business name is required. Please fill in your business name in Step 1.");
-      }
-
-      // Create Stripe Connected Account
-      const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
-      const accountResponse = await fetch(
-        `${apiUrl}/api/provider/connected-account`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: session.user.id,
-            email: session.user.email,
-            businessName: form.name,
-          }),
-        }
-      );
-
-      if (!accountResponse.ok) {
-        const errorData = await accountResponse.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Failed to create Stripe account (Status: ${accountResponse.status})`
-        );
-      }
-
-      const { accountId } = await accountResponse.json();
-
-      if (!accountId) {
-        throw new Error("No account ID received from server");
-      }
-
-      // Get onboarding link
-      const linkResponse = await fetch(
-        `${apiUrl}/api/provider/onboarding-link`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            accountId,
-            refreshUrl: `${window.location.origin}/provider/onboarding?step=5`,
-            returnUrl: `${window.location.origin}/provider/onboarding?completed=true`,
-          }),
-        }
-      );
-
-      if (!linkResponse.ok) {
-        const errorData = await linkResponse.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Failed to get onboarding link (Status: ${linkResponse.status})`
-        );
-      }
-
-      const { onboardingLink } = await linkResponse.json();
-
-      if (!onboardingLink) {
-        throw new Error("No onboarding link received from server");
-      }
-
-      // Save account ID to profile
-      await updateProfile({
-        stripeAccountId: accountId,
+      const data = await request("/provider/stripe/connect", {
+        method: "POST",
+        body: JSON.stringify({
+          refreshUrl: `${window.location.origin}/provider/onboarding?step=5`,
+          returnUrl:  `${window.location.origin}/provider/onboarding?stripe=done`,
+        }),
       });
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      toast.push({ title: "Stripe setup failed", description: err.message, variant: "error" });
+      setStripeLoading(false);
+    }
+  };
 
-      setForm((prev) => ({
-        ...prev,
-        stripeAccountId: accountId,
-      }));
+  // ── Continue logic ────────────────────────────────────────────────────────
+  const canContinue = () => {
+    if (step === 1) return !!category;
+    if (step === 2) return profile.businessName.trim() && profile.city.trim() && profile.bio.trim();
+    if (step === 3) return services.length > 0;
+    if (step === 4) return true; // always enabled
+    if (step === 5) return handleStatus === "available" && stripeConnected;
+    return false;
+  };
 
-      // Open Stripe onboarding form in the same window
-      toast.push({
-        title: "Redirecting to Stripe",
-        description: "Please complete your profile verification",
-        variant: "info",
+  const handleContinue = async () => {
+    if (step < 5) {
+      setStep((s) => s + 1);
+      return;
+    }
+    // Final submit
+    setSubmitting(true);
+    try {
+      await request("/provider/onboarding/complete", {
+        method: "POST",
+        body: JSON.stringify({
+          category,
+          businessName: profile.businessName,
+          city:         profile.city,
+          bio:          profile.bio,
+          handle,
+          services,
+          availability,
+          bufferMinutes:      bufferMins,
+          bookingWindowWeeks: bookingWindow,
+        }),
       });
-
-      // Redirect to Stripe after a brief delay to show the toast
-      setTimeout(() => {
-        window.location.href = onboardingLink;
-      }, 500);
-    } catch (error) {
-      console.error("Bank setup error:", error);
-      toast.push({
-        title: "Setup failed",
-        description: error.message || "An unexpected error occurred",
-        variant: "error",
-      });
+      // Clear the draft from Supabase
+      request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
+      toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
+      navigate("/provider");
+    } catch (err) {
+      toast.push({ title: "Setup failed", description: err.message, variant: "error" });
+    } finally {
       setSubmitting(false);
     }
   };
 
-  const handleNext = async () => {
-    // Validate step 1
-    if (currentStep === 1) {
-      if (!form.name.trim()) {
-        toast.push({
-          title: "Name required",
-          description: "Please enter your full name to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      if (!form.category) {
-        toast.push({
-          title: "Category required",
-          description: "Please select a service category to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      if (!form.city.trim()) {
-        toast.push({
-          title: "City required",
-          description: "Please enter your city to continue.",
-          variant: "error",
-        });
-        return;
-      }
-
-      setCurrentStep(2);
-      return;
-    }
-
-    // Step 2 - Photo (optional, can skip)
-    if (currentStep === 2) {
-      setCurrentStep(3);
-      return;
-    }
-
-    // Step 3 - Services (optional, can skip)
-    if (currentStep === 3) {
-      setCurrentStep(4);
-      return;
-    }
-
-    // Step 4 - Availability (optional, can skip)
-    if (currentStep === 4) {
-      setCurrentStep(5);
-      return;
-    }
-
-    // Step 5 - Stripe Connect
-    if (currentStep === 5) {
-      await handleStripeConnect();
-    }
-  };
-
   const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    } else {
-      navigate(-1);
-    }
+    if (step > 1) setStep((s) => s - 1);
+    else navigate(-1);
   };
 
-  const renderStepContent = () => {
-    if (currentStep === 1) {
-      return (
-        <div className="provider-onboarding__content">
-          {/* Step Header */}
-          <div className="provider-onboarding__step-header">
-            <h2 className="provider-onboarding__step-title">
-              Set up your business profile
-            </h2>
-            <p className="provider-onboarding__step-subtitle">
-              This information will be visible to clients on your public profile.
-            </p>
-          </div>
-
-          {/* Form Fields */}
-          <div className="provider-onboarding__fields">
-            {/* Provider Name */}
-            <label className="provider-onboarding__field">
-              <span className="provider-onboarding__field-label">Full Name</span>
-              <div className="provider-onboarding__input-wrapper">
-                <svg
-                  className="provider-onboarding__input-icon"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" />
-                </svg>
-                <input
-                  type="text"
-                  className="provider-onboarding__input provider-onboarding__input--with-icon"
-                  placeholder="e.g., John Smith"
-                  value={form.name}
-                  onChange={handleNameChange}
-                />
-              </div>
-            </label>
-
-            {/* Service Category */}
-            <label className="provider-onboarding__field">
-              <span className="provider-onboarding__field-label">
-                Service Category
-              </span>
-              <div className="provider-onboarding__input-wrapper">
-                <svg
-                  className="provider-onboarding__input-icon"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
-                </svg>
-                <select
-                  className="provider-onboarding__select provider-onboarding__input--with-icon"
-                  value={form.category}
-                  onChange={handleCategoryChange}
-                >
-                  <option value="" disabled>
-                    Select a category
-                  </option>
-                  {SERVICE_CATEGORIES.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  className="provider-onboarding__select-icon"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M7 10l5 5 5-5z" />
-                </svg>
-              </div>
-            </label>
-
-            {/* City */}
-            <label className="provider-onboarding__field">
-              <span className="provider-onboarding__field-label">City</span>
-              <div className="provider-onboarding__input-wrapper provider-onboarding__autocomplete">
-                <svg
-                  className="provider-onboarding__input-icon"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                </svg>
-                <input
-                  type="text"
-                  className="provider-onboarding__input provider-onboarding__input--with-icon"
-                  placeholder="Enter your city"
-                  value={form.city}
-                  onChange={handleCityChange}
-                  onFocus={() => setCityInputFocused(true)}
-                  onBlur={() => {
-                    // Delay to allow click on suggestion
-                    setTimeout(() => setCityInputFocused(false), 200);
-                  }}
-                  autoComplete="off"
-                />
-                {cityInputFocused && citySuggestions.length > 0 && (
-                  <div className="provider-onboarding__suggestions">
-                    {citySuggestions.map((city) => (
-                      <button
-                        key={city}
-                        type="button"
-                        className="provider-onboarding__suggestion-item"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleCitySelect(city);
-                        }}
-                      >
-                        <svg
-                          className="provider-onboarding__suggestion-icon"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                        </svg>
-                        {city}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </label>
-          </div>
-        </div>
-      );
-    }
-
-    if (currentStep === 2) {
-      return (
-        <div className="provider-onboarding__content provider-onboarding__content--photo">
-          {/* Step Header */}
-          <div className="provider-onboarding__step-header provider-onboarding__step-header--center">
-            <h2 className="provider-onboarding__step-title provider-onboarding__step-title--center">
-              Upload your photo
-            </h2>
-            <p className="provider-onboarding__step-subtitle provider-onboarding__step-subtitle--center">
-              This will be shown on your public profile and helps clients recognize you.
-            </p>
-          </div>
-
-          {/* Photo Upload Section */}
-          <div className="provider-onboarding__photo-section">
-            <button
-              type="button"
-              onClick={handlePhotoClick}
-              className="provider-onboarding__photo-button"
-              aria-label="Upload profile photo"
-            >
-              <div className="provider-onboarding__photo-circle">
-                {form.photoPreview ? (
-                  <>
-                    <img
-                      src={form.photoPreview}
-                      alt="Profile preview"
-                      className="provider-onboarding__photo-preview"
-                    />
-                    <div className="provider-onboarding__photo-edit">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                      </svg>
-                    </div>
-                  </>
-                ) : (
-                  <svg
-                    className="provider-onboarding__photo-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                  >
-                    <path
-                      d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <circle cx="12" cy="13" r="4" strokeWidth="2" />
-                  </svg>
-                )}
-              </div>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              className="provider-onboarding__photo-input"
-              aria-hidden="true"
-            />
-            <p className="provider-onboarding__photo-label">Add Photo</p>
-            <p className="provider-onboarding__photo-hint">
-              Tap to upload your logo or profile picture
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (currentStep === 3) {
-      return (
-        <div className="provider-onboarding__content">
-          {/* Step Header */}
-          <div className="provider-onboarding__step-header">
-            <h2 className="provider-onboarding__step-title">
-              Set up your services
-            </h2>
-            <p className="provider-onboarding__step-subtitle">
-              Add the services you offer. You can always edit these later.
-            </p>
-          </div>
-
-          {/* Add New Service Button */}
-          <button
-            type="button"
-            onClick={handleAddService}
-            className="provider-onboarding__add-service-button"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-            </svg>
-            Add New Service
-          </button>
-
-          {/* Service List */}
-          <div className="provider-onboarding__services-list">
-            {form.services.length === 0 ? (
-              <div className="provider-onboarding__empty-state">
-                <svg
-                  className="provider-onboarding__empty-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <rect
-                    x="3"
-                    y="3"
-                    width="18"
-                    height="18"
-                    rx="2"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M9 9h6M9 15h6"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <p className="provider-onboarding__empty-text">
-                  No services added yet
-                </p>
-                <p className="provider-onboarding__empty-hint">
-                  Click "Add New Service" to get started
-                </p>
-              </div>
-            ) : (
-              form.services.map((service, index) => (
-                <div key={index} className="provider-onboarding__service-item">
-                  <div className="provider-onboarding__service-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
-                    </svg>
-                  </div>
-                  <div className="provider-onboarding__service-info">
-                    <h3 className="provider-onboarding__service-name">
-                      {service.name}
-                    </h3>
-                    <p className="provider-onboarding__service-details">
-                      ${service.price} • {service.duration} min
-                    </p>
-                  </div>
-                  <div className="provider-onboarding__service-actions">
-                    <button
-                      type="button"
-                      onClick={() => handleEditService(index)}
-                      className="provider-onboarding__service-action-button"
-                      aria-label="Edit service"
-                    >
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteService(index)}
-                      className="provider-onboarding__service-action-button provider-onboarding__service-action-button--delete"
-                      aria-label="Delete service"
-                    >
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (currentStep === 4) {
-      const days = [
-        { key: "monday", label: "Monday" },
-        { key: "tuesday", label: "Tuesday" },
-        { key: "wednesday", label: "Wednesday" },
-        { key: "thursday", label: "Thursday" },
-        { key: "friday", label: "Friday" },
-        { key: "saturday", label: "Saturday" },
-        { key: "sunday", label: "Sunday" },
-      ];
-
-      return (
-        <div className="provider-onboarding__content provider-onboarding__content--availability">
-          {/* Step Header */}
-          <div className="provider-onboarding__step-header provider-onboarding__step-header--center">
-            <h2 className="provider-onboarding__step-title provider-onboarding__step-title--center">
-              Set Your Availability
-            </h2>
-            <p className="provider-onboarding__step-subtitle provider-onboarding__step-subtitle--center">
-              Let clients know when you're available for bookings. You can change this anytime.
-            </p>
-          </div>
-
-          {/* Apply to all checkbox */}
-          <div className="provider-onboarding__apply-all">
-            <label className="provider-onboarding__checkbox-label">
-              <input
-                type="checkbox"
-                checked={applyToAll}
-                onChange={handleApplyToAll}
-                className="provider-onboarding__checkbox"
-              />
-              <span className="provider-onboarding__checkbox-text">
-                Apply to all working days
-              </span>
-            </label>
-          </div>
-
-          {/* Day List */}
-          <div className="provider-onboarding__days-list">
-            {days.map((day) => {
-              const dayData = form.availability[day.key];
-
-              return (
-                <div key={day.key} className="provider-onboarding__day-card">
-                  {/* Day Header */}
-                  <div className="provider-onboarding__day-header">
-                    <span
-                      className={`provider-onboarding__day-name ${!dayData.enabled ? "provider-onboarding__day-name--disabled" : ""
-                        }`}
-                    >
-                      {day.label}
-                    </span>
-                    <label className="provider-onboarding__toggle">
-                      <input
-                        type="checkbox"
-                        checked={dayData.enabled}
-                        onChange={() => handleDayToggle(day.key)}
-                        className="provider-onboarding__toggle-input"
-                      />
-                      <span className="provider-onboarding__toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  {/* Time Inputs - Only show if day is enabled */}
-                  {dayData.enabled && (
-                    <div className="provider-onboarding__day-times">
-                      <div className="provider-onboarding__time-row">
-                        <div className="provider-onboarding__time-field">
-                          <label className="provider-onboarding__time-label">From</label>
-                          <input
-                            type="text"
-                            className="provider-onboarding__time-input"
-                            value={dayData.from}
-                            onChange={(e) => handleTimeChange(day.key, "from", e.target.value)}
-                            placeholder="9:00 AM"
-                          />
-                        </div>
-                        <div className="provider-onboarding__time-field">
-                          <label className="provider-onboarding__time-label">To</label>
-                          <input
-                            type="text"
-                            className="provider-onboarding__time-input"
-                            value={dayData.to}
-                            onChange={(e) => handleTimeChange(day.key, "to", e.target.value)}
-                            placeholder="5:00 PM"
-                          />
-                        </div>
-                      </div>
-                      <div className="provider-onboarding__time-row">
-                        <div className="provider-onboarding__time-field">
-                          <label className="provider-onboarding__time-label">Break From</label>
-                          <input
-                            type="text"
-                            className="provider-onboarding__time-input"
-                            value={dayData.breakFrom}
-                            onChange={(e) => handleTimeChange(day.key, "breakFrom", e.target.value)}
-                            placeholder="12:00 PM"
-                          />
-                        </div>
-                        <div className="provider-onboarding__time-field">
-                          <label className="provider-onboarding__time-label">Break To</label>
-                          <input
-                            type="text"
-                            className="provider-onboarding__time-input"
-                            value={dayData.breakTo}
-                            onChange={(e) => handleTimeChange(day.key, "breakTo", e.target.value)}
-                            placeholder="1:00 PM"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    if (currentStep === 5) {
-      return (
-        <div className="provider-onboarding__content provider-onboarding__content--stripe">
-          {/* Step Content - Centered */}
-          <div className="provider-onboarding__stripe-container">
-            {/* Icon */}
-            <div className="provider-onboarding__stripe-icon-wrapper">
-              <div className="provider-onboarding__stripe-icon-outer">
-                <div className="provider-onboarding__stripe-icon-inner">
-                  <svg
-                    className="provider-onboarding__stripe-icon"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Title */}
-            <h2 className="provider-onboarding__stripe-title">
-              Connect your bank account
-            </h2>
-
-            {/* Subtitle */}
-            <p className="provider-onboarding__stripe-subtitle">
-              Proxey uses Stripe for fast, secure payouts. Connect your account to receive payments directly from clients.
-            </p>
-
-            {/* Info Text */}
-            <p style={{ marginTop: "1rem", color: "#666", textAlign: "center", fontSize: "14px" }}>
-              You'll be redirected to Stripe to complete your profile securely.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (draftLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen font-manrope" style={{ background: BG }}>
+        <Logo size={22} color="accent" />
+        <div className="mt-6 w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: ACCENT, borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
 
   return (
-    <div className="provider-onboarding">
-      {/* Header */}
-      <header className="provider-onboarding__header">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="provider-onboarding__back"
-          aria-label="Go back"
+    <div
+      className="flex flex-col min-h-screen font-manrope"
+      style={{ background: BG }}
+    >
+      {/* Top bar */}
+      <div
+        className="flex items-center justify-between px-4 pt-3 pb-1 flex-shrink-0"
+        style={{ background: BG }}
+      >
+        {/* Back */}
+        {step > 1 ? (
+          <button
+            onClick={handleBack}
+            className="flex items-center focus:outline-none -ml-1"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "8px" }}
+          >
+            <svg width="24" height="24" fill="none" stroke={FG} strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : (
+          <div style={{ width: 40 }} />
+        )}
+
+        {/* Logo */}
+        <Logo size={18} color="accent" />
+
+        {/* Step label */}
+        <span
+          className="font-manrope text-[13px] font-semibold"
+          style={{ color: MUTED, minWidth: 40, textAlign: "right" }}
         >
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-          </svg>
-        </button>
-        <h1 className="provider-onboarding__title">
-          {currentStep === 2 ? "Setup Wizard" : currentStep === 3 ? "Services" : currentStep === 4 ? "Availability" : currentStep === 5 ? "Get Paid" : "Create Profile"}
-        </h1>
-        <div className="provider-onboarding__header-spacer" />
-      </header>
-
-      {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} totalSteps={5} />
-
-      {/* Step Content */}
-      <div className="provider-onboarding__main">
-        {renderStepContent()}
-
-        {/* Next Button */}
-        <div className="provider-onboarding__footer">
-          {currentStep === 5 ? (
-            <button
-              onClick={handleStripeConnect}
-              className="provider-onboarding__stripe-button"
-            >
-              <svg
-                className="provider-onboarding__stripe-logo"
-                viewBox="0 0 60 25"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v3.32a8.33 8.33 0 0 1-4.56 1.1c-4.01 0-6.83-2.5-6.83-7.48 0-4.19 2.39-7.52 6.3-7.52 3.92 0 5.96 3.28 5.96 7.5 0 .4-.04 1.26-.06 1.48zm-5.92-5.62c-1.03 0-2.17.73-2.17 2.58h4.25c0-1.85-1.07-2.58-2.08-2.58zM40.95 20.3c-1.44 0-2.32-.6-2.9-1.04l-.02 4.63-4.12.87V5.57h3.76l.08 1.02a4.7 4.7 0 0 1 3.23-1.29c2.9 0 5.62 2.6 5.62 7.4 0 5.23-2.7 7.6-5.65 7.6zM40 8.95c-.95 0-1.54.34-1.97.81l.02 6.12c.4.44.98.78 1.95.78 1.52 0 2.54-1.65 2.54-3.87 0-2.15-1.04-3.84-2.54-3.84zM28.24 5.57h4.13v14.44h-4.13V5.57zm0-4.7L32.37 0v3.36l-4.13.88V.88zm-4.32 9.35v9.79H19.8V5.57h3.7l.12 1.22c1-1.77 3.07-1.41 3.62-1.22v3.79c-.52-.17-2.29-.43-3.32.86zm-8.55 4.72c0 2.43 2.6 1.68 3.12 1.46v3.36c-.55.3-1.54.54-2.89.54a4.15 4.15 0 0 1-4.27-4.24l.01-13.17 4.02-.86v3.54h3.14V9.1h-3.13v5.85zm-4.91.7c0 2.97-2.31 4.66-5.73 4.66a11.2 11.2 0 0 1-4.46-.93v-3.93c1.38.75 3.1 1.31 4.46 1.31.92 0 1.53-.24 1.53-1C6.26 13.77 0 14.51 0 9.95 0 7.04 2.28 5.3 5.62 5.3c1.36 0 2.72.2 4.09.75v3.88a9.23 9.23 0 0 0-4.1-1.06c-.86 0-1.44.25-1.44.93 0 1.85 6.29.97 6.29 5.88z"
-                  fill="white"
-                />
-              </svg>
-              Connect with Stripe
-            </button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              loading={submitting}
-              className="provider-onboarding__button"
-            >
-              {currentStep === 3 || currentStep === 4 ? "Continue" : "Next"}
-            </Button>
-          )}
-          {currentStep === 5 && (
-            <button
-              type="button"
-              onClick={completeOnboarding}
-              className="provider-onboarding__skip-button"
-              style={{ marginTop: '1rem' }}
-            >
-              Skip for now (Demo)
-            </button>
-          )}
-          {currentStep === 2 && (
-            <button
-              type="button"
-              onClick={handleSkipPhoto}
-              className="provider-onboarding__skip-button"
-            >
-              Skip for now
-            </button>
-          )}
-        </div>
+          {step}/{TOTAL_STEPS}
+        </span>
       </div>
 
-      {/* Service Modal */}
-      {serviceModalOpen && (
-        <div className="provider-onboarding__modal-overlay" onClick={() => setServiceModalOpen(false)}>
-          <div className="provider-onboarding__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="provider-onboarding__modal-header">
-              <h2 className="provider-onboarding__modal-title">
-                {editingServiceIndex !== null ? "Edit Service" : "Add New Service"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setServiceModalOpen(false)}
-                className="provider-onboarding__modal-close"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </svg>
-              </button>
-            </div>
+      {/* Progress bar */}
+      <StepBar step={step} />
 
-            <div className="provider-onboarding__modal-body">
-              <label className="provider-onboarding__field">
-                <span className="provider-onboarding__field-label">Service Name</span>
-                <input
-                  type="text"
-                  className="provider-onboarding__input"
-                  placeholder="e.g., House Cleaning"
-                  value={serviceForm.name}
-                  onChange={(e) => setServiceForm((prev) => ({ ...prev, name: e.target.value }))}
-                />
-              </label>
+      {/* Step subtitle */}
+      <p
+        className="font-manrope text-[12px] font-semibold tracking-wide uppercase px-5 mb-0 mt-1"
+        style={{ color: ACCENT }}
+      >
+        {STEP_TITLES[step - 1]}
+      </p>
 
-              <label className="provider-onboarding__field">
-                <span className="provider-onboarding__field-label">Price ($)</span>
-                <input
-                  type="number"
-                  className="provider-onboarding__input"
-                  placeholder="e.g., 50"
-                  min="0"
-                  step="0.01"
-                  value={serviceForm.price}
-                  onChange={(e) => setServiceForm((prev) => ({ ...prev, price: e.target.value }))}
-                />
-              </label>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto pb-36">
+        {step === 1 && (
+          <StepCategory selected={category} onChange={setCategory} />
+        )}
+        {step === 2 && (
+          <StepProfile data={profile} onChange={updateProfile} />
+        )}
+        {step === 3 && (
+          <StepServices
+            services={services}
+            onAdd={(svc) => setServices((prev) => [...prev, svc])}
+            onEdit={(idx, svc) => setServices((prev) => prev.map((s, i) => i === idx ? svc : s))}
+            onDelete={(idx) => setServices((prev) => prev.filter((_, i) => i !== idx))}
+          />
+        )}
+        {step === 4 && (
+          <StepAvailability
+            availability={availability}
+            onChange={updateAvailability}
+            buffer={bufferMins}
+            onBuffer={setBufferMins}
+            bookingWindow={bookingWindow}
+            onBookingWindow={setBookingWindow}
+          />
+        )}
+        {step === 5 && (
+          <StepGoLive
+            handle={handle}
+            onHandle={(v) => { setHandle(v); setHandleStatus(null); }}
+            handleStatus={handleStatus}
+            onCheckHandle={checkHandle}
+            stripeConnected={stripeConnected}
+            onStripeConnect={handleStripeConnect}
+            stripeLoading={stripeLoading}
+          />
+        )}
 
-              <label className="provider-onboarding__field">
-                <span className="provider-onboarding__field-label">Duration (minutes)</span>
-                <input
-                  type="number"
-                  className="provider-onboarding__input"
-                  placeholder="e.g., 60"
-                  min="0"
-                  step="5"
-                  value={serviceForm.duration}
-                  onChange={(e) => setServiceForm((prev) => ({ ...prev, duration: e.target.value }))}
-                />
-              </label>
-            </div>
+        <Footer />
+      </div>
 
-            <div className="provider-onboarding__modal-footer">
-              <button
-                type="button"
-                onClick={() => setServiceModalOpen(false)}
-                className="provider-onboarding__modal-cancel"
-              >
-                Cancel
-              </button>
-              <Button
-                onClick={handleSaveService}
-                className="provider-onboarding__modal-save"
-              >
-                {editingServiceIndex !== null ? "Update" : "Add"} Service
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sticky bottom bar */}
+      <div
+        className="fixed bottom-0 left-0 right-0 px-4 pt-3 pb-8 flex flex-col gap-3"
+        style={{ background: BG, borderTop: `0.5px solid ${DIVIDER}` }}
+      >
+        <ContinueBtn
+          onClick={handleContinue}
+          disabled={!canContinue()}
+          loading={submitting}
+          label={step === 5 ? "Launch my page" : "Continue"}
+        />
+        {step === 4 && (
+          <button
+            onClick={handleContinue}
+            className="font-manrope text-[14px] font-semibold text-center focus:outline-none"
+            style={{ color: MUTED, background: "none", border: "none", cursor: "pointer" }}
+          >
+            Skip for now
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -520,6 +520,59 @@ app.get("/api/services", async (req, res) => {
   res.status(200).json({ services: memoryStore.services });
 });
 
+// GET /api/provider/services — services for the authenticated provider + booking counts this month
+app.get("/api/provider/services", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+
+  try {
+    const { data: services, error: svcError } = await supabase
+      .from("services")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: false });
+
+    if (svcError) throw svcError;
+
+    if (!services || services.length === 0) {
+      return res.status(200).json({ services: [] });
+    }
+
+    // Booking counts this calendar month per service
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+    const serviceIds = services.map((s) => s.id);
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("service_id")
+      .eq("provider_id", providerId)
+      .in("service_id", serviceIds)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", monthStart)
+      .lt("scheduled_at", monthEnd);
+
+    const countMap = {};
+    for (const b of bookings || []) {
+      if (b.service_id) countMap[b.service_id] = (countMap[b.service_id] || 0) + 1;
+    }
+
+    const result = services.map((s) => ({
+      ...s,
+      bookings_this_month: countMap[s.id] || 0,
+    }));
+
+    res.status(200).json({ services: result });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider services", err);
+    res.status(500).json({ error: "Failed to load services." });
+  }
+});
+
 // Create or update a service (provider-owned)
 app.post("/api/services", async (req, res) => {
   if (!supabase) {
@@ -533,6 +586,11 @@ app.post("/api/services", async (req, res) => {
     return res.status(400).json({ error: "name, category, and basePrice are required." });
   }
 
+  const {
+    paymentType, depositType, depositValue, clientNotesEnabled,
+    isActive, photos,
+  } = req.body || {};
+
   const payload = {
     id: id || crypto.randomUUID(),
     name,
@@ -542,6 +600,12 @@ app.post("/api/services", async (req, res) => {
     unit: unit || "visit",
     duration: duration || 60,
     provider_id: providerId,
+    is_active: isActive !== undefined ? isActive : true,
+    payment_type: paymentType || "full",
+    deposit_type: depositType || null,
+    deposit_value: depositValue != null ? depositValue : null,
+    client_notes_enabled: clientNotesEnabled !== undefined ? clientNotesEnabled : true,
+    metadata: photos ? { photos } : undefined,
   };
 
   try {
@@ -587,6 +651,296 @@ app.delete("/api/services/:id", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to delete service", err);
     res.status(500).json({ error: "Failed to delete service." });
+  }
+});
+
+// ─── GET /api/provider/services/:id — single service with intake questions + options
+app.get("/api/provider/services/:id", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const { id } = req.params;
+
+  try {
+    const { data: service, error: svcErr } = await supabase
+      .from("services")
+      .select("*")
+      .eq("id", id)
+      .eq("provider_id", providerId)
+      .single();
+
+    if (svcErr || !service) return res.status(404).json({ error: "Service not found." });
+
+    const { data: questions } = await supabase
+      .from("service_intake_questions")
+      .select("*, service_intake_options(*)")
+      .eq("service_id", id)
+      .order("sort_order", { ascending: true });
+
+    const enriched = (questions || []).map((q) => ({
+      ...q,
+      options: (q.service_intake_options || []).sort((a, b) => a.sort_order - b.sort_order),
+    }));
+
+    res.status(200).json({ service, questions: enriched });
+  } catch (err) {
+    console.error("[provider/services/:id] Error:", err);
+    res.status(500).json({ error: "Failed to load service." });
+  }
+});
+
+// ─── GET /api/services/:serviceId/intake — public: intake questions for booking flow
+app.get("/api/services/:serviceId/intake", async (req, res) => {
+  if (!supabase) return res.json({ questions: [], clientNotesEnabled: true });
+  const { serviceId } = req.params;
+
+  try {
+    const { data: service, error: svcErr } = await supabase
+      .from("services")
+      .select("id, client_notes_enabled")
+      .eq("id", serviceId)
+      .single();
+
+    if (svcErr || !service) return res.status(404).json({ error: "Service not found." });
+
+    const { data: questions } = await supabase
+      .from("service_intake_questions")
+      .select("id, question_text, question_type, sort_order, service_intake_options(id, option_text, sort_order)")
+      .eq("service_id", serviceId)
+      .order("sort_order", { ascending: true });
+
+    const enriched = (questions || []).map((q) => ({
+      ...q,
+      options: (q.service_intake_options || []).sort((a, b) => a.sort_order - b.sort_order),
+    }));
+
+    res.json({ questions: enriched, clientNotesEnabled: service.client_notes_enabled !== false });
+  } catch (err) {
+    console.error("[services/:serviceId/intake] Error:", err);
+    res.status(500).json({ error: "Failed to load intake questions." });
+  }
+});
+
+// ─── PUT /api/provider/services/:id — full update including payment/notes fields
+app.put("/api/provider/services/:id", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const { id } = req.params;
+  const {
+    name, description, category, basePrice, duration, isActive,
+    paymentType, depositType, depositValue, clientNotesEnabled, photos,
+  } = req.body || {};
+
+  try {
+    const updates = {
+      updated_at: new Date().toISOString(),
+    };
+    if (name !== undefined)                 updates.name = name;
+    if (description !== undefined)          updates.description = description;
+    if (category !== undefined)             updates.category = category;
+    if (basePrice !== undefined)            updates.base_price = basePrice;
+    if (duration !== undefined)             updates.duration = duration;
+    if (isActive !== undefined)             updates.is_active = isActive;
+    if (paymentType !== undefined)          updates.payment_type = paymentType;
+    if (depositType !== undefined)          updates.deposit_type = depositType;
+    if (depositValue !== undefined)         updates.deposit_value = depositValue;
+    if (clientNotesEnabled !== undefined)   updates.client_notes_enabled = clientNotesEnabled;
+    if (photos !== undefined)               updates.metadata = { photos };
+
+    const { data, error } = await supabase
+      .from("services")
+      .update(updates)
+      .eq("id", id)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Service not found." });
+
+    res.status(200).json({ service: data });
+  } catch (err) {
+    console.error("[provider/services/:id PUT] Error:", err);
+    res.status(500).json({ error: "Failed to update service." });
+  }
+});
+
+// ─── Intake questions CRUD ────────────────────────────────────────────────────
+
+// GET /api/provider/services/:serviceId/questions
+app.get("/api/provider/services/:serviceId/questions", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { serviceId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("service_intake_questions")
+      .select("*, service_intake_options(*)")
+      .eq("service_id", serviceId)
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+
+    const questions = (data || []).map((q) => ({
+      ...q,
+      options: (q.service_intake_options || []).sort((a, b) => a.sort_order - b.sort_order),
+    }));
+
+    res.status(200).json({ questions });
+  } catch (err) {
+    console.error("[intake questions GET] Error:", err);
+    res.status(500).json({ error: "Failed to load questions." });
+  }
+});
+
+// POST /api/provider/services/:serviceId/questions
+app.post("/api/provider/services/:serviceId/questions", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { serviceId } = req.params;
+  const { questionText, questionType = "select", sortOrder = 0 } = req.body || {};
+
+  if (!questionText) return res.status(400).json({ error: "questionText is required." });
+
+  try {
+    const { data, error } = await supabase
+      .from("service_intake_questions")
+      .insert({
+        service_id: serviceId,
+        question_text: questionText,
+        question_type: questionType,
+        sort_order: sortOrder,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json({ question: { ...data, options: [] } });
+  } catch (err) {
+    console.error("[intake questions POST] Error:", err);
+    res.status(500).json({ error: "Failed to create question." });
+  }
+});
+
+// PATCH /api/provider/questions/:questionId
+app.patch("/api/provider/questions/:questionId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { questionId } = req.params;
+  const { questionText, questionType, sortOrder } = req.body || {};
+
+  const updates = {};
+  if (questionText !== undefined)  updates.question_text = questionText;
+  if (questionType !== undefined)  updates.question_type = questionType;
+  if (sortOrder !== undefined)     updates.sort_order = sortOrder;
+
+  try {
+    const { data, error } = await supabase
+      .from("service_intake_questions")
+      .update(updates)
+      .eq("id", questionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(200).json({ question: data });
+  } catch (err) {
+    console.error("[intake questions PATCH] Error:", err);
+    res.status(500).json({ error: "Failed to update question." });
+  }
+});
+
+// DELETE /api/provider/questions/:questionId
+app.delete("/api/provider/questions/:questionId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { questionId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from("service_intake_questions")
+      .delete()
+      .eq("id", questionId);
+
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[intake questions DELETE] Error:", err);
+    res.status(500).json({ error: "Failed to delete question." });
+  }
+});
+
+// ─── Intake options CRUD ──────────────────────────────────────────────────────
+
+// POST /api/provider/questions/:questionId/options
+app.post("/api/provider/questions/:questionId/options", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { questionId } = req.params;
+  const { optionText, sortOrder = 0 } = req.body || {};
+
+  if (!optionText) return res.status(400).json({ error: "optionText is required." });
+
+  try {
+    const { data, error } = await supabase
+      .from("service_intake_options")
+      .insert({ question_id: questionId, option_text: optionText, sort_order: sortOrder })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json({ option: data });
+  } catch (err) {
+    console.error("[intake options POST] Error:", err);
+    res.status(500).json({ error: "Failed to create option." });
+  }
+});
+
+// DELETE /api/provider/options/:optionId
+app.delete("/api/provider/options/:optionId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { optionId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from("service_intake_options")
+      .delete()
+      .eq("id", optionId);
+
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[intake options DELETE] Error:", err);
+    res.status(500).json({ error: "Failed to delete option." });
+  }
+});
+
+// PUT /api/provider/questions/:questionId/options — replace all options for a question
+app.put("/api/provider/questions/:questionId/options", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const { questionId } = req.params;
+  const { options = [] } = req.body || {};
+
+  try {
+    // Delete existing
+    await supabase
+      .from("service_intake_options")
+      .delete()
+      .eq("question_id", questionId);
+
+    if (options.length === 0) return res.status(200).json({ options: [] });
+
+    const rows = options.map((opt, idx) => ({
+      question_id: questionId,
+      option_text: typeof opt === "string" ? opt : opt.option_text,
+      sort_order: idx,
+    }));
+
+    const { data, error } = await supabase
+      .from("service_intake_options")
+      .insert(rows)
+      .select();
+
+    if (error) throw error;
+    res.status(200).json({ options: data });
+  } catch (err) {
+    console.error("[intake options PUT] Error:", err);
+    res.status(500).json({ error: "Failed to replace options." });
   }
 });
 
@@ -772,6 +1126,7 @@ app.post("/api/bookings", async (req, res) => {
     discountType,
     discountValue,
     discountAmount,
+    intakeResponses,  // [{ questionId, responseText }]
   } = req.body || {};
 
   if (!serviceId || !providerId || !scheduledAt) {
@@ -836,6 +1191,20 @@ app.post("/api/bookings", async (req, res) => {
       if (error) {
         console.warn("[supabase] Failed to create booking, using stub.", error);
       } else {
+        // Save intake responses if provided
+        if (Array.isArray(intakeResponses) && intakeResponses.length > 0) {
+          const rows = intakeResponses
+            .filter((r) => r.questionId && r.responseText !== undefined && r.responseText !== "")
+            .map((r) => ({
+              booking_id: data.id,
+              question_id: r.questionId,
+              response_text: String(r.responseText),
+            }));
+          if (rows.length > 0) {
+            await supabase.from("booking_intake_responses").insert(rows);
+          }
+        }
+
         // Send notification to provider about new booking request
         if (data.status === 'pending' || data.status === 'confirmed') {
           const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
@@ -1088,6 +1457,145 @@ app.get("/api/provider/jobs", async (req, res) => {
   res.status(200).json({ jobs });
 });
 
+// GET /api/provider/jobs/:id — single job enriched with client stats + previous notes
+app.get("/api/provider/jobs/:id", async (req, res) => {
+  const providerId = getProviderId(req);
+  const jobId = req.params.id;
+
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  try {
+    // Fetch the job
+    const { data: job, error: jobError } = await supabase
+      .from("provider_jobs")
+      .select("*")
+      .eq("id", jobId)
+      .eq("provider_id", providerId)
+      .single();
+
+    if (jobError || !job) {
+      return res.status(404).json({ error: "Job not found." });
+    }
+
+    // Try to get client profile via booking_id → bookings.client_id
+    let clientProfile = null;
+    let clientId = null;
+    if (job.booking_id) {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("client_id")
+        .eq("id", job.booking_id)
+        .single();
+      if (booking?.client_id) {
+        clientId = booking.client_id;
+        const { data: profile } = await supabase
+          .from("client_profiles")
+          .select("name, city, updated_at")
+          .eq("user_id", clientId)
+          .single();
+        clientProfile = profile || null;
+      }
+    }
+
+    // Count all completed visits from this client to this provider
+    let visitCount = 0;
+    let clientSince = null;
+    if (clientId) {
+      const { data: allBookings } = await supabase
+        .from("bookings")
+        .select("id, created_at, status")
+        .eq("provider_id", providerId)
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: true });
+
+      if (allBookings) {
+        visitCount = allBookings.filter(b => b.status === "completed").length;
+        clientSince = allBookings[0]?.created_at || null;
+      }
+    }
+
+    // Get previous session notes: last completed job for this client before this one
+    let previousNotes = null;
+    if (clientId) {
+      const { data: prevJobs } = await supabase
+        .from("provider_jobs")
+        .select("notes, scheduled_at")
+        .eq("provider_id", providerId)
+        .eq("status", "completed")
+        .neq("id", jobId)
+        .order("scheduled_at", { ascending: false })
+        .limit(1);
+      // Match by client_name as fallback (provider_jobs has no client_id)
+      if (!prevJobs || prevJobs.length === 0) {
+        const { data: prevByName } = await supabase
+          .from("provider_jobs")
+          .select("notes, scheduled_at")
+          .eq("provider_id", providerId)
+          .eq("client_name", job.client_name)
+          .eq("status", "completed")
+          .neq("id", jobId)
+          .order("scheduled_at", { ascending: false })
+          .limit(1);
+        previousNotes = prevByName?.[0]?.notes || null;
+      } else {
+        previousNotes = prevJobs[0]?.notes || null;
+      }
+    }
+
+    // Format client since date
+    const clientSinceLabel = clientSince
+      ? new Date(clientSince).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+      : null;
+
+    return res.status(200).json({
+      job: {
+        ...job,
+        price_dollars: (job.price || 0) / 100,
+        client_id: clientId,
+        client_city: clientProfile?.city || null,
+        visit_count: visitCount,
+        client_since: clientSinceLabel,
+        previous_notes: previousNotes,
+      },
+    });
+  } catch (err) {
+    console.error("[provider/jobs/:id] Unexpected error:", err);
+    return res.status(500).json({ error: "Failed to load appointment." });
+  }
+});
+
+// PATCH /api/provider/jobs/:id/notes — save session notes
+app.patch("/api/provider/jobs/:id/notes", async (req, res) => {
+  const providerId = getProviderId(req);
+  const jobId = req.params.id;
+  const { notes } = req.body || {};
+
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_jobs")
+      .update({ notes, updated_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: "Failed to save notes." });
+    }
+
+    return res.status(200).json({ job: data });
+  } catch (err) {
+    console.error("[provider/jobs/:id/notes] Unexpected error:", err);
+    return res.status(500).json({ error: "Failed to save notes." });
+  }
+});
+
 app.patch("/api/provider/jobs/:id", async (req, res) => {
   const providerId = getProviderId(req);
   const jobId = req.params.id;
@@ -1099,9 +1607,14 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
 
   if (supabase) {
     try {
+      const updatePayload = { status, updated_at: new Date().toISOString() };
+      if (status === 'completed') {
+        updatePayload.completed_at = new Date().toISOString();
+      }
+
       const { data, error } = await supabase
         .from("provider_jobs")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", jobId)
         .eq("provider_id", providerId)
         .select()
@@ -1140,6 +1653,17 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
             data: {
               provider_id: data.provider_id,
               status: 'declined'
+            }
+          });
+        } else if (clientId && status === 'completed') {
+          await createClientNotification(clientId, {
+            type: 'booking_completed',
+            title: 'Service Completed!',
+            body: `Your booking for ${data.service_name || 'your service'} has been marked as completed. How was it?`,
+            booking_id: data.id,
+            data: {
+              provider_id: data.provider_id,
+              status: 'completed'
             }
           });
         }
@@ -1283,6 +1807,18 @@ app.get("/api/provider/earnings", async (req, res) => {
       });
     }
 
+    // Build service breakdown for current month
+    const breakdownMap = {};
+    thisMonthBookings.forEach(b => {
+      const key = b.service_name || "Other";
+      if (!breakdownMap[key]) breakdownMap[key] = { name: key, sessions: 0, revenue: 0 };
+      breakdownMap[key].sessions += 1;
+      breakdownMap[key].revenue += (b.price || 0);
+    });
+    const breakdown = Object.values(breakdownMap)
+      .map(item => ({ ...item, revenue: item.revenue / 100 }))
+      .sort((a, b) => b.revenue - a.revenue);
+
     // Generate transactions list from bookings
     const transactions = allBookings.slice(0, 20).map(b => {
       const bookingDate = new Date(b.scheduled_at || b.created_at);
@@ -1311,6 +1847,7 @@ app.get("/api/provider/earnings", async (req, res) => {
       monthlyTrend,
       weeklyData,
       monthlyData,
+      breakdown,
       transactions,
       payoutMethod: {
         type: 'bank',
@@ -1368,6 +1905,48 @@ app.get("/api/provider/me", async (req, res) => {
     schedule: profile.schedule || [],
   };
   res.status(200).json({ profile: normalized });
+});
+
+// GET /api/provider/stats — rating, review count, distinct client count
+app.get("/api/provider/stats", async (req, res) => {
+  const providerId = getProviderId(req);
+
+  if (!supabase) {
+    return res.status(200).json({ stats: { rating: null, reviews: 0, clients: 0 } });
+  }
+
+  try {
+    const [reviewsResult, clientsResult] = await Promise.all([
+      supabase
+        .from("reviews")
+        .select("rating")
+        .eq("provider_id", providerId)
+        .eq("is_visible", true),
+      supabase
+        .from("bookings")
+        .select("client_id")
+        .eq("provider_id", providerId)
+        .eq("status", "completed"),
+    ]);
+
+    const reviewRows = reviewsResult.data || [];
+    const reviewCount = reviewRows.length;
+    const avgRating =
+      reviewCount > 0
+        ? (reviewRows.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewCount).toFixed(1)
+        : null;
+
+    const distinctClients = new Set(
+      (clientsResult.data || []).map((b) => b.client_id)
+    ).size;
+
+    return res.status(200).json({
+      stats: { rating: avgRating, reviews: reviewCount, clients: distinctClients },
+    });
+  } catch (err) {
+    console.error("[provider/stats] Unexpected error:", err);
+    return res.status(200).json({ stats: { rating: null, reviews: 0, clients: 0 } });
+  }
 });
 
 app.patch("/api/provider/me", async (req, res) => {
@@ -2286,6 +2865,356 @@ app.put("/api/client/profile", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to upsert client profile", err);
     res.status(500).json({ error: "Failed to save client profile." });
+  }
+});
+
+// GET /api/client/kliques — distinct providers this client has booked,
+// with total visits, last visit date, and provider profile info + avg rating.
+app.get("/api/client/kliques", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    // Fetch all non-cancelled bookings for this client
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("provider_id, provider_name, scheduled_at, status")
+      .eq("client_id", userId)
+      .neq("status", "cancelled");
+
+    if (bookingsError) throw bookingsError;
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(200).json({ kliques: [] });
+    }
+
+    // Aggregate per provider: visit count + last visit
+    const providerMap = {};
+    for (const b of bookings) {
+      if (!b.provider_id) continue;
+      if (!providerMap[b.provider_id]) {
+        providerMap[b.provider_id] = {
+          provider_id: b.provider_id,
+          provider_name: b.provider_name,
+          visits: 0,
+          last_visit: null,
+        };
+      }
+      providerMap[b.provider_id].visits += 1;
+      const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
+      if (bDate && (!providerMap[b.provider_id].last_visit || bDate > new Date(providerMap[b.provider_id].last_visit))) {
+        providerMap[b.provider_id].last_visit = b.scheduled_at;
+      }
+    }
+
+    const providerIds = Object.keys(providerMap);
+
+    // Fetch provider profiles
+    const { data: profiles } = await supabase
+      .from("provider_profiles")
+      .select("provider_id, name, avatar, categories")
+      .in("provider_id", providerIds);
+
+    const profileMap = {};
+    for (const p of profiles || []) {
+      profileMap[p.provider_id] = p;
+    }
+
+    // Fetch avg ratings from reviews
+    const { data: reviews } = await supabase
+      .from("reviews")
+      .select("provider_id, rating")
+      .in("provider_id", providerIds)
+      .eq("is_visible", true);
+
+    const ratingMap = {};
+    for (const r of reviews || []) {
+      if (!ratingMap[r.provider_id]) ratingMap[r.provider_id] = { sum: 0, count: 0 };
+      ratingMap[r.provider_id].sum += r.rating;
+      ratingMap[r.provider_id].count += 1;
+    }
+
+    const kliques = providerIds.map((pid) => {
+      const agg = providerMap[pid];
+      const profile = profileMap[pid] || {};
+      const ratingData = ratingMap[pid];
+      const avgRating = ratingData && ratingData.count > 0
+        ? (ratingData.sum / ratingData.count).toFixed(1)
+        : null;
+      const role = profile.categories && profile.categories.length > 0
+        ? profile.categories[0]
+        : null;
+
+      return {
+        provider_id: pid,
+        name: profile.name || agg.provider_name || "Provider",
+        avatar: profile.avatar || null,
+        role,
+        rating: avgRating,
+        visits: agg.visits,
+        last_visit: agg.last_visit,
+      };
+    });
+
+    // Sort by most visits desc, then most recent visit desc
+    kliques.sort((a, b) => b.visits - a.visits || new Date(b.last_visit) - new Date(a.last_visit));
+
+    res.status(200).json({ kliques });
+  } catch (err) {
+    console.error("[supabase] Failed to load kliques", err);
+    res.status(500).json({ error: "Failed to load kliques." });
+  }
+});
+
+// GET /api/client/relationship/:providerId — full relationship data for one provider
+app.get("/api/client/relationship/:providerId", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+  const { providerId } = req.params;
+
+  try {
+    // Fetch provider profile
+    const { data: profile, error: profileError } = await supabase
+      .from("provider_profiles")
+      .select("provider_id, name, avatar, bio, categories")
+      .eq("provider_id", providerId)
+      .single();
+
+    if (profileError && profileError.code !== "PGRST116") throw profileError;
+
+    // Fetch all bookings between this client and provider, newest first
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, created_at")
+      .eq("client_id", userId)
+      .eq("provider_id", providerId)
+      .order("scheduled_at", { ascending: false });
+
+    if (bookingsError) throw bookingsError;
+
+    const allBookings = bookings || [];
+
+    // Aggregate stats
+    const nonCancelled = allBookings.filter((b) => b.status !== "cancelled");
+    const totalSessions = nonCancelled.length;
+    const totalSpent = nonCancelled.reduce((sum, b) => sum + (b.price || 0), 0);
+    const togetherSince = nonCancelled.length > 0
+      ? nonCancelled.reduce((earliest, b) => {
+          const d = new Date(b.scheduled_at || b.created_at);
+          return d < new Date(earliest) ? b.scheduled_at || b.created_at : earliest;
+        }, nonCancelled[0].scheduled_at || nonCancelled[0].created_at)
+      : null;
+
+    res.status(200).json({
+      provider: profile || { provider_id: providerId, name: "Provider", avatar: null, categories: [] },
+      stats: {
+        together_since: togetherSince,
+        sessions: totalSessions,
+        total_spent: totalSpent,
+      },
+      bookings: allBookings,
+    });
+  } catch (err) {
+    console.error("[supabase] Failed to load relationship data", err);
+    res.status(500).json({ error: "Failed to load relationship data." });
+  }
+});
+
+// GET /api/provider/calendar?year=YYYY&month=M(0-based) — bookings for this provider
+// grouped by YYYY-MM-DD for the given month, used by the calendar view.
+app.get("/api/provider/calendar", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getProviderId(req);
+  const year  = parseInt(req.query.year,  10) || new Date().getFullYear();
+  const month = parseInt(req.query.month, 10);        // 0-based
+  const m = isNaN(month) ? new Date().getMonth() : month;
+
+  const start = new Date(year, m, 1).toISOString();
+  const end   = new Date(year, m + 1, 1).toISOString();
+
+  try {
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("id, client_name, service_name, scheduled_at, duration, status")
+      .eq("provider_id", providerId)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", start)
+      .lt("scheduled_at", end)
+      .order("scheduled_at", { ascending: true });
+
+    if (error) throw error;
+
+    // Group by local date string "YYYY-MM-DD"
+    const byDate = {};
+    for (const b of bookings || []) {
+      if (!b.scheduled_at) continue;
+      const key = b.scheduled_at.slice(0, 10); // "2026-03-19"
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(b);
+    }
+
+    res.status(200).json({ byDate });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider calendar", err);
+    res.status(500).json({ error: "Failed to load calendar." });
+  }
+});
+
+// GET /api/provider/clients — all distinct clients this provider has served,
+// with visit count, lifetime value, last visit date, and client name.
+app.get("/api/provider/clients", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+
+  try {
+    // All non-cancelled bookings for this provider
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("client_id, client_name, scheduled_at, price, status")
+      .eq("provider_id", userId)
+      .neq("status", "cancelled");
+
+    if (bookingsError) throw bookingsError;
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(200).json({ clients: [] });
+    }
+
+    // Aggregate per client
+    const clientMap = {};
+    for (const b of bookings) {
+      if (!b.client_id) continue;
+      if (!clientMap[b.client_id]) {
+        clientMap[b.client_id] = {
+          client_id: b.client_id,
+          client_name: b.client_name || "Client",
+          visits: 0,
+          ltv: 0,
+          last_visit: null,
+        };
+      }
+      clientMap[b.client_id].visits += 1;
+      clientMap[b.client_id].ltv += b.price || 0;
+      const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
+      if (bDate && (!clientMap[b.client_id].last_visit || bDate > new Date(clientMap[b.client_id].last_visit))) {
+        clientMap[b.client_id].last_visit = b.scheduled_at;
+      }
+    }
+
+    const clientIds = Object.keys(clientMap);
+
+    // Fetch client profiles for avatar/name
+    const { data: profiles } = await supabase
+      .from("client_profiles")
+      .select("user_id, name, avatar")
+      .in("user_id", clientIds);
+
+    const profileMap = {};
+    for (const p of profiles || []) {
+      profileMap[p.user_id] = p;
+    }
+
+    // Determine status + merge profile
+    const threeWeeksAgo = new Date();
+    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+
+    const clients = clientIds.map((cid) => {
+      const agg = clientMap[cid];
+      const profile = profileMap[cid] || {};
+      const lastVisitDate = agg.last_visit ? new Date(agg.last_visit) : null;
+
+      let status;
+      if (agg.visits < 3) {
+        status = "new";
+      } else if (lastVisitDate && lastVisitDate < threeWeeksAgo) {
+        status = "at-risk";
+      } else {
+        status = "active";
+      }
+
+      return {
+        client_id: cid,
+        name: profile.name || agg.client_name,
+        avatar: profile.avatar || null,
+        visits: agg.visits,
+        ltv: agg.ltv,
+        last_visit: agg.last_visit,
+        status,
+      };
+    });
+
+    // Sort: active first, then at-risk, then new; within each group by visits desc
+    const statusOrder = { active: 0, "at-risk": 1, new: 2 };
+    clients.sort((a, b) =>
+      (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3) ||
+      b.visits - a.visits
+    );
+
+    res.status(200).json({ clients });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider clients", err);
+    res.status(500).json({ error: "Failed to load provider clients." });
+  }
+});
+
+// GET /api/provider/clients/:clientId — full timeline for one client
+app.get("/api/provider/clients/:clientId", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const userId = getUserId(req);
+  const { clientId } = req.params;
+
+  try {
+    // Client profile
+    const { data: profile } = await supabase
+      .from("client_profiles")
+      .select("user_id, name, avatar, city")
+      .eq("user_id", clientId)
+      .single();
+
+    // All bookings between this provider and client, newest first
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("id, service_name, scheduled_at, duration, price, status, notes, client_name, created_at")
+      .eq("provider_id", userId)
+      .eq("client_id", clientId)
+      .order("scheduled_at", { ascending: false });
+
+    if (bookingsError) throw bookingsError;
+
+    const allBookings = bookings || [];
+    const nonCancelled = allBookings.filter((b) => b.status !== "cancelled");
+    const totalVisits = nonCancelled.length;
+    const totalLtv = nonCancelled.reduce((sum, b) => sum + (b.price || 0), 0);
+    const firstVisit = nonCancelled.length > 0
+      ? nonCancelled.reduce((earliest, b) => {
+          const d = new Date(b.scheduled_at || b.created_at);
+          return d < new Date(earliest) ? b.scheduled_at || b.created_at : earliest;
+        }, nonCancelled[0].scheduled_at || nonCancelled[0].created_at)
+      : null;
+
+    res.status(200).json({
+      client: profile || { user_id: clientId, name: allBookings[0]?.client_name || "Client", avatar: null },
+      stats: { visits: totalVisits, ltv: totalLtv, first_visit: firstVisit },
+      bookings: allBookings,
+    });
+  } catch (err) {
+    console.error("[supabase] Failed to load provider client timeline", err);
+    res.status(500).json({ error: "Failed to load client timeline." });
   }
 });
 
@@ -5206,6 +6135,673 @@ app.get("/api/admin/disputes/stats", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("[admin/disputes] Error fetching stats", err);
     res.status(500).json({ error: "Failed to fetch stats." });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVIDER INVITES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── POST /api/provider/invites — generate a new invite code ─────────────────
+app.post("/api/provider/invites", async (req, res) => {
+  const providerId = getProviderId(req);
+  if (!supabase) {
+    return res.status(201).json({ code: "demo-invite-code", url: `/join/demo-invite-code` });
+  }
+  try {
+    // Generate a short random code: 8 url-safe chars
+    const code = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    const { data, error } = await supabase
+      .from("provider_invites")
+      .insert({ provider_id: providerId, code, status: "active" })
+      .select("code")
+      .single();
+    if (error) throw error;
+    res.status(201).json({ code: data.code, url: `/join/${data.code}` });
+  } catch (err) {
+    console.error("[provider/invites POST]", err);
+    res.status(500).json({ error: "Failed to create invite." });
+  }
+});
+
+// ─── GET /api/provider/invites/join/:code — look up invite + provider info ───
+app.get("/api/provider/invites/join/:code", async (req, res) => {
+  const { code } = req.params;
+  if (!supabase) {
+    // Stub for local dev
+    return res.json({
+      valid: true,
+      invite: { id: "stub-id", code, status: "active" },
+      provider: {
+        id: "stub-provider",
+        name: "Demo Provider",
+        business_name: "Demo Studio",
+        category: "wellness",
+        city: "Toronto",
+        photo: null,
+        bio: "Here to help.",
+      },
+    });
+  }
+  try {
+    const { data: invite, error: invErr } = await supabase
+      .from("provider_invites")
+      .select("id, code, status, provider_id, expires_at")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (invErr) throw invErr;
+    if (!invite) return res.json({ valid: false, reason: "not_found" });
+    if (invite.status === "accepted") return res.json({ valid: false, reason: "already_accepted" });
+    if (invite.status === "expired") return res.json({ valid: false, reason: "expired" });
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      // Mark expired
+      await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
+      return res.json({ valid: false, reason: "expired" });
+    }
+
+    // Fetch provider info
+    const { data: provider } = await supabase
+      .from("providers")
+      .select("id, name, business_name, category, city, photo, bio, avatar")
+      .eq("user_id", invite.provider_id)
+      .maybeSingle();
+
+    res.json({ valid: true, invite: { id: invite.id, code, status: invite.status }, provider: provider || null });
+  } catch (err) {
+    console.error("[provider/invites/join GET]", err);
+    res.status(500).json({ error: "Failed to look up invite." });
+  }
+});
+
+// ─── POST /api/provider/invites/join/:code/accept — accept invite ─────────────
+app.post("/api/provider/invites/join/:code/accept", async (req, res) => {
+  const { code } = req.params;
+  const clientId = getUserId(req);
+
+  if (!supabase) return res.json({ ok: true });
+  try {
+    const { data: invite, error: invErr } = await supabase
+      .from("provider_invites")
+      .select("id, provider_id, status")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (invErr) throw invErr;
+    if (!invite) return res.status(404).json({ error: "Invite not found." });
+    if (invite.status === "expired") return res.status(410).json({ error: "This invite has expired." });
+
+    // Upsert the provider_clients relationship (idempotent — safe to call twice)
+    await supabase
+      .from("provider_clients")
+      .upsert(
+        {
+          provider_id: invite.provider_id,
+          client_id: clientId,
+          invite_id: invite.id,
+          connected_at: new Date().toISOString(),
+        },
+        { onConflict: "provider_id,client_id" }
+      );
+
+    // Mark invite as accepted (only if it was active — don't re-close already-accepted ones)
+    if (invite.status === "active") {
+      await supabase
+        .from("provider_invites")
+        .update({ status: "accepted", accepted_by: clientId, accepted_at: new Date().toISOString() })
+        .eq("id", invite.id);
+    }
+
+    // Notify provider
+    await createProviderNotification(invite.provider_id, {
+      type: "new_client",
+      title: "New client connected",
+      body: "A client accepted your invite link.",
+      data: { client_id: clientId },
+    }).catch(() => {});
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[provider/invites/join/accept POST]", err);
+    res.status(500).json({ error: "Failed to accept invite." });
+  }
+});
+
+// ─── POST /api/auth/signup — passwordless client signup for invite/booking flow
+app.post("/api/auth/signup", async (req, res) => {
+  const { name, email, phone } = req.body || {};
+  if (!name?.trim() || !email?.trim() || !phone?.trim()) {
+    return res.status(400).json({ error: "name, email, and phone are required." });
+  }
+  if (!supabase) {
+    const stubId = email.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    return res.json({ ok: true, userId: stubId, email });
+  }
+  try {
+    // 1. Create auth user + send magic link
+    const { data: otpData, error: otpErr } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        data: { name, phone, role: "client" },
+      },
+    });
+    if (otpErr) throw otpErr;
+
+    // 2. Upsert a row in client_profiles so name/phone are available immediately
+    //    user_id from the OTP response may not exist yet — use email as lookup key
+    //    and rely on the auth trigger or a second upsert when the session lands.
+    //    We store what we can now, keyed by email, and finish in AuthCallback.
+    const pendingKey = `kliques.pending_profile.${email.toLowerCase()}`;
+    // Store as a transient lookup via a separate upsert attempt using admin API
+    try {
+      const { data: users } = await supabase.auth.admin.listUsers();
+      const authUser = (users?.users || []).find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      );
+      if (authUser?.id) {
+        await supabase
+          .from("client_profiles")
+          .upsert(
+            {
+              user_id: authUser.id,
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              phone: phone.trim(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" }
+          );
+      }
+    } catch (profileErr) {
+      // Non-fatal — profile will be created on first authenticated request
+      console.warn("[auth/signup] Could not pre-create client_profile:", profileErr.message);
+    }
+
+    res.json({ ok: true, message: "Magic link sent to " + email });
+  } catch (err) {
+    console.error("[auth/signup]", err);
+    res.status(500).json({ error: err.message || "Failed to create account." });
+  }
+});
+
+// ─── GET /api/provider/onboarding/draft — load saved draft ──────────────────
+app.get("/api/provider/onboarding/draft", async (req, res) => {
+  if (!supabase) return res.json({ draft: null });
+  const providerId = getProviderId(req);
+  try {
+    const { data, error } = await supabase
+      .from("provider_onboarding_drafts")
+      .select("step, data")
+      .eq("provider_id", providerId)
+      .maybeSingle();
+    if (error) throw error;
+    res.json({ draft: data ? { step: data.step, ...data.data } : null });
+  } catch (err) {
+    console.error("[onboarding/draft GET]", err);
+    res.status(500).json({ error: "Failed to load draft." });
+  }
+});
+
+// ─── PUT /api/provider/onboarding/draft — upsert draft ───────────────────────
+app.put("/api/provider/onboarding/draft", async (req, res) => {
+  if (!supabase) return res.json({ ok: true });
+  const providerId = getProviderId(req);
+  const { step, ...rest } = req.body || {};
+  try {
+    const { error } = await supabase
+      .from("provider_onboarding_drafts")
+      .upsert(
+        {
+          provider_id: providerId,
+          step: step || 1,
+          data: rest,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "provider_id" }
+      );
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[onboarding/draft PUT]", err);
+    res.status(500).json({ error: "Failed to save draft." });
+  }
+});
+
+// ─── DELETE /api/provider/onboarding/draft — clear draft on completion ───────
+app.delete("/api/provider/onboarding/draft", async (req, res) => {
+  if (!supabase) return res.json({ ok: true });
+  const providerId = getProviderId(req);
+  try {
+    await supabase
+      .from("provider_onboarding_drafts")
+      .delete()
+      .eq("provider_id", providerId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[onboarding/draft DELETE]", err);
+    res.status(500).json({ error: "Failed to clear draft." });
+  }
+});
+
+// ─── GET /api/provider/check-handle — check if a public handle is available ──
+app.get("/api/provider/check-handle", async (req, res) => {
+  const { handle } = req.query;
+  if (!handle) return res.status(400).json({ error: "handle is required" });
+  // Validate format: lowercase letters, numbers, hyphens only
+  if (!/^[a-z0-9-]+$/.test(handle)) {
+    return res.json({ available: false, reason: "invalid" });
+  }
+  if (!supabase) return res.json({ available: true }); // stub
+  try {
+    const { data } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("handle", handle)
+      .maybeSingle();
+    res.json({ available: !data });
+  } catch (err) {
+    console.error("[check-handle]", err);
+    res.status(500).json({ error: "Failed to check handle." });
+  }
+});
+
+// ─── POST /api/provider/stripe/connect — create Stripe Connect account link ──
+app.post("/api/provider/stripe/connect", async (req, res) => {
+  const providerId = getProviderId(req);
+  const { refreshUrl, returnUrl } = req.body || {};
+  try {
+    // Fetch provider email / business name
+    let email = null;
+    let businessName = null;
+    if (supabase) {
+      const { data } = await supabase
+        .from("providers")
+        .select("email, business_name, name, stripe_account_id")
+        .eq("user_id", providerId)
+        .maybeSingle();
+      email = data?.email || null;
+      businessName = data?.business_name || data?.name || null;
+      // Reuse existing account if already created
+      if (data?.stripe_account_id) {
+        const link = await stripe.accountLinks.create({
+          account: data.stripe_account_id,
+          refresh_url: refreshUrl || `${req.headers.origin}/provider/onboarding?step=5`,
+          return_url: returnUrl || `${req.headers.origin}/provider/onboarding?stripe=done`,
+          type: "account_onboarding",
+        });
+        return res.json({ url: link.url, accountId: data.stripe_account_id });
+      }
+    }
+    const account = await stripe.accounts.create({
+      type: "express",
+      ...(email ? { email } : {}),
+      business_profile: businessName ? { name: businessName } : undefined,
+    });
+    // Save account ID to providers row
+    if (supabase) {
+      await supabase
+        .from("providers")
+        .update({ stripe_account_id: account.id })
+        .eq("user_id", providerId);
+    }
+    const link = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: refreshUrl || `${req.headers.origin}/provider/onboarding?step=5`,
+      return_url: returnUrl || `${req.headers.origin}/provider/onboarding?stripe=done`,
+      type: "account_onboarding",
+    });
+    res.json({ url: link.url, accountId: account.id });
+  } catch (err) {
+    console.error("[stripe/connect]", err);
+    res.status(500).json({ error: err.message || "Failed to create Stripe Connect link." });
+  }
+});
+
+// ─── POST /api/provider/onboarding/complete — persist all onboarding data ────
+app.post("/api/provider/onboarding/complete", async (req, res) => {
+  const providerId = getProviderId(req);
+  const {
+    category,
+    businessName,
+    city,
+    bio,
+    handle,
+    services,        // [{ name, duration, price, paymentType, depositType, depositValue }]
+    availability,    // { monday: { enabled, from, to }, ... }
+    bufferMinutes,
+    bookingWindowWeeks,
+    photoUrl,
+  } = req.body || {};
+
+  if (!supabase) return res.json({ ok: true });
+
+  try {
+    // Upsert provider row
+    const updates = {
+      user_id: providerId,
+      is_profile_complete: true,
+      onboarding_completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (category)            updates.category = category;
+    if (businessName)        updates.business_name = businessName;
+    if (city)                updates.city = city;
+    if (bio)                 updates.bio = bio;
+    if (handle)              updates.handle = handle;
+    if (photoUrl)            updates.photo = photoUrl;
+    if (availability)        updates.availability = availability;
+    if (bufferMinutes != null)       updates.buffer_minutes = bufferMinutes;
+    if (bookingWindowWeeks != null)  updates.booking_window_weeks = bookingWindowWeeks;
+
+    const { error: provErr } = await supabase
+      .from("providers")
+      .upsert(updates, { onConflict: "user_id" });
+
+    if (provErr) {
+      console.error("[onboarding/complete] provider upsert error", provErr);
+    }
+
+    // Insert services (skip if already exist for this provider)
+    if (Array.isArray(services) && services.length > 0) {
+      const { data: existing } = await supabase
+        .from("services")
+        .select("id")
+        .eq("provider_id", providerId)
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        const serviceRows = services.map((s) => ({
+          id: crypto.randomUUID(),
+          provider_id: providerId,
+          name: s.name,
+          duration: s.duration,
+          base_price: Math.round((parseFloat(s.price) || 0) * 100), // dollars → cents
+          payment_type: s.paymentType || "full",
+          deposit_type: s.depositType || null,
+          deposit_value: s.depositValue || null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        await supabase.from("services").insert(serviceRows);
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[onboarding/complete]", err);
+    res.status(500).json({ error: "Failed to complete onboarding." });
+  }
+});
+
+// ============================================================================
+// PUBLIC BOOKING FLOW ENDPOINTS
+// ============================================================================
+
+// GET /api/provider/public/:handle — public provider profile + services
+app.get("/api/provider/public/:handle", async (req, res) => {
+  const { handle } = req.params;
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  try {
+    const { data: provider, error } = await supabase
+      .from("providers")
+      .select("id, name, business_name, avatar, category, city, bio, rating, handle")
+      .eq("handle", handle)
+      .maybeSingle();
+    if (error) throw error;
+    if (!provider) return res.status(404).json({ error: "Provider not found." });
+
+    const { data: services } = await supabase
+      .from("services")
+      .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description")
+      .eq("provider_id", provider.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true });
+
+    res.json({ provider, services: services || [] });
+  } catch (err) {
+    console.error("[provider/public/:handle]", err);
+    res.status(500).json({ error: "Failed to load provider." });
+  }
+});
+
+// POST /api/auth/check-email — check whether an email has an account
+app.post("/api/auth/check-email", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email?.trim()) return res.status(400).json({ error: "email is required." });
+  if (!supabase) return res.json({ exists: false });
+  try {
+    // Check auth users via admin API
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) throw error;
+    const exists = (data?.users || []).some(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+    res.json({ exists });
+  } catch (err) {
+    console.error("[auth/check-email]", err);
+    res.status(500).json({ error: "Failed to check email." });
+  }
+});
+
+// POST /api/auth/magic-link — send magic login link to existing user
+app.post("/api/auth/magic-link", async (req, res) => {
+  const { email, redirectTo } = req.body || {};
+  if (!email?.trim()) return res.status(400).json({ error: "email is required." });
+  if (!supabase) return res.json({ ok: true });
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: redirectTo || process.env.FRONTEND_URL + "/auth/callback",
+      },
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[auth/magic-link]", err);
+    res.status(500).json({ error: err.message || "Failed to send magic link." });
+  }
+});
+
+// POST /api/auth/send-password-setup — send account setup email to new user
+app.post("/api/auth/send-password-setup", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email?.trim()) return res.status(400).json({ error: "email is required." });
+  if (!supabase) return res.json({ ok: true });
+  try {
+    // Generate a password reset link (acts as "set up your password")
+    const { error } = await supabase.auth.admin.generateLink({
+      type: "recovery",
+      email,
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[auth/send-password-setup]", err);
+    // Non-fatal — don't fail the booking confirmation
+    res.json({ ok: true, warning: err.message });
+  }
+});
+
+// GET /api/payments/methods — get saved cards for logged-in client
+app.get("/api/payments/methods", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  if (!supabase) return res.json({ paymentMethods: [] });
+  try {
+    // Look up the client's Stripe customer id
+    const { data: client } = await supabase
+      .from("client_profiles")
+      .select("stripe_customer_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const customerId = client?.stripe_customer_id;
+    if (!customerId) return res.json({ paymentMethods: [] });
+
+    const customer = await stripe.customers.retrieve(customerId);
+    const defaultPmId = customer.invoice_settings?.default_payment_method;
+    const pmList = await stripe.paymentMethods.list({ customer: customerId, type: "card" });
+
+    res.json({
+      paymentMethods: pmList.data.map((pm) => ({
+        id: pm.id,
+        isDefault: pm.id === defaultPmId,
+        brand: pm.card.brand,
+        last4: pm.card.last4,
+        expMonth: pm.card.exp_month,
+        expYear: pm.card.exp_year,
+      })),
+    });
+  } catch (err) {
+    console.error("[payments/methods]", err);
+    res.status(500).json({ error: "Failed to load payment methods." });
+  }
+});
+
+// POST /api/payments/setup-intent — create SetupIntent to save a card
+app.post("/api/payments/setup-intent", async (req, res) => {
+  const userId = getUserId(req);
+  const { email, name } = req.body || {};
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    // Find or create Stripe customer
+    const customers = await stripe.customers.list({ limit: 100 });
+    let customerId;
+    const existing = customers.data.find((c) => c.metadata?.userId === userId);
+    if (existing) {
+      customerId = existing.id;
+    } else {
+      const customer = await stripe.customers.create({
+        email,
+        name,
+        metadata: { userId, userType: "client" },
+      });
+      customerId = customer.id;
+      // Store customer id on client_profiles row
+      if (supabase) {
+        await supabase
+          .from("client_profiles")
+          .upsert(
+            { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+            { onConflict: "user_id" }
+          )
+          .catch(() => {});
+      }
+    }
+    const intent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      usage: "off_session",
+    });
+    res.json({ clientSecret: intent.client_secret, customerId });
+  } catch (err) {
+    console.error("[payments/setup-intent]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/bookings/create — create booking and charge via PaymentIntent
+app.post("/api/bookings/create", async (req, res) => {
+  const userId = getUserId(req);
+  const {
+    serviceId,
+    providerId,
+    scheduledAt,
+    notes,
+    price,           // total price in dollars
+    depositAmount,   // deposit in dollars (null if full)
+    paymentMethodId, // Stripe PM id
+    saveCard,        // boolean
+  } = req.body || {};
+
+  if (!serviceId || !providerId || !scheduledAt) {
+    return res.status(400).json({ error: "serviceId, providerId, and scheduledAt are required." });
+  }
+
+  const chargeAmount = depositAmount != null ? depositAmount : price;
+  const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
+
+  try {
+    let bookingId = crypto.randomUUID();
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("bookings")
+        .insert({
+          id: bookingId,
+          client_id: userId,
+          service_id: serviceId,
+          provider_id: providerId,
+          scheduled_at: scheduledAt,
+          notes: notes || "",
+          status: "pending",
+          price: price ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      bookingId = data.id;
+    }
+
+    // Charge the payment method if amount > 0
+    let paymentIntentId = null;
+    if (amountCents > 0 && paymentMethodId) {
+      // Get or create customer
+      const customers = await stripe.customers.list({ limit: 100 });
+      let customerId;
+      const existing = customers.data.find((c) => c.metadata?.userId === userId);
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const customer = await stripe.customers.create({ metadata: { userId } });
+        customerId = customer.id;
+      }
+
+      const intent = await stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: "usd",
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirm: true,
+        off_session: false,
+        metadata: { bookingId, providerId, userId },
+        ...(saveCard ? { setup_future_usage: "off_session" } : {}),
+      });
+      paymentIntentId = intent.id;
+    }
+
+    // Upsert provider_clients relationship (source = booking)
+    if (supabase && userId) {
+      await supabase
+        .from("provider_clients")
+        .upsert(
+          {
+            provider_id: providerId,
+            client_id: userId,
+            source: "booking",
+            connected_at: new Date().toISOString(),
+          },
+          { onConflict: "provider_id,client_id" }
+        )
+        .catch((err) => console.warn("[bookings/create] provider_clients upsert:", err.message));
+    }
+
+    // Notify provider
+    await createProviderNotification(providerId, {
+      type: "new_booking",
+      title: "New booking request",
+      body: "A client just booked through your public link.",
+      data: { booking_id: bookingId },
+      booking_id: bookingId,
+    }).catch(() => {});
+
+    res.json({ ok: true, bookingId, paymentIntentId });
+  } catch (err) {
+    console.error("[bookings/create]", err);
+    res.status(500).json({ error: err.message || "Failed to create booking." });
   }
 });
 
