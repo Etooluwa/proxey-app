@@ -143,9 +143,10 @@ const ProviderServiceEditor = () => {
 
   const [form, setForm]       = useState(EMPTY_FORM);
   const [questions, setQuestions] = useState([]); // [{ id, question_text, question_type, sort_order, options: [{id, option_text}] }]
-  const [errors, setErrors]   = useState({});
-  const [loading, setLoading] = useState(!isNew);
-  const [saving, setSaving]   = useState(false);
+  const [errors, setErrors]       = useState({});
+  const [loading, setLoading]     = useState(!isNew);
+  const [saving, setSaving]       = useState(false);
+  const [savingStatus, setSavingStatus] = useState("");
 
   const photoInputRef = useRef(null);
 
@@ -250,6 +251,11 @@ const ProviderServiceEditor = () => {
     if (Object.keys(errs).length > 0)  return;
 
     setSaving(true);
+    setSavingStatus("Saving…");
+
+    // If it takes more than 5s, let the user know the server is waking up
+    const slowTimer = setTimeout(() => setSavingStatus("Server is waking up…"), 5000);
+
     try {
       const servicePayload = {
         name:               form.name.trim(),
@@ -284,6 +290,7 @@ const ProviderServiceEditor = () => {
 
       // Persist intake questions: delete-all + re-insert is simplest for MVP
       if (serviceId) {
+        setSavingStatus("Saving questions…");
         // Fetch existing saved questions to delete them
         const existing = await request(`/provider/services/${serviceId}/questions`).catch(() => ({ questions: [] }));
         // Delete all existing questions (cascade deletes options)
@@ -324,7 +331,9 @@ const ProviderServiceEditor = () => {
         : err.message;
       toast.push({ title: "Failed to save", description, variant: "error" });
     } finally {
+      clearTimeout(slowTimer);
       setSaving(false);
+      setSavingStatus("");
     }
   };
 
@@ -676,17 +685,31 @@ const ProviderServiceEditor = () => {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="font-manrope text-[16px] font-bold text-white rounded-card focus:outline-none"
+          className="font-manrope font-bold text-white rounded-card focus:outline-none flex items-center justify-center gap-2"
           style={{
             flex: 2, padding: "16px",
-            background: saving ? "#B0B0B0" : "#0D1619",
+            background: saving ? "#6B7280" : "#0D1619",
             border: "none",
             cursor: saving ? "not-allowed" : "pointer",
           }}
         >
-          {saving ? "Saving…" : "Save service"}
+          {saving && (
+            <div
+              style={{
+                width: 16, height: 16, borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.4)",
+                borderTop: "2px solid #fff",
+                animation: "spin 0.8s linear infinite",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span style={{ fontSize: saving && savingStatus.length > 10 ? 13 : 16 }}>
+            {saving ? savingStatus || "Saving…" : "Save service"}
+          </span>
         </button>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
