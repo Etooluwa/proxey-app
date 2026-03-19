@@ -119,8 +119,8 @@ const ProviderClients = () => {
             />
           ))}
 
-        {/* Empty state */}
-        {!loading && filtered.length === 0 && (
+        {/* Empty state — filtered (non-All) */}
+        {!loading && filtered.length === 0 && activeFilter !== "All" && (
           <Card className="flex flex-col items-center py-10">
             <svg
               width="40"
@@ -138,12 +138,42 @@ const ProviderClients = () => {
               />
             </svg>
             <p className="font-manrope text-[15px] font-semibold text-foreground">
-              {activeFilter === "All" ? "No clients yet" : `No ${activeFilter.toLowerCase()} clients`}
+              No {activeFilter.toLowerCase()} clients
             </p>
             <p className="font-manrope text-[13px] text-muted mt-1 text-center">
-              {activeFilter === "All"
-                ? "Clients will appear here once bookings are confirmed"
-                : "Try a different filter"}
+              Try a different filter
+            </p>
+          </Card>
+        )}
+
+        {/* Empty state — no clients at all */}
+        {!loading && clients.length === 0 && activeFilter === "All" && (
+          <Card style={{ textAlign: "center", padding: "32px 24px" }}>
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                background: "#FFF0E6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+              }}
+            >
+              <svg width="32" height="32" fill="none" stroke="#FF751F" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0D1619", margin: "0 0 8px" }}>
+              No clients yet
+            </p>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
+              When clients accept your invite or book with you, they'll appear here with their full history.
             </p>
           </Card>
         )}

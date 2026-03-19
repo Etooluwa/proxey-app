@@ -119,28 +119,34 @@ const MessagesPage = () => {
 
       <div className="flex-1 px-4 pt-8 pb-4 flex flex-col gap-0">
         {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 mt-16">
-            <svg
-              width="48"
-              height="48"
-              fill="none"
-              stroke="#D1D5DB"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
+          <Card style={{ textAlign: "center", padding: "40px 24px" }}>
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                background: "#FFF0E6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+              }}
             >
-              <path
-                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="font-manrope text-[15px] font-semibold text-foreground">
+              <svg width="32" height="32" fill="none" stroke="#FF751F" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0D1619", margin: "0 0 8px" }}>
               No messages yet
             </p>
-            <p className="font-manrope text-[13px] text-muted text-center">
-              Messages from your providers will appear here
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
+              When you connect with a provider, you can message them here about bookings, questions, or updates.
             </p>
-          </div>
+          </Card>
         ) : (
           conversations.map((chat) => {
             const unread = (chat.client_unread_count || 0) > 0;

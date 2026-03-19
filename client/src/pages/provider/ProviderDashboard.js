@@ -9,6 +9,7 @@ import GradientHeader from "../../components/ui/GradientHeader";
 import Avatar from "../../components/ui/Avatar";
 import Card from "../../components/ui/Card";
 import Footer from "../../components/ui/Footer";
+import ShareLinksSection from "../../components/ui/ShareLinksSection";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -303,27 +304,37 @@ const ProviderDashboard = () => {
             />
           ))
         ) : todayJobs.length === 0 ? (
-          <Card className="flex flex-col items-center py-8 gap-2">
-            <svg
-              width="40"
-              height="40"
-              fill="none"
-              stroke="#D1D5DB"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <p className="font-manrope text-[15px] font-semibold text-foreground">
-              No appointments today
-            </p>
-            <p className="font-manrope text-[13px] text-muted text-center">
-              Your schedule is clear for today
-            </p>
-          </Card>
+          <>
+            <ShareLinksSection handle={profile?.handle || ""} />
+            <Card style={{ textAlign: "center", padding: "32px 24px" }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#F2F2F7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                }}
+              >
+                <svg width="24" height="24" fill="none" stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "16px", fontWeight: 600, color: "#0D1619", margin: "0 0 4px" }}>
+                No bookings today
+              </p>
+              <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+                Share your booking link to start getting clients.
+              </p>
+            </Card>
+          </>
         ) : (
           todayJobs.map((job) => (
             <button

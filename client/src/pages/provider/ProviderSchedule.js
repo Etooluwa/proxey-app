@@ -247,22 +247,42 @@ const ProviderSchedule = () => {
 
         {/* ── Empty state ────────────────────────────────────────────────── */}
         {!loading && daySchedule.length === 0 && (
-          <Card className="flex flex-col items-center py-8 gap-2">
-            <svg
-              width="36"
-              height="36"
-              fill="none"
-              stroke="#D1D5DB"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
+          <Card style={{ textAlign: "center", padding: "32px 24px" }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: "#F2F2F7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 12px",
+              }}
             >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <p className="font-manrope text-[15px] text-muted m-0">
+              <svg width="24" height="24" fill="none" stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: "0 0 4px" }}>
               No bookings this day
+            </p>
+            <p
+              style={{
+                fontFamily: "Manrope, sans-serif",
+                fontSize: "14px",
+                color: "#FF751F",
+                fontWeight: 600,
+                cursor: "pointer",
+                margin: 0,
+              }}
+              onClick={() => navigate("/provider/availability")}
+            >
+              + Add availability
             </p>
           </Card>
         )}

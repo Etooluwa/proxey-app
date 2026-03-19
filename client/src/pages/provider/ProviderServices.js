@@ -98,12 +98,20 @@ const ProviderServices = () => {
 
         {/* Empty state */}
         {!loading && services.length === 0 && (
-          <Card className="flex flex-col items-center py-12 gap-3">
+          <Card style={{ textAlign: "center", padding: "40px 24px" }}>
             <div
-              className="flex items-center justify-center"
-              style={{ width: 56, height: 56, borderRadius: 14, background: "#F2F2F7" }}
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                background: "#FFF0E6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+              }}
             >
-              <svg width="24" height="24" fill="none" stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24">
+              <svg width="32" height="32" fill="none" stroke="#FF751F" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path
                   d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                   strokeLinecap="round"
@@ -111,10 +119,34 @@ const ProviderServices = () => {
                 />
               </svg>
             </div>
-            <p className="font-manrope text-[15px] font-semibold text-foreground">No services yet</p>
-            <p className="font-manrope text-[13px] text-muted text-center">
-              Tap 'Add' to create your first service
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0D1619", margin: "0 0 8px" }}>
+              Add your first service
             </p>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: "0 0 24px", lineHeight: 1.6 }}>
+              Set up the services you offer — name, duration, price, and how you'd like to collect payment.
+            </p>
+            <button
+              onClick={() => navigate("/provider/services/new")}
+              style={{
+                padding: "14px 28px",
+                borderRadius: "12px",
+                border: "none",
+                background: "#0D1619",
+                color: "#FFFFFF",
+                fontFamily: "Manrope, sans-serif",
+                fontSize: "15px",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              Create service
+            </button>
           </Card>
         )}
 

@@ -181,9 +181,32 @@ const ProviderEarnings = () => {
 
         {/* ── Breakdown empty state ────────────────────────────────────── */}
         {!loading && breakdown.length === 0 && (
-          <Card className="mb-2">
-            <p className="font-manrope text-[14px] text-muted text-center py-4">
-              No completed bookings this month
+          <Card style={{ textAlign: "center", padding: "32px 24px", marginBottom: "8px" }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "#F2F2F7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 12px",
+              }}
+            >
+              <svg width="28" height="28" fill="none" stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "17px", fontWeight: 600, color: "#0D1619", margin: "0 0 4px" }}>
+              No earnings yet
+            </p>
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+              Your earnings will appear here once clients start booking and paying for your services.
             </p>
           </Card>
         )}

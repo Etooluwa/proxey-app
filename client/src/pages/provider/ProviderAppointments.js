@@ -236,38 +236,30 @@ const ProviderAppointments = () => {
             );
           })}
 
-        {/* All caught up empty state */}
+        {/* Empty state — no pending bookings */}
         {!loading && pending.length === 0 && (
-          <Card className="flex flex-col items-center py-10 mb-3">
+          <Card style={{ textAlign: "center", padding: "32px 24px", marginBottom: "12px" }}>
             <div
-              className="flex items-center justify-center mb-3"
               style={{
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
                 background: "#F0FDF4",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 12px",
               }}
             >
-              <svg
-                width="28"
-                height="28"
-                fill="none"
-                stroke="#22C55E"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M5 13l4 4L19 7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              <svg width="28" height="28" fill="none" stroke="#22C55E" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <p className="font-manrope text-[17px] font-semibold text-foreground m-0">
-              All caught up!
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "17px", fontWeight: 600, color: "#0D1619", margin: "0 0 4px" }}>
+              No pending bookings
             </p>
-            <p className="font-manrope text-[14px] text-muted m-0 mt-1">
-              No pending requests
+            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+              When clients book with you, their requests will appear here for you to accept.
             </p>
           </Card>
         )}
