@@ -1,352 +1,181 @@
-import { useState, useEffect, useRef } from "react";
-import { useOutletContext, useLocation } from "react-router-dom";
-import { useMessages } from "../contexts/MessageContext";
-import { useSession } from "../auth/authContext";
-import GradientHeader from "../components/ui/GradientHeader";
-import Avatar from "../components/ui/Avatar";
-import Card from "../components/ui/Card";
-import Footer from "../components/ui/Footer";
+/**
+ * MessagesPage — v6 Warm Editorial
+ * Route: /app/messages
+ *
+ * Conversation list. Tap a row → navigate to /app/messages/:conversationId
+ */
+import { useEffect } from 'react';
+import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
+import { useMessages } from '../contexts/MessageContext';
+import { useSession } from '../auth/authContext';
+import Header from '../components/ui/Header';
+import Avatar from '../components/ui/Avatar';
+import Divider from '../components/ui/Divider';
+import HeroCard from '../components/ui/HeroCard';
+import Footer from '../components/ui/Footer';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatRelTime(timestamp) {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "now";
-  if (diffMins < 60) return `${diffMins}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function formatTime(timestamp) {
-  if (!timestamp) return "";
-  return new Date(timestamp).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+function formatRelTime(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(diff / 3600000);
+    if (hrs < 24) return `${hrs}h`;
+    const days = Math.floor(diff / 86400000);
+    if (days < 7) return `${days}d`;
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function getInitials(name) {
-  if (!name) return "P";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+    return (name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+const MessagesEmpty = () => (
+    <HeroCard>
+        <div className="flex justify-center mb-5">
+            <div
+                className="w-14 h-14 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(194,94,74,0.12)' }}
+            >
+                <svg width="24" height="24" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            </div>
+        </div>
+        <p className="text-[20px] font-semibold text-ink text-center leading-tight tracking-[-0.02em] mb-2">
+            No messages yet
+        </p>
+        <p className="text-[14px] text-muted text-center leading-relaxed">
+            When you connect with a provider, you can message them here about bookings, questions, or updates.
+        </p>
+    </HeroCard>
+);
+
+// ─── Conversation row ─────────────────────────────────────────────────────────
+
+const ConvoRow = ({ chat, unread, onClick }) => (
+    <>
+        <button
+            onClick={onClick}
+            className="w-full flex items-center gap-4 py-5 px-1 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
+        >
+            {/* Avatar + unread dot */}
+            <div className="relative flex-shrink-0">
+                <Avatar initials={getInitials(chat.provider_name || chat.client_name)} size={44} />
+                {unread && (
+                    <div
+                        className="absolute top-0 right-0 w-[10px] h-[10px] rounded-full"
+                        style={{ background: '#C25E4A', border: '2px solid #FBF7F2' }}
+                    />
+                )}
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-baseline mb-0.5">
+                    <p
+                        className="text-[15px] text-ink truncate"
+                        style={{ fontWeight: unread ? 600 : 400 }}
+                    >
+                        {chat.provider_name || chat.client_name || 'Provider'}
+                    </p>
+                    <span className="text-[12px] text-faded ml-2 flex-shrink-0">
+                        {formatRelTime(chat.last_message_at)}
+                    </span>
+                </div>
+                <p
+                    className="text-[14px] truncate"
+                    style={{ color: unread ? '#3D231E' : '#8C6A64' }}
+                >
+                    {chat.last_message || 'No messages yet'}
+                </p>
+            </div>
+        </button>
+        <Divider />
+    </>
+);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const MessagesPage = () => {
-  const { onMenu } = useOutletContext() || {};
-  const location = useLocation();
-  const { session } = useSession();
-  const {
-    conversations,
-    messages: messagesMap,
-    currentConversation,
-    setCurrentConversation,
-    loadMessages,
-    sendMessage,
-    markAsRead,
-  } = useMessages();
+    const { onMenu } = useOutletContext() || {};
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { session } = useSession();
+    const { conversations, markAsRead, setCurrentConversation, loadMessages } = useMessages();
 
-  const [showChat, setShowChat] = useState(false);
-  const [messageInput, setMessageInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
+    // Pre-select from route state (e.g., navigate from RelationshipPage with { providerId })
+    useEffect(() => {
+        const targetProviderId = location.state?.providerId;
+        if (!targetProviderId || conversations.length === 0) return;
 
-  // Pre-select conversation from location state (e.g., from RelationshipPage)
-  useEffect(() => {
-    const targetProviderId = location.state?.providerId;
-    if (targetProviderId && conversations.length > 0) {
-      const match = conversations.find(
-        (c) => c.provider_id === targetProviderId
-      );
-      if (match) {
-        markAsRead(match.id);
-        setCurrentConversation(match.id);
-        loadMessages(match.id);
-        setShowChat(true);
-      }
-    }
-  }, [location.state?.providerId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
+        const match = conversations.find((c) => c.provider_id === targetProviderId);
+        if (match) {
+            markAsRead(match.id);
+            setCurrentConversation(match.id);
+            loadMessages(match.id);
+            navigate(`/app/messages/${match.id}`, { replace: true });
+        }
+    }, [location.state?.providerId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll when messages update
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesMap, currentConversation]);
+    const handleSelect = (chat) => {
+        markAsRead(chat.id);
+        setCurrentConversation(chat.id);
+        loadMessages(chat.id);
+        navigate(`/app/messages/${chat.id}`);
+    };
 
-  const activeMessages = currentConversation
-    ? messagesMap[currentConversation] || []
-    : [];
-  const activeChat = conversations.find((c) => c.id === currentConversation);
+    const userId = session?.user?.id;
 
-  const handleChatSelect = (chat) => {
-    markAsRead(chat.id);
-    setCurrentConversation(chat.id);
-    loadMessages(chat.id);
-    setShowChat(true);
-  };
+    return (
+        <div className="flex flex-col min-h-screen bg-base">
+            <Header onMenu={onMenu} showAvatar={false} />
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!messageInput.trim() || !currentConversation) return;
-    setSending(true);
-    try {
-      await sendMessage({ conversationId: currentConversation, content: messageInput });
-      setMessageInput("");
-    } catch (err) {
-      console.error("Failed to send message:", err);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // ── Conversation list view ─────────────────────────────────────────────────
-  const ConversationList = () => (
-    <div className="flex flex-col min-h-screen bg-background font-manrope">
-      <GradientHeader title="Messages" onMenu={onMenu} />
-
-      <div className="flex-1 px-4 pt-8 pb-4 flex flex-col gap-0">
-        {conversations.length === 0 ? (
-          <Card style={{ textAlign: "center", padding: "40px 24px" }}>
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                background: "#FFF0E6",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px",
-              }}
-            >
-              <svg width="32" height="32" fill="none" stroke="#FF751F" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0D1619", margin: "0 0 8px" }}>
-              No messages yet
-            </p>
-            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
-              When you connect with a provider, you can message them here about bookings, questions, or updates.
-            </p>
-          </Card>
-        ) : (
-          conversations.map((chat) => {
-            const unread = (chat.client_unread_count || 0) > 0;
-            const initials = getInitials(chat.provider_name);
-            return (
-              <button
-                key={chat.id}
-                onClick={() => handleChatSelect(chat)}
-                className="w-full text-left focus:outline-none"
-              >
-                <Card className="flex items-center gap-3.5 mb-2">
-                  {/* Avatar with unread dot */}
-                  <div className="relative flex-shrink-0">
-                    <Avatar initials={initials} size={48} />
-                    {unread && (
-                      <div
-                        className="absolute top-0 right-0 w-[10px] h-[10px] rounded-full"
-                        style={{
-                          background: "#FF751F",
-                          border: "2px solid #FFFFFF",
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center mb-0.5">
-                      <p
-                        className="font-manrope text-[15px] text-foreground truncate"
-                        style={{ fontWeight: unread ? 700 : 500 }}
-                      >
-                        {chat.provider_name || "Provider"}
-                      </p>
-                      <span className="font-manrope text-[12px] text-muted ml-2 flex-shrink-0">
-                        {formatRelTime(chat.last_message_at)}
-                      </span>
-                    </div>
-                    <p
-                      className="font-manrope text-[14px] truncate"
-                      style={{ color: unread ? "#0D1619" : "#6B7280" }}
-                    >
-                      {chat.last_message || "No messages yet"}
-                    </p>
-                  </div>
-                </Card>
-              </button>
-            );
-          })
-        )}
-      </div>
-
-      <Footer />
-    </div>
-  );
-
-  // ── Chat window view ───────────────────────────────────────────────────────
-  const ChatWindow = () => (
-    <div className="flex flex-col h-screen bg-background font-manrope">
-      {/* Chat header */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 bg-white"
-        style={{ borderBottom: "0.5px solid #E5E5EA" }}
-      >
-        <button
-          onClick={() => setShowChat(false)}
-          className="p-2 -ml-1 focus:outline-none"
-        >
-          <svg
-            width="20"
-            height="20"
-            fill="none"
-            stroke="#0D1619"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-          >
-            <path
-              d="M15 18l-6-6 6-6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <Avatar initials={getInitials(activeChat?.provider_name)} size={36} />
-        <div className="flex-1 min-w-0">
-          <p className="font-manrope text-[15px] font-bold text-foreground truncate">
-            {activeChat?.provider_name || "Provider"}
-          </p>
-          <p className="font-manrope text-[12px] text-muted">Provider</p>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
-        {activeMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-2">
-            <p className="font-manrope text-[14px] text-muted">
-              No messages yet
-            </p>
-            <p className="font-manrope text-[12px] text-muted">
-              Start the conversation!
-            </p>
-          </div>
-        ) : (
-          <>
-            {activeMessages.map((msg) => {
-              const isMe = msg.sender_id === session?.user?.id;
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`flex flex-col ${
-                      isMe ? "items-end" : "items-start"
-                    }`}
-                    style={{ maxWidth: "72%" }}
-                  >
-                    <div
-                      className="px-4 py-2.5 font-manrope text-[15px] leading-relaxed"
-                      style={{
-                        borderRadius: isMe
-                          ? "18px 18px 4px 18px"
-                          : "18px 18px 18px 4px",
-                        background: isMe ? "#0D1619" : "#FFFFFF",
-                        color: isMe ? "#FFFFFF" : "#0D1619",
-                        boxShadow: isMe ? "none" : "0 1px 2px rgba(0,0,0,0.06)",
-                      }}
-                    >
-                      {msg.content}
-                    </div>
-                    <span className="font-manrope text-[11px] text-muted mt-1 px-1">
-                      {formatTime(msg.created_at)}
-                    </span>
-                  </div>
+            <div className="px-5 pb-6 flex-1 flex flex-col">
+                {/* Page title */}
+                <div className="mb-5">
+                    <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
+                        Messages
+                    </h1>
                 </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
 
-      {/* Input area */}
-      <div
-        className="px-4 py-3 bg-white"
-        style={{ borderTop: "0.5px solid #E5E5EA" }}
-      >
-        <form onSubmit={handleSendMessage}>
-          <div
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full"
-            style={{ background: "#F2F2F7" }}
-          >
-            <textarea
-              placeholder="Message…"
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              className="flex-1 bg-transparent border-none outline-none font-manrope text-[15px] text-foreground placeholder:text-muted resize-none py-0.5"
-              rows={1}
-              disabled={sending}
-              style={{ color: "#0D1619" }}
-            />
-            <button
-              type="submit"
-              disabled={!messageInput.trim() || sending}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none"
-              style={{
-                background:
-                  messageInput.trim() && !sending ? "#FF751F" : "#D1D5DB",
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+                {/* Empty state */}
+                {conversations.length === 0 && <MessagesEmpty />}
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-  return showChat && activeChat ? <ChatWindow /> : <ConversationList />;
+                {/* List */}
+                {conversations.length > 0 && (
+                    <div>
+                        <Divider />
+                        {conversations.map((chat) => {
+                            const unread =
+                                session?.user?.role === 'provider'
+                                    ? (chat.provider_unread_count || 0) > 0
+                                    : (chat.client_unread_count || 0) > 0;
+                            return (
+                                <ConvoRow
+                                    key={chat.id}
+                                    chat={chat}
+                                    unread={unread}
+                                    onClick={() => handleSelect(chat)}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            <Footer />
+        </div>
+    );
 };
 
 export default MessagesPage;

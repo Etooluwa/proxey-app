@@ -29,6 +29,7 @@ import BrowsePage from './pages/BrowsePage';
 import BookingsPage from './pages/BookingsPage';
 import BookingFlowPage from './pages/BookingFlowPage';
 import MessagesPage from './pages/MessagesPage';
+import ChatPage from './pages/ChatPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AccountPage from './pages/AccountPage';
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
@@ -120,6 +121,7 @@ function App() {
                       <Route path="bookings" element={<BookingsPage />} />
                       <Route path="booking-flow" element={<BookingFlowPage />} />
                       <Route path="messages" element={<MessagesPage />} />
+                      <Route path="messages/:conversationId" element={<ChatPage />} />
                       <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="account" element={<AccountPage />} />
                       <Route path="invoices" element={<ClientInvoices />} />
@@ -161,6 +163,7 @@ function App() {
                       <Route path="analytics" element={<ProviderAnalytics />} />
                       <Route path="invoices" element={<ProviderInvoices />} />
                       <Route path="messages" element={<ProviderMessages />} />
+                      <Route path="messages/:conversationId" element={<ChatPage />} />
                       <Route path="services" element={<ProviderServices />} />
                       <Route path="services/new" element={<ProviderServiceEditor />} />
                       <Route path="services/:id" element={<ProviderServiceEditor />} />
