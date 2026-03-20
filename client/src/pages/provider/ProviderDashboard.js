@@ -1,376 +1,284 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
-import { useSession } from "../../auth/authContext";
-import {
-  fetchProviderJobs,
-  fetchProviderEarnings,
-} from "../../data/provider";
-import GradientHeader from "../../components/ui/GradientHeader";
-import Avatar from "../../components/ui/Avatar";
-import Card from "../../components/ui/Card";
-import Footer from "../../components/ui/Footer";
-import ShareLinksSection from "../../components/ui/ShareLinksSection";
+/**
+ * ProviderDashboard — v6 Warm Editorial
+ * Route: /provider
+ *
+ * API: GET /api/provider/dashboard  → { schedule, weeklyEarnings, newClientsThisWeek }
+ *      GET /api/provider/me         → { profile }  (for handle used by ShareLinks)
+ */
+import { useEffect, useState } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { request } from '../../data/apiClient';
+import { fetchProviderProfile } from '../../data/provider';
+import Header from '../../components/ui/Header';
+import HeroCard from '../../components/ui/HeroCard';
+import HeroPill from '../../components/ui/HeroPill';
+import Lbl from '../../components/ui/Lbl';
+import Divider from '../../components/ui/Divider';
+import Avatar from '../../components/ui/Avatar';
+import ArrowIcon from '../../components/ui/ArrowIcon';
+import ShareLinks from '../../components/ui/ShareLinks';
+import Footer from '../../components/ui/Footer';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtCurrency(cents) {
-  if (!cents && cents !== 0) return "$0";
-  return `$${(cents / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
+function getInitials(name) {
+    return (name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function todayLabel() {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+function greeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+}
+
+function todayPill() {
+    return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 function fmtTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function getInitials(name) {
-  if (!name) return "C";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function fmtDuration(mins) {
+    if (!mins) return null;
+    if (mins < 60) return `${mins} min`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function isToday(iso) {
-  if (!iso) return false;
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
+function fmtEarnings(cents) {
+    if (!cents) return '$0';
+    return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
+
+// ─── Schedule row ─────────────────────────────────────────────────────────────
+
+const ApptRow = ({ appt, onClick }) => (
+    <>
+        <button
+            onClick={onClick}
+            className="w-full flex items-center justify-between py-4 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
+        >
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+                <Avatar initials={getInitials(appt.clientName)} size={40} />
+                <div className="min-w-0">
+                    <p className="text-[16px] text-ink m-0 mb-0.5 truncate">{appt.clientName}</p>
+                    <p className="text-[13px] text-muted m-0 truncate">
+                        {appt.serviceName}
+                        {appt.duration ? ` · ${fmtDuration(appt.duration)}` : ''}
+                    </p>
+                </div>
+            </div>
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-3">
+                <span className="text-[15px] text-ink">{fmtTime(appt.scheduledAt)}</span>
+                <ArrowIcon size={18} />
+            </div>
+        </button>
+        <Divider />
+    </>
+);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderDashboard = () => {
-  const navigate = useNavigate();
-  const { onMenu } = useOutletContext() || {};
-  const { profile } = useSession();
+    const navigate = useNavigate();
+    const { onMenu } = useOutletContext() || {};
+    const { profile: sessionProfile } = useSession();
+    const { unreadCount } = useNotifications();
 
-  const [allJobs, setAllJobs] = useState([]);
-  const [earnings, setEarnings] = useState(null);
-  const [loading, setLoading] = useState(true);
+    const [schedule, setSchedule] = useState([]);
+    const [weeklyEarnings, setWeeklyEarnings] = useState(0);
+    const [newClients, setNewClients] = useState(0);
+    const [handle, setHandle] = useState('');
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const [jobs, earn] = await Promise.all([
-          fetchProviderJobs(),
-          fetchProviderEarnings(),
-        ]);
-        if (!cancelled) {
-          setAllJobs(jobs || []);
-          setEarnings(earn || null);
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoading(true);
+            try {
+                const [dash, prof] = await Promise.all([
+                    request('/provider/dashboard'),
+                    fetchProviderProfile(),
+                ]);
+                if (!cancelled) {
+                    setSchedule(dash.schedule || []);
+                    setWeeklyEarnings(dash.weeklyEarnings || 0);
+                    setNewClients(dash.newClientsThisWeek || 0);
+                    setHandle(prof?.handle || '');
+                }
+            } catch (err) {
+                console.error('[ProviderDashboard] load error:', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         }
-      } catch (err) {
-        console.error("ProviderDashboard load error:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
+        load();
+        return () => { cancelled = true; };
+    }, []);
+
+    const firstName = sessionProfile?.name?.split(' ')[0] || 'there';
+    const initials = getInitials(sessionProfile?.name);
+    const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
+    const upNext = schedule[0] || null;
+
+    // Stats display — faded color when empty
+    const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
+    const clientsColor = isEmpty ? '#B0948F' : '#C25E4A';
+
+    const handleApptClick = (appt) => {
+        navigate(`/provider/appointments/${appt.id}`);
     };
-  }, []);
 
-  const firstName = profile?.name?.split(" ")[0] || "there";
-  const initials = getInitials(profile?.name);
-
-  // Derived counts
-  const todayJobs = allJobs.filter(
-    (j) => isToday(j.scheduled_at) && j.status !== "cancelled"
-  );
-  const pendingJobs = allJobs.filter(
-    (j) => (j.status || "").toLowerCase() === "pending"
-  );
-
-  // This-week revenue: sum of completed jobs in the current Mon–Sun week
-  const weekStart = (() => {
-    const d = new Date();
-    const day = d.getDay(); // 0=Sun
-    d.setDate(d.getDate() - ((day + 6) % 7)); // back to Monday
-    d.setHours(0, 0, 0, 0);
-    return d;
-  })();
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-
-  const weekRevenue = allJobs
-    .filter((j) => {
-      const d = new Date(j.scheduled_at || j.created_at);
-      return (
-        d >= weekStart &&
-        d < weekEnd &&
-        (j.status === "completed" || j.status === "confirmed")
-      );
-    })
-    .reduce((sum, j) => sum + (j.price || 0), 0);
-
-  // ─── Notification bell (right slot) ────────────────────────────────────────
-  const hasNotifications = pendingJobs.length > 0;
-  const NotifBell = (
-    <button
-      onClick={() => navigate("/provider/appointments")}
-      className="relative flex items-center justify-center focus:outline-none"
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: "50%",
-        background: "rgba(255,255,255,0.2)",
-        backdropFilter: "blur(10px)",
-        border: "none",
-        cursor: "pointer",
-      }}
-    >
-      <svg
-        width="18"
-        height="18"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="1.5"
-        viewBox="0 0 24 24"
-      >
-        <path
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      {hasNotifications && (
-        <div
-          className="absolute"
-          style={{
-            top: 4,
-            right: 4,
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#FF751F",
-            border: "2px solid rgba(255,255,255,0.9)",
-          }}
-        />
-      )}
-    </button>
-  );
-
-  // ─── Frosted stat cards (inside gradient) ──────────────────────────────────
-  const StatCards = (
-    <div className="flex gap-2.5 mt-4">
-      {/* Today */}
-      <div
-        className="flex-1 px-3 py-3.5 rounded-xl"
-        style={{
-          background: "rgba(255,255,255,0.2)",
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <p
-          className="font-manrope text-[12px] m-0 mb-1.5"
-          style={{ color: "rgba(255,255,255,0.75)" }}
-        >
-          Today
-        </p>
-        <p className="font-manrope text-[22px] font-bold text-white m-0 mb-0.5">
-          {loading ? "—" : todayJobs.length}
-        </p>
-        <p
-          className="font-manrope text-[12px] font-semibold m-0"
-          style={{ color: "rgba(255,255,255,0.9)" }}
-        >
-          bookings
-        </p>
-      </div>
-
-      {/* This week */}
-      <div
-        className="flex-1 px-3 py-3.5 rounded-xl"
-        style={{
-          background: "rgba(255,255,255,0.2)",
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <p
-          className="font-manrope text-[12px] m-0 mb-1.5"
-          style={{ color: "rgba(255,255,255,0.75)" }}
-        >
-          This week
-        </p>
-        <p className="font-manrope text-[22px] font-bold text-white m-0 mb-0.5">
-          {loading ? "—" : fmtCurrency(weekRevenue)}
-        </p>
-        <p
-          className="font-manrope text-[12px] font-semibold m-0"
-          style={{ color: "rgba(255,255,255,0.9)" }}
-        >
-          {earnings?.weekChangePercent != null
-            ? `${earnings.weekChangePercent > 0 ? "+" : ""}${earnings.weekChangePercent}%`
-            : "revenue"}
-        </p>
-      </div>
-    </div>
-  );
-
-  // ─── Render ────────────────────────────────────────────────────────────────
-  return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
-      <GradientHeader
-        onMenu={onMenu}
-        right={NotifBell}
-      >
-        <p
-          className="font-manrope text-[14px] m-0 mt-3 mb-0.5"
-          style={{ color: "rgba(255,255,255,0.7)" }}
-        >
-          {todayLabel()}
-        </p>
-        <h1 className="font-manrope text-[28px] font-bold text-white m-0">
-          Hi, {firstName}
-        </h1>
-        {StatCards}
-      </GradientHeader>
-
-      {/* ── Body ──────────────────────────────────────────────────────────── */}
-      <div className="flex-1 px-4 pt-8 pb-4 flex flex-col">
-
-        {/* Pending bookings banner */}
-        {!loading && pendingJobs.length > 0 && (
-          <button
-            onClick={() => navigate("/provider/appointments")}
-            className="w-full text-left focus:outline-none mb-2"
-          >
-            <Card
-              className="flex items-center gap-3"
-              style={{ background: "#FFF0E6" }}
-            >
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "#FF751F",
-                }}
-              >
-                <span className="font-manrope text-[16px] font-bold text-white">
-                  {pendingJobs.length}
-                </span>
-              </div>
-              <div>
-                <p className="font-manrope text-[15px] font-semibold text-foreground m-0">
-                  Pending booking requests
-                </p>
-                <p className="font-manrope text-[13px] text-muted m-0 mt-0.5">
-                  Tap to review and accept
-                </p>
-              </div>
-            </Card>
-          </button>
-        )}
-
-        {/* Today's schedule */}
-        <p className="font-manrope text-[18px] font-bold text-foreground mt-2 mb-3.5 px-1">
-          Today's schedule
-        </p>
-
-        {loading ? (
-          /* Loading skeletons */
-          [1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="w-full h-[72px] rounded-card mb-2 animate-pulse"
-              style={{ background: "#E5E5EA" }}
+    return (
+        <div className="flex flex-col min-h-screen bg-base">
+            <Header
+                onMenu={onMenu}
+                showAvatar
+                initials={initials}
+                notifCount={unreadCount}
+                onNotif={() => navigate('/provider/notifications')}
             />
-          ))
-        ) : todayJobs.length === 0 ? (
-          <>
-            <ShareLinksSection handle={profile?.handle || ""} />
-            <Card style={{ textAlign: "center", padding: "32px 24px" }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "#F2F2F7",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 12px",
-                }}
-              >
-                <svg width="24" height="24" fill="none" stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "16px", fontWeight: 600, color: "#0D1619", margin: "0 0 4px" }}>
-                No bookings today
-              </p>
-              <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
-                Share your booking link to start getting clients.
-              </p>
-            </Card>
-          </>
-        ) : (
-          todayJobs.map((job) => (
-            <button
-              key={job.id}
-              onClick={() =>
-                navigate(`/provider/appointments/${job.id}`)
-              }
-              className="w-full text-left focus:outline-none"
-            >
-              <Card className="flex items-center gap-3.5 mb-2">
-                <Avatar
-                  initials={getInitials(job.client_name)}
-                  size={44}
-                  bg="#FFF0E6"
-                  color="#FF751F"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-manrope text-[16px] font-semibold text-foreground m-0 truncate">
-                    {job.client_name || "Client"}
-                  </p>
-                  <p className="font-manrope text-[14px] text-muted m-0 mt-0.5 truncate">
-                    {job.service_name || "Service"}
-                  </p>
-                </div>
-                <span className="font-manrope text-[14px] font-semibold text-foreground flex-shrink-0">
-                  {fmtTime(job.scheduled_at)}
-                </span>
-              </Card>
-            </button>
-          ))
-        )}
-      </div>
 
-      <Footer />
-    </div>
-  );
+            {/* ── Hero card ── */}
+            <div className="px-5 mb-6">
+                <HeroCard>
+                    {/* Date pill + greeting */}
+                    <div className="mb-5">
+                        <HeroPill className="mb-3">{todayPill()}</HeroPill>
+                        <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
+                            {greeting()},<br />{firstName}
+                        </h1>
+                    </div>
+
+                    {/* Up Next / empty message */}
+                    <div>
+                        <div className="h-px mb-4" style={{ background: 'rgba(61,35,30,0.1)' }} />
+                        {upNext ? (
+                            <button
+                                onClick={() => handleApptClick(upNext)}
+                                className="w-full flex items-end justify-between focus:outline-none"
+                            >
+                                <div>
+                                    <Lbl className="block mb-1">Up Next</Lbl>
+                                    <p className="text-[15px] text-ink m-0">
+                                        {upNext.clientName} · {upNext.serviceName}
+                                    </p>
+                                </div>
+                                <ArrowIcon />
+                            </button>
+                        ) : (
+                            <p className="text-[15px] text-muted m-0">No upcoming sessions today.</p>
+                        )}
+                    </div>
+                </HeroCard>
+            </div>
+
+            {/* ── Stats row ── */}
+            <div className="px-5 flex-1 flex flex-col">
+                <Divider />
+                <div className="flex gap-6 pt-5 pb-5 relative">
+                    {/* Vertical divider */}
+                    <div className="absolute inset-y-5 left-1/2 w-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
+
+                    {/* Weekly Earnings */}
+                    <div className="flex-1">
+                        <Lbl className="block mb-2">Weekly Earnings</Lbl>
+                        <div className="flex items-end gap-1">
+                            <ArrowIcon size={28} color={earningsColor} />
+                            <span
+                                className="text-[52px] font-semibold tracking-[-0.05em] leading-none"
+                                style={{ color: earningsColor }}
+                            >
+                                {fmtEarnings(weeklyEarnings)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* New Clients */}
+                    <div className="flex-1 flex flex-col items-end">
+                        <Lbl className="block mb-2">New Clients</Lbl>
+                        <span
+                            className="text-[52px] font-semibold tracking-[-0.05em] leading-none"
+                            style={{ color: clientsColor }}
+                        >
+                            {newClients}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Context line */}
+                <p className="text-[15px] text-muted mb-7 mt-0">
+                    {isEmpty
+                        ? 'Share your links below to start booking clients.'
+                        : "You're on track to beat last week's earnings."}
+                </p>
+
+                {/* ── Today's Schedule ── */}
+                <div className="flex items-end justify-between mb-2">
+                    <Lbl>Today's Schedule</Lbl>
+                    {schedule.length > 0 && (
+                        <button
+                            onClick={() => navigate('/provider/appointments')}
+                            className="text-[11px] font-semibold text-accent uppercase tracking-[0.04em] focus:outline-none"
+                        >
+                            View All
+                        </button>
+                    )}
+                </div>
+                <Divider />
+
+                {/* Loading skeleton */}
+                {loading && (
+                    <div className="py-5 flex flex-col gap-4">
+                        {[1, 2].map((i) => (
+                            <div key={i} className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-line/60 animate-pulse" />
+                                <div className="flex-1">
+                                    <div className="h-4 w-32 bg-line/60 rounded animate-pulse mb-2" />
+                                    <div className="h-3 w-24 bg-line/60 rounded animate-pulse" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Empty schedule */}
+                {!loading && schedule.length === 0 && (
+                    <>
+                        <div className="py-8 text-center">
+                            <p className="text-[16px] text-ink m-0 mb-1">Your day is wide open.</p>
+                            <p className="text-[14px] text-muted m-0">
+                                Once clients book, their sessions show up here.
+                            </p>
+                        </div>
+                        <Divider />
+                    </>
+                )}
+
+                {/* Appointment rows */}
+                {!loading && schedule.map((appt) => (
+                    <ApptRow
+                        key={appt.id}
+                        appt={appt}
+                        onClick={() => handleApptClick(appt)}
+                    />
+                ))}
+
+                {/* ── Share Links ── */}
+                <div className="mt-7">
+                    <ShareLinks handle={handle} />
+                </div>
+
+                <Footer />
+            </div>
+        </div>
+    );
 };
 
 export default ProviderDashboard;

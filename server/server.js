@@ -1913,6 +1913,82 @@ app.get("/api/provider/me", async (req, res) => {
   res.status(200).json({ profile: normalized });
 });
 
+// GET /api/provider/dashboard — today's schedule + weekly earnings + new clients this week
+app.get("/api/provider/dashboard", async (req, res) => {
+  const providerId = getProviderId(req);
+
+  if (!supabase) {
+    return res.status(200).json({ schedule: [], weeklyEarnings: 0, newClientsThisWeek: 0 });
+  }
+
+  try {
+    const now = new Date();
+
+    // Today window
+    const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+    const todayEnd   = new Date(now); todayEnd.setHours(23,59,59,999);
+
+    // This-week window (Mon–Sun)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    weekStart.setHours(0,0,0,0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+
+    const [todayRes, weekRes] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, client_id, client_name, service_name, scheduled_at, duration, status")
+        .eq("provider_id", providerId)
+        .gte("scheduled_at", todayStart.toISOString())
+        .lte("scheduled_at", todayEnd.toISOString())
+        .not("status", "eq", "cancelled")
+        .order("scheduled_at", { ascending: true }),
+      supabase
+        .from("bookings")
+        .select("client_id, price, status, scheduled_at")
+        .eq("provider_id", providerId)
+        .gte("scheduled_at", weekStart.toISOString())
+        .lt("scheduled_at", weekEnd.toISOString()),
+    ]);
+
+    const todayBookings = (todayRes.data || []).map((b) => ({
+      id: b.id,
+      clientName: b.client_name || "Client",
+      serviceName: b.service_name || "Session",
+      scheduledAt: b.scheduled_at,
+      duration: b.duration,
+      status: b.status,
+    }));
+
+    const weekBookings = weekRes.data || [];
+
+    const weeklyEarnings = weekBookings
+      .filter((b) => b.status === "completed" || b.status === "confirmed")
+      .reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // New clients = client_ids that appear for the first time this week
+    const weekClientIds = new Set(weekBookings.map((b) => b.client_id).filter(Boolean));
+    let newClientsThisWeek = 0;
+    if (weekClientIds.size > 0) {
+      const { data: priorBookings } = await supabase
+        .from("bookings")
+        .select("client_id")
+        .eq("provider_id", providerId)
+        .lt("scheduled_at", weekStart.toISOString())
+        .in("client_id", [...weekClientIds]);
+
+      const priorIds = new Set((priorBookings || []).map((b) => b.client_id));
+      newClientsThisWeek = [...weekClientIds].filter((id) => !priorIds.has(id)).length;
+    }
+
+    return res.status(200).json({ schedule: todayBookings, weeklyEarnings, newClientsThisWeek });
+  } catch (err) {
+    console.error("[provider/dashboard]", err);
+    return res.status(200).json({ schedule: [], weeklyEarnings: 0, newClientsThisWeek: 0 });
+  }
+});
+
 // GET /api/provider/stats — rating, review count, distinct client count
 app.get("/api/provider/stats", async (req, res) => {
   const providerId = getProviderId(req);
