@@ -4349,6 +4349,56 @@ app.post("/api/charge", async (req, res) => {
   }
 });
 
+// POST /api/tips
+// Charge a tip for a completed booking via saved payment method
+app.post("/api/tips", async (req, res) => {
+  const { bookingId, providerId, amountCents, paymentMethodId, customerId } = req.body;
+
+  if (!bookingId || !providerId || !amountCents || !paymentMethodId || !customerId) {
+    return res.status(400).json({ error: "Missing required fields: bookingId, providerId, amountCents, paymentMethodId, customerId" });
+  }
+
+  if (amountCents < 100) {
+    return res.status(400).json({ error: "Tip must be at least $1.00" });
+  }
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amountCents),
+      currency: "cad",
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        type: "tip",
+        bookingId: String(bookingId),
+        providerId: String(providerId),
+      },
+    });
+
+    // Record the tip in the database
+    if (supabase) {
+      await supabase.from("client_transactions").insert({
+        booking_id: bookingId,
+        provider_id: providerId,
+        amount: amountCents,
+        type: "tip",
+        stripe_payment_intent_id: paymentIntent.id,
+        status: paymentIntent.status,
+        created_at: new Date().toISOString(),
+      }).catch((err) => {
+        console.error("[tip] Failed to record tip transaction:", err);
+      });
+    }
+
+    res.status(201).json({ paymentIntentId: paymentIntent.id, status: paymentIntent.status });
+  } catch (error) {
+    console.error("[tip] Charge error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/bookings/:bookingId/invoice
 // Generate and download invoice PDF for a booking
 app.get("/api/bookings/:bookingId/invoice", async (req, res) => {

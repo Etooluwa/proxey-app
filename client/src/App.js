@@ -36,6 +36,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import ClientInvoices from './pages/ClientInvoices';
 import RelationshipPage from './pages/RelationshipPage';
 import BookingConfirmPage from './pages/BookingConfirmPage';
+import ReviewPage from './pages/ReviewPage';
 
 // Provider Pages
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -125,6 +126,7 @@ function App() {
                       <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
                       <Route path="relationship/:providerId" element={<RelationshipPage />} />
                       <Route path="book/confirm" element={<BookingConfirmPage />} />
+                      <Route path="review" element={<ReviewPage />} />
                     </Route>
 
                     {/* Provider Onboarding */}
