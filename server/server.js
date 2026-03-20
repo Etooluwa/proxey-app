@@ -1650,6 +1650,125 @@ app.patch("/api/provider/jobs/:id/notes", async (req, res) => {
   }
 });
 
+// POST /api/provider/jobs/:id/complete — mark complete + return payout breakdown
+// Sets completed_at, updates linked booking, upserts provider_earnings record
+const PLATFORM_FEE_RATE = 0.10; // 10%
+
+app.post("/api/provider/jobs/:id/complete", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const jobId = req.params.id;
+  const { sessionNotes } = req.body || {};
+
+  try {
+    // Load the job
+    const { data: job, error: jobErr } = await supabase
+      .from("provider_jobs")
+      .select("*")
+      .eq("id", jobId)
+      .eq("provider_id", providerId)
+      .single();
+    if (jobErr || !job) return res.status(404).json({ error: "Job not found." });
+    if (job.status === "completed") return res.status(409).json({ error: "Already completed." });
+
+    const now = new Date().toISOString();
+
+    // Mark job complete
+    const updatePayload = { status: "completed", completed_at: now, updated_at: now };
+    if (sessionNotes) updatePayload.notes = sessionNotes;
+
+    const { data: updatedJob, error: updateErr } = await supabase
+      .from("provider_jobs")
+      .update(updatePayload)
+      .eq("id", jobId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    // Also mark the linked booking complete
+    let bookingPrice = job.price || 0; // cents
+    let depositPaid = 0;
+    let bookingPaymentType = "full";
+    if (job.booking_id) {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("price, payment_status, metadata, payment_type, deposit_value, deposit_type")
+        .eq("id", job.booking_id)
+        .single();
+      if (booking) {
+        bookingPrice = booking.price || bookingPrice;
+        bookingPaymentType = booking.payment_type || "full";
+        const meta = booking.metadata || {};
+        depositPaid = meta.deposit_paid || 0;
+        await supabase
+          .from("bookings")
+          .update({ status: "completed", completed_at: now, payment_status: "paid", updated_at: now })
+          .eq("id", job.booking_id);
+      }
+    }
+
+    // Payout calculation
+    const totalPrice = bookingPrice > 1000 ? bookingPrice / 100 : bookingPrice; // normalise to dollars
+    const depositDollars = depositPaid > 1000 ? depositPaid / 100 : depositPaid;
+    const remainingDollars = Math.max(totalPrice - depositDollars, 0);
+    const platformFee = +(totalPrice * PLATFORM_FEE_RATE).toFixed(2);
+    const providerPayout = +(totalPrice - platformFee).toFixed(2);
+
+    // Upsert provider_earnings (single-row per provider model)
+    const { data: existing } = await supabase
+      .from("provider_earnings")
+      .select("total_earned, pending_payout, transactions")
+      .eq("provider_id", providerId)
+      .single();
+    const newTransaction = {
+      id: jobId,
+      booking_id: job.booking_id,
+      client_name: job.client_name,
+      service_name: job.service_name,
+      amount: providerPayout,
+      fee: platformFee,
+      completed_at: now,
+    };
+    const prevTransactions = existing?.transactions || [];
+    const totalEarned = (existing?.total_earned || 0) + Math.round(providerPayout * 100);
+    const pendingPayout = (existing?.pending_payout || 0) + Math.round(providerPayout * 100);
+    await supabase.from("provider_earnings").upsert({
+      provider_id: providerId,
+      total_earned: totalEarned,
+      pending_payout: pendingPayout,
+      transactions: [newTransaction, ...prevTransactions].slice(0, 100),
+    }, { onConflict: "provider_id" });
+
+    // Notify client
+    const clientId = updatedJob.client_id;
+    if (clientId) {
+      await createClientNotification(clientId, {
+        type: "booking_completed",
+        title: "Session Complete!",
+        body: `Your session for ${job.service_name || "your service"} is complete. How was it?`,
+        booking_id: job.booking_id || jobId,
+        data: { provider_id: providerId, status: "completed" },
+      }).catch(() => {});
+    }
+
+    return res.status(200).json({
+      job: updatedJob,
+      payout: {
+        totalPrice,
+        depositCollected: depositDollars,
+        remainingCharged: remainingDollars,
+        platformFee,
+        providerPayout,
+        paymentType: bookingPaymentType,
+      },
+    });
+  } catch (err) {
+    console.error("[jobs/:id/complete]", err);
+    return res.status(500).json({ error: "Failed to mark complete." });
+  }
+});
+
 app.patch("/api/provider/jobs/:id", async (req, res) => {
   const providerId = getProviderId(req);
   const jobId = req.params.id;

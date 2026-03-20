@@ -1,324 +1,535 @@
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useSession } from "../../auth/authContext";
-import { request } from "../../data/apiClient";
-import Nav from "../../components/ui/Nav";
-import Card from "../../components/ui/Card";
-import Avatar from "../../components/ui/Avatar";
-import Badge from "../../components/ui/Badge";
-import Footer from "../../components/ui/Footer";
+/**
+ * ProviderAppointmentDetail — v6 Warm Editorial
+ * Route: /provider/appointments/:id
+ *
+ * Two phases:
+ *   1. Detail view — client info, session details, payment status, notes, CTA buttons
+ *   2. Completion view — payout summary screen shown after Mark Complete
+ *
+ * API:
+ *   GET  /api/provider/jobs/:id            → { job }
+ *   POST /api/provider/jobs/:id/complete   → { job, payout }
+ *   PATCH /api/provider/jobs/:id/notes     → { job }
+ */
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { request } from '../../data/apiClient';
+import { useMessages } from '../../contexts/MessageContext';
+import BackBtn from '../../components/ui/BackBtn';
+import Avatar from '../../components/ui/Avatar';
+import Lbl from '../../components/ui/Lbl';
+import Divider from '../../components/ui/Divider';
+import Footer from '../../components/ui/Footer';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getInitials(name) {
-  if (!name) return "C";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+    return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function fmtDateTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+    });
+}
+
+function fmtTime(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 function fmtDuration(mins) {
-  if (!mins) return null;
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `${h} hr ${m} min` : `${h} hr`;
+    if (!mins) return null;
+    if (mins < 60) return `${mins} min`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-function fmtPrice(cents) {
-  if (!cents && cents !== 0) return null;
-  const dollars = cents / 100;
-  return `$${dollars.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+function fmtPrice(val) {
+    if (!val && val !== 0) return null;
+    const dollars = val > 1000 ? val / 100 : val;
+    return `$${Math.round(dollars)}`;
 }
 
-function statusBadgeVariant(status) {
-  if (!status) return "muted";
-  const s = status.toLowerCase();
-  if (s === "confirmed" || s === "accepted" || s === "completed") return "success";
-  if (s === "declined" || s === "cancelled") return "danger";
-  if (s === "pending") return "warning";
-  return "muted";
+function fmt$(n) {
+    return `$${Number(n).toFixed(2)}`;
 }
 
-function statusLabel(status) {
-  if (!status) return "Pending";
-  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+function ordinal(n) {
+    if (n === 1) return '1st';
+    if (n === 2) return '2nd';
+    if (n === 3) return '3rd';
+    return `${n}th`;
 }
+
+// ─── Shimmer ──────────────────────────────────────────────────────────────────
+
+const Shimmer = ({ className }) => (
+    <div className={`bg-line/60 rounded animate-pulse ${className}`} />
+);
+
+// ─── Completion screen ────────────────────────────────────────────────────────
+
+const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
+    const providerInitials = getInitials(job?.provider_name || 'P');
+    const clientInitials = getInitials(job?.client_name);
+
+    return (
+        <div className="flex flex-col min-h-screen bg-base">
+            <div className="flex-1 px-5 flex flex-col items-center justify-center py-10">
+
+                {/* Two avatars connected by green line */}
+                <div className="flex items-center gap-0 mb-8">
+                    <Avatar initials={providerInitials} size={52} />
+                    {/* Connecting line */}
+                    <div className="flex items-center" style={{ width: 48 }}>
+                        <div style={{ flex: 1, height: 2, background: '#5A8A5E' }} />
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#5A8A5E', flexShrink: 0 }} />
+                        <div style={{ flex: 1, height: 2, background: '#5A8A5E' }} />
+                    </div>
+                    <Avatar initials={clientInitials} size={52} />
+                </div>
+
+                <p className="text-[28px] font-semibold text-ink tracking-[-0.02em] m-0 mb-1 text-center">
+                    Session complete.
+                </p>
+                <p className="text-[14px] text-muted m-0 mb-8 text-center">
+                    {job?.service_name || 'Session'} with {job?.client_name || 'client'}
+                </p>
+
+                {/* Payout summary card */}
+                {payout && (
+                    <div
+                        className="w-full rounded-[20px] p-5 mb-4"
+                        style={{ background: '#FFFFFF', border: '1px solid rgba(140,106,100,0.15)' }}
+                    >
+                        <p className="text-[13px] font-semibold text-muted uppercase tracking-[0.05em] m-0 mb-4">
+                            Payout Summary
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            {payout.paymentType === 'deposit' ? (
+                                <>
+                                    <div className="flex justify-between">
+                                        <span className="text-[14px] text-muted">Deposit collected</span>
+                                        <span className="text-[14px] text-ink font-semibold">
+                                            {fmt$(payout.depositCollected)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-[14px] text-muted">Remaining charged</span>
+                                        <span className="text-[14px] text-ink font-semibold">
+                                            {fmt$(payout.remainingCharged)}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex justify-between">
+                                    <span className="text-[14px] text-muted">Session total</span>
+                                    <span className="text-[14px] text-ink font-semibold">
+                                        {fmt$(payout.totalPrice)}
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between">
+                                <span className="text-[14px] text-muted">Platform fee (10%)</span>
+                                <span className="text-[14px] text-muted">− {fmt$(payout.platformFee)}</span>
+                            </div>
+
+                            <div
+                                className="pt-3"
+                                style={{ borderTop: '1px solid rgba(140,106,100,0.15)' }}
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[15px] font-semibold text-ink">Your payout</span>
+                                    <span
+                                        className="text-[22px] font-semibold tracking-[-0.02em]"
+                                        style={{ color: '#C25E4A' }}
+                                    >
+                                        {fmt$(payout.providerPayout)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Green info bar */}
+                <div
+                    className="w-full flex items-start gap-3 px-4 py-3 rounded-[14px] mb-8"
+                    style={{ background: '#EBF2EC' }}
+                >
+                    <svg width="16" height="16" fill="none" stroke="#5A8A5E" strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0 mt-0.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#5A8A5E' }}>
+                        Payout will arrive via Stripe within <strong>2–3 business days</strong>.
+                    </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="w-full flex flex-col gap-3">
+                    <button
+                        onClick={onDashboard}
+                        className="w-full py-4 rounded-[14px] text-[14px] font-semibold text-white focus:outline-none active:opacity-80"
+                        style={{ background: '#3D231E', border: 'none' }}
+                    >
+                        Back to Dashboard
+                    </button>
+                    <button
+                        onClick={onTimeline}
+                        className="w-full py-4 rounded-[14px] text-[14px] font-semibold text-ink focus:outline-none active:opacity-70"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        View Client Timeline
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderAppointmentDetail = () => {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const { session } = useSession();
+    const navigate = useNavigate();
+    const { id } = useParams();
+    const { getOrCreateConversation, setCurrentConversation, loadMessages } = useMessages();
 
-  const [job, setJob] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [completing, setCompleting] = useState(false);
+    const [job, setJob] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [notes, setNotes] = useState('');
+    const [savingNotes, setSavingNotes] = useState(false);
+    const [completing, setCompleting] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
-    try {
-      const data = await request(`/provider/jobs/${id}`);
-      const j = data.job || null;
-      setJob(j);
-      setNotes(j?.notes || "");
-    } catch (err) {
-      console.error("Failed to load appointment:", err);
-    } finally {
-      setLoading(false);
+    // Completion state
+    const [completed, setCompleted] = useState(false);
+    const [payoutData, setPayoutData] = useState(null);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await request(`/provider/jobs/${id}`);
+            const j = data.job || null;
+            setJob(j);
+            setNotes(j?.notes || '');
+            if (j?.status === 'completed') {
+                setCompleted(true);
+            }
+        } catch (err) {
+            console.error('[ProviderAppointmentDetail] load error:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleSaveNotes = async () => {
+        if (!notes.trim() || savingNotes) return;
+        setSavingNotes(true);
+        try {
+            await request(`/provider/jobs/${id}/notes`, {
+                method: 'PATCH',
+                body: JSON.stringify({ notes }),
+            });
+        } catch (err) {
+            console.error('[saveNotes]', err);
+        } finally {
+            setSavingNotes(false);
+        }
+    };
+
+    const handleMessage = async () => {
+        if (!job?.client_id) return;
+        try {
+            const conv = await getOrCreateConversation(job.client_id, 'client');
+            setCurrentConversation(conv.id);
+            loadMessages(conv.id);
+            navigate(`/provider/messages/${conv.id}`);
+        } catch (err) {
+            console.error('[message]', err);
+        }
+    };
+
+    const handleMarkComplete = async () => {
+        if (!job || completing) return;
+        setCompleting(true);
+        try {
+            const data = await request(`/provider/jobs/${id}/complete`, {
+                method: 'POST',
+                body: JSON.stringify({ sessionNotes: notes.trim() || undefined }),
+            });
+            setPayoutData(data.payout || null);
+            setJob((prev) => ({ ...prev, status: 'completed' }));
+            setCompleted(true);
+        } catch (err) {
+            console.error('[markComplete]', err);
+        } finally {
+            setCompleting(false);
+        }
+    };
+
+    // ── Loading ──────────────────────────────────────────────────────────────
+    if (loading) {
+        return (
+            <div className="flex flex-col min-h-screen bg-base">
+                <div className="flex items-center px-5 pt-10 pb-2">
+                    <BackBtn onClick={() => navigate('/provider/appointments')} />
+                </div>
+                <div className="px-5 flex flex-col gap-5 pt-4">
+                    <div className="flex items-center gap-4">
+                        <Shimmer className="w-14 h-14 rounded-full" />
+                        <div className="flex-1">
+                            <Shimmer className="h-5 w-40 mb-2" />
+                            <Shimmer className="h-3.5 w-28" />
+                        </div>
+                    </div>
+                    <Shimmer className="h-4 w-56 mt-2" />
+                    <Shimmer className="h-3.5 w-40" />
+                    <Shimmer className="h-20 w-full mt-2" />
+                </div>
+            </div>
+        );
     }
-  }, [session, id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleMarkComplete = async () => {
-    if (!job) return;
-    setCompleting(true);
-    try {
-      await request(`/provider/jobs/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "completed" }),
-      });
-      setJob((prev) => ({ ...prev, status: "completed" }));
-    } catch (err) {
-      console.error("Failed to mark complete:", err);
-    } finally {
-      setCompleting(false);
+    // ── Not found ────────────────────────────────────────────────────────────
+    if (!job) {
+        return (
+            <div className="flex flex-col min-h-screen bg-base items-center justify-center">
+                <p className="text-[15px] text-muted">Appointment not found</p>
+                <button
+                    onClick={() => navigate('/provider/appointments')}
+                    className="mt-3 text-[13px] font-semibold focus:outline-none"
+                    style={{ color: '#C25E4A', background: 'none', border: 'none' }}
+                >
+                    Go back
+                </button>
+            </div>
+        );
     }
-  };
 
-  const handleSaveNotes = async () => {
-    if (!job) return;
-    setSaving(true);
-    try {
-      await request(`/provider/jobs/${id}/notes`, {
-        method: "PATCH",
-        body: JSON.stringify({ notes }),
-      });
-    } catch (err) {
-      console.error("Failed to save notes:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleMessage = () => {
-    const clientId = job?.client_id;
-    navigate("/provider/messages", { state: clientId ? { clientId } : undefined });
-  };
-
-  // ── Loading skeleton ──────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex flex-col min-h-screen bg-background font-manrope">
-        <Nav onBack={() => navigate("/provider/appointments")} title="Appointment" />
-        <div className="flex-1 px-4 pt-2 pb-4 flex flex-col gap-3">
-          {[80, 220].map((h) => (
-            <div
-              key={h}
-              className="w-full rounded-card animate-pulse"
-              style={{ height: h, background: "#E5E5EA" }}
+    // ── Completion screen ────────────────────────────────────────────────────
+    if (completed && payoutData) {
+        return (
+            <CompletionScreen
+                job={job}
+                payout={payoutData}
+                onDashboard={() => navigate('/provider')}
+                onTimeline={() => job.client_id
+                    ? navigate(`/provider/client/${job.client_id}`)
+                    : navigate('/provider/clients')
+                }
             />
-          ))}
-        </div>
-      </div>
-    );
-  }
+        );
+    }
 
-  // ── Not found ─────────────────────────────────────────────────────────────
-  if (!job) {
+    // ── Derived values ───────────────────────────────────────────────────────
+    const isConfirmed = ['confirmed', 'accepted', 'pending'].includes((job.status || '').toLowerCase());
+    const isAlreadyCompleted = job.status?.toLowerCase() === 'completed';
+    const price = fmtPrice(job.price);
+    const duration = fmtDuration(job.duration);
+    const dateLabel = fmtDate(job.scheduled_at);
+    const timeLabel = fmtTime(job.scheduled_at);
+
+    const visitLabel = job.visit_count > 0 ? `${ordinal(job.visit_count)} visit` : null;
+    const sinceLabel = job.client_since ? `Client since ${job.client_since}` : null;
+    const clientSubtitle = [visitLabel, sinceLabel].filter(Boolean).join(' · ');
+
+    // Payment breakdown
+    const totalDollars = job.price ? (job.price > 1000 ? job.price / 100 : job.price) : null;
+    const paymentType = job.payment_type || 'full';
+    const depositValue = job.deposit_value;
+    const depositType = job.deposit_type; // 'percent' | 'fixed'
+    let depositPaid = null;
+    let remaining = null;
+    if (totalDollars && paymentType === 'deposit' && depositValue) {
+        depositPaid = depositType === 'percent'
+            ? (totalDollars * depositValue) / 100
+            : Math.min(depositValue, totalDollars);
+        remaining = Math.max(totalDollars - depositPaid, 0);
+    }
+
+    // ─── Render detail view ───────────────────────────────────────────────────
     return (
-      <div className="flex flex-col min-h-screen bg-background font-manrope">
-        <Nav onBack={() => navigate("/provider/appointments")} title="Appointment" />
-        <div className="flex flex-col items-center justify-center flex-1 gap-2 px-4">
-          <p className="font-manrope text-[15px] text-muted">Appointment not found</p>
+        <div className="flex flex-col bg-base" style={{ minHeight: '100dvh' }}>
+
+            {/* ── Back nav ── */}
+            <div className="flex items-center px-5 pt-10 pb-2">
+                <BackBtn onClick={() => navigate('/provider/appointments')} />
+            </div>
+
+            {/* ── Scrollable body ── */}
+            <div className="flex-1 overflow-y-auto px-5 pb-32">
+
+                {/* ─ Client info ─ */}
+                <div className="flex items-center gap-4 mb-4 pt-2">
+                    <Avatar initials={getInitials(job.client_name)} size={56} />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[22px] font-semibold text-ink tracking-[-0.02em] m-0 mb-0.5 truncate">
+                            {job.client_name || 'Client'}
+                        </p>
+                        {clientSubtitle ? (
+                            <p className="text-[13px] text-muted m-0">{clientSubtitle}</p>
+                        ) : null}
+                    </div>
+                </div>
+
+                {/* Status pill */}
+                {isConfirmed && (
+                    <div className="mb-5">
+                        <span
+                            className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
+                            style={{ background: '#FDDCC6', color: '#C25E4A' }}
+                        >
+                            Confirmed
+                        </span>
+                    </div>
+                )}
+                {isAlreadyCompleted && (
+                    <div className="mb-5">
+                        <span
+                            className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
+                            style={{ background: '#EBF2EC', color: '#5A8A5E' }}
+                        >
+                            Completed
+                        </span>
+                    </div>
+                )}
+
+                <Divider />
+
+                {/* ─ Session info ─ */}
+                <div className="py-5">
+                    <Lbl className="block mb-3">Session Info</Lbl>
+                    <p className="text-[20px] font-semibold text-ink tracking-[-0.02em] m-0 mb-1">
+                        {dateLabel}
+                        {timeLabel ? ` at ${timeLabel}` : ''}
+                    </p>
+                    <p className="text-[14px] text-muted m-0">
+                        {[duration, job.service_name, price].filter(Boolean).join(' · ')}
+                    </p>
+                </div>
+
+                <Divider />
+
+                {/* ─ Payment status ─ */}
+                {totalDollars && (
+                    <div className="py-5">
+                        <Lbl className="block mb-3">Payment</Lbl>
+                        {paymentType === 'deposit' && depositPaid !== null ? (
+                            <>
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-[14px] text-muted">Deposit paid</span>
+                                    <span className="text-[14px] font-semibold text-ink">${depositPaid.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between mb-3">
+                                    <span className="text-[14px] text-muted">Remaining balance</span>
+                                    <span className="text-[14px] font-semibold text-ink">${remaining.toFixed(2)}</span>
+                                </div>
+                                <div
+                                    className="px-4 py-3 rounded-[12px]"
+                                    style={{ background: '#FFF5E6' }}
+                                >
+                                    <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
+                                        Remaining ${remaining.toFixed(2)} will be charged automatically on completion.
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex justify-between">
+                                <span className="text-[14px] text-muted">Full payment</span>
+                                <span className="text-[14px] font-semibold text-ink">{price}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <Divider />
+
+                {/* ─ Session notes ─ */}
+                <div className="py-5">
+                    <Lbl className="block mb-3">Session Notes</Lbl>
+
+                    {/* Previous notes */}
+                    <div
+                        className="px-4 py-3 rounded-[12px] mb-3"
+                        style={{ background: '#F2EBE5' }}
+                    >
+                        <p className="text-[13px] text-muted m-0 italic leading-relaxed">
+                            {job.previous_notes
+                                ? `Last: ${job.previous_notes}`
+                                : 'No previous session notes.'}
+                        </p>
+                    </div>
+
+                    {/* Current notes textarea */}
+                    {!isAlreadyCompleted && (
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            onBlur={handleSaveNotes}
+                            disabled={savingNotes}
+                            placeholder="Add notes for this session…"
+                            rows={3}
+                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
+                            style={{
+                                padding: '13px 16px',
+                                borderRadius: 12,
+                                border: '1px solid rgba(140,106,100,0.2)',
+                                background: '#F2EBE5',
+                                fontFamily: 'inherit',
+                                lineHeight: 1.6,
+                                boxSizing: 'border-box',
+                            }}
+                        />
+                    )}
+                    {isAlreadyCompleted && notes && (
+                        <p className="text-[14px] text-ink m-0 leading-relaxed">{notes}</p>
+                    )}
+                </div>
+
+                <Footer />
+            </div>
+
+            {/* ── Sticky bottom bar ── */}
+            {!isAlreadyCompleted && (
+                <div
+                    className="fixed bottom-0 left-0 right-0 flex gap-3 px-5 py-3"
+                    style={{
+                        background: '#FBF7F2',
+                        borderTop: '1px solid rgba(140,106,100,0.15)',
+                        paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+                    }}
+                >
+                    <button
+                        onClick={handleMessage}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Message
+                    </button>
+                    <button
+                        onClick={handleMarkComplete}
+                        disabled={completing}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                        style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
+                    >
+                        {completing && (
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                        )}
+                        {completing ? 'Completing…' : 'Mark Complete'}
+                    </button>
+                </div>
+            )}
+
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      </div>
     );
-  }
-
-  const isCompleted = job.status?.toLowerCase() === "completed";
-  const duration = fmtDuration(job.duration);
-  const price = fmtPrice(job.price);
-
-  // Subtitle line: "N visits · Client since Jan 2025"
-  const visitLabel = job.visit_count > 0
-    ? `${job.visit_count}${job.visit_count === 1 ? "st" : job.visit_count === 2 ? "nd" : job.visit_count === 3 ? "rd" : "th"} visit`
-    : null;
-  const sinceLabel = job.client_since ? `Client since ${job.client_since}` : null;
-  const clientSubtitle = [visitLabel, sinceLabel].filter(Boolean).join(" · ");
-
-  // Detail line: "1 hr · 1-on-1 Vocal Lesson · $85"
-  const detailParts = [duration, job.service_name, price].filter(Boolean);
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
-      <Nav onBack={() => navigate("/provider/appointments")} title="Appointment" />
-
-      <div className="flex-1 px-4 pt-2 pb-32 flex flex-col">
-
-        {/* ── Client card ─────────────────────────────────────────────────── */}
-        <Card className="mb-3">
-          <div className="flex items-center gap-3.5 mb-3">
-            <Avatar
-              initials={getInitials(job.client_name)}
-              size={56}
-              bg="#FFF0E6"
-              color="#FF751F"
-            />
-            <div className="min-w-0">
-              <p className="font-manrope text-[20px] font-bold text-foreground m-0 truncate">
-                {job.client_name || "Client"}
-              </p>
-              {clientSubtitle ? (
-                <p className="font-manrope text-[14px] text-muted m-0 mt-0.5">
-                  {clientSubtitle}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <Badge
-            label={statusLabel(job.status)}
-            variant={statusBadgeVariant(job.status)}
-          />
-        </Card>
-
-        {/* ── Booking detail + notes card ──────────────────────────────────── */}
-        <Card className="mb-3">
-          {/* Date / time */}
-          <p className="font-manrope text-[20px] font-bold text-foreground m-0 mb-1">
-            {fmtDateTime(job.scheduled_at)}
-          </p>
-
-          {/* Detail line */}
-          <p className="font-manrope text-[14px] text-muted m-0 mb-4">
-            {detailParts.join(" · ")}
-          </p>
-
-          {/* Divider */}
-          <div
-            className="mb-4"
-            style={{ height: "0.5px", background: "#E5E5EA" }}
-          />
-
-          {/* Session notes heading */}
-          <p className="font-manrope text-[15px] font-semibold text-foreground m-0 mb-2">
-            Session notes
-          </p>
-
-          {/* Previous notes (gray block) */}
-          {job.previous_notes ? (
-            <div
-              className="px-3 py-3 rounded-xl mb-3"
-              style={{ background: "#F2F2F7" }}
-            >
-              <p
-                className="font-manrope text-[14px] text-muted m-0"
-                style={{ fontStyle: "italic", lineHeight: 1.5 }}
-              >
-                Last: {job.previous_notes}
-              </p>
-            </div>
-          ) : (
-            <div
-              className="px-3 py-3 rounded-xl mb-3"
-              style={{ background: "#F2F2F7" }}
-            >
-              <p
-                className="font-manrope text-[14px] text-muted m-0"
-                style={{ fontStyle: "italic" }}
-              >
-                No previous session notes
-              </p>
-            </div>
-          )}
-
-          {/* Current session notes textarea */}
-          <textarea
-            placeholder="Add notes for this session…"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={handleSaveNotes}
-            disabled={saving}
-            rows={3}
-            className="w-full font-manrope text-[14px] text-foreground placeholder:text-muted outline-none resize-none"
-            style={{
-              padding: "14px",
-              borderRadius: "12px",
-              border: "1px solid #E5E5EA",
-              background: "#F2F2F7",
-              minHeight: "80px",
-              lineHeight: 1.5,
-            }}
-          />
-        </Card>
-
-      </div>
-
-      {/* ── Sticky bottom buttons ────────────────────────────────────────── */}
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-white px-4 py-3 flex gap-2.5"
-        style={{
-          borderTop: "0.5px solid #E5E5EA",
-          paddingBottom: `calc(0.75rem + env(safe-area-inset-bottom))`,
-        }}
-      >
-        <button
-          onClick={handleMessage}
-          className="flex-1 font-manrope text-[15px] font-semibold text-foreground focus:outline-none"
-          style={{
-            padding: "14px",
-            borderRadius: "12px",
-            border: "1px solid #E5E5EA",
-            background: "#FFFFFF",
-            cursor: "pointer",
-          }}
-        >
-          Message
-        </button>
-        <button
-          onClick={handleMarkComplete}
-          disabled={isCompleted || completing}
-          className="font-manrope text-[15px] font-semibold focus:outline-none"
-          style={{
-            flex: 2,
-            padding: "14px",
-            borderRadius: "12px",
-            border: "none",
-            background: isCompleted ? "#E5E5EA" : "#0D1619",
-            color: isCompleted ? "#6B7280" : "#FFFFFF",
-            cursor: isCompleted ? "default" : "pointer",
-          }}
-        >
-          {completing ? "Saving…" : isCompleted ? "Completed" : "Mark complete"}
-        </button>
-      </div>
-
-      <Footer />
-    </div>
-  );
 };
 
 export default ProviderAppointmentDetail;
