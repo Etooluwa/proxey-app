@@ -10,13 +10,15 @@ export async function fetchProviderJobs({ status } = {}) {
   return data.jobs || [];
 }
 
-export async function updateProviderJobStatus(jobId, nextStatus) {
+export async function updateProviderJobStatus(jobId, nextStatus, declineReason) {
   if (!jobId || !nextStatus) {
     throw new Error("Both jobId and nextStatus are required.");
   }
+  const body = { status: nextStatus };
+  if (declineReason) body.declineReason = declineReason;
   const data = await request(`/provider/jobs/${jobId}`, {
     method: "PATCH",
-    body: JSON.stringify({ status: nextStatus }),
+    body: JSON.stringify(body),
   });
   return data.job;
 }

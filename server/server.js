@@ -1605,7 +1605,7 @@ app.patch("/api/provider/jobs/:id/notes", async (req, res) => {
 app.patch("/api/provider/jobs/:id", async (req, res) => {
   const providerId = getProviderId(req);
   const jobId = req.params.id;
-  const { status } = req.body || {};
+  const { status, declineReason } = req.body || {};
 
   if (!status) {
     return res.status(400).json({ error: "status is required." });
@@ -1616,6 +1616,10 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
       const updatePayload = { status, updated_at: new Date().toISOString() };
       if (status === 'completed') {
         updatePayload.completed_at = new Date().toISOString();
+      }
+      // Store decline reason in metadata when declining
+      if ((status === 'declined' || status === 'cancelled') && declineReason) {
+        updatePayload.metadata = { decline_reason: declineReason };
       }
 
       const { data, error } = await supabase
@@ -1653,12 +1657,15 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
         } else if (clientId && (status === 'declined' || status === 'cancelled')) {
           await createClientNotification(clientId, {
             type: 'booking_declined',
-            title: 'Booking Update',
-            body: `Your booking request was not accepted. Please try another time or provider.`,
+            title: 'Request Declined',
+            body: declineReason
+              ? `Your booking request was declined.`
+              : `Your booking request was not accepted. Please try another time or provider.`,
             booking_id: data.id,
             data: {
               provider_id: data.provider_id,
-              status: 'declined'
+              status: 'declined',
+              reason: declineReason || null,
             }
           });
         } else if (clientId && status === 'completed') {
