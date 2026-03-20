@@ -1,253 +1,222 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
-import { useSession } from "../../auth/authContext";
-import { request } from "../../data/apiClient";
-import GradientHeader from "../../components/ui/GradientHeader";
-import Avatar from "../../components/ui/Avatar";
-import Badge from "../../components/ui/Badge";
-import Card from "../../components/ui/Card";
-import Footer from "../../components/ui/Footer";
+/**
+ * ProviderClients — v6 Warm Editorial
+ * Route: /provider/clients
+ *
+ * API: GET /api/provider/clients → { clients: [{ client_id, name, visits, ltv, last_visit, status }] }
+ */
+import { useEffect, useState } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { request } from '../../data/apiClient';
+import Header from '../../components/ui/Header';
+import Avatar from '../../components/ui/Avatar';
+import Lbl from '../../components/ui/Lbl';
+import Divider from '../../components/ui/Divider';
+import ArrowIcon from '../../components/ui/ArrowIcon';
+import HeroCard from '../../components/ui/HeroCard';
+import ShareLinks from '../../components/ui/ShareLinks';
+import Footer from '../../components/ui/Footer';
+import { fetchProviderProfile } from '../../data/provider';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtLtv(cents) {
-  if (!cents && cents !== 0) return "$0";
-  const dollars = cents > 1000 ? cents / 100 : cents;
-  return `$${dollars.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+function getInitials(name) {
+    return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function fmtLastVisit(iso) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+    if (!iso) return null;
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function getInitials(name) {
-  if (!name) return "C";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+// ─── Status pill config ───────────────────────────────────────────────────────
 
-// ─── Status badge config ─────────────────────────────────────────────────────
-
-const STATUS_CONFIG = {
-  active:   { label: "Active",   variant: "success" },
-  "at-risk":{ label: "At risk",  variant: "warning" },
-  new:      { label: "New",      variant: "accent"  },
+const STATUS = {
+    active:   { label: 'Active',   color: '#5A8A5E' },
+    'at-risk':{ label: 'At risk',  color: '#92400E' },
+    new:      { label: 'New',      color: '#C25E4A' },
 };
 
-const FILTERS = ["All", "Active", "At risk", "New"];
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+const EmptyKliques = ({ handle }) => (
+    <div className="flex flex-col">
+        {/* Hero card with ghost avatars */}
+        <HeroCard className="mb-5">
+            {/* Overlapping ghost avatar circles */}
+            <div className="flex mb-6">
+                {[0, 1, 2].map((i) => (
+                    <div
+                        key={i}
+                        className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{
+                            background: 'rgba(255,255,255,0.5)',
+                            border: '2px solid rgba(255,255,255,0.7)',
+                            marginLeft: i > 0 ? '-10px' : 0,
+                            zIndex: 3 - i,
+                        }}
+                    >
+                        <svg
+                            width="18" height="18" fill="none"
+                            stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24"
+                            style={{ opacity: 1 - i * 0.25 }}
+                        >
+                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </div>
+                ))}
+            </div>
+
+            <h2 className="text-[22px] font-semibold text-ink tracking-[-0.02em] leading-snug m-0 mb-2">
+                Your people are<br />out there.
+            </h2>
+            <p className="text-[14px] text-muted leading-relaxed m-0">
+                When clients accept your invite or book a session, they become part of your klique. Every session and milestone — tracked here.
+            </p>
+        </HeroCard>
+
+        <ShareLinks handle={handle} />
+    </div>
+);
+
+// ─── Client row ───────────────────────────────────────────────────────────────
+
+const ClientRow = ({ client, onClick }) => {
+    const statusCfg = STATUS[client.status] || STATUS.active;
+    const lastVisit = fmtLastVisit(client.last_visit);
+
+    return (
+        <>
+            <button
+                onClick={onClick}
+                className="w-full flex items-center justify-between py-5 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
+            >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <Avatar initials={getInitials(client.name)} size={44} />
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <p className="text-[16px] text-ink m-0 truncate">{client.name}</p>
+                            <span
+                                className="text-[10px] font-semibold uppercase tracking-[0.05em] flex-shrink-0"
+                                style={{ color: statusCfg.color }}
+                            >
+                                {statusCfg.label}
+                            </span>
+                        </div>
+                        <p className="text-[13px] text-muted m-0">
+                            {client.visits} {client.visits === 1 ? 'visit' : 'visits'}
+                            {lastVisit ? ` · Last: ${lastVisit}` : ''}
+                        </p>
+                    </div>
+                </div>
+                <ArrowIcon size={18} />
+            </button>
+            <Divider />
+        </>
+    );
+};
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderClients = () => {
-  const navigate = useNavigate();
-  const { onMenu } = useOutletContext() || {};
-  const { session } = useSession();
+    const navigate = useNavigate();
+    const { onMenu } = useOutletContext() || {};
+    const { profile } = useSession();
+    const { unreadCount } = useNotifications();
 
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState("All");
+    const [clients, setClients] = useState([]);
+    const [handle, setHandle] = useState('');
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await request("/provider/clients");
-        if (!cancelled) setClients(data.clients || []);
-      } catch (err) {
-        console.error("Failed to load provider clients", err);
-        if (!cancelled) setClients([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [session]);
+    const initials = (profile?.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
-  const filtered = useMemo(() => {
-    if (activeFilter === "All") return clients;
-    const map = { Active: "active", "At risk": "at-risk", New: "new" };
-    return clients.filter((c) => c.status === map[activeFilter]);
-  }, [clients, activeFilter]);
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoading(true);
+            try {
+                const [clientsData, prof] = await Promise.all([
+                    request('/provider/clients'),
+                    fetchProviderProfile(),
+                ]);
+                if (!cancelled) {
+                    setClients(clientsData.clients || []);
+                    setHandle(prof?.handle || '');
+                }
+            } catch (err) {
+                console.error('[ProviderClients] load error:', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        load();
+        return () => { cancelled = true; };
+    }, []);
 
-  const subtitle = loading ? "Loading…" : `${clients.length} client${clients.length !== 1 ? "s" : ""}`;
-
-  return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
-      <GradientHeader onMenu={onMenu} title="My kliques" subtitle={subtitle} />
-
-      <div className="flex-1 px-4 pt-8 pb-4 flex flex-col">
-
-        {/* Filter pills */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">
-          {FILTERS.map((f) => {
-            const active = f === activeFilter;
-            return (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className="flex-shrink-0 px-4 py-[7px] rounded-pill font-manrope text-[13px] font-semibold focus:outline-none transition-colors"
-                style={{
-                  background: active ? "#0D1619" : "#FFFFFF",
-                  color: active ? "#FFFFFF" : "#0D1619",
-                  border: active ? "none" : "1px solid #E5E5EA",
-                }}
-              >
-                {f}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Loading skeletons */}
-        {loading &&
-          [1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="w-full h-[76px] rounded-card mb-2 animate-pulse"
-              style={{ background: "#E5E5EA" }}
+    return (
+        <div className="flex flex-col min-h-screen bg-base">
+            <Header
+                onMenu={onMenu}
+                showAvatar
+                initials={initials}
+                notifCount={unreadCount}
+                onNotif={() => navigate('/provider/notifications')}
             />
-          ))}
 
-        {/* Empty state — filtered (non-All) */}
-        {!loading && filtered.length === 0 && activeFilter !== "All" && (
-          <Card className="flex flex-col items-center py-10">
-            <svg
-              width="40"
-              height="40"
-              fill="none"
-              stroke="#D1D5DB"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
-              className="mb-3"
-            >
-              <path
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="font-manrope text-[15px] font-semibold text-foreground">
-              No {activeFilter.toLowerCase()} clients
-            </p>
-            <p className="font-manrope text-[13px] text-muted mt-1 text-center">
-              Try a different filter
-            </p>
-          </Card>
-        )}
-
-        {/* Empty state — no clients at all */}
-        {!loading && clients.length === 0 && activeFilter === "All" && (
-          <Card style={{ textAlign: "center", padding: "32px 24px" }}>
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                background: "#FFF0E6",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px",
-              }}
-            >
-              <svg width="32" height="32" fill="none" stroke="#FF751F" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            {/* ── Title ── */}
+            <div className="px-5 pb-5">
+                <Lbl className="block mb-1.5">
+                    {loading ? '…' : `${clients.length} client${clients.length !== 1 ? 's' : ''}`}
+                </Lbl>
+                <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
+                    My kliques
+                </h1>
             </div>
-            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "20px", fontWeight: 700, color: "#0D1619", margin: "0 0 8px" }}>
-              No clients yet
-            </p>
-            <p style={{ fontFamily: "Manrope, sans-serif", fontSize: "15px", color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
-              When clients accept your invite or book with you, they'll appear here with their full history.
-            </p>
-          </Card>
-        )}
 
-        {/* Client cards */}
-        {!loading &&
-          filtered.map((client) => {
-            const cfg = STATUS_CONFIG[client.status] || STATUS_CONFIG.new;
-            const lastVisit = fmtLastVisit(client.last_visit);
-
-            return (
-              <button
-                key={client.client_id}
-                onClick={() => navigate(`/provider/client/${client.client_id}`)}
-                className="w-full text-left focus:outline-none"
-              >
-                <Card className="flex items-center gap-3.5 mb-2">
-                  <Avatar
-                    initials={getInitials(client.name)}
-                    size={48}
-                    bg="#FFF0E6"
-                    color="#FF751F"
-                  />
-
-                  <div className="flex-1 min-w-0">
-                    {/* Name + badge */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-manrope text-[16px] font-semibold text-foreground m-0 truncate">
-                        {client.name}
-                      </p>
-                      <Badge label={cfg.label} variant={cfg.variant} />
+            <div className="px-5 flex-1 flex flex-col">
+                {/* Loading skeleton */}
+                {loading && (
+                    <div className="flex flex-col gap-4 pt-2">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="flex items-center gap-4 py-2">
+                                <div className="w-11 h-11 rounded-full bg-line/60 animate-pulse flex-shrink-0" />
+                                <div className="flex-1">
+                                    <div className="h-4 w-36 bg-line/60 rounded animate-pulse mb-2" />
+                                    <div className="h-3 w-24 bg-line/60 rounded animate-pulse" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
+                )}
 
-                    {/* Stats row */}
-                    <div className="flex gap-3">
-                      <span className="font-manrope text-[12px] text-muted">
-                        {client.visits} visit{client.visits !== 1 ? "s" : ""}
-                      </span>
-                      <span className="font-manrope text-[12px] text-muted">
-                        {fmtLtv(client.ltv)} LTV
-                      </span>
-                      {lastVisit && (
-                        <span className="font-manrope text-[12px] text-muted">
-                          Last {lastVisit}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Empty state */}
+                {!loading && clients.length === 0 && (
+                    <EmptyKliques handle={handle} />
+                )}
 
-                  {/* Chevron */}
-                  <svg
-                    width="20"
-                    height="20"
-                    fill="none"
-                    stroke="#6B7280"
-                    strokeWidth="1.5"
-                    viewBox="0 0 24 24"
-                    className="flex-shrink-0"
-                  >
-                    <path
-                      d="M9 5l7 7-7 7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Card>
-              </button>
-            );
-          })}
-      </div>
+                {/* Client list */}
+                {!loading && clients.length > 0 && (
+                    <>
+                        <Divider />
+                        {clients.map((client) => (
+                            <ClientRow
+                                key={client.client_id}
+                                client={client}
+                                onClick={() => navigate(`/provider/client/${client.client_id}`)}
+                            />
+                        ))}
 
-      <Footer />
-    </div>
-  );
+                        <div className="mt-7">
+                            <ShareLinks handle={handle} />
+                        </div>
+                    </>
+                )}
+
+                <Footer />
+            </div>
+        </div>
+    );
 };
 
 export default ProviderClients;
