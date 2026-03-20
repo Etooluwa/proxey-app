@@ -127,3 +127,20 @@ export async function downloadInvoicePDF(invoiceId) {
 export async function fetchProviderAnalytics({ period = "month" } = {}) {
   return request(`/provider/analytics?period=${period}`);
 }
+
+// Service groups
+export async function createServiceGroup(name) {
+  const data = await request("/provider/service-groups", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  return data.group;
+}
+
+export async function assignServiceGroup(serviceId, groupId) {
+  const data = await request(`/provider/services/${serviceId}/group`, {
+    method: "PATCH",
+    body: JSON.stringify({ group_id: groupId }),
+  });
+  return data.service;
+}

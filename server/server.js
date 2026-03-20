@@ -526,7 +526,7 @@ app.get("/api/services", async (req, res) => {
   res.status(200).json({ services: memoryStore.services });
 });
 
-// GET /api/provider/services — services for the authenticated provider + booking counts this month
+// GET /api/provider/services — services + groups for the authenticated provider
 app.get("/api/provider/services", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -535,47 +535,95 @@ app.get("/api/provider/services", async (req, res) => {
   const providerId = getProviderId(req);
 
   try {
-    const { data: services, error: svcError } = await supabase
-      .from("services")
-      .select("*")
-      .eq("provider_id", providerId)
-      .order("created_at", { ascending: false });
+    const [{ data: services, error: svcError }, { data: groups, error: grpError }] = await Promise.all([
+      supabase.from("services").select("*").eq("provider_id", providerId).order("created_at", { ascending: false }),
+      supabase.from("service_groups").select("*").eq("provider_id", providerId).order("sort_order", { ascending: true }),
+    ]);
 
     if (svcError) throw svcError;
+    if (grpError) throw grpError;
 
-    if (!services || services.length === 0) {
-      return res.status(200).json({ services: [] });
-    }
+    const svcs = services || [];
 
     // Booking counts this calendar month per service
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
 
-    const serviceIds = services.map((s) => s.id);
-    const { data: bookings } = await supabase
-      .from("bookings")
-      .select("service_id")
-      .eq("provider_id", providerId)
-      .in("service_id", serviceIds)
-      .neq("status", "cancelled")
-      .gte("scheduled_at", monthStart)
-      .lt("scheduled_at", monthEnd);
-
-    const countMap = {};
-    for (const b of bookings || []) {
-      if (b.service_id) countMap[b.service_id] = (countMap[b.service_id] || 0) + 1;
+    let countMap = {};
+    if (svcs.length > 0) {
+      const serviceIds = svcs.map((s) => s.id);
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("service_id")
+        .eq("provider_id", providerId)
+        .in("service_id", serviceIds)
+        .neq("status", "cancelled")
+        .gte("scheduled_at", monthStart)
+        .lt("scheduled_at", monthEnd);
+      for (const b of bookings || []) {
+        if (b.service_id) countMap[b.service_id] = (countMap[b.service_id] || 0) + 1;
+      }
     }
 
-    const result = services.map((s) => ({
+    const result = svcs.map((s) => ({
       ...s,
       bookings_this_month: countMap[s.id] || 0,
     }));
 
-    res.status(200).json({ services: result });
+    res.status(200).json({ services: result, groups: groups || [] });
   } catch (err) {
     console.error("[supabase] Failed to load provider services", err);
     res.status(500).json({ error: "Failed to load services." });
+  }
+});
+
+// POST /api/provider/service-groups — create a new service group
+app.post("/api/provider/service-groups", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
+  const providerId = getProviderId(req);
+  const { name } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
+  try {
+    const { data: existing } = await supabase
+      .from("service_groups")
+      .select("sort_order")
+      .eq("provider_id", providerId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    const sort_order = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
+    const { data, error } = await supabase
+      .from("service_groups")
+      .insert({ provider_id: providerId, name: name.trim(), sort_order })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ group: data });
+  } catch (err) {
+    console.error("[service-groups POST]", err);
+    res.status(500).json({ error: "Failed to create group." });
+  }
+});
+
+// PATCH /api/provider/services/:id/group — assign a service to a group
+app.patch("/api/provider/services/:id/group", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
+  const providerId = getProviderId(req);
+  const { id } = req.params;
+  const { group_id } = req.body || {};
+  try {
+    const { data, error } = await supabase
+      .from("services")
+      .update({ group_id: group_id || null })
+      .eq("id", id)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(200).json({ service: data });
+  } catch (err) {
+    console.error("[services/:id/group PATCH]", err);
+    res.status(500).json({ error: "Failed to update service group." });
   }
 });
 
