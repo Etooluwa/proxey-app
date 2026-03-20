@@ -55,6 +55,8 @@ import ProviderServiceEditor from './pages/provider/ProviderServiceEditor';
 import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcceptance';
 import ProviderNotifications from './pages/provider/ProviderNotifications';
 import ProviderAppointmentDetail from './pages/provider/ProviderAppointmentDetail';
+import AvailabilityPage from './pages/provider/AvailabilityPage';
+import BlockTimePage from './pages/provider/BlockTimePage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -154,6 +156,8 @@ function App() {
                       <Route path="notifications" element={<ProviderNotifications />} />
                       <Route path="requests/:requestId" element={<AppointmentRequestAcceptance />} />
                       <Route path="schedule" element={<ProviderSchedule />} />
+                      <Route path="availability" element={<AvailabilityPage />} />
+                      <Route path="block-time" element={<BlockTimePage />} />
                       <Route path="appointments" element={<ProviderAppointments />} />
                       <Route path="appointments/:id" element={<ProviderAppointmentDetail />} />
                       <Route path="clients" element={<ProviderClients />} />

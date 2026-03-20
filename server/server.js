@@ -3199,7 +3199,22 @@ app.get("/api/provider/calendar", async (req, res) => {
       byDate[key].push(b);
     }
 
-    res.status(200).json({ byDate });
+    // Also fetch blocked dates for this month
+    const startDate = new Date(year, m, 1).toISOString().slice(0, 10);
+    const endDate = new Date(year, m + 1, 1).toISOString().slice(0, 10);
+    const { data: blockedRows } = await supabase
+      .from("provider_blocked_dates")
+      .select("date, block_type, start_time, end_time, reason")
+      .eq("provider_id", providerId)
+      .gte("date", startDate)
+      .lt("date", endDate);
+
+    const blockedDates = {};
+    for (const row of blockedRows || []) {
+      blockedDates[row.date] = row;
+    }
+
+    res.status(200).json({ byDate, blockedDates });
   } catch (err) {
     console.error("[supabase] Failed to load provider calendar", err);
     res.status(500).json({ error: "Failed to load calendar." });
@@ -3661,6 +3676,121 @@ app.post("/api/provider/time-blocks", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to upsert provider time blocks", err);
     res.status(500).json({ error: "Failed to save time blocks." });
+  }
+});
+
+// ─── Provider weekly hours (provider_time_blocks) ────────────────────────────
+// These are the 7-day recurring availability blocks used by AvailabilityPage
+
+// GET /api/provider/weekly-hours — returns day_index 0-6 (0=Mon) with start/end
+app.get("/api/provider/weekly-hours", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  try {
+    const { data, error } = await supabase
+      .from("provider_time_blocks")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("day_index", { ascending: true });
+    if (error) throw error;
+    res.status(200).json({ hours: data || [] });
+  } catch (err) {
+    console.error("[weekly-hours GET]", err);
+    res.status(500).json({ error: "Failed to load weekly hours." });
+  }
+});
+
+// POST /api/provider/weekly-hours — replace all with new schedule
+// body: { hours: [{ dayIndex, startTime, endTime, isAvailable }], bufferMinutes, bookingWindowDays }
+app.post("/api/provider/weekly-hours", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const { hours = [], bufferMinutes, bookingWindowDays } = req.body || {};
+  if (!Array.isArray(hours)) return res.status(400).json({ error: "hours must be an array." });
+  try {
+    await supabase.from("provider_time_blocks").delete().eq("provider_id", providerId);
+    const payload = hours.map((h) => ({
+      provider_id: providerId,
+      day_index: h.dayIndex ?? h.day_index ?? 0,
+      start_time: h.startTime ?? h.start_time ?? "09:00",
+      end_time: h.endTime ?? h.end_time ?? "17:00",
+      is_available: h.isAvailable ?? h.is_available ?? true,
+    }));
+    const { data, error } = await supabase.from("provider_time_blocks").insert(payload).select();
+    if (error) throw error;
+    // Persist booking settings in provider_profiles.metadata
+    if (bufferMinutes !== undefined || bookingWindowDays !== undefined) {
+      const { data: prof } = await supabase.from("provider_profiles").select("metadata").eq("provider_id", providerId).single();
+      const meta = prof?.metadata || {};
+      if (bufferMinutes !== undefined) meta.bufferMinutes = bufferMinutes;
+      if (bookingWindowDays !== undefined) meta.bookingWindowDays = bookingWindowDays;
+      await supabase.from("provider_profiles").update({ metadata: meta }).eq("provider_id", providerId);
+    }
+    res.status(201).json({ hours: data });
+  } catch (err) {
+    console.error("[weekly-hours POST]", err);
+    res.status(500).json({ error: "Failed to save weekly hours." });
+  }
+});
+
+// ─── Provider blocked dates ───────────────────────────────────────────────────
+
+// GET /api/provider/blocked-dates — returns upcoming blocked dates
+app.get("/api/provider/blocked-dates", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  try {
+    const { data, error } = await supabase
+      .from("provider_blocked_dates")
+      .select("*")
+      .eq("provider_id", providerId)
+      .gte("date", new Date().toISOString().slice(0, 10))
+      .order("date", { ascending: true });
+    if (error) throw error;
+    res.status(200).json({ blocks: data || [] });
+  } catch (err) {
+    console.error("[blocked-dates GET]", err);
+    res.status(500).json({ error: "Failed to load blocked dates." });
+  }
+});
+
+// POST /api/provider/blocked-dates — add a blocked date
+// body: { date, blockType, startTime, endTime, reason }
+app.post("/api/provider/blocked-dates", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const { date, blockType = "full_day", startTime, endTime, reason } = req.body || {};
+  if (!date) return res.status(400).json({ error: "date is required." });
+  try {
+    const { data, error } = await supabase
+      .from("provider_blocked_dates")
+      .insert({ provider_id: providerId, date, block_type: blockType, start_time: startTime || null, end_time: endTime || null, reason: reason || null })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ block: data });
+  } catch (err) {
+    console.error("[blocked-dates POST]", err);
+    res.status(500).json({ error: "Failed to block date." });
+  }
+});
+
+// DELETE /api/provider/blocked-dates/:id
+app.delete("/api/provider/blocked-dates/:id", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const { id } = req.params;
+  try {
+    const { error } = await supabase
+      .from("provider_blocked_dates")
+      .delete()
+      .eq("id", id)
+      .eq("provider_id", providerId);
+    if (error) throw error;
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("[blocked-dates DELETE]", err);
+    res.status(500).json({ error: "Failed to delete blocked date." });
   }
 });
 
