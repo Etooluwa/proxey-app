@@ -14,7 +14,7 @@ This app was formerly called **Proxey**. It has been rebranded to **Kliques**.
 - The backend URL still contains "proxey" — this is expected
 - Any references to "Proxey" in existing code are legacy — do not change them unless specifically asked
 - All NEW code, UI text, comments, and user-facing strings should use "Kliques" or "kliques"
-- The logo wordmark is "kliques" (lowercase, Playfair Display font)
+- The logo wordmark is "kliques" (lowercase, Sora font)
 
 ## Tech Stack
 - **Frontend:** React 18.3.0 (Create React App), React Router 6.26.1
@@ -22,94 +22,75 @@ This app was formerly called **Proxey**. It has been rebranded to **Kliques**.
 - **State Management:** Context API (AuthContext, BookingContext, NotificationContext, MessageContext)
 - **Payment:** Stripe (@stripe/stripe-js, @stripe/react-stripe-js) + Stripe Connect for provider payouts
 - **Charts:** Recharts
-- **Icons:** Lucide React
+- **Icons:** Migrating from Lucide React → **@phosphor-icons/react**. New pages use Phosphor. Do NOT change existing Lucide imports unless reskinning that page.
 - **Backend:** Node.js + Express.js 5.1.0
 - **Database:** Supabase (PostgreSQL)
 - **PDF Generation:** jspdf (client), PDFKit (server)
 - **Hosting:** Frontend → Render Static Site (mykliques.com via Cloudflare CDN), Backend → Render Web Service
 
-## UI Direction — Apple Health-Inspired Design System
-**IMPORTANT:** We are migrating to a new UI. See `/docs/ui-reference/DESIGN_SYSTEM.md` for the full design system.
+## UI Direction — Warm Editorial Design System (v6)
 
-Screen mockups are in `/docs/ui-reference/client/` and `/docs/ui-reference/provider/`. These are JSX prototypes showing the exact UI for each screen. When building or updating a page, **read the matching reference file first** and match its layout, component structure, and visual hierarchy. Convert inline styles to Tailwind classes.
+The app has been fully redesigned. The v4 Apple Health gradient system is **deprecated and removed**. The new design uses a warm cream editorial aesthetic inspired by topographic card layouts.
 
-### Brand & Colors
-- **Brand color:** `#FF751F` (warm orange) — the ONLY accent color
-- **Page background:** `#F2F2F7` (Apple system gray)
-- **Card surfaces:** `#FFFFFF` (white cards on gray bg)
-- **Primary text:** `#0D1619` (near-black)
-- **Secondary text:** `#6B7280`
-- **CTA buttons:** `#0D1619` fill (near-black), white text
-- **Dividers:** `#E5E5EA`
-- **OLD colors to replace:** `#F58027` → `#FF751F`, `#12a6a1` teal → remove entirely, orange-to-teal gradient → remove entirely
+Reference prototypes are in `/docs/ui-reference/`. When building or updating a page, **read the matching reference file first.**
 
-### Gradient Header
-Every main screen has a warm gradient header:
+### Design Tokens
 ```css
-background: linear-gradient(180deg, #D45400 0%, #E87020 40%, #F09050 65%, #F5C4A0 82%, #F2F2F7 100%);
-border-radius: 0 0 28px 28px;
+base: #FBF7F2      /* Warm cream background */
+ink: #3D231E        /* Deep brown-black — primary text */
+muted: #8C6A64      /* Warm brown-gray — secondary text */
+faded: #B0948F      /* Lightest text */
+accent: #C25E4A     /* Terracotta — the ONLY accent color */
+hero: #FDDCC6       /* Orange-toned hero card background */
+avatarBg: #F2EBE5   /* Warm light bg for sections */
+line: rgba(140,106,100,0.2) /* Warm hairline divider */
+success: #5A8A5E    /* Muted earthy green */
+successBg: #EBF2EC
+callout: #FFF5E6    /* Warm yellow callout */
+card: #FFFFFF
+dangerBg: #FDEDEA
 ```
-- White text throughout the gradient area
-- Frosted glass stat cards in gradient: `bg-white/20 backdrop-blur-[10px]`
-- The gradient covers roughly 40% of the screen height
 
 ### Typography
-- **UI Font:** "Manrope", system-ui, sans-serif
-- **Logo Font:** "Playfair Display", Georgia, serif (wordmark only)
-- Page titles: 30px bold white (inside gradient)
-- Section headers: 18px bold
-- Card titles: 16px semibold
-- Body: 14px regular
+- **UI Font:** "Sora" (Google Font) — 400 body, 500 emphasis, 600 labels
+- **Logo Font:** "Sora" (wordmark only)
+- Page titles: 32px, font-weight 600, letter-spacing -0.03em
+- Labels (Lbl): 11px, uppercase, letter-spacing 0.05em, font-weight 500
+- Body: 14px, weight 400
 
 ### Key Patterns
-- **Cards everywhere:** All content sits in white rounded cards (16px radius, subtle shadow) on the gray `#F2F2F7` background
-- **No tab bar:** Navigation is an offcanvas hamburger menu (slide from left) for both client and provider
-- **GradientHeader:** Hamburger (white) + "kliques" logo (white) + optional right element (avatar, action button)
-- **Connected timelines:** History/relationship screens use dots + vertical connecting line between cards
+- **No white card containers** — content sits directly on the cream `#FBF7F2` base
+- **Hairline dividers** (`line` color) separate sections instead of card edges
+- **Hero cards:** `#FDDCC6` background + topographic SVG texture at 15% opacity, 28px border radius
+- **No gradient header** — the gradient header is removed entirely
+- **Hamburger menu:** Three lines in terracotta, offcanvas slide-in from left (no tab bar)
+- **Header layout:** "kliques" wordmark centered (absolute positioned), notification bell between logo and avatar, hamburger on left
+- **Provider headers** show avatar in header; **client headers do NOT** show avatar
+- **ArrowIcon:** Diagonal arrow (↗) as interaction hint — replaces chevrons
+- **Primary buttons:** `ink` fill (`#3D231E`), white text
+- **Secondary buttons:** Transparent fill, `line` border
+- **Connected timelines:** Dots + vertical line (unchanged pattern)
 - **Footer on every page:** kliques logo + About/Terms/Privacy/Support + © 2026
 
-### UI Reference Files
+### OLD things removed (do not use)
+- ~~Apple Health gradient header~~ → removed entirely, do not recreate
+- ~~`#F2F2F7` gray background~~ → replaced with `#FBF7F2`
+- ~~`#FF751F` orange~~ → replaced with `#C25E4A` terracotta
+- ~~`#0D1619` text~~ → replaced with `#3D231E`
+- ~~White card containers with shadows~~ → removed, use direct-on-cream + dividers
+- ~~Manrope font~~ → replaced with Sora
+- ~~GradientHeader component~~ → do not use, do not import
+- ~~Frosted glass stat cards~~ → removed with gradient header
+- ~~`#F58027`, `#12a6a1` teal~~ → remove on sight
+
+### UI Reference Files (v6)
 | File | Description |
 |------|-------------|
-| **Root** | |
-| `/docs/ui-reference/kliques-prototype-full.jsx` | Complete working prototype — all screens in a single file. Use as the master reference when you need to see how everything fits together. |
-| `/docs/ui-reference/README.md` | Index of all files with descriptions and usage instructions |
-| `/docs/ui-reference/DESIGN_SYSTEM.md` | Full design system — colors, gradient, typography, card patterns, layout rules |
-| **Shared components** (`/docs/ui-reference/shared/`) | |
-| `shared/tokens.js` | Design tokens — all colors, fonts, gradient definition |
-| `shared/gradient-header.jsx` | GradientHeader — warm gradient header with hamburger + logo |
-| `shared/card.jsx` | Card — white rounded card surface component |
-| `shared/side-menu.jsx` | SideMenu — offcanvas hamburger navigation |
-| `shared/nav-header.jsx` | Nav — back/close navigation bar for sub-screens |
-| `shared/footer.jsx` | Footer — page footer (logo + links + copyright) |
-| `shared/avatar.jsx` | Avatar — circle avatar with initials + frosted glass |
-| `shared/badge.jsx` | Badge — status pill badge |
-| `shared/logo.jsx` | Logo — kliques wordmark component |
-| `shared/menu-button.jsx` | MenuBtn — hamburger icon button |
-| `shared/phone-frame.jsx` | Phone — phone mockup wrapper (prototype only, not for production) |
-| `shared/app-router.jsx` | KliquesApp — main app router with role switcher (prototype only) |
-| **Client screens** (`/docs/ui-reference/client/`) | |
-| `client/my-kliques.jsx` | My kliques — provider relationship list |
-| `client/relationship.jsx` | Relationship — connected timeline with provider + rebook buttons |
-| `client/select-services.jsx` | Select services — category pills + toggle-select service cards |
-| `client/service-detail.jsx` | Service detail — bottom sheet with radio option cards |
-| `client/select-time.jsx` | Select time — date picker card + time slot cards |
-| `client/booking-confirmed.jsx` | Booking confirmed — success state + receipt card |
-| `client/messages.jsx` | Messages — conversation cards with unread indicators |
-| `client/profile.jsx` | Profile — avatar in gradient + settings cards |
-| **Provider screens** (`/docs/ui-reference/provider/`) | |
-| `provider/dashboard.jsx` | Dashboard — frosted stats in gradient + pending bookings + schedule |
-| `provider/bookings.jsx` | Bookings — accept/reject cards with client notes |
-| `provider/my-kliques.jsx` | My kliques — client cards with Active/At risk/New badges |
-| `provider/client-timeline.jsx` | Client timeline — gradient header + connected timeline cards |
-| `provider/services.jsx` | Services — service management cards + Add button |
-| `provider/service-editor.jsx` | Service editor — grouped form cards (details, pricing, deposits, intake questions) |
-| `provider/calendar.jsx` | Calendar — month grid card + day schedule cards |
-| `provider/messages.jsx` | Messages — conversation cards with unread dots |
-| `provider/earnings.jsx` | Earnings — total in frosted gradient card + chart + breakdown cards |
-| `provider/smart-alerts.jsx` | Smart alerts — color-coded actionable alert cards |
-| `provider/appointment-detail.jsx` | Appointment detail — client card + session notes + mark complete |
-| `provider/profile.jsx` | Profile — avatar + stats in gradient + settings cards |
+| `/docs/ui-reference/kliques-prototype-v6.jsx` | **Master reference** — full dual-flow prototype (client + provider) |
+| `/docs/ui-reference/kliques-v6-onboarding.jsx` | Auth + onboarding flows |
+| `/docs/ui-reference/kliques-v6-public.jsx` | Public booking + invite flow |
+| `/docs/ui-reference/kliques-v6-provider-empty.jsx` | Provider empty states |
+| `/docs/ui-reference/kliques-v6-client-empty.jsx` | Client empty states |
 
 ## User Roles
 | Role | Entry Point | Menu Items |
@@ -155,8 +136,8 @@ These are **new** features that don't exist in the current codebase:
 - **Direct SQL Access:** Use `/usr/local/opt/libpq/bin/psql` with DATABASE_URL from server/.env
 - **MCP Config:** `.mcp.json` in project root (Supabase native MCP)
 
-## Database Tables (26 tables)
-providers, provider_profiles, client_profiles, bookings, provider_jobs, services, promotions, reviews, notifications, client_notifications, messages, portfolio_media, provider_time_blocks, provider_availability, time_requests, client_transactions, provider_invoices, disputes, conversations, service_intake_questions, service_intake_options, booking_intake_responses, provider_onboarding_drafts, provider_invites, provider_clients, disputes
+## Database Tables (20 tables)
+providers, provider_profiles, client_profiles, bookings, provider_jobs, services, promotions, reviews, notifications, client_notifications, messages, portfolio_media, provider_time_blocks, provider_availability, time_requests, client_transactions, provider_invoices, disputes, users, conversations
 
 ## Project Structure
 ```
@@ -198,4 +179,6 @@ providers, provider_profiles, client_profiles, bookings, provider_jobs, services
 - Messaging is functional but incomplete in some areas
 - Codebase root folder still named "proxeyapp" — needs rename
 - Old CSS Modules being replaced by Tailwind incrementally
-- Old brand colors (#F58027, #12a6a1) being replaced with new system
+- All previously built pages (v4 design) need to be reskinned to v6 (warm editorial)
+- Lucide React imports being replaced by @phosphor-icons/react incrementally on reskin
+- `tailwind.config.js` needs tokens updated from v4 to v6 palette
