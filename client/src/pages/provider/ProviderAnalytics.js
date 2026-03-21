@@ -138,8 +138,8 @@ const ProviderAnalytics = () => {
                                     labelFormatter={(d) => new Date(d).toLocaleDateString()}
                                 />
                                 <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="bookings" name="Bookings" stroke="#F58027" strokeWidth={2} dot={false} />
-                                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue" stroke="#12a6a1" strokeWidth={2} dot={false} />
+                                <Line yAxisId="left" type="monotone" dataKey="bookings" name="Bookings" stroke="#C25E4A" strokeWidth={2} dot={false} />
+                                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue" stroke="#5A8A5E" strokeWidth={2} dot={false} />
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (
@@ -185,7 +185,7 @@ const ProviderAnalytics = () => {
                                     />
                                     <Bar dataKey="revenue" radius={[6, 6, 0, 0]} barSize={30}>
                                         {servicePerformance.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill="#F58027" />
+                                            <Cell key={`cell-${index}`} fill="#C25E4A" />
                                         ))}
                                     </Bar>
                                 </BarChart>

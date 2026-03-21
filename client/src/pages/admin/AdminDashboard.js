@@ -132,7 +132,7 @@ const AdminDashboard = () => {
                                 />
                                 <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
                                     {monthlyData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#F58027' : '#e2e8f0'} />
+                                        <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#C25E4A' : '#e2e8f0'} />
                                     ))}
                                 </Bar>
                             </BarChart>

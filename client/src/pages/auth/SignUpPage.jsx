@@ -74,12 +74,12 @@ function SignUpPage() {
         <section className="auth__intro">
           <span className="eyebrow">Create an account</span>
           <h1 className="auth__title">
-            {role === "provider" ? "Grow with Proxey" : "Find your next go-to pro"}
+            {role === "provider" ? "Grow with Kliques" : "Find your next go-to pro"}
           </h1>
           <p className="auth__support">
             {role === "provider"
               ? "Join a trusted marketplace and start receiving qualified bookings within minutes."
-              : "Curate your home team of providers and handle payments securely on Proxey."}
+              : "Curate your home team of providers and handle payments securely on Kliques."}
           </p>
         </section>
 

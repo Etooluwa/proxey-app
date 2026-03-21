@@ -1,6 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { MobileBottomNav } from './MobileBottomNav';
 import { Icons } from '../Icons';
 import { useSession } from '../../auth/authContext';
 
@@ -60,7 +59,6 @@ const AdminShell = () => {
                     <Outlet />
                 </main>
 
-                <MobileBottomNav role="admin" />
             </div>
         </div>
     );

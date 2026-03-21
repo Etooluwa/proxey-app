@@ -86,16 +86,16 @@ export default function AuthCallback() {
         height: "100vh",
         flexDirection: "column",
         gap: 16,
-        fontFamily: "Manrope, system-ui, sans-serif",
-        background: "#F2F2F7",
+        fontFamily: "'Sora', system-ui, sans-serif",
+        background: "#FBF7F2",
       }}
     >
       <div
         style={{
           width: 40,
           height: 40,
-          border: "3px solid #E5E5EA",
-          borderTop: "3px solid #FF751F",
+          border: "3px solid rgba(140,106,100,0.2)",
+          borderTop: "3px solid #C25E4A",
           borderRadius: "50%",
           animation: "spin 0.9s linear infinite",
         }}

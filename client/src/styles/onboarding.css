@@ -97,7 +97,7 @@
 }
 
 .onboarding__photo-button:hover .onboarding__photo-circle {
-  border-color: #F58027;
+  border-color: #C25E4A;
 }
 
 .onboarding__photo-icon {
@@ -108,7 +108,7 @@
 }
 
 .onboarding__photo-button:hover .onboarding__photo-icon {
-  color: #F58027;
+  color: #C25E4A;
 }
 
 .onboarding__photo-preview {
@@ -124,7 +124,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #F58027;
+  background: #C25E4A;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +222,7 @@
 
 .onboarding__input:focus {
   outline: none;
-  border-color: #F58027;
+  border-color: #C25E4A;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
 }
 
@@ -243,7 +243,7 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #F58027 !important;
+  background: #C25E4A !important;
   box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.2),
     0 4px 6px -2px rgba(20, 184, 166, 0.1);
 }
@@ -299,7 +299,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #F58027;
+  color: #C25E4A;
   margin-bottom: 0.5rem;
 }
 
@@ -334,7 +334,7 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #F58027 !important;
+  background: #C25E4A !important;
   border-radius: 9999px;
   box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
   margin-top: 1rem;
@@ -359,7 +359,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #F58027;
+  color: #C25E4A;
   margin-bottom: 1rem;
 }
 
@@ -383,7 +383,7 @@
   height: 56px;
   font-size: 1rem;
   font-weight: 700;
-  background: #F58027 !important;
+  background: #C25E4A !important;
   color: #ffffff !important;
   border: none;
   border-radius: 9999px;

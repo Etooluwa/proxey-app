@@ -42,7 +42,7 @@
 }
 
 .plain-field:focus-within {
-  border-color: #F58027;
+  border-color: #C25E4A;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
   transform: translateY(-1px);
 }
@@ -115,7 +115,7 @@
 
 .plain-input:focus {
   outline: none;
-  border-color: #F58027;
+  border-color: #C25E4A;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
   transform: translateY(-1px);
 }
@@ -134,7 +134,7 @@
   height: 22px;
   min-width: 22px;
   min-height: 22px;
-  accent-color: #F58027;
+  accent-color: #C25E4A;
   cursor: pointer;
 }
 
@@ -174,14 +174,14 @@
 .plain-secure-icon {
   width: 18px;
   height: 18px;
-  color: #F58027;
+  color: #C25E4A;
   flex-shrink: 0;
 }
 
 .plain-submit {
   width: 100%;
   min-height: 56px !important;
-  background: linear-gradient(90deg, #F58027, #12a6a1) !important;
+  background: linear-gradient(90deg, #C25E4A, #5A8A5E) !important;
   color: white !important;
   border: none !important;
   border-radius: 14px;

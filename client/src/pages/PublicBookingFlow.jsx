@@ -20,16 +20,16 @@ import Nav from "../components/ui/Nav";
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || "");
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const ACCENT = "#FF751F";
+const ACCENT = "#C25E4A";
 const ACCENT_LIGHT = "#FFF0E6";
-const BG = "#F2F2F7";
-const FG = "#0D1619";
+const BG = "#FBF7F2";
+const FG = "#3D231E";
 const MUTED = "#6B7280";
-const DIVIDER = "#E5E5EA";
+const DIVIDER = "rgba(140,106,100,0.2)";
 const SUCCESS_BG = "#F0FDF4";
 const SUCCESS_FG = "#22C55E";
 const GRADIENT =
-  "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#F2F2F7 100%)";
+  "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#FBF7F2 100%)";
 
 // sessionStorage keys
 const SS_PREFIX = "kliques.pub_booking.";
@@ -104,7 +104,7 @@ function PageShell({ children, onBack, title }) {
         background: BG,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Manrope, system-ui, sans-serif",
+        fontFamily: "'Sora', system-ui, sans-serif",
       }}
     >
       <Nav onBack={onBack} title={title} />
@@ -143,7 +143,7 @@ function StickyBar({ children, disabled, loading, onClick, label }) {
             color: "#fff",
             fontSize: 16,
             fontWeight: 700,
-            fontFamily: "Manrope, system-ui, sans-serif",
+            fontFamily: "'Sora', system-ui, sans-serif",
             cursor: disabled || loading ? "not-allowed" : "pointer",
           }}
         >
@@ -245,7 +245,7 @@ function StepServices({ provider, services, onNext }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", fontFamily: "Manrope, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", fontFamily: "'Sora', system-ui, sans-serif" }}>
       <ProviderHero provider={provider} />
       <div style={{ flex: 1, padding: "24px 16px 0" }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: FG, margin: "0 0 16px" }}>
@@ -487,7 +487,7 @@ function StepEmail({ onNext, onBack }) {
                 border: `1px solid ${DIVIDER}`,
                 background: BG,
                 fontSize: 16,
-                fontFamily: "Manrope, system-ui, sans-serif",
+                fontFamily: "'Sora', system-ui, sans-serif",
                 color: FG,
                 outline: "none",
                 boxSizing: "border-box",
@@ -510,7 +510,7 @@ function StepEmail({ onNext, onBack }) {
             color: "#fff",
             fontSize: 16,
             fontWeight: 700,
-            fontFamily: "Manrope, system-ui, sans-serif",
+            fontFamily: "'Sora', system-ui, sans-serif",
             cursor: !email.trim() || loading ? "not-allowed" : "pointer",
             marginTop: 4,
           }}
@@ -606,7 +606,7 @@ function StepMagicLink({ email, onBack }) {
             </p>
             <button
               onClick={sendLink}
-              style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "Manrope, system-ui, sans-serif" }}
+              style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Sora', system-ui, sans-serif" }}
             >
               Resend link
             </button>
@@ -681,7 +681,7 @@ function StepMagicLinkNew({ email, onBack }) {
         <button
           onClick={resend}
           disabled={resending}
-          style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "Manrope, system-ui, sans-serif" }}
+          style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Sora', system-ui, sans-serif" }}
         >
           {resending ? "Sending…" : "Resend link"}
         </button>
@@ -767,8 +767,8 @@ function StepResumeBooking({ provider, service, slot, onConfirmed }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "Manrope, system-ui, sans-serif" }}>
-      <div style={{ width: 40, height: 40, border: "3px solid #E5E5EA", borderTop: `3px solid ${ACCENT}`, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "'Sora', system-ui, sans-serif" }}>
+      <div style={{ width: 40, height: 40, border: "3px solid rgba(140,106,100,0.2)", borderTop: `3px solid ${ACCENT}`, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
       <p style={{ color: MUTED, fontSize: 15 }}>Completing your booking…</p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -809,7 +809,7 @@ function PaymentCardForm({ onToken }) {
         }}
       >
         <CardElement
-          options={{ style: { base: { fontSize: "16px", fontFamily: "Manrope, system-ui, sans-serif", color: FG } } }}
+          options={{ style: { base: { fontSize: "16px", fontFamily: "'Sora', system-ui, sans-serif", color: FG } } }}
           onChange={(e) => { setReady(e.complete); setError(e.error?.message || ""); }}
         />
       </div>
@@ -949,7 +949,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
             </div>
             <button
               onClick={() => setUseNewCard(true)}
-              style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0, fontFamily: "Manrope, system-ui, sans-serif" }}
+              style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0, fontFamily: "'Sora', system-ui, sans-serif" }}
             >
               Use a different card
             </button>
@@ -973,7 +973,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
             {paymentMethods.length > 0 && (
               <button
                 onClick={() => { setUseNewCard(false); setSelectedPm(paymentMethods.find((p) => p.isDefault) || paymentMethods[0]); }}
-                style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "Manrope, system-ui, sans-serif" }}
+                style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "'Sora', system-ui, sans-serif" }}
               >
                 Use saved card
               </button>
@@ -1008,7 +1008,7 @@ function StepConfirmedExisting({ result }) {
         background: BG,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Manrope, system-ui, sans-serif",
+        fontFamily: "'Sora', system-ui, sans-serif",
       }}
     >
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "56px 24px 32px", textAlign: "center" }}>
@@ -1075,13 +1075,13 @@ function StepConfirmedExisting({ result }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", marginTop: 8 }}>
           <button
             onClick={() => navigate("/app/messages")}
-            style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", background: FG, color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "Manrope, system-ui, sans-serif", cursor: "pointer" }}
+            style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", background: FG, color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Sora', system-ui, sans-serif", cursor: "pointer" }}
           >
             Message {provider?.name?.split(" ")[0]}
           </button>
           <button
             onClick={() => navigate("/app")}
-            style={{ width: "100%", padding: 14, borderRadius: 12, border: `1px solid ${DIVIDER}`, background: "#fff", fontSize: 16, fontWeight: 600, fontFamily: "Manrope, system-ui, sans-serif", color: FG, cursor: "pointer" }}
+            style={{ width: "100%", padding: 14, borderRadius: 12, border: `1px solid ${DIVIDER}`, background: "#fff", fontSize: 16, fontWeight: 600, fontFamily: "'Sora', system-ui, sans-serif", color: FG, cursor: "pointer" }}
           >
             View my kliques
           </button>
@@ -1154,7 +1154,7 @@ function StepCreateAccountPayment({ service, provider, slot, email, onNext, onBa
     border: `1px solid ${DIVIDER}`,
     background: BG,
     fontSize: 16,
-    fontFamily: "Manrope, system-ui, sans-serif",
+    fontFamily: "'Sora', system-ui, sans-serif",
     color: FG,
     outline: "none",
     boxSizing: "border-box",
@@ -1203,7 +1203,7 @@ function StepCreateAccountPayment({ service, provider, slot, email, onNext, onBa
               style: {
                 base: {
                   fontSize: "16px",
-                  fontFamily: "Manrope, system-ui, sans-serif",
+                  fontFamily: "'Sora', system-ui, sans-serif",
                   color: FG,
                 },
               },
@@ -1275,7 +1275,7 @@ function StepConfirmedNew({ result }) {
         background: BG,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Manrope, system-ui, sans-serif",
+        fontFamily: "'Sora', system-ui, sans-serif",
       }}
     >
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "56px 24px 32px", textAlign: "center" }}>
@@ -1353,13 +1353,13 @@ function StepConfirmedNew({ result }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", marginTop: 8 }}>
           <button
             onClick={() => navigate("/app/messages")}
-            style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", background: FG, color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "Manrope, system-ui, sans-serif", cursor: "pointer" }}
+            style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", background: FG, color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Sora', system-ui, sans-serif", cursor: "pointer" }}
           >
             Message {provider?.name?.split(" ")[0]}
           </button>
           <button
             onClick={() => navigate("/app")}
-            style={{ width: "100%", padding: 14, borderRadius: 12, border: `1px solid ${DIVIDER}`, background: "#fff", fontSize: 16, fontWeight: 600, fontFamily: "Manrope, system-ui, sans-serif", color: FG, cursor: "pointer" }}
+            style={{ width: "100%", padding: 14, borderRadius: 12, border: `1px solid ${DIVIDER}`, background: "#fff", fontSize: 16, fontWeight: 600, fontFamily: "'Sora', system-ui, sans-serif", color: FG, cursor: "pointer" }}
           >
             View my kliques
           </button>

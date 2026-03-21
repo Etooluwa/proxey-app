@@ -49,7 +49,7 @@
 
 .dashboard__search-input:focus {
   outline: none;
-  border-color: #F58027;
+  border-color: #C25E4A;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
 }
@@ -73,7 +73,7 @@
   width: 80px;
   height: 80px;
   margin-bottom: 1.5rem;
-  color: #F58027;
+  color: #C25E4A;
   display: flex;
   align-items: center;
   justify-content: center;

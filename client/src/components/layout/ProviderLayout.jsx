@@ -3,9 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { useSession } from '../../auth/authContext';
 
-// ─── Provider menu items ──────────────────────────────────────────────────────
-// id maps to the first path segment after /provider (or 'home' for the index route)
-// d is the SVG path string for the 22×22 icon
+// ─── Provider side menu ──────────────────────────────────────────────────────
 const PROVIDER_MENU = [
     {
         id: 'home',
@@ -14,9 +12,9 @@ const PROVIDER_MENU = [
         d: 'M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z M9 21V12h6v9',
     },
     {
-        id: 'appointments',
+        id: 'bookings',
         label: 'Bookings',
-        path: '/provider/appointments',
+        path: '/provider/bookings',
         d: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
         badge: true,
     },
@@ -33,9 +31,9 @@ const PROVIDER_MENU = [
         d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
     },
     {
-        id: 'schedule',
+        id: 'calendar',
         label: 'Calendar',
-        path: '/provider/schedule',
+        path: '/provider/calendar',
         d: 'M8 7V3m8 4V3M3 11h18M5 5h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z',
     },
     {
@@ -52,6 +50,13 @@ const PROVIDER_MENU = [
         d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     },
     {
+        id: 'notifications',
+        label: 'Notifications',
+        path: '/provider/notifications',
+        d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+        badge: true,
+    },
+    {
         id: 'profile',
         label: 'Profile',
         path: '/provider/profile',
@@ -59,55 +64,46 @@ const PROVIDER_MENU = [
     },
 ];
 
-// Derive the active menu id from the current pathname
-function useProviderActiveId(items) {
+function useActiveId(items, rootPath) {
     const { pathname } = useLocation();
-    // Exact match for the root /provider route; startsWith for all others
-    for (const item of items) {
-        if (item.path === '/provider') {
-            if (pathname === '/provider') return item.id;
+    // Check longer paths first to avoid /provider/calendar matching /provider
+    const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
+    for (const item of sorted) {
+        if (item.path === rootPath) {
+            if (pathname === rootPath) return item.id;
         } else if (pathname.startsWith(item.path)) {
             return item.id;
         }
     }
-    return 'home';
+    return items[0]?.id ?? 'home';
 }
-
-// ─── Layout ───────────────────────────────────────────────────────────────────
 
 const ProviderLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
 
-    const activeId = useProviderActiveId(PROVIDER_MENU);
+    const activeId = useActiveId(PROVIDER_MENU, '/provider');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
-    const initials = displayName
-        .split(' ')
-        .map((w) => w[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
+    const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
     const userPhoto = profile?.photo || undefined;
 
     const handleNav = (id) => {
-        if (id === 'logout') {
-            logout().then(() => navigate('/'));
-            return;
-        }
         const item = PROVIDER_MENU.find((m) => m.id === id);
         if (item) navigate(item.path);
     };
 
+    const handleSignOut = () => {
+        logout().then(() => navigate('/login'));
+    };
+
     return (
-        <div className="relative min-h-screen bg-background font-manrope">
-            {/* Page content — each child page renders its own GradientHeader */}
+        <div className="relative min-h-screen" style={{ background: '#FBF7F2' }}>
             <main>
                 <Outlet context={{ onMenu: () => setMenuOpen(true) }} />
             </main>
 
-            {/* Offcanvas side menu */}
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
@@ -117,6 +113,7 @@ const ProviderLayout = () => {
                 userName={displayName}
                 userInitials={initials}
                 userPhoto={userPhoto}
+                onSignOut={handleSignOut}
             />
         </div>
     );

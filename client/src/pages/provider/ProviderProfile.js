@@ -75,14 +75,14 @@ const ProviderProfile = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
+    <div className="flex flex-col min-h-screen bg-background font-sora overflow-y-auto">
 
       {/* ── Gradient header ────────────────────────────────────────────── */}
       <div
         className="relative flex flex-col"
         style={{
           background:
-            "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#F2F2F7 100%)",
+            "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#FBF7F2 100%)",
           borderRadius: "0 0 28px 28px",
           marginBottom: "-20px",
           zIndex: 1,
@@ -99,7 +99,7 @@ const ProviderProfile = () => {
           <Avatar initials={initials} size={80} />
 
           <p
-            className="font-manrope font-bold text-white m-0 mt-3 mb-0.5"
+            className="font-sora font-bold text-white m-0 mt-3 mb-0.5"
             style={{ fontSize: 22 }}
           >
             {name}
@@ -107,7 +107,7 @@ const ProviderProfile = () => {
 
           {studioName && (
             <p
-              className="font-manrope text-[14px] m-0"
+              className="font-sora text-[14px] m-0"
               style={{ color: "rgba(255,255,255,0.8)" }}
             >
               {studioName}
@@ -126,13 +126,13 @@ const ProviderProfile = () => {
                 }}
               >
                 <p
-                  className="font-manrope font-bold text-white m-0 mb-0.5"
+                  className="font-sora font-bold text-white m-0 mb-0.5"
                   style={{ fontSize: 18 }}
                 >
                   {s.value}
                 </p>
                 <p
-                  className="font-manrope text-[12px] m-0"
+                  className="font-sora text-[12px] m-0"
                   style={{ color: "rgba(255,255,255,0.7)" }}
                 >
                   {s.label}
@@ -152,10 +152,10 @@ const ProviderProfile = () => {
             className="flex items-center gap-3.5 mb-2 cursor-pointer"
           >
             <div className="flex-1 min-w-0">
-              <p className="font-manrope text-[16px] font-semibold text-foreground m-0">
+              <p className="font-sora text-[16px] font-semibold text-foreground m-0">
                 {item.label}
               </p>
-              <p className="font-manrope text-[14px] text-muted m-0 mt-0.5">
+              <p className="font-sora text-[14px] text-muted m-0 mt-0.5">
                 {item.sub}
               </p>
             </div>
@@ -176,7 +176,7 @@ const ProviderProfile = () => {
         {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="w-full font-manrope text-[15px] font-semibold focus:outline-none mt-1"
+          className="w-full font-sora text-[15px] font-semibold focus:outline-none mt-1"
           style={{
             padding: "14px",
             borderRadius: "12px",

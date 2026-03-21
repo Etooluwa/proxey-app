@@ -6,6 +6,7 @@ module.exports = {
     theme: {
         fontFamily: {
             sans: ["'Sora'", 'system-ui', 'sans-serif'],
+            sora: ["'Sora'", 'system-ui', 'sans-serif'],
         },
         extend: {
             colors: {

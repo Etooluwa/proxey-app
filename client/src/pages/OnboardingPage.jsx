@@ -101,7 +101,7 @@ function OnboardingPage() {
 
       toast.push({
         title: "Profile created!",
-        description: "Welcome to Proxey! Let's get started.",
+        description: "Welcome to Kliques! Let's get started.",
         variant: "success",
       });
 
@@ -461,13 +461,13 @@ function OnboardingPage() {
             <div className="onboarding__payment-section">
               {/* Success Icon */}
               <div className="onboarding__payment-success-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#F58027", width: "48px", height: "48px" }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: "#C25E4A", width: "48px", height: "48px" }}>
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                 </svg>
               </div>
 
               {/* Success Message */}
-              <p style={{ marginTop: "1rem", color: "#F58027", fontWeight: "500", fontSize: "1rem", textAlign: "center" }}>
+              <p style={{ marginTop: "1rem", color: "#C25E4A", fontWeight: "500", fontSize: "1rem", textAlign: "center" }}>
                 Card saved successfully!
               </p>
             </div>

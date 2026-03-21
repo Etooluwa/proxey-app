@@ -158,9 +158,9 @@ function BookingConfirmPage() {
   // ── Loading skeleton ───────────────────────────────────────────────────────
   if (bookingsLoading && !booking) {
     return (
-      <div className="flex flex-col min-h-screen bg-background font-manrope items-center justify-center px-6">
+      <div className="flex flex-col min-h-screen bg-background font-sora items-center justify-center px-6">
         <div className="w-10 h-10 rounded-full border-2 border-accent border-t-transparent animate-spin mb-4" />
-        <p className="font-manrope text-[14px] text-muted">Loading booking…</p>
+        <p className="font-sora text-[14px] text-muted">Loading booking…</p>
       </div>
     );
   }
@@ -168,17 +168,17 @@ function BookingConfirmPage() {
   // ── Not found state ────────────────────────────────────────────────────────
   if (!booking) {
     return (
-      <div className="flex flex-col min-h-screen bg-background font-manrope items-center justify-center px-6 text-center gap-4">
-        <p className="font-manrope text-[17px] font-semibold text-foreground">
+      <div className="flex flex-col min-h-screen bg-background font-sora items-center justify-center px-6 text-center gap-4">
+        <p className="font-sora text-[17px] font-semibold text-foreground">
           Booking not found
         </p>
-        <p className="font-manrope text-[14px] text-muted">
+        <p className="font-sora text-[14px] text-muted">
           It may have been updated or cancelled.
         </p>
         <button
           onClick={() => navigate("/app")}
-          className="mt-2 px-6 py-3 rounded-card font-manrope text-[15px] font-bold text-white focus:outline-none"
-          style={{ background: "#0D1619" }}
+          className="mt-2 px-6 py-3 rounded-card font-sora text-[15px] font-bold text-white focus:outline-none"
+          style={{ background: "#3D231E" }}
         >
           Go home
         </button>
@@ -188,7 +188,7 @@ function BookingConfirmPage() {
 
   // ── Confirmed screen ───────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope items-center justify-center px-6 text-center">
+    <div className="flex flex-col min-h-screen bg-background font-sora items-center justify-center px-6 text-center">
 
       {/* Green check circle */}
       <div
@@ -204,13 +204,13 @@ function BookingConfirmPage() {
       </div>
 
       {/* Heading */}
-      <h1 className="font-manrope text-[28px] font-bold text-foreground m-0 mb-2">
+      <h1 className="font-sora text-[28px] font-bold text-foreground m-0 mb-2">
         You're booked!
       </h1>
 
       {/* Summary sentence */}
       <p
-        className="font-manrope text-[15px] text-muted m-0 mb-8"
+        className="font-sora text-[15px] text-muted m-0 mb-8"
         style={{ lineHeight: 1.6 }}
       >
         {serviceName} with {providerName}
@@ -230,8 +230,8 @@ function BookingConfirmPage() {
           .filter(Boolean)
           .map(([label, value]) => (
             <div key={label} className="flex justify-between items-center mb-2">
-              <span className="font-manrope text-[14px] text-muted">{label}</span>
-              <span className="font-manrope text-[14px] font-semibold text-foreground">
+              <span className="font-sora text-[14px] text-muted">{label}</span>
+              <span className="font-sora text-[14px] font-semibold text-foreground">
                 {value}
               </span>
             </div>
@@ -240,22 +240,22 @@ function BookingConfirmPage() {
         {/* Divider */}
         <div
           className="my-3"
-          style={{ height: "0.5px", background: "#E5E5EA" }}
+          style={{ height: "0.5px", background: "rgba(140,106,100,0.2)" }}
         />
 
         {/* Total */}
         <div className="flex justify-between items-center">
-          <span className="font-manrope text-[16px] font-bold text-foreground">
+          <span className="font-sora text-[16px] font-bold text-foreground">
             Total
           </span>
-          <span className="font-manrope text-[16px] font-bold text-foreground">
+          <span className="font-sora text-[16px] font-bold text-foreground">
             {totalPrice ? fmtPrice(totalPrice) : "Provided after review"}
           </span>
         </div>
 
         {/* Deposit note */}
         {booking.depositAmount && (
-          <p className="font-manrope text-[13px] text-muted m-0 mt-2">
+          <p className="font-sora text-[13px] text-muted m-0 mt-2">
             Deposit: {fmtPrice(booking.depositAmount)} ·{" "}
             Final {fmtPrice(booking.price - booking.depositAmount)} after service
           </p>
@@ -265,7 +265,7 @@ function BookingConfirmPage() {
       {/* Payment method selector (if saved cards) */}
       {!loadingPaymentMethods && savedPaymentMethods.length > 0 && (
         <div className="w-full mb-3">
-          <p className="font-manrope text-[13px] font-semibold text-foreground text-left mb-2">
+          <p className="font-sora text-[13px] font-semibold text-foreground text-left mb-2">
             Pay with
           </p>
           <div className="flex flex-col gap-2">
@@ -278,7 +278,7 @@ function BookingConfirmPage() {
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-card text-left focus:outline-none transition-colors"
                   style={{
                     background: isSelected ? "#FFF0E6" : "#FFFFFF",
-                    border: isSelected ? "1.5px solid #FF751F" : "1px solid #E5E5EA",
+                    border: isSelected ? "1.5px solid #C25E4A" : "1px solid rgba(140,106,100,0.2)",
                   }}
                 >
                   <div
@@ -287,16 +287,16 @@ function BookingConfirmPage() {
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      background: isSelected ? "#FF751F" : "transparent",
+                      background: isSelected ? "#C25E4A" : "transparent",
                       border: isSelected ? "none" : "2px solid #D1D5DB",
                     }}
                   >
                     {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
-                  <span className="font-manrope text-[14px] font-semibold text-foreground">
+                  <span className="font-sora text-[14px] font-semibold text-foreground">
                     {method.brand?.toUpperCase()} ···· {method.last4}
                   </span>
-                  <span className="font-manrope text-[12px] text-muted ml-auto">
+                  <span className="font-sora text-[12px] text-muted ml-auto">
                     {method.expMonth}/{method.expYear}
                   </span>
                 </button>
@@ -313,9 +313,9 @@ function BookingConfirmPage() {
           <button
             onClick={handleCheckout}
             disabled={loadingCheckout}
-            className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform"
+            className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform"
             style={{
-              background: loadingCheckout ? "#B0B0B0" : "#0D1619",
+              background: loadingCheckout ? "#B0B0B0" : "#3D231E",
               cursor: loadingCheckout ? "not-allowed" : "pointer",
             }}
           >
@@ -330,8 +330,8 @@ function BookingConfirmPage() {
             onClick={() =>
               navigate("/app/messages", { state: { providerId } })
             }
-            className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform"
-            style={{ background: "#0D1619" }}
+            className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform"
+            style={{ background: "#3D231E" }}
           >
             Message {providerName.split(" ")[0]}
           </button>
@@ -343,8 +343,8 @@ function BookingConfirmPage() {
             onClick={() =>
               navigate("/app/messages", { state: { providerId } })
             }
-            className="w-full py-[14px] rounded-card font-manrope text-[16px] font-semibold text-foreground bg-card focus:outline-none active:scale-[0.98] transition-transform"
-            style={{ border: "1px solid #E5E5EA" }}
+            className="w-full py-[14px] rounded-card font-sora text-[16px] font-semibold text-foreground bg-card focus:outline-none active:scale-[0.98] transition-transform"
+            style={{ border: "1px solid rgba(140,106,100,0.2)" }}
           >
             Message {providerName.split(" ")[0]}
           </button>
@@ -354,8 +354,8 @@ function BookingConfirmPage() {
         {providerId && (
           <button
             onClick={() => navigate(`/app/relationship/${providerId}`)}
-            className="w-full py-[14px] rounded-card font-manrope text-[16px] font-semibold text-foreground bg-card focus:outline-none active:scale-[0.98] transition-transform"
-            style={{ border: "1px solid #E5E5EA" }}
+            className="w-full py-[14px] rounded-card font-sora text-[16px] font-semibold text-foreground bg-card focus:outline-none active:scale-[0.98] transition-transform"
+            style={{ border: "1px solid rgba(140,106,100,0.2)" }}
           >
             View relationship
           </button>

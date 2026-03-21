@@ -3,9 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { useSession } from '../../auth/authContext';
 
-// ─── Client menu items ────────────────────────────────────────────────────────
-// id maps to the first path segment after /app (or 'home' for the index route)
-// d is the SVG path string for the 22×22 icon
+// ─── Client side menu ────────────────────────────────────────────────────────
 const CLIENT_MENU = [
     {
         id: 'home',
@@ -21,62 +19,58 @@ const CLIENT_MENU = [
         badge: true,
     },
     {
+        id: 'notifications',
+        label: 'Notifications',
+        path: '/app/notifications',
+        d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+        badge: true,
+    },
+    {
         id: 'profile',
         label: 'Profile',
-        path: '/app/account',
+        path: '/app/profile',
         d: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
     },
 ];
 
-// Derive the active menu id from the current pathname
-function useClientActiveId(items) {
+function useActiveId(items, rootPath) {
     const { pathname } = useLocation();
-    // Exact match for the root /app route; startsWith for all others
     for (const item of items) {
-        if (item.path === '/app') {
-            if (pathname === '/app') return item.id;
+        if (item.path === rootPath) {
+            if (pathname === rootPath) return item.id;
         } else if (pathname.startsWith(item.path)) {
             return item.id;
         }
     }
-    return 'home';
+    return items[0]?.id ?? 'home';
 }
-
-// ─── Layout ───────────────────────────────────────────────────────────────────
 
 const AppLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
 
-    const activeId = useClientActiveId(CLIENT_MENU);
+    const activeId = useActiveId(CLIENT_MENU, '/app');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
-    const initials = displayName
-        .split(' ')
-        .map((w) => w[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
+    const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
     const userPhoto = profile?.photo || undefined;
 
     const handleNav = (id) => {
-        if (id === 'logout') {
-            logout().then(() => navigate('/'));
-            return;
-        }
         const item = CLIENT_MENU.find((m) => m.id === id);
         if (item) navigate(item.path);
     };
 
+    const handleSignOut = () => {
+        logout().then(() => navigate('/login'));
+    };
+
     return (
-        <div className="relative min-h-screen bg-background font-manrope">
-            {/* Page content — each child page renders its own GradientHeader */}
+        <div className="relative min-h-screen" style={{ background: '#FBF7F2' }}>
             <main>
                 <Outlet context={{ onMenu: () => setMenuOpen(true) }} />
             </main>
 
-            {/* Offcanvas side menu */}
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
@@ -86,6 +80,7 @@ const AppLayout = () => {
                 userName={displayName}
                 userInitials={initials}
                 userPhoto={userPhoto}
+                onSignOut={handleSignOut}
             />
         </div>
     );

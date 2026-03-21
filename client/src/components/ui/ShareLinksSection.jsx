@@ -38,7 +38,7 @@ const ShareLinksSection = ({ handle = "" }) => {
           padding: "16px",
           borderRadius: "16px",
           background: "#FFFFFF",
-          border: "1px solid #E5E5EA",
+          border: "1px solid rgba(140,106,100,0.2)",
           marginBottom: "12px",
         }}
       >
@@ -46,7 +46,7 @@ const ShareLinksSection = ({ handle = "" }) => {
       </div>
       <p
         style={{
-          fontFamily: "Manrope, sans-serif",
+          fontFamily: "'Sora', system-ui, sans-serif",
           fontSize: "13px",
           color: "#6B7280",
           margin: "0 0 8px",
@@ -60,12 +60,12 @@ const ShareLinksSection = ({ handle = "" }) => {
         style={{
           padding: "8px 20px",
           borderRadius: "9999px",
-          border: "1px solid #E5E5EA",
+          border: "1px solid rgba(140,106,100,0.2)",
           background: "#FFFFFF",
-          fontFamily: "Manrope, sans-serif",
+          fontFamily: "'Sora', system-ui, sans-serif",
           fontSize: "13px",
           fontWeight: 600,
-          color: "#0D1619",
+          color: "#3D231E",
           cursor: "pointer",
         }}
       >
@@ -82,7 +82,7 @@ const ShareLinksSection = ({ handle = "" }) => {
         style={{
           padding: "14px",
           borderRadius: "12px",
-          background: "#F2F2F7",
+          background: "#FBF7F2",
           marginBottom: type === "booking" ? "10px" : "0",
         }}
       >
@@ -110,10 +110,10 @@ const ShareLinksSection = ({ handle = "" }) => {
           </div>
           <span
             style={{
-              fontFamily: "Manrope, sans-serif",
+              fontFamily: "'Sora', system-ui, sans-serif",
               fontSize: "14px",
               fontWeight: 600,
-              color: "#0D1619",
+              color: "#3D231E",
             }}
           >
             {label}
@@ -129,7 +129,7 @@ const ShareLinksSection = ({ handle = "" }) => {
             padding: "10px 12px",
             borderRadius: "10px",
             background: "#FFFFFF",
-            border: "1px solid #E5E5EA",
+            border: "1px solid rgba(140,106,100,0.2)",
             marginBottom: "10px",
             overflow: "hidden",
           }}
@@ -151,7 +151,7 @@ const ShareLinksSection = ({ handle = "" }) => {
           </svg>
           <span
             style={{
-              fontFamily: "Manrope, sans-serif",
+              fontFamily: "'Sora', system-ui, sans-serif",
               fontSize: "13px",
               color: "#6B7280",
               flex: 1,
@@ -173,9 +173,9 @@ const ShareLinksSection = ({ handle = "" }) => {
               padding: "10px",
               borderRadius: "10px",
               border: "none",
-              background: isCopied ? "#F0FDF4" : "#0D1619",
+              background: isCopied ? "#F0FDF4" : "#3D231E",
               color: isCopied ? "#15803D" : "#FFFFFF",
-              fontFamily: "Manrope, sans-serif",
+              fontFamily: "'Sora', system-ui, sans-serif",
               fontSize: "13px",
               fontWeight: 600,
               cursor: "pointer",
@@ -230,8 +230,8 @@ const ShareLinksSection = ({ handle = "" }) => {
             style={{
               padding: "10px 14px",
               borderRadius: "10px",
-              border: "1px solid #E5E5EA",
-              background: isShowingQR ? "#F2F2F7" : "#FFFFFF",
+              border: "1px solid rgba(140,106,100,0.2)",
+              background: isShowingQR ? "#FBF7F2" : "#FFFFFF",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -242,7 +242,7 @@ const ShareLinksSection = ({ handle = "" }) => {
               width="16"
               height="16"
               fill="none"
-              stroke="#0D1619"
+              stroke="#3D231E"
               strokeWidth="1.5"
               viewBox="0 0 24 24"
             >
@@ -260,7 +260,7 @@ const ShareLinksSection = ({ handle = "" }) => {
             style={{
               padding: "10px 14px",
               borderRadius: "10px",
-              border: "1px solid #E5E5EA",
+              border: "1px solid rgba(140,106,100,0.2)",
               background: "#FFFFFF",
               cursor: "pointer",
               display: "flex",
@@ -272,7 +272,7 @@ const ShareLinksSection = ({ handle = "" }) => {
               width="16"
               height="16"
               fill="none"
-              stroke="#0D1619"
+              stroke="#3D231E"
               strokeWidth="1.5"
               viewBox="0 0 24 24"
             >
@@ -304,10 +304,10 @@ const ShareLinksSection = ({ handle = "" }) => {
       <div style={{ padding: "16px 16px 12px" }}>
         <p
           style={{
-            fontFamily: "Manrope, sans-serif",
+            fontFamily: "'Sora', system-ui, sans-serif",
             fontSize: "16px",
             fontWeight: 700,
-            color: "#0D1619",
+            color: "#3D231E",
             margin: "0 0 4px",
           }}
         >
@@ -315,7 +315,7 @@ const ShareLinksSection = ({ handle = "" }) => {
         </p>
         <p
           style={{
-            fontFamily: "Manrope, sans-serif",
+            fontFamily: "'Sora', system-ui, sans-serif",
             fontSize: "13px",
             color: "#6B7280",
             margin: "0 0 16px",
@@ -330,13 +330,13 @@ const ShareLinksSection = ({ handle = "" }) => {
           label="Booking link"
           url={bookingUrl}
           fullUrl={bookingFullUrl}
-          iconBg="#FFF0E6"
+          iconBg="#FDDCC6"
           icon={
             <svg
               width="14"
               height="14"
               fill="none"
-              stroke="#FF751F"
+              stroke="#C25E4A"
               strokeWidth="2"
               viewBox="0 0 24 24"
             >
@@ -378,14 +378,14 @@ const ShareLinksSection = ({ handle = "" }) => {
       <div
         style={{
           padding: "12px 16px",
-          borderTop: "0.5px solid #E5E5EA",
-          background: "#F2F2F7",
+          borderTop: "0.5px solid rgba(140,106,100,0.2)",
+          background: "#FBF7F2",
           borderRadius: "0 0 16px 16px",
         }}
       >
         <p
           style={{
-            fontFamily: "Manrope, sans-serif",
+            fontFamily: "'Sora', system-ui, sans-serif",
             fontSize: "12px",
             color: "#6B7280",
             margin: 0,

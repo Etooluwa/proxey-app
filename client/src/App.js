@@ -9,56 +9,54 @@ import { BookingProvider } from './contexts/BookingContext';
 import { MessageProvider } from './contexts/MessageContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRedirect from './routes/RoleRedirect';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Layouts
 import AppLayout from './components/layout/AppLayout';
 import ProviderLayout from './components/layout/ProviderLayout';
 import AdminShell from './components/layout/AdminShell';
 
-// Auth Pages
+// ── Auth / onboarding ────────────────────────────────────────────────────────
+import LoginPage from './pages/auth/LoginPage';
 import SignIn from './pages/auth/SignInPage';
 import SignUp from './pages/auth/SignUpPage';
 import AuthCallback from './pages/AuthCallback';
-import ProviderOnboardingPage from './pages/ProviderOnboardingPage';
-import InviteFlow from './pages/InviteFlow';
-import PublicBookingFlow from './pages/PublicBookingFlow';
+import ClientOnboarding from './pages/ClientOnboarding';
+import ProviderOnboarding from './pages/ProviderOnboarding';
 
-// Client Pages
+// ── Public (no auth) ─────────────────────────────────────────────────────────
+import ProviderPublicProfile from './pages/ProviderPublicProfile';
+import InviteFlow from './pages/InviteFlow';
+
+// ── Client pages ─────────────────────────────────────────────────────────────
 import AppDashboard from './pages/AppDashboard';
-import BrowsePage from './pages/BrowsePage';
-import BookingsPage from './pages/BookingsPage';
+import RelationshipPage from './pages/RelationshipPage';
 import BookingFlowPage from './pages/BookingFlowPage';
+import ReviewPage from './pages/ReviewPage';
 import MessagesPage from './pages/MessagesPage';
 import ChatPage from './pages/ChatPage';
 import NotificationsPage from './pages/NotificationsPage';
+import AllNotificationsPage from './pages/AllNotificationsPage';
 import AccountPage from './pages/AccountPage';
-import ProviderPublicProfile from './pages/ProviderPublicProfile';
-import OnboardingPage from './pages/OnboardingPage';
-import ClientInvoices from './pages/ClientInvoices';
-import RelationshipPage from './pages/RelationshipPage';
-import BookingConfirmPage from './pages/BookingConfirmPage';
-import ReviewPage from './pages/ReviewPage';
 
-// Provider Pages
+// ── Provider pages ───────────────────────────────────────────────────────────
 import ProviderDashboard from './pages/provider/ProviderDashboard';
-import ProviderSchedule from './pages/provider/ProviderSchedule';
 import ProviderAppointments from './pages/provider/ProviderAppointments';
-import ProviderEarnings from './pages/provider/ProviderEarnings';
-import ProviderInvoices from './pages/provider/ProviderInvoices';
-import ProviderMessages from './pages/provider/ProviderMessages';
-import ProviderServices from './pages/provider/ProviderServices';
-import ProviderProfile from './pages/provider/ProviderProfile';
-import ProviderPromotions from './pages/provider/ProviderPromotions';
+import ProviderAppointmentDetail from './pages/provider/ProviderAppointmentDetail';
 import ProviderClients from './pages/provider/ProviderClients';
 import ProviderClientTimeline from './pages/provider/ProviderClientTimeline';
+import ProviderServices from './pages/provider/ProviderServices';
 import ProviderServiceEditor from './pages/provider/ProviderServiceEditor';
-import AppointmentRequestAcceptance from './pages/provider/AppointmentRequestAcceptance';
-import ProviderNotifications from './pages/provider/ProviderNotifications';
-import ProviderAppointmentDetail from './pages/provider/ProviderAppointmentDetail';
+import ProviderSchedule from './pages/provider/ProviderSchedule';
 import AvailabilityPage from './pages/provider/AvailabilityPage';
 import BlockTimePage from './pages/provider/BlockTimePage';
+import ProviderMessages from './pages/provider/ProviderMessages';
+import ProviderEarnings from './pages/provider/ProviderEarnings';
+import ProviderNotifications from './pages/provider/ProviderNotifications';
+import ProviderAllNotifications from './pages/provider/ProviderAllNotifications';
+import ProviderProfile from './pages/provider/ProviderProfile';
 
-// Admin Pages
+// ── Admin pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -69,13 +67,7 @@ import AdminReviews from './pages/admin/AdminReviews';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminPromotions from './pages/admin/AdminPromotions';
 
-// Provider Analytics
-import ProviderAnalytics from './pages/provider/ProviderAnalytics';
-
-import ErrorBoundary from './components/ErrorBoundary';
-
 function App() {
-  // Warm up the Render server on app load so it's ready when the user needs it
   useEffect(() => {
     fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
   }, []);
@@ -89,27 +81,59 @@ function App() {
               <BookingProvider>
                 <MessageProvider>
                   <Routes>
-                    {/* Public Routes */}
+
+                    {/* ── Public routes (no auth) ──────────────────────────── */}
+                    <Route path="/book/:handle" element={<ProviderPublicProfile />} />
+                    <Route path="/join/:code" element={<InviteFlow />} />
+
+                    {/* ── Auth routes ──────────────────────────────────────── */}
+                    <Route path="/login" element={<LoginPage />} />
+                    {/* Legacy auth paths kept for email-link compatibility */}
+                    <Route path="/auth/login" element={<LoginPage />} />
                     <Route path="/auth/sign-in" element={<SignIn />} />
                     <Route path="/auth/sign-up" element={<SignUp />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/join/:code" element={<InviteFlow />} />
-                    <Route path="/book/:handle" element={<PublicBookingFlow />} />
 
-                    {/* Root Redirect */}
-                    <Route path="/" element={<RoleRedirect />} />
-
-                    {/* Client Onboarding */}
+                    {/* ── Onboarding ───────────────────────────────────────── */}
+                    <Route
+                      path="/onboarding/client"
+                      element={
+                        <ProtectedRoute allowedRoles={['client']} requireProfile={false}>
+                          <ClientOnboarding />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* Legacy path kept for existing magic-link redirects */}
                     <Route
                       path="/onboarding"
                       element={
                         <ProtectedRoute allowedRoles={['client']} requireProfile={false}>
-                          <OnboardingPage />
+                          <ClientOnboarding />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/onboarding/provider"
+                      element={
+                        <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
+                          <ProviderOnboarding />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* Legacy provider onboarding path */}
+                    <Route
+                      path="/provider/onboarding"
+                      element={
+                        <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
+                          <ProviderOnboarding />
                         </ProtectedRoute>
                       }
                     />
 
-                    {/* Client Routes */}
+                    {/* ── Root redirect (role-based) ───────────────────────── */}
+                    <Route path="/" element={<RoleRedirect />} />
+
+                    {/* ── Client routes ───────────────────────────────────── */}
                     <Route
                       path="/app"
                       element={
@@ -118,32 +142,29 @@ function App() {
                         </ProtectedRoute>
                       }
                     >
+                      {/* /app → My Kliques */}
                       <Route index element={<AppDashboard />} />
-                      <Route path="browse" element={<BrowsePage />} />
-                      <Route path="bookings" element={<BookingsPage />} />
-                      <Route path="booking-flow" element={<BookingFlowPage />} />
+                      {/* Relationship timeline with a specific provider */}
+                      <Route path="relationship/:providerId" element={<RelationshipPage />} />
+                      {/* Booking flow (multi-step) */}
+                      <Route path="book/:providerId" element={<BookingFlowPage />} />
+                      {/* Leave a review */}
+                      <Route path="review/:bookingId" element={<ReviewPage />} />
+                      {/* Messaging */}
                       <Route path="messages" element={<MessagesPage />} />
                       <Route path="messages/:conversationId" element={<ChatPage />} />
+                      {/* Notifications */}
                       <Route path="notifications" element={<NotificationsPage />} />
-                      <Route path="account" element={<AccountPage />} />
-                      <Route path="invoices" element={<ClientInvoices />} />
-                      <Route path="provider/:providerId" element={<ProviderPublicProfile />} />
-                      <Route path="relationship/:providerId" element={<RelationshipPage />} />
-                      <Route path="book/confirm" element={<BookingConfirmPage />} />
-                      <Route path="review" element={<ReviewPage />} />
+                      <Route path="notifications/all" element={<AllNotificationsPage />} />
+                      {/* Profile / account */}
+                      <Route path="profile" element={<AccountPage />} />
+                      {/* Legacy paths — redirect to canonical routes */}
+                      <Route path="account" element={<Navigate to="/app/profile" replace />} />
+                      <Route path="bookings" element={<Navigate to="/app" replace />} />
+                      <Route path="browse" element={<Navigate to="/app" replace />} />
                     </Route>
 
-                    {/* Provider Onboarding */}
-                    <Route
-                      path="/provider/onboarding"
-                      element={
-                        <ProtectedRoute allowedRoles={['provider']} requireProfile={false}>
-                          <ProviderOnboardingPage />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    {/* Provider Routes */}
+                    {/* ── Provider routes ─────────────────────────────────── */}
                     <Route
                       path="/provider"
                       element={
@@ -152,29 +173,42 @@ function App() {
                         </ProtectedRoute>
                       }
                     >
+                      {/* /provider → Dashboard */}
                       <Route index element={<ProviderDashboard />} />
-                      <Route path="notifications" element={<ProviderNotifications />} />
-                      <Route path="requests/:requestId" element={<AppointmentRequestAcceptance />} />
-                      <Route path="schedule" element={<ProviderSchedule />} />
-                      <Route path="availability" element={<AvailabilityPage />} />
-                      <Route path="block-time" element={<BlockTimePage />} />
-                      <Route path="appointments" element={<ProviderAppointments />} />
+                      {/* Bookings (pending + upcoming) */}
+                      <Route path="bookings" element={<ProviderAppointments />} />
                       <Route path="appointments/:id" element={<ProviderAppointmentDetail />} />
+                      {/* My kliques (client list) */}
                       <Route path="clients" element={<ProviderClients />} />
-                      <Route path="client/:clientId" element={<ProviderClientTimeline />} />
-                      <Route path="promotions" element={<ProviderPromotions />} />
-                      <Route path="earnings" element={<ProviderEarnings />} />
-                      <Route path="analytics" element={<ProviderAnalytics />} />
-                      <Route path="invoices" element={<ProviderInvoices />} />
-                      <Route path="messages" element={<ProviderMessages />} />
-                      <Route path="messages/:conversationId" element={<ChatPage />} />
+                      <Route path="clients/:clientId" element={<ProviderClientTimeline />} />
+                      {/* Services */}
                       <Route path="services" element={<ProviderServices />} />
                       <Route path="services/new" element={<ProviderServiceEditor />} />
-                      <Route path="services/:id" element={<ProviderServiceEditor />} />
+                      <Route path="services/:id/edit" element={<ProviderServiceEditor />} />
+                      {/* Calendar */}
+                      <Route path="calendar" element={<ProviderSchedule />} />
+                      <Route path="calendar/availability" element={<AvailabilityPage />} />
+                      <Route path="calendar/block" element={<BlockTimePage />} />
+                      {/* Messages */}
+                      <Route path="messages" element={<ProviderMessages />} />
+                      <Route path="messages/:conversationId" element={<ChatPage />} />
+                      {/* Earnings */}
+                      <Route path="earnings" element={<ProviderEarnings />} />
+                      {/* Notifications */}
+                      <Route path="notifications" element={<ProviderNotifications />} />
+                      <Route path="notifications/all" element={<ProviderAllNotifications />} />
+                      {/* Profile */}
                       <Route path="profile" element={<ProviderProfile />} />
+                      {/* Legacy paths — redirect to canonical routes */}
+                      <Route path="appointments" element={<Navigate to="/provider/bookings" replace />} />
+                      <Route path="schedule" element={<Navigate to="/provider/calendar" replace />} />
+                      <Route path="availability" element={<Navigate to="/provider/calendar/availability" replace />} />
+                      <Route path="block-time" element={<Navigate to="/provider/calendar/block" replace />} />
+                      {/* Legacy /provider/client/:id path handled by clients/:clientId above */}
+                      <Route path="client/:clientId" element={<ProviderClientTimeline />} />
                     </Route>
 
-                    {/* Admin Routes */}
+                    {/* ── Admin routes ─────────────────────────────────────── */}
                     <Route
                       path="/admin"
                       element={
@@ -194,18 +228,9 @@ function App() {
                       <Route path="promotions" element={<AdminPromotions />} />
                     </Route>
 
-                    {/* Shared/Preview Routes - Standalone without AppShell */}
-                    <Route
-                      path="/preview/provider/:providerId"
-                      element={
-                        <ProtectedRoute allowedRoles={['client', 'provider']}>
-                          <ProviderPublicProfile />
-                        </ProtectedRoute>
-                      }
-                    />
-
-                    {/* Catch all - Redirect to root which handles role redirection */}
+                    {/* ── Catch-all ────────────────────────────────────────── */}
                     <Route path="*" element={<Navigate to="/" replace />} />
+
                   </Routes>
                 </MessageProvider>
               </BookingProvider>

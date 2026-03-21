@@ -18,7 +18,7 @@ import { Icons } from '../../components/Icons';
 import { PeriodSelector } from '../../components/charts/PeriodSelector';
 import { fetchAdminAnalytics } from '../../data/admin';
 
-const COLORS = ['#F58027', '#12a6a1', '#8b5cf6', '#ec4899', '#eab308', '#22c55e'];
+const COLORS = ['#C25E4A', '#5A8A5E', '#8b5cf6', '#ec4899', '#eab308', '#22c55e'];
 
 const AdminAnalytics = () => {
     const [period, setPeriod] = useState('month');
@@ -101,8 +101,8 @@ const AdminAnalytics = () => {
                                     labelFormatter={(d) => new Date(d).toLocaleDateString()}
                                 />
                                 <Legend />
-                                <Line type="monotone" dataKey="providers" name="Providers" stroke="#F58027" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="clients" name="Clients" stroke="#12a6a1" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="providers" name="Providers" stroke="#C25E4A" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="clients" name="Clients" stroke="#5A8A5E" strokeWidth={2} dot={false} />
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (
@@ -138,7 +138,7 @@ const AdminAnalytics = () => {
                                     <Tooltip
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                                     />
-                                    <Bar dataKey="bookings" name="Bookings" fill="#F58027" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar dataKey="bookings" name="Bookings" fill="#C25E4A" radius={[0, 4, 4, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (

@@ -1,5 +1,5 @@
 :root {
-  --teal: #F58027;
+  --teal: #C25E4A;
   --teal-pressed: #E67420;
   --ink: #0e0f11;
   --text: #2f3a3a;
@@ -49,7 +49,7 @@ body {
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  background: #F58027;
+  background: #C25E4A;
   color: var(--surface);
   display: grid;
   place-items: center;

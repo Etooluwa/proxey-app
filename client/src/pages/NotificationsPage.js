@@ -225,10 +225,10 @@ const NotifItem = ({ n, onMarkRead, onPayNow }) => {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const NotificationsPage = () => {
+const NotificationsPage = ({ showAll: showAllProp = false }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const showAll = searchParams.get('all') === '1';
+    const showAll = showAllProp || searchParams.get('all') === '1';
 
     const { notifications, markAsRead, markAllAsRead, loading } = useNotifications();
 

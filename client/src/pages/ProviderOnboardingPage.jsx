@@ -8,12 +8,12 @@ import Footer from "../components/ui/Footer";
 import Logo from "../components/ui/Logo";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
-const ACCENT      = "#FF751F";
+const ACCENT      = "#C25E4A";
 const ACCENT_LIGHT = "#FFF0E6";
-const BG          = "#F2F2F7";
-const FG          = "#0D1619";
+const BG          = "#FBF7F2";
+const FG          = "#3D231E";
 const MUTED       = "#6B7280";
-const DIVIDER     = "#E5E5EA";
+const DIVIDER     = "rgba(140,106,100,0.2)";
 const SUCCESS_BG  = "#F0FDF4";
 const SUCCESS_FG  = "#15803D";
 const DANGER      = "#EF4444";
@@ -104,7 +104,7 @@ function StepBar({ step }) {
 function Field({ label, children }) {
   return (
     <div className="mb-4">
-      <p className="font-manrope text-[13px] font-semibold text-foreground mb-1.5 m-0"
+      <p className="font-sora text-[13px] font-semibold text-foreground mb-1.5 m-0"
          style={{ color: MUTED }}>
         {label}
       </p>
@@ -122,7 +122,7 @@ function TextInput({ value, onChange, placeholder, maxLength, type = "text", onB
       onBlur={onBlur}
       placeholder={placeholder}
       maxLength={maxLength}
-      className="w-full font-manrope text-[15px] focus:outline-none"
+      className="w-full font-sora text-[15px] focus:outline-none"
       style={{
         padding: "12px 14px",
         borderRadius: 12,
@@ -141,7 +141,7 @@ function NativeSelect({ value, onChange, children }) {
       <select
         value={value}
         onChange={onChange}
-        className="w-full font-manrope text-[15px] focus:outline-none appearance-none"
+        className="w-full font-sora text-[15px] focus:outline-none appearance-none"
         style={{
           padding: "12px 40px 12px 14px",
           borderRadius: 12,
@@ -166,7 +166,7 @@ function ContinueBtn({ onClick, disabled, loading, label = "Continue" }) {
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+      className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
       style={{
         background: disabled || loading ? "#B0B0B0" : FG,
         cursor: disabled || loading ? "not-allowed" : "pointer",
@@ -184,10 +184,10 @@ function ContinueBtn({ onClick, disabled, loading, label = "Continue" }) {
 function StepCategory({ selected, onChange }) {
   return (
     <div className="px-4 pt-2 pb-4">
-      <h2 className="font-manrope text-[26px] font-bold text-foreground m-0 mb-1" style={{ color: FG }}>
+      <h2 className="font-sora text-[26px] font-bold text-foreground m-0 mb-1" style={{ color: FG }}>
         What do you offer?
       </h2>
-      <p className="font-manrope text-[15px] m-0 mb-6" style={{ color: MUTED }}>
+      <p className="font-sora text-[15px] m-0 mb-6" style={{ color: MUTED }}>
         Choose the category that best describes your services.
       </p>
 
@@ -198,7 +198,7 @@ function StepCategory({ selected, onChange }) {
             <button
               key={cat.id}
               onClick={() => onChange(cat.id)}
-              className="flex flex-col items-center py-5 rounded-card font-manrope focus:outline-none active:scale-[0.97] transition-transform"
+              className="flex flex-col items-center py-5 rounded-card font-sora focus:outline-none active:scale-[0.97] transition-transform"
               style={{
                 background: isSel ? ACCENT_LIGHT : "#fff",
                 border: isSel ? `2px solid ${ACCENT}` : `1px solid ${DIVIDER}`,
@@ -207,7 +207,7 @@ function StepCategory({ selected, onChange }) {
             >
               <span style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }}>{cat.emoji}</span>
               <span
-                className="font-manrope text-[14px] font-semibold"
+                className="font-sora text-[14px] font-semibold"
                 style={{ color: isSel ? ACCENT : FG }}
               >
                 {cat.label}
@@ -236,10 +236,10 @@ function StepProfile({ data, onChange }) {
 
   return (
     <div className="px-4 pt-2 pb-4">
-      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
         Your profile
       </h2>
-      <p className="font-manrope text-[15px] m-0 mb-6" style={{ color: MUTED }}>
+      <p className="font-sora text-[15px] m-0 mb-6" style={{ color: MUTED }}>
         This is what clients will see when they find you.
       </p>
 
@@ -283,7 +283,7 @@ function StepProfile({ data, onChange }) {
           </div>
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-        <p className="font-manrope text-[13px] mt-2 m-0" style={{ color: MUTED }}>
+        <p className="font-sora text-[13px] mt-2 m-0" style={{ color: MUTED }}>
           {data.photoPreview ? "Tap to change photo" : "Tap to add photo"}
         </p>
       </div>
@@ -312,7 +312,7 @@ function StepProfile({ data, onChange }) {
             maxLength={bioMax}
             placeholder="Tell clients a little about yourself and your experience…"
             rows={4}
-            className="w-full font-manrope text-[15px] focus:outline-none resize-none"
+            className="w-full font-sora text-[15px] focus:outline-none resize-none"
             style={{
               padding: "12px 14px",
               borderRadius: 12,
@@ -342,7 +342,7 @@ function ServiceModal({ initial, onSave, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end font-manrope"
+      className="fixed inset-0 z-50 flex flex-col justify-end font-sora"
       style={{ background: "rgba(0,0,0,0.45)" }}
     >
       <div
@@ -365,7 +365,7 @@ function ServiceModal({ initial, onSave, onClose }) {
         </div>
         {/* Header */}
         <div className="flex justify-between items-center px-5 pt-3 pb-2 flex-shrink-0">
-          <h2 className="font-manrope text-[20px] font-bold m-0" style={{ color: FG }}>
+          <h2 className="font-sora text-[20px] font-bold m-0" style={{ color: FG }}>
             {initial ? "Edit service" : "Add service"}
           </h2>
           <button onClick={onClose} className="focus:outline-none -m-1 p-1">
@@ -387,7 +387,7 @@ function ServiceModal({ initial, onSave, onClose }) {
 
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
-              <p className="font-manrope text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Duration</p>
+              <p className="font-sora text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Duration</p>
               <NativeSelect value={svc.duration} onChange={(e) => set("duration", Number(e.target.value))}>
                 {DURATIONS.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -395,7 +395,7 @@ function ServiceModal({ initial, onSave, onClose }) {
               </NativeSelect>
             </div>
             <div className="flex-1">
-              <p className="font-manrope text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Price ($)</p>
+              <p className="font-sora text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Price ($)</p>
               <TextInput
                 type="number"
                 value={svc.price}
@@ -407,7 +407,7 @@ function ServiceModal({ initial, onSave, onClose }) {
           </div>
 
           {/* Payment model */}
-          <p className="font-manrope text-[13px] font-semibold mb-3 m-0" style={{ color: MUTED }}>
+          <p className="font-sora text-[13px] font-semibold mb-3 m-0" style={{ color: MUTED }}>
             Payment model
           </p>
           {[
@@ -438,7 +438,7 @@ function ServiceModal({ initial, onSave, onClose }) {
                     {isActive && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
                   <span
-                    className="font-manrope text-[15px] font-semibold"
+                    className="font-sora text-[15px] font-semibold"
                     style={{ color: isActive ? ACCENT : FG }}
                   >
                     {opt.label}
@@ -455,7 +455,7 @@ function ServiceModal({ initial, onSave, onClose }) {
                       min="0"
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <p className="font-manrope text-[12px] mt-1 m-0" style={{ color: MUTED }}>
+                    <p className="font-sora text-[12px] mt-1 m-0" style={{ color: MUTED }}>
                       Fixed deposit amount in $
                     </p>
                   </div>
@@ -471,7 +471,7 @@ function ServiceModal({ initial, onSave, onClose }) {
                       max="100"
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <p className="font-manrope text-[12px] mt-1 m-0" style={{ color: MUTED }}>
+                    <p className="font-sora text-[12px] mt-1 m-0" style={{ color: MUTED }}>
                       Percentage of total price
                     </p>
                   </div>
@@ -483,7 +483,7 @@ function ServiceModal({ initial, onSave, onClose }) {
           <button
             onClick={() => canSave && onSave(svc)}
             disabled={!canSave}
-            className="w-full py-4 rounded-card font-manrope text-[16px] font-bold text-white mt-2 focus:outline-none active:scale-[0.98] transition-transform"
+            className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white mt-2 focus:outline-none active:scale-[0.98] transition-transform"
             style={{ background: canSave ? FG : "#B0B0B0", cursor: canSave ? "pointer" : "not-allowed" }}
           >
             {initial ? "Save changes" : "Add service"}
@@ -513,10 +513,10 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
 
   return (
     <div className="px-4 pt-2 pb-4">
-      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
         Your services
       </h2>
-      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
         Add the services you offer. You can edit these any time.
       </p>
 
@@ -525,10 +525,10 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
         <Card key={i} className="mb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="font-manrope text-[16px] font-semibold m-0 mb-0.5 truncate" style={{ color: FG }}>
+              <p className="font-sora text-[16px] font-semibold m-0 mb-0.5 truncate" style={{ color: FG }}>
                 {svc.name}
               </p>
-              <p className="font-manrope text-[13px] m-0" style={{ color: MUTED }}>
+              <p className="font-sora text-[13px] m-0" style={{ color: MUTED }}>
                 {fmtDuration(svc.duration)} · {fmtPrice(svc.price)} · {payLabel(svc)}
               </p>
             </div>
@@ -564,7 +564,7 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
       {/* Add service dashed button */}
       <button
         onClick={() => { setEditingIdx(null); setModalOpen(true); }}
-        className="w-full flex items-center justify-center gap-2 font-manrope text-[15px] font-semibold focus:outline-none active:scale-[0.98] transition-transform"
+        className="w-full flex items-center justify-center gap-2 font-sora text-[15px] font-semibold focus:outline-none active:scale-[0.98] transition-transform"
         style={{
           padding: "14px",
           borderRadius: 14,
@@ -581,7 +581,7 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
       </button>
 
       {services.length === 0 && (
-        <p className="font-manrope text-[13px] text-center mt-3 m-0" style={{ color: MUTED }}>
+        <p className="font-sora text-[13px] text-center mt-3 m-0" style={{ color: MUTED }}>
           Add at least one service to continue.
         </p>
       )}
@@ -606,10 +606,10 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
 function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
   return (
     <div className="px-4 pt-2 pb-4">
-      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
         Your availability
       </h2>
-      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
         Set your working hours. You can always update this later.
       </p>
 
@@ -623,7 +623,7 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
                 {/* Day row */}
                 <div className="flex items-center justify-between mb-0">
                   <span
-                    className="font-manrope text-[15px] font-semibold"
+                    className="font-sora text-[15px] font-semibold"
                     style={{ color: d.enabled ? FG : MUTED }}
                   >
                     {day.label}
@@ -664,7 +664,7 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </NativeSelect>
-                    <span className="font-manrope text-[13px]" style={{ color: MUTED, flexShrink: 0 }}>to</span>
+                    <span className="font-sora text-[13px]" style={{ color: MUTED, flexShrink: 0 }}>to</span>
                     <NativeSelect
                       value={d.to}
                       onChange={(e) => onChange(day.key, "to", e.target.value)}
@@ -707,10 +707,10 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
 
   return (
     <div className="px-4 pt-2 pb-4">
-      <h2 className="font-manrope text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
+      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
         Go live
       </h2>
-      <p className="font-manrope text-[15px] m-0 mb-5" style={{ color: MUTED }}>
+      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
         Claim your booking link and connect your payout account.
       </p>
 
@@ -750,7 +750,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
 
           {/* URL preview */}
           {handle && (
-            <p className="font-manrope text-[13px] mt-2 m-0" style={{ color: MUTED }}>
+            <p className="font-sora text-[13px] mt-2 m-0" style={{ color: MUTED }}>
               mykliques.com/book/
               <span style={{ color: handleStatus === "available" ? SUCCESS_FG : handleStatus === "taken" || handleStatus === "invalid" ? DANGER : FG, fontWeight: 600 }}>
                 {handle}
@@ -759,12 +759,12 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
           )}
 
           {handleStatus === "taken" && (
-            <p className="font-manrope text-[13px] mt-1 m-0" style={{ color: DANGER }}>
+            <p className="font-sora text-[13px] mt-1 m-0" style={{ color: DANGER }}>
               That handle is already taken. Try another.
             </p>
           )}
           {handleStatus === "invalid" && (
-            <p className="font-manrope text-[13px] mt-1 m-0" style={{ color: DANGER }}>
+            <p className="font-sora text-[13px] mt-1 m-0" style={{ color: DANGER }}>
               Only lowercase letters, numbers, and hyphens allowed.
             </p>
           )}
@@ -783,10 +783,10 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
             </svg>
           </div>
           <div>
-            <p className="font-manrope text-[16px] font-semibold m-0 mb-0.5" style={{ color: FG }}>
+            <p className="font-sora text-[16px] font-semibold m-0 mb-0.5" style={{ color: FG }}>
               Connect with Stripe
             </p>
-            <p className="font-manrope text-[13px] m-0" style={{ color: MUTED }}>
+            <p className="font-sora text-[13px] m-0" style={{ color: MUTED }}>
               Receive payouts directly to your bank account.
             </p>
           </div>
@@ -800,7 +800,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
             <svg width="20" height="20" fill="none" stroke={SUCCESS_FG} strokeWidth="2.2" viewBox="0 0 24 24">
               <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="font-manrope text-[14px] font-semibold" style={{ color: SUCCESS_FG }}>
+            <span className="font-sora text-[14px] font-semibold" style={{ color: SUCCESS_FG }}>
               Stripe account connected
             </span>
           </div>
@@ -808,7 +808,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
           <button
             onClick={onStripeConnect}
             disabled={stripeLoading}
-            className="w-full py-3.5 rounded-xl font-manrope text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-xl font-sora text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
             style={{ background: stripeLoading ? "#B0B0B0" : "#635BFF", cursor: stripeLoading ? "not-allowed" : "pointer" }}
           >
             {stripeLoading && (
@@ -1011,7 +1011,7 @@ function ProviderOnboardingPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   if (draftLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen font-manrope" style={{ background: BG }}>
+      <div className="flex flex-col items-center justify-center min-h-screen font-sora" style={{ background: BG }}>
         <Logo size={22} color="accent" />
         <div className="mt-6 w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: ACCENT, borderTopColor: "transparent" }} />
       </div>
@@ -1020,7 +1020,7 @@ function ProviderOnboardingPage() {
 
   return (
     <div
-      className="flex flex-col min-h-screen font-manrope"
+      className="flex flex-col min-h-screen font-sora"
       style={{ background: BG }}
     >
       {/* Top bar */}
@@ -1048,7 +1048,7 @@ function ProviderOnboardingPage() {
 
         {/* Step label */}
         <span
-          className="font-manrope text-[13px] font-semibold"
+          className="font-sora text-[13px] font-semibold"
           style={{ color: MUTED, minWidth: 40, textAlign: "right" }}
         >
           {step}/{TOTAL_STEPS}
@@ -1060,7 +1060,7 @@ function ProviderOnboardingPage() {
 
       {/* Step subtitle */}
       <p
-        className="font-manrope text-[12px] font-semibold tracking-wide uppercase px-5 mb-0 mt-1"
+        className="font-sora text-[12px] font-semibold tracking-wide uppercase px-5 mb-0 mt-1"
         style={{ color: ACCENT }}
       >
         {STEP_TITLES[step - 1]}
@@ -1121,7 +1121,7 @@ function ProviderOnboardingPage() {
         {step === 4 && (
           <button
             onClick={handleContinue}
-            className="font-manrope text-[14px] font-semibold text-center focus:outline-none"
+            className="font-sora text-[14px] font-semibold text-center focus:outline-none"
             style={{ color: MUTED, background: "none", border: "none", cursor: "pointer" }}
           >
             Skip for now

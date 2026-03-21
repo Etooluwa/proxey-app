@@ -24,7 +24,7 @@ const Badge = ({ label, children, variant = 'accent', bg, color, className = '' 
 
     return (
         <span
-            className={`inline-flex items-center px-3 py-1 rounded-pill font-manrope text-[13px] font-semibold leading-none ${variants[variant] ?? variants.accent} ${className}`}
+            className={`inline-flex items-center px-3 py-1 rounded-pill font-sora text-[13px] font-semibold leading-none ${variants[variant] ?? variants.accent} ${className}`}
             style={bg || color ? { background: bg, color } : undefined}
         >
             {label ?? children}

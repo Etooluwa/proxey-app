@@ -153,7 +153,7 @@
 }
 
 .review-modal__star--filled .review-modal__star-icon {
-  fill: #F58027;
+  fill: #C25E4A;
 }
 
 .review-modal__star:hover .review-modal__star-icon {
@@ -168,7 +168,7 @@
   margin: 0.75rem 0 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #F58027;
+  color: #C25E4A;
   min-height: 1.5rem;
 }
 
@@ -196,7 +196,7 @@
 
 .review-modal__textarea:focus {
   outline: none;
-  border-color: #F58027;
+  border-color: #C25E4A;
   box-shadow: 0 0 0 3px rgba(245, 128, 39, 0.15);
 }
 

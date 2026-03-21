@@ -1,204 +1,328 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useSession } from "../../auth/authContext";
-import { request } from "../../data/apiClient";
-import Nav from "../../components/ui/Nav";
-import Card from "../../components/ui/Card";
-import Footer from "../../components/ui/Footer";
+/**
+ * ProviderNotifications — v6 Warm Editorial
+ * Route: /provider/notifications          → limited preview (3 most recent)
+ * Route: /provider/notifications?all=1   → full list
+ *
+ * Data from NotificationContext (real-time Supabase).
+ * Type map:
+ *   booking_request / new_booking / time_request → "booking"
+ *   booking_completed / completed               → "completed"
+ *   connected / new_client / new_connection     → "connected"
+ *   (default)                                   → "reminder"
+ */
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNotifications } from '../../contexts/NotificationContext';
+import BackBtn from '../../components/ui/BackBtn';
+import Avatar from '../../components/ui/Avatar';
+import Lbl from '../../components/ui/Lbl';
+import Divider from '../../components/ui/Divider';
+import Footer from '../../components/ui/Footer';
 
-// ─── Alert type config ────────────────────────────────────────────────────────
-// Maps notification `type` values to background color + action label
+// ─── Type normalisation ───────────────────────────────────────────────────────
 
-const TYPE_CONFIG = {
-  // Milestone / loyalty
-  milestone:    { bg: "#FFF0E6", action: "Send reward" },
-  loyalty:      { bg: "#FFF0E6", action: "Send reward" },
-  // Reschedule / cancellation / reminder
-  reschedule:   { bg: "#FEF2F2", action: "View message" },
-  cancellation: { bg: "#FEF2F2", action: "View message" },
-  reminder:     { bg: "#FEF2F2", action: "View details" },
-  // New client / booking completed / review
-  new_client:   { bg: "#F0FDF4", action: "View profile" },
-  booking_completed: { bg: "#F0FDF4", action: "View booking" },
-  review:       { bg: "#F0FDF4", action: "View review" },
+const BOOKING_TYPES = new Set([
+    'booking_request', 'new_booking', 'time_request', 'appointment_request',
+    'booking_accepted', 'appointment_accepted',
+]);
+const COMPLETED_TYPES = new Set([
+    'booking_completed', 'completed', 'session_completed',
+]);
+const CONNECTED_TYPES = new Set([
+    'connected', 'new_client', 'new_connection',
+]);
+
+function normaliseType(rawType) {
+    if (!rawType) return 'reminder';
+    const t = rawType.toLowerCase();
+    if (BOOKING_TYPES.has(t)) return 'booking';
+    if (COMPLETED_TYPES.has(t)) return 'completed';
+    if (CONNECTED_TYPES.has(t)) return 'connected';
+    return 'reminder';
+}
+
+// ─── Badge config ─────────────────────────────────────────────────────────────
+
+const BADGE = {
+    // Accent calendar icon — new booking
+    booking: {
+        bg: '#C25E4A',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
+                <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
+                <line x1="3" y1="10" x2="21" y2="10" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    // Green person+ icon — new client connected
+    connected: {
+        bg: '#5A8A5E',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="9" cy="7" r="4" />
+                <line x1="19" y1="8" x2="19" y2="14" strokeLinecap="round" />
+                <line x1="22" y1="11" x2="16" y2="11" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    // Gray check — session completed
+    completed: {
+        bg: '#8C6A64',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+    },
+    // Muted clock — reminder / default
+    reminder: {
+        bg: '#B0948F',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="1.75" viewBox="0 0 24 24">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+    },
 };
 
-const DEFAULT_CONFIG = { bg: "#F2F2F7", action: "View" };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getConfig(type) {
-  if (!type) return DEFAULT_CONFIG;
-  const key = type.toLowerCase();
-  return TYPE_CONFIG[key] || DEFAULT_CONFIG;
+function formatRelTime(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(diff / 3600000);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(diff / 86400000);
+    if (days < 7) return `${days}d ago`;
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function formatRelTime(timestamp) {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function getInitials(name) {
+    return (name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
+
+function initialsFromNotif(n) {
+    const name =
+        n.data?.client_name ||
+        n.data?.other_name ||
+        n.title?.split(' ')[0] ||
+        '?';
+    return getInitials(name);
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+const Empty = () => (
+    <div className="py-14 flex flex-col items-center">
+        <div
+            className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+            style={{ background: 'rgba(194,94,74,0.08)' }}
+        >
+            <svg width="24" height="24" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </div>
+        <p className="text-[15px] font-semibold text-ink mb-1">All caught up</p>
+        <p className="text-[13px] text-muted text-center px-8">
+            Booking requests, new clients, and session updates will appear here.
+        </p>
+    </div>
+);
+
+// ─── Single notification item ─────────────────────────────────────────────────
+
+const NotifItem = ({ n, onAction }) => {
+    const type = normaliseType(n.type);
+    const badge = BADGE[type];
+    const unread = !n.is_read && !n.read;
+    const ts = n.timestamp || n.created_at;
+
+    return (
+        <div>
+            <div
+                className="flex gap-3.5 py-5"
+                style={{ opacity: unread ? 1 : 0.55 }}
+            >
+                {/* Avatar + badge */}
+                <div className="relative flex-shrink-0">
+                    <Avatar initials={initialsFromNotif(n)} size={44} />
+                    <div
+                        className="absolute flex items-center justify-center rounded-full"
+                        style={{
+                            bottom: -2,
+                            right: -2,
+                            width: 22,
+                            height: 22,
+                            background: badge.bg,
+                            border: '2px solid #FBF7F2',
+                        }}
+                    >
+                        {badge.icon}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                    {/* Title row */}
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                        <p
+                            className="text-[15px] text-ink m-0"
+                            style={{ fontWeight: unread ? 600 : 400 }}
+                        >
+                            {n.title}
+                        </p>
+                        {unread && (
+                            <div
+                                className="w-2 h-2 rounded-full flex-shrink-0 mt-[6px]"
+                                style={{ background: '#C25E4A' }}
+                            />
+                        )}
+                    </div>
+
+                    {/* Body */}
+                    <p className="text-[13px] text-muted leading-relaxed m-0 mb-1.5">
+                        {n.message || n.body}
+                    </p>
+
+                    {/* Footer row: timestamp + action CTA */}
+                    <div className="flex items-center justify-between gap-3">
+                        <Lbl style={{ fontSize: '10px' }}>{formatRelTime(ts)}</Lbl>
+                        {type === 'booking' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold text-white focus:outline-none"
+                                style={{ background: '#3D231E' }}
+                            >
+                                View Request
+                            </button>
+                        )}
+                        {type === 'connected' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold focus:outline-none"
+                                style={{ background: '#EBF2EC', color: '#3D6B41' }}
+                            >
+                                View Client
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <Divider />
+        </div>
+    );
+};
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const ProviderNotifications = () => {
-  const navigate = useNavigate();
-  const { session } = useSession();
+const ProviderNotifications = ({ showAll: showAllProp = false }) => {
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const showAll = showAllProp || searchParams.get('all') === '1';
 
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const { notifications, markAsRead, markAllAsRead, loading } = useNotifications();
 
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await request("/provider/notifications");
-        if (!cancelled) setAlerts(data.notifications || []);
-        // Mark all as read in background
-        request("/provider/notifications/read-all", { method: "PATCH" }).catch(() => {});
-      } catch (err) {
-        console.error("Failed to load notifications:", err);
-        if (!cancelled) setAlerts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [session]);
+    const displayed = showAll ? notifications : notifications.slice(0, 3);
+    const unreadCount = notifications.filter((n) => !n.is_read && !n.read).length;
 
-  const handleAction = (alert) => {
-    const type = (alert.type || "").toLowerCase();
-    if (type === "reschedule" || type === "cancellation") {
-      navigate("/provider/messages");
-    } else if (type === "new_client") {
-      const clientId = alert.data?.client_id;
-      if (clientId) navigate(`/provider/client/${clientId}`);
-      else navigate("/provider/clients");
-    } else if (type === "booking_completed" || type === "reminder") {
-      const bookingId = alert.data?.booking_id;
-      if (bookingId) navigate(`/provider/appointments/${bookingId}`);
-      else navigate("/provider/appointments");
-    } else if (type === "review") {
-      navigate("/provider/appointments");
-    } else {
-      // milestone / loyalty / default
-      const clientId = alert.data?.client_id;
-      if (clientId) navigate(`/provider/client/${clientId}`);
-      else navigate("/provider/clients");
-    }
-  };
+    const handleMarkAllRead = () => markAllAsRead();
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  return (
-    <div className="flex flex-col min-h-screen bg-background font-manrope overflow-y-auto">
-      <Nav onBack={() => navigate("/provider")} title="Smart alerts" />
+    const handleViewAll = () => setSearchParams({ all: '1' });
 
-      <div className="flex-1 px-4 pt-2 pb-4 flex flex-col">
+    const handleBack = () => {
+        if (showAll) {
+            setSearchParams({});
+        } else {
+            navigate(-1);
+        }
+    };
 
-        {/* Loading skeletons */}
-        {loading &&
-          [1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="w-full h-[100px] rounded-card mb-3 animate-pulse"
-              style={{ background: "#E5E5EA" }}
-            />
-          ))}
+    const handleAction = (n) => {
+        markAsRead(n.id);
+        const type = normaliseType(n.type);
+        if (type === 'booking') {
+            const bookingId = n.data?.booking_id;
+            if (bookingId) navigate(`/provider/appointments/${bookingId}`);
+            else navigate('/provider/appointments');
+        } else if (type === 'connected') {
+            const clientId = n.data?.client_id;
+            if (clientId) navigate(`/provider/client/${clientId}`);
+            else navigate('/provider/clients');
+        } else if (type === 'completed') {
+            const bookingId = n.data?.booking_id;
+            if (bookingId) navigate(`/provider/appointments/${bookingId}`);
+            else navigate('/provider/appointments');
+        }
+    };
 
-        {/* Empty state */}
-        {!loading && alerts.length === 0 && (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 mt-16">
-            <div
-              className="flex items-center justify-center"
-              style={{
-                width: 56, height: 56, borderRadius: 14,
-                background: "#F2F2F7",
-              }}
-            >
-              <svg
-                width="24" height="24" fill="none"
-                stroke="#6B7280" strokeWidth="1.5" viewBox="0 0 24 24"
-              >
-                <path
-                  d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"
-                  strokeLinecap="round" strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <p className="font-manrope text-[15px] font-semibold text-foreground">
-              No alerts
-            </p>
-            <p className="font-manrope text-[13px] text-muted text-center">
-              Smart alerts about your clients and bookings will appear here
-            </p>
-          </div>
-        )}
-
-        {/* Alert cards */}
-        {!loading &&
-          alerts.map((alert) => {
-            const { bg, action } = getConfig(alert.type);
-            return (
-              <Card
-                key={alert.id}
-                className="mb-3"
-                style={{ background: bg }}
-              >
-                {/* Title row */}
-                <div className="flex justify-between items-start gap-2 mb-1">
-                  <p
-                    className="font-manrope text-[16px] font-semibold text-foreground m-0 flex-1"
-                  >
-                    {alert.title || "Alert"}
-                  </p>
-                  <span className="font-manrope text-[11px] text-muted flex-shrink-0 mt-0.5">
-                    {formatRelTime(alert.created_at)}
-                  </span>
-                </div>
-
-                {/* Body */}
-                <p
-                  className="font-manrope text-[14px] text-muted m-0 mb-3"
-                  style={{ lineHeight: 1.5 }}
-                >
-                  {alert.body || ""}
+    return (
+        <div className="flex flex-col min-h-screen bg-base">
+            {/* ── Header */}
+            <div className="flex items-center gap-3 px-5 pt-10 pb-4">
+                <BackBtn onClick={handleBack} />
+                <p className="flex-1 text-[13px] font-semibold text-ink m-0">
+                    {showAll ? 'All Notifications' : 'Notifications'}
                 </p>
+                {unreadCount > 0 && (
+                    <button
+                        onClick={handleMarkAllRead}
+                        className="text-[11px] font-semibold text-accent focus:outline-none uppercase tracking-[0.04em]"
+                    >
+                        Mark all read
+                    </button>
+                )}
+            </div>
 
-                {/* Action button */}
-                <button
-                  onClick={() => handleAction(alert)}
-                  className="font-manrope text-[13px] font-semibold focus:outline-none"
-                  style={{
-                    padding: "8px 18px",
-                    borderRadius: 9999,
-                    border: "none",
-                    background: "#0D1619",
-                    color: "#FFFFFF",
-                    cursor: "pointer",
-                  }}
-                >
-                  {action}
-                </button>
-              </Card>
-            );
-          })}
+            {/* ── Content */}
+            <div className="px-5 flex-1 flex flex-col">
+                <Divider />
 
-      </div>
+                {/* Loading */}
+                {loading && (
+                    <div className="flex items-center justify-center py-14">
+                        <div className="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+                    </div>
+                )}
 
-      <Footer />
-    </div>
-  );
+                {/* Empty */}
+                {!loading && notifications.length === 0 && <Empty />}
+
+                {/* Items */}
+                {!loading && notifications.length > 0 && (
+                    <>
+                        {displayed.map((n) => (
+                            <NotifItem
+                                key={n.id}
+                                n={n}
+                                onAction={handleAction}
+                            />
+                        ))}
+
+                        {/* View All — preview mode only */}
+                        {!showAll && (
+                            <button
+                                onClick={handleViewAll}
+                                className="w-full flex items-center justify-center gap-2 py-4 mt-2 rounded-[12px] text-[14px] font-semibold text-ink focus:outline-none"
+                                style={{ border: '1px solid rgba(140,106,100,0.2)' }}
+                            >
+                                View All Notifications
+                                <Lbl style={{ fontSize: '10px', margin: 0 }}>
+                                    {notifications.length}
+                                </Lbl>
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
+
+            <Footer />
+        </div>
+    );
 };
 
 export default ProviderNotifications;
