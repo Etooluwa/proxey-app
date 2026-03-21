@@ -12,10 +12,13 @@ import { useSession } from '../../auth/authContext';
 import { fetchProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
 import Header from '../../components/ui/Header';
-import Avatar from '../../components/ui/Avatar';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
 import { ArrowUpRight } from '@phosphor-icons/react';
+
+// ─── Topo texture ─────────────────────────────────────────────────────────────
+
+const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M100 50 Q 200 -50 300 50 T 500 50' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M200 350 Q 250 250 350 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
 
 // ─── Settings rows ────────────────────────────────────────────────────────────
 
@@ -24,7 +27,7 @@ const SETTINGS = [
     { label: 'Business details',    sub: 'Studio name, address' },
     { label: 'Photos & portfolio',  sub: 'Manage gallery images' },
     { label: 'Payouts & billing',   sub: 'Stripe Connect' },
-    { label: 'Working hours',       sub: 'Availability schedule',  route: '/provider/availability' },
+    { label: 'Working hours',       sub: 'Availability schedule',  route: '/provider/calendar/availability' },
     { label: 'Notifications',       sub: 'Email, push, SMS' },
     { label: 'Booking settings',    sub: 'Cancellation, buffer times' },
     { label: 'Help & support',      sub: 'FAQ, contact Kliques' },
@@ -52,36 +55,14 @@ function buildName(profile) {
     return parts.join(' ') || profile.name || 'Provider';
 }
 
-// ─── Stat pill ────────────────────────────────────────────────────────────────
-
-const StatPill = ({ label, value, loading }) => (
-    <div
-        className="flex-1 flex flex-col items-center py-3 px-2 rounded-[12px]"
-        style={{ background: '#F2EBE5' }}
-    >
-        {loading ? (
-            <div className="h-5 w-10 bg-line/60 rounded animate-pulse mb-1" />
-        ) : (
-            <span
-                className="text-[18px] font-semibold tracking-[-0.02em] mb-0.5"
-                style={{ color: '#C25E4A' }}
-            >
-                {value}
-            </span>
-        )}
-        <span className="text-[11px] uppercase tracking-[0.05em] font-medium text-muted">
-            {label}
-        </span>
-    </div>
-);
-
 // ─── Settings row ─────────────────────────────────────────────────────────────
 
 const SettingsRow = ({ label, sub, onClick }) => (
     <>
         <button
             onClick={onClick}
-            className="w-full flex items-center gap-4 py-5 px-1 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
+            className="w-full flex items-center gap-4 py-5 px-1 text-left focus:outline-none"
+            style={{ background: 'none', border: 'none' }}
         >
             <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink m-0">{label}</p>
@@ -134,53 +115,122 @@ const ProviderProfile = () => {
     const name = buildName(profile);
     const subtitle = buildSubtitle(profile);
 
-    const rating = stats?.rating ? `${stats.rating} ★` : '—';
+    const rating  = stats?.rating  ? `${stats.rating} ★` : '—';
     const reviews = stats?.reviews ?? '—';
     const clients = stats?.clients ?? '—';
 
     const handleRowTap = (row) => {
         if (row.route) navigate(row.route);
-        // Other rows are placeholders for now — future modals/sub-pages
     };
 
     const handleSignOut = async () => {
         await logout();
-        navigate('/auth/sign-in', { replace: true });
+        navigate('/login', { replace: true });
     };
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
             <Header onMenu={onMenu} showAvatar initials={initials} />
 
-            <div className="px-5 pb-10 flex-1 flex flex-col">
+            {/* ── Hero card ── */}
+            <div className="px-4 pt-2 pb-1">
+                <div
+                    className="relative overflow-hidden flex flex-col items-center justify-end px-6 pb-7 pt-10"
+                    style={{ background: '#FDDCC6', borderRadius: 28 }}
+                >
+                    {/* Topo texture */}
+                    <div
+                        aria-hidden="true"
+                        className="absolute inset-0 pointer-events-none"
+                        style={{ backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.12 }}
+                    />
 
-                {/* ── Avatar + name + subtitle ── */}
-                <div className="flex flex-col items-center pt-4 pb-6">
-                    {loadingProfile ? (
-                        <>
-                            <div className="w-[72px] h-[72px] rounded-full bg-line/60 animate-pulse mb-3" />
-                            <div className="h-5 w-32 bg-line/60 rounded animate-pulse mb-2" />
-                            <div className="h-3.5 w-48 bg-line/60 rounded animate-pulse" />
-                        </>
-                    ) : (
-                        <>
-                            <Avatar initials={initials} size={72} />
-                            <h2 className="text-[22px] font-semibold text-ink tracking-[-0.02em] mt-3 mb-0.5 text-center">
-                                {name}
-                            </h2>
-                            <p className="text-[14px] text-muted text-center m-0">{subtitle}</p>
-                        </>
-                    )}
+                    {/* Avatar */}
+                    <div className="relative z-10 mb-3">
+                        {loadingProfile ? (
+                            <div
+                                className="rounded-full animate-pulse"
+                                style={{ width: 80, height: 80, background: 'rgba(61,35,30,0.12)' }}
+                            />
+                        ) : (
+                            <div
+                                className="rounded-full flex items-center justify-center"
+                                style={{
+                                    width: 80,
+                                    height: 80,
+                                    background: '#3D231E',
+                                    fontSize: 28,
+                                    fontWeight: 600,
+                                    color: '#FDDCC6',
+                                    fontFamily: "'Sora', system-ui, sans-serif",
+                                }}
+                            >
+                                {initials}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Name + subtitle */}
+                    <div className="relative z-10 text-center">
+                        {loadingProfile ? (
+                            <>
+                                <div className="h-6 w-40 rounded-lg animate-pulse mx-auto mb-2"
+                                    style={{ background: 'rgba(61,35,30,0.12)' }} />
+                                <div className="h-4 w-28 rounded animate-pulse mx-auto"
+                                    style={{ background: 'rgba(61,35,30,0.08)' }} />
+                            </>
+                        ) : (
+                            <>
+                                <h2
+                                    className="font-semibold tracking-[-0.02em] text-center m-0 mb-1"
+                                    style={{ fontSize: 22, color: '#3D231E' }}
+                                >
+                                    {name}
+                                </h2>
+                                <p className="text-[13px] text-center m-0" style={{ color: '#8C6A64' }}>
+                                    {subtitle}
+                                </p>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="relative z-10 flex gap-2.5 w-full mt-5">
+                        {[
+                            { label: 'Rating',  value: rating  },
+                            { label: 'Reviews', value: reviews },
+                            { label: 'Clients', value: clients },
+                        ].map(({ label, value }) => (
+                            <div
+                                key={label}
+                                className="flex-1 flex flex-col items-center py-3 px-2 rounded-[12px]"
+                                style={{ background: 'rgba(61,35,30,0.08)' }}
+                            >
+                                {loadingStats ? (
+                                    <div className="h-5 w-10 rounded animate-pulse mb-1"
+                                        style={{ background: 'rgba(61,35,30,0.12)' }} />
+                                ) : (
+                                    <span
+                                        className="text-[18px] font-semibold tracking-[-0.02em] mb-0.5"
+                                        style={{ color: '#3D231E' }}
+                                    >
+                                        {value}
+                                    </span>
+                                )}
+                                <span
+                                    className="text-[11px] uppercase tracking-[0.05em] font-medium"
+                                    style={{ color: '#8C6A64' }}
+                                >
+                                    {label}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+            </div>
 
-                {/* ── Stats row ── */}
-                <div className="flex gap-2.5 mb-7">
-                    <StatPill label="Rating"  value={rating}  loading={loadingStats} />
-                    <StatPill label="Reviews" value={reviews} loading={loadingStats} />
-                    <StatPill label="Clients" value={clients} loading={loadingStats} />
-                </div>
-
-                {/* ── Settings rows ── */}
+            {/* ── Settings rows ── */}
+            <div className="px-5 flex-1 flex flex-col mt-4">
                 <Divider />
                 {SETTINGS.map((row) => (
                     <SettingsRow
@@ -191,19 +241,14 @@ const ProviderProfile = () => {
                     />
                 ))}
 
-                {/* ── Sign out ── */}
+                {/* Sign out */}
                 <button
                     onClick={handleSignOut}
                     className="w-full mt-4 py-4 rounded-[12px] text-[15px] font-semibold focus:outline-none"
-                    style={{
-                        background: '#FDEDEA',
-                        color: '#B04040',
-                        border: 'none',
-                    }}
+                    style={{ background: '#FDEDEA', color: '#B04040', border: 'none' }}
                 >
                     Sign out
                 </button>
-
             </div>
 
             <Footer />
