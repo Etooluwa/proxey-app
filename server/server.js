@@ -37,10 +37,13 @@ const app = express();
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
+  'https://mykliques.com',
+  'https://www.mykliques.com',
   'https://proxey-app-git-feature-prototype-migration-eto-seguns-projects.vercel.app',
   'https://proxey-app.vercel.app',
   /\.vercel\.app$/,      // Allow all Vercel preview deployments
   /\.onrender\.com$/,    // Allow all Render deployments
+  /\.mykliques\.com$/,   // Allow all mykliques subdomains
 ];
 
 app.use(cors({
