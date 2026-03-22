@@ -56,6 +56,14 @@ import ProviderEarnings from './pages/provider/ProviderEarnings';
 import ProviderNotifications from './pages/provider/ProviderNotifications';
 import ProviderAllNotifications from './pages/provider/ProviderAllNotifications';
 import ProviderProfile from './pages/provider/ProviderProfile';
+import ProviderPersonalDetails from './pages/provider/ProviderPersonalDetails';
+import ProviderBusinessDetails from './pages/provider/ProviderBusinessDetails';
+import ProviderPhotosPortfolio from './pages/provider/ProviderPhotosPortfolio';
+import ProviderPayoutsBilling from './pages/provider/ProviderPayoutsBilling';
+import ProviderWorkingHours from './pages/provider/ProviderWorkingHours';
+import ProviderNotifSettings from './pages/provider/ProviderNotifSettings';
+import ProviderBookingSettings from './pages/provider/ProviderBookingSettings';
+import HelpSupport from './pages/provider/HelpSupport';
 import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
 
 // ── Admin pages ──────────────────────────────────────────────────────────────
@@ -203,6 +211,14 @@ function App() {
                       <Route path="notifications/all" element={<ProviderAllNotifications />} />
                       {/* Profile */}
                       <Route path="profile" element={<ProviderProfile />} />
+                      <Route path="profile/personal" element={<ProviderPersonalDetails />} />
+                      <Route path="profile/business" element={<ProviderBusinessDetails />} />
+                      <Route path="profile/photos" element={<ProviderPhotosPortfolio />} />
+                      <Route path="profile/payouts" element={<ProviderPayoutsBilling />} />
+                      <Route path="profile/hours" element={<ProviderWorkingHours />} />
+                      <Route path="profile/notifications" element={<ProviderNotifSettings />} />
+                      <Route path="profile/booking-settings" element={<ProviderBookingSettings />} />
+                      <Route path="profile/help" element={<HelpSupport />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="appointments" element={<Navigate to="/provider/bookings" replace />} />
                       <Route path="schedule" element={<Navigate to="/provider/calendar" replace />} />

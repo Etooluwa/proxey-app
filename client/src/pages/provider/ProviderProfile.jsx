@@ -27,14 +27,14 @@ const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBo
 // ─── Settings rows ────────────────────────────────────────────────────────────
 
 const SETTINGS = [
-    { label: 'Personal details',    sub: 'Name, email, phone' },
-    { label: 'Business details',    sub: 'Studio name, address' },
-    { label: 'Photos & portfolio',  sub: 'Manage gallery images' },
-    { label: 'Payouts & billing',   sub: 'Stripe Connect' },
-    { label: 'Working hours',       sub: 'Availability schedule',  route: '/provider/calendar/availability' },
-    { label: 'Notifications',       sub: 'Email, push, SMS' },
-    { label: 'Booking settings',    sub: 'Cancellation, buffer times' },
-    { label: 'Help & support',      sub: 'FAQ, contact Kliques' },
+    { label: 'Personal details',    sub: 'Name, email, phone',         route: '/provider/profile/personal' },
+    { label: 'Business details',    sub: 'Studio name, address',       route: '/provider/profile/business' },
+    { label: 'Photos & portfolio',  sub: 'Manage gallery images',      route: '/provider/profile/photos' },
+    { label: 'Payouts & billing',   sub: 'Stripe Connect',             route: '/provider/profile/payouts' },
+    { label: 'Working hours',       sub: 'Availability schedule',      route: '/provider/calendar/availability' },
+    { label: 'Notifications',       sub: 'Email, push, SMS',           route: '/provider/profile/notifications' },
+    { label: 'Booking settings',    sub: 'Cancellation, buffer times', route: '/provider/profile/booking-settings' },
+    { label: 'Help & support',      sub: 'FAQ, contact Kliques',       route: '/provider/profile/help' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
