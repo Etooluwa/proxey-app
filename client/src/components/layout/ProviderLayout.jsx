@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
+import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
-// ─── Provider side menu ──────────────────────────────────────────────────────
+// ─── Provider nav items ───────────────────────────────────────────────────────
 const PROVIDER_MENU = [
     {
         id: 'home',
@@ -64,9 +67,21 @@ const PROVIDER_MENU = [
     },
 ];
 
+// ─── Page titles for desktop header ──────────────────────────────────────────
+const PAGE_TITLES = {
+    '/provider': { title: 'Dashboard', subtitle: 'Welcome back' },
+    '/provider/bookings': { title: 'Bookings', subtitle: '' },
+    '/provider/clients': { title: 'My Kliques', subtitle: '' },
+    '/provider/services': { title: 'Services', subtitle: '' },
+    '/provider/calendar': { title: 'Calendar', subtitle: '' },
+    '/provider/messages': { title: 'Messages', subtitle: '' },
+    '/provider/earnings': { title: 'Earnings', subtitle: '' },
+    '/provider/notifications': { title: 'Notifications', subtitle: '' },
+    '/provider/profile': { title: 'Profile', subtitle: '' },
+};
+
 function useActiveId(items, rootPath) {
     const { pathname } = useLocation();
-    // Check longer paths first to avoid /provider/calendar matching /provider
     const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
     for (const item of sorted) {
         if (item.path === rootPath) {
@@ -78,16 +93,33 @@ function useActiveId(items, rootPath) {
     return items[0]?.id ?? 'home';
 }
 
+function usePageMeta(rootPath) {
+    const { pathname } = useLocation();
+    if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+    // Find longest prefix match
+    let best = null;
+    let bestLen = 0;
+    for (const [path, meta] of Object.entries(PAGE_TITLES)) {
+        if (path !== rootPath && pathname.startsWith(path) && path.length > bestLen) {
+            best = meta;
+            bestLen = path.length;
+        }
+    }
+    return best || { title: '', subtitle: '' };
+}
+
 const ProviderLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
+    const { notifications, unreadCount } = useNotifications();
+    const isDesktop = useIsDesktop();
 
     const activeId = useActiveId(PROVIDER_MENU, '/provider');
+    const { title, subtitle } = usePageMeta('/provider');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-    const userPhoto = profile?.photo || undefined;
 
     const handleNav = (id) => {
         const item = PROVIDER_MENU.find((m) => m.id === id);
@@ -98,12 +130,45 @@ const ProviderLayout = () => {
         logout().then(() => navigate('/login'));
     };
 
+    const handleNotifNavigate = () => {
+        navigate('/provider/notifications');
+    };
+
+    // ── Desktop layout ────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ minHeight: '100vh', background: '#FBF7F2' }}>
+                <DesktopSidebar
+                    items={PROVIDER_MENU}
+                    active={activeId}
+                    onNav={handleNav}
+                    userName={displayName}
+                    userInitials={initials}
+                    isProvider={true}
+                    onSignOut={handleSignOut}
+                />
+                <div style={{ marginLeft: '260px', minHeight: '100vh' }}>
+                    <DesktopHeader
+                        title={title}
+                        subtitle={subtitle}
+                        notifications={notifications}
+                        unreadCount={unreadCount}
+                        onNotifNavigate={handleNotifNavigate}
+                    />
+                    <main>
+                        <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
+                    </main>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Mobile layout ─────────────────────────────────────────────────────────
     return (
         <div className="relative min-h-screen" style={{ background: '#FBF7F2' }}>
             <main>
-                <Outlet context={{ onMenu: () => setMenuOpen(true) }} />
+                <Outlet context={{ onMenu: () => setMenuOpen(true), isDesktop: false }} />
             </main>
-
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
@@ -112,7 +177,6 @@ const ProviderLayout = () => {
                 onNav={handleNav}
                 userName={displayName}
                 userInitials={initials}
-                userPhoto={userPhoto}
                 onSignOut={handleSignOut}
             />
         </div>

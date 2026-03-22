@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
+import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
-// ─── Client side menu ────────────────────────────────────────────────────────
+// ─── Client nav items ─────────────────────────────────────────────────────────
 const CLIENT_MENU = [
     {
         id: 'home',
@@ -33,6 +36,14 @@ const CLIENT_MENU = [
     },
 ];
 
+// ─── Page titles for desktop header ──────────────────────────────────────────
+const PAGE_TITLES = {
+    '/app': { title: 'My Kliques', subtitle: 'Your relationships' },
+    '/app/messages': { title: 'Messages', subtitle: '' },
+    '/app/notifications': { title: 'Notifications', subtitle: '' },
+    '/app/profile': { title: 'Profile', subtitle: '' },
+};
+
 function useActiveId(items, rootPath) {
     const { pathname } = useLocation();
     for (const item of items) {
@@ -45,16 +56,29 @@ function useActiveId(items, rootPath) {
     return items[0]?.id ?? 'home';
 }
 
+function usePageMeta(items, rootPath) {
+    const { pathname } = useLocation();
+    // Exact match first
+    if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+    // Prefix match
+    for (const [path, meta] of Object.entries(PAGE_TITLES)) {
+        if (path !== rootPath && pathname.startsWith(path)) return meta;
+    }
+    return { title: '', subtitle: '' };
+}
+
 const AppLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
+    const { notifications, unreadCount } = useNotifications();
+    const isDesktop = useIsDesktop();
 
     const activeId = useActiveId(CLIENT_MENU, '/app');
+    const { title, subtitle } = usePageMeta(CLIENT_MENU, '/app');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-    const userPhoto = profile?.photo || undefined;
 
     const handleNav = (id) => {
         const item = CLIENT_MENU.find((m) => m.id === id);
@@ -65,12 +89,46 @@ const AppLayout = () => {
         logout().then(() => navigate('/login'));
     };
 
+    const handleNotifNavigate = (notif) => {
+        // Navigate to notifications page; specific notif routing can be added later
+        navigate('/app/notifications');
+    };
+
+    // ── Desktop layout ────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ minHeight: '100vh', background: '#FBF7F2' }}>
+                <DesktopSidebar
+                    items={CLIENT_MENU}
+                    active={activeId}
+                    onNav={handleNav}
+                    userName={displayName}
+                    userInitials={initials}
+                    isProvider={false}
+                    onSignOut={handleSignOut}
+                />
+                <div style={{ marginLeft: '260px', minHeight: '100vh' }}>
+                    <DesktopHeader
+                        title={title}
+                        subtitle={subtitle}
+                        notifications={notifications}
+                        unreadCount={unreadCount}
+                        onNotifNavigate={handleNotifNavigate}
+                    />
+                    <main>
+                        <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
+                    </main>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Mobile layout ─────────────────────────────────────────────────────────
     return (
         <div className="relative min-h-screen" style={{ background: '#FBF7F2' }}>
             <main>
-                <Outlet context={{ onMenu: () => setMenuOpen(true) }} />
+                <Outlet context={{ onMenu: () => setMenuOpen(true), isDesktop: false }} />
             </main>
-
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
@@ -79,7 +137,6 @@ const AppLayout = () => {
                 onNav={handleNav}
                 userName={displayName}
                 userInitials={initials}
-                userPhoto={userPhoto}
                 onSignOut={handleSignOut}
             />
         </div>
