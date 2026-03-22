@@ -23,6 +23,12 @@ const CLIENT_MENU = [
         badge: true,
     },
     {
+        id: 'bookings',
+        label: 'Bookings',
+        path: '/app/bookings',
+        d: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    },
+    {
         id: 'notifications',
         label: 'Notifications',
         path: '/app/notifications',
@@ -41,6 +47,7 @@ const CLIENT_MENU = [
 const PAGE_TITLES = {
     '/app': { title: 'My Kliques', subtitle: 'Your relationships' },
     '/app/messages': { title: 'Messages', subtitle: '' },
+    '/app/bookings': { title: 'Bookings', subtitle: '' },
     '/app/notifications': { title: 'Notifications', subtitle: '' },
     '/app/profile': { title: 'Profile', subtitle: '' },
 };

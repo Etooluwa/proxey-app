@@ -2,30 +2,41 @@
  * ProviderAppointments — v6 Warm Editorial
  * Route: /provider/appointments
  *
- * Pending bookings shown as cards with Accept / Decline flow.
- * Decline reveals a textarea for an optional reason before confirming.
- * Reviewed (handled) bookings shown below at 50% opacity.
+ * 3-tab bookings page:
+ *   Pending  — cards with Accept / Decline flow
+ *   Upcoming — confirmed sessions not yet passed
+ *   Past     — completed / cancelled / declined sessions
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { fetchProviderJobs, updateProviderJobStatus } from '../../data/provider';
+import request from '../../data/apiClient';
 import Header from '../../components/ui/Header';
 import Avatar from '../../components/ui/Avatar';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
 
-// ─── Desktop design tokens ─────────────────────────────────────────────────────
+// ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
-    ink: '#3D231E', muted: '#8C6A64', accent: '#C25E4A',
-    line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5',
-    success: '#5A8A5E', successBg: '#EBF2EC', dangerBg: '#FDEDEA',
+    ink: '#3D231E',
+    muted: '#8C6A64',
+    faded: '#B0948F',
+    accent: '#C25E4A',
+    line: 'rgba(140,106,100,0.18)',
+    card: '#FFFFFF',
+    hero: '#FDDCC6',
+    avatarBg: '#F2EBE5',
+    success: '#5A8A5E',
+    successBg: '#EBF2EC',
+    dangerBg: '#FDEDEA',
+    base: '#FBF7F2',
 };
 const F = "'Sora',system-ui,sans-serif";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function getInitials(name) {
     return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -53,11 +64,10 @@ function fmtDuration(mins) {
     return m ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+// ─── InboxZero empty state ──────────────────────────────────────────────────────
 
 const InboxZero = () => (
     <div className="flex-1 flex flex-col items-center justify-center py-14">
-        {/* Open envelope icon */}
         <div
             className="w-16 h-16 rounded-[20px] flex items-center justify-center mb-5"
             style={{ background: '#F2EBE5' }}
@@ -76,7 +86,7 @@ const InboxZero = () => (
     </div>
 );
 
-// ─── Pending booking card ─────────────────────────────────────────────────────
+// ─── Pending booking card ───────────────────────────────────────────────────────
 
 const PendingCard = ({ job, declining, declineReason, onDeclineStart, onDeclineCancel, onDeclineReasonChange, onConfirmDecline, onAccept, actioning }) => {
     const isActioning = actioning === job.id;
@@ -200,7 +210,7 @@ const PendingCard = ({ job, declining, declineReason, onDeclineStart, onDeclineC
     );
 };
 
-// ─── Reviewed row ─────────────────────────────────────────────────────────────
+// ─── Reviewed row (legacy — kept for compatibility) ────────────────────────────
 
 const ReviewedRow = ({ job }) => {
     const isAccepted = ['confirmed', 'accepted', 'completed'].includes(job.status);
@@ -223,18 +233,163 @@ const ReviewedRow = ({ job }) => {
     );
 };
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Tab bar ───────────────────────────────────────────────────────────────────
+
+const TabBar = ({ activeTab, setActiveTab, pendingCount, upcomingCount, pastCount }) => {
+    const tabs = [
+        { key: 'pending', label: 'Pending', count: pendingCount },
+        { key: 'upcoming', label: 'Upcoming', count: upcomingCount },
+        { key: 'past', label: 'Past', count: pastCount },
+    ];
+
+    return (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {tabs.map(({ key, label, count }) => {
+                const isActive = activeTab === key;
+                return (
+                    <button
+                        key={key}
+                        onClick={() => setActiveTab(key)}
+                        style={{
+                            flex: 1,
+                            padding: '14px 0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            borderRadius: 14,
+                            background: isActive ? T.hero : T.card,
+                            border: isActive ? `2px solid ${T.accent}` : `1px solid ${T.line}`,
+                            cursor: 'pointer',
+                            outline: 'none',
+                            fontFamily: F,
+                            gap: 2,
+                        }}
+                    >
+                        <span style={{
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: isActive ? T.accent : T.ink,
+                            lineHeight: 1.1,
+                        }}>
+                            {count}
+                        </span>
+                        <span style={{
+                            fontSize: 11,
+                            fontWeight: 500,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            color: T.muted,
+                        }}>
+                            {label}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
+
+// ─── Booking list row (Upcoming + Past tabs) ───────────────────────────────────
+
+const BookingRow = ({ job, onClick, isLast }) => {
+    const price = fmtPrice(job.price);
+    const duration = fmtDuration(job.duration);
+    const isCompleted = job.status === 'completed';
+    const isCancelled = ['cancelled', 'declined'].includes(job.status);
+
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '14px 0',
+                borderBottom: isLast ? 'none' : `1px solid ${T.line}`,
+                cursor: 'pointer',
+            }}
+        >
+            {/* Avatar */}
+            <Avatar initials={getInitials(job.client_name)} size={40} />
+
+            {/* Middle info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {job.client_name || 'Client'}
+                </p>
+                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {[job.service_name, duration].filter(Boolean).join(' · ') || 'Session'}
+                </p>
+            </div>
+
+            {/* Right: price + date + status pill */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                {price && (
+                    <span style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink }}>
+                        {price}
+                    </span>
+                )}
+                <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>
+                    {fmtDateTime(job.scheduled_at)}
+                </span>
+                {isCompleted && (
+                    <span style={{
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: T.success,
+                        background: T.successBg,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                    }}>
+                        Completed
+                    </span>
+                )}
+                {isCancelled && (
+                    <span style={{
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#B04040',
+                        background: T.dangerBg,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                    }}>
+                        Cancelled
+                    </span>
+                )}
+                {!isCompleted && !isCancelled && job.status === 'confirmed' && (
+                    <span style={{
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: T.success,
+                        background: T.successBg,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                    }}>
+                        Confirmed
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 const ProviderAppointments = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { profile } = useSession();
     const { unreadCount } = useNotifications();
+    const navigate = useNavigate();
 
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actioning, setActioning] = useState(null);
     const [declining, setDeclining] = useState(null);
     const [declineReason, setDeclineReason] = useState('');
+    const [activeTab, setActiveTab] = useState('pending');
 
     const initials = (profile?.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
@@ -253,9 +408,32 @@ const ProviderAppointments = () => {
 
     useEffect(() => { load(); }, [load]);
 
-    const pending = jobs.filter((j) => (j.status || '').toLowerCase() === 'pending');
-    const reviewed = jobs.filter((j) => (j.status || '').toLowerCase() !== 'pending');
+    // ── Derive tab lists ──────────────────────────────────────────────────────
+    const nowIso = new Date().toISOString();
 
+    const pending = jobs
+        .filter((j) => (j.status || '').toLowerCase() === 'pending');
+
+    const upcoming = jobs
+        .filter((j) => {
+            const s = (j.status || '').toLowerCase();
+            return s === 'confirmed' && j.scheduled_at >= nowIso;
+        })
+        .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''));
+
+    const past = jobs
+        .filter((j) => {
+            const s = (j.status || '').toLowerCase();
+            return ['completed', 'cancelled', 'declined'].includes(s) ||
+                (s === 'confirmed' && j.scheduled_at < nowIso);
+        })
+        .sort((a, b) => (b.scheduled_at || '').localeCompare(a.scheduled_at || ''));
+
+    const pendingCount = pending.length;
+    const upcomingCount = upcoming.length;
+    const pastCount = past.length;
+
+    // ── Actions ───────────────────────────────────────────────────────────────
     const handleAccept = async (job) => {
         setActioning(job.id);
         try {
@@ -292,86 +470,121 @@ const ProviderAppointments = () => {
         }
     };
 
-      const subtitle = loading
-        ? 'Loading…'
-        : `${pending.length} pending · ${reviewed.length} reviewed`;
+    const handleRowClick = (jobId) => navigate(`/provider/appointments/${jobId}`);
 
-    // ── Desktop layout ─────────────────────────────────────────────────────────
+    // ── Desktop layout ────────────────────────────────────────────────────────
     if (isDesktop) {
         return (
             <div style={{ padding: '40px', fontFamily: F }}>
-                <div style={{ maxWidth: 900, margin: '0 auto' }}>
-                    {/* Subtitle + title */}
-                    <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
-                        {subtitle}
-                    </span>
+                <div style={{ maxWidth: 860, margin: '0 auto' }}>
 
-                    {/* Pending section */}
-                    {!loading && pending.length > 0 && (
-                        <div style={{ marginBottom: 40 }}>
-                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 14 }}>Pending</span>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
-                                {pending.map((job) => (
-                                    <PendingCard
-                                        key={job.id}
-                                        job={job}
-                                        declining={declining}
-                                        declineReason={declineReason}
-                                        onDeclineStart={handleDeclineStart}
-                                        onDeclineCancel={handleDeclineCancel}
-                                        onDeclineReasonChange={setDeclineReason}
-                                        onConfirmDecline={handleConfirmDecline}
-                                        onAccept={handleAccept}
-                                        actioning={actioning}
-                                    />
-                                ))}
-                            </div>
+                    {/* Page title */}
+                    <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.ink, letterSpacing: '-0.03em', margin: '0 0 24px' }}>
+                        Bookings
+                    </h1>
+
+                    {/* Tab bar */}
+                    <TabBar
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        pendingCount={pendingCount}
+                        upcomingCount={upcomingCount}
+                        pastCount={pastCount}
+                    />
+
+                    {/* Loading skeleton */}
+                    {loading && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {[1, 2].map((i) => (
+                                <div key={i} style={{ width: '100%', height: 120, borderRadius: 20, background: 'rgba(140,106,100,0.08)', animation: 'pulse 1.5s infinite' }} />
+                            ))}
                         </div>
                     )}
 
-                    {/* All caught up */}
-                    {!loading && pending.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <div style={{ width: 56, height: 56, borderRadius: 16, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                                <svg width="24" height="24" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
-                                    <path d="M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
-                                    <path d="M3 9l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </div>
-                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Inbox zero. Feels good.</p>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No pending requests right now.</p>
-                        </div>
+                    {/* ── Pending tab ── */}
+                    {!loading && activeTab === 'pending' && (
+                        <>
+                            {pending.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                                    <div style={{ width: 56, height: 56, borderRadius: 16, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                        <svg width="24" height="24" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                                            <path d="M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M3 9l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </div>
+                                    <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>All caught up.</p>
+                                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No pending requests right now.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
+                                    {pending.map((job) => (
+                                        <PendingCard
+                                            key={job.id}
+                                            job={job}
+                                            declining={declining}
+                                            declineReason={declineReason}
+                                            onDeclineStart={handleDeclineStart}
+                                            onDeclineCancel={handleDeclineCancel}
+                                            onDeclineReasonChange={setDeclineReason}
+                                            onConfirmDecline={handleConfirmDecline}
+                                            onAccept={handleAccept}
+                                            actioning={actioning}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
 
-                    {/* Reviewed section */}
-                    {!loading && reviewed.length > 0 && (
-                        <div>
-                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 12 }}>Reviewed</span>
-                            <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
-                                {reviewed.map((job, i) => {
-                                    const isAccepted = ['confirmed', 'accepted', 'completed'].includes(job.status);
-                                    return (
-                                        <div key={job.id}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', opacity: 0.55 }}>
-                                                <Avatar initials={getInitials(job.client_name)} size={36} />
-                                                <span style={{ flex: 1, fontFamily: F, fontSize: 14, color: T.ink }}>{job.client_name || 'Client'}</span>
-                                                <span style={{ fontFamily: F, fontSize: 12, fontWeight: 500, color: isAccepted ? T.success : '#B04040', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                                    {isAccepted ? 'Accepted' : 'Declined'}
-                                                </span>
-                                                <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtDateTime(job.scheduled_at)}</span>
-                                            </div>
-                                            {i < reviewed.length - 1 && <div style={{ height: 1, background: T.line, marginLeft: 70 }} />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                    {/* ── Upcoming tab ── */}
+                    {!loading && activeTab === 'upcoming' && (
+                        <>
+                            {upcoming.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                                    <p style={{ fontFamily: F, fontSize: 16, color: T.muted, margin: 0 }}>No upcoming sessions. Confirmed bookings will appear here.</p>
+                                </div>
+                            ) : (
+                                <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, padding: '0 20px', overflow: 'hidden' }}>
+                                    {upcoming.map((job, i) => (
+                                        <BookingRow
+                                            key={job.id}
+                                            job={job}
+                                            onClick={() => handleRowClick(job.id)}
+                                            isLast={i === upcoming.length - 1}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* ── Past tab ── */}
+                    {!loading && activeTab === 'past' && (
+                        <>
+                            {past.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                                    <p style={{ fontFamily: F, fontSize: 16, color: T.muted, margin: 0 }}>No past sessions yet.</p>
+                                </div>
+                            ) : (
+                                <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, padding: '0 20px', overflow: 'hidden' }}>
+                                    {past.map((job, i) => (
+                                        <BookingRow
+                                            key={job.id}
+                                            job={job}
+                                            onClick={() => handleRowClick(job.id)}
+                                            isLast={i === past.length - 1}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
         );
     }
 
+    // ── Mobile layout ─────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col min-h-screen bg-base">
             <Header
@@ -381,15 +594,24 @@ const ProviderAppointments = () => {
                 notifCount={unreadCount}
             />
 
-            {/* ── Title ── */}
+            {/* Title section */}
             <div className="px-5 pb-5">
-                <Lbl className="block mb-1.5">{subtitle}</Lbl>
                 <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
                     Bookings
                 </h1>
             </div>
 
             <div className="px-5 flex-1 flex flex-col">
+
+                {/* Tab bar */}
+                <TabBar
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    pendingCount={pendingCount}
+                    upcomingCount={upcomingCount}
+                    pastCount={pastCount}
+                />
+
                 {/* Loading skeleton */}
                 {loading && (
                     <div className="flex flex-col gap-3">
@@ -403,41 +625,74 @@ const ProviderAppointments = () => {
                     </div>
                 )}
 
-                {/* Empty state */}
-                {!loading && pending.length === 0 && reviewed.length === 0 && <InboxZero />}
-
-                {/* Pending cards */}
-                {!loading && pending.map((job) => (
-                    <PendingCard
-                        key={job.id}
-                        job={job}
-                        declining={declining}
-                        declineReason={declineReason}
-                        onDeclineStart={handleDeclineStart}
-                        onDeclineCancel={handleDeclineCancel}
-                        onDeclineReasonChange={setDeclineReason}
-                        onConfirmDecline={handleConfirmDecline}
-                        onAccept={handleAccept}
-                        actioning={actioning}
-                    />
-                ))}
-
-                {/* All-caught-up inline message when pending=0 but reviewed exist */}
-                {!loading && pending.length === 0 && reviewed.length > 0 && (
-                    <div className="text-center py-10">
-                        <p className="text-[18px] text-ink m-0 mb-1">All caught up.</p>
-                        <p className="text-[14px] text-muted m-0">No pending requests right now.</p>
-                    </div>
+                {/* ── Pending tab ── */}
+                {!loading && activeTab === 'pending' && (
+                    <>
+                        {pending.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                                <p style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.ink, margin: '0 0 6px' }}>All caught up.</p>
+                                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No pending requests right now.</p>
+                            </div>
+                        ) : (
+                            pending.map((job) => (
+                                <PendingCard
+                                    key={job.id}
+                                    job={job}
+                                    declining={declining}
+                                    declineReason={declineReason}
+                                    onDeclineStart={handleDeclineStart}
+                                    onDeclineCancel={handleDeclineCancel}
+                                    onDeclineReasonChange={setDeclineReason}
+                                    onConfirmDecline={handleConfirmDecline}
+                                    onAccept={handleAccept}
+                                    actioning={actioning}
+                                />
+                            ))
+                        )}
+                    </>
                 )}
 
-                {/* Reviewed section */}
-                {!loading && reviewed.length > 0 && (
+                {/* ── Upcoming tab ── */}
+                {!loading && activeTab === 'upcoming' && (
                     <>
-                        <Lbl className="block mb-3 mt-2">Reviewed</Lbl>
-                        <Divider />
-                        {reviewed.map((job) => (
-                            <ReviewedRow key={job.id} job={job} />
-                        ))}
+                        {upcoming.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No upcoming sessions. Confirmed bookings will appear here.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                {upcoming.map((job, i) => (
+                                    <BookingRow
+                                        key={job.id}
+                                        job={job}
+                                        onClick={() => handleRowClick(job.id)}
+                                        isLast={i === upcoming.length - 1}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* ── Past tab ── */}
+                {!loading && activeTab === 'past' && (
+                    <>
+                        {past.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No past sessions yet.</p>
+                            </div>
+                        ) : (
+                            <div>
+                                {past.map((job, i) => (
+                                    <BookingRow
+                                        key={job.id}
+                                        job={job}
+                                        onClick={() => handleRowClick(job.id)}
+                                        isLast={i === past.length - 1}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </>
                 )}
 

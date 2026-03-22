@@ -38,6 +38,7 @@ import ChatPage from './pages/ChatPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AllNotificationsPage from './pages/AllNotificationsPage';
 import AccountPage from './pages/AccountPage';
+import ClientBookings from './pages/ClientBookings';
 
 // ── Provider pages ───────────────────────────────────────────────────────────
 import ProviderDashboard from './pages/provider/ProviderDashboard';
@@ -153,6 +154,8 @@ function App() {
                       {/* Messaging */}
                       <Route path="messages" element={<MessagesPage />} />
                       <Route path="messages/:conversationId" element={<ChatPage />} />
+                      {/* Bookings */}
+                      <Route path="bookings" element={<ClientBookings />} />
                       {/* Notifications */}
                       <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="notifications/all" element={<AllNotificationsPage />} />
@@ -160,7 +163,6 @@ function App() {
                       <Route path="profile" element={<AccountPage />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="account" element={<Navigate to="/app/profile" replace />} />
-                      <Route path="bookings" element={<Navigate to="/app" replace />} />
                       <Route path="browse" element={<Navigate to="/app" replace />} />
                     </Route>
 
