@@ -19,6 +19,7 @@ import Divider from '../../components/ui/Divider';
 import Avatar from '../../components/ui/Avatar';
 import ArrowIcon from '../../components/ui/ArrowIcon';
 import ShareLinks from '../../components/ui/ShareLinks';
+import DesktopShareLinks from '../../components/DesktopShareLinks';
 import Footer from '../../components/ui/Footer';
 import AppointmentDrawer from '../../components/AppointmentDrawer';
 
@@ -305,7 +306,10 @@ const ProviderDashboard = () => {
 
                 {/* ── Share Links ── */}
                 <div className="mt-7">
-                    <ShareLinks handle={handle} />
+                    {isDesktop
+                        ? <DesktopShareLinks handle={handle} />
+                        : <ShareLinks handle={handle} />
+                    }
                 </div>
 
                 <Footer />
