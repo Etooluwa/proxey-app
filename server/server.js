@@ -626,6 +626,52 @@ app.post("/api/provider/service-groups", async (req, res) => {
   }
 });
 
+// PUT /api/provider/service-groups/:groupId — update group name/description
+app.put("/api/provider/service-groups/:groupId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
+  const { groupId } = req.params;
+  const { name, description } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
+  try {
+    const providerId = await resolveProviderId(req);
+    const { data, error } = await supabase
+      .from("service_groups")
+      .update({ name: name.trim(), description: description?.trim() ?? null, updated_at: new Date().toISOString() })
+      .eq("id", groupId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Group not found." });
+    res.status(200).json({ group: data });
+  } catch (err) {
+    console.error("[PUT /provider/service-groups/:groupId]", err);
+    res.status(500).json({ error: "Failed to update group." });
+  }
+});
+
+// DELETE /api/provider/service-groups/:groupId — delete group, reassign services to ungrouped
+app.delete("/api/provider/service-groups/:groupId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
+  const { groupId } = req.params;
+  try {
+    const providerId = await resolveProviderId(req);
+    // Verify group belongs to this provider
+    const { data: group, error: findErr } = await supabase
+      .from("service_groups").select("id").eq("id", groupId).eq("provider_id", providerId).single();
+    if (findErr || !group) return res.status(404).json({ error: "Group not found." });
+    // Reassign services to ungrouped
+    await supabase.from("services").update({ group_id: null }).eq("group_id", groupId).eq("provider_id", providerId);
+    // Delete the group
+    const { error: delErr } = await supabase.from("service_groups").delete().eq("id", groupId).eq("provider_id", providerId);
+    if (delErr) throw delErr;
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /provider/service-groups/:groupId]", err);
+    res.status(500).json({ error: "Failed to delete group." });
+  }
+});
+
 // PATCH /api/provider/services/:id/group — assign a service to a group
 app.patch("/api/provider/services/:id/group", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });

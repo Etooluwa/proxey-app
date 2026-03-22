@@ -141,7 +141,7 @@ const ServiceRow = ({ svc, onClick, isLast }) => {
 
 // ─── Group section ────────────────────────────────────────────────────────────
 
-const GroupSection = ({ group, services, onServiceClick, onAddToGroup }) => {
+const GroupSection = ({ group, services, onServiceClick, onAddToGroup, onGroupClick }) => {
     const groupName = group ? group.name : 'General';
     const count = services.length;
 
@@ -150,7 +150,16 @@ const GroupSection = ({ group, services, onServiceClick, onAddToGroup }) => {
             {/* Group header */}
             <div className="flex items-center justify-between mb-1">
                 <div>
-                    <Lbl className="block">{groupName}</Lbl>
+                    {group ? (
+                        <button
+                            onClick={() => onGroupClick(group)}
+                            className="focus:outline-none active:opacity-60 text-left"
+                        >
+                            <Lbl className="block underline-offset-2" style={{ textDecoration: 'underline', textDecorationColor: 'rgba(140,106,100,0.3)' }}>{groupName}</Lbl>
+                        </button>
+                    ) : (
+                        <Lbl className="block">{groupName}</Lbl>
+                    )}
                     <p className="text-[12px] text-faded m-0 mt-0.5">
                         {count} service{count !== 1 ? 's' : ''}
                     </p>
@@ -282,6 +291,7 @@ const ProviderServices = () => {
     const totalServices = services.length;
 
     const handleServiceClick = (svc) => navigate(`/provider/services/${svc.id}`);
+    const handleGroupClick = (group) => navigate(`/provider/services/groups/${group.id}`);
 
     const handleAddToGroup = (group) => {
         // Navigate to new service pre-assigned to this group
@@ -334,9 +344,15 @@ const ProviderServices = () => {
                         return (
                             <div key={section.group?.id || 'ungrouped'} style={{ marginBottom: 28 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                    <div>
-                                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{groupName}</span>
-                                        <span style={{ fontFamily: F, fontSize: 11, color: T.faded, marginLeft: 8 }}>{section.services.length} service{section.services.length !== 1 ? 's' : ''}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        {section.group ? (
+                                            <button onClick={() => handleGroupClick(section.group)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'underline', textDecorationColor: 'rgba(140,106,100,0.35)' }}>
+                                                {groupName}
+                                            </button>
+                                        ) : (
+                                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{groupName}</span>
+                                        )}
+                                        <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>{section.services.length} service{section.services.length !== 1 ? 's' : ''}</span>
                                     </div>
                                     {section.group && (
                                         <button
@@ -458,6 +474,7 @@ const ProviderServices = () => {
                                 services={section.services}
                                 onServiceClick={handleServiceClick}
                                 onAddToGroup={handleAddToGroup}
+                                onGroupClick={handleGroupClick}
                             />
                         ))}
 

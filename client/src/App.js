@@ -65,6 +65,7 @@ import ProviderNotifSettings from './pages/provider/ProviderNotifSettings';
 import ProviderBookingSettings from './pages/provider/ProviderBookingSettings';
 import HelpSupport from './pages/provider/HelpSupport';
 import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
+import ProviderGroupEditor from './pages/provider/ProviderGroupEditor';
 import ClientPersonalDetails from './pages/ClientPersonalDetails';
 import ClientPaymentMethods from './pages/ClientPaymentMethods';
 import ClientNotifSettings from './pages/ClientNotifSettings';
@@ -207,8 +208,9 @@ function App() {
                       {/* Services */}
                       <Route path="services" element={<ProviderServices />} />
                       <Route path="services/groups/new" element={<ProviderNewServiceGroup />} />
+                      <Route path="services/groups/:groupId" element={<ProviderGroupEditor />} />
                       <Route path="services/new" element={<ProviderServiceEditor />} />
-                      <Route path="services/:id/edit" element={<ProviderServiceEditor />} />
+                      <Route path="services/:id" element={<ProviderServiceEditor />} />
                       {/* Calendar */}
                       <Route path="calendar" element={<ProviderSchedule />} />
                       <Route path="calendar/availability" element={<AvailabilityPage />} />

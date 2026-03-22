@@ -197,6 +197,7 @@ const EMPTY_FORM = {
     depositValue: 50,
     clientNotesEnabled: true,
     is_active: true,
+    group_id: null,
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -212,11 +213,13 @@ const ProviderServiceEditor = () => {
     const preGroupId = location.state?.groupId || null;
 
     const [form, setForm] = useState(EMPTY_FORM);
+    const [groups, setGroups] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(!isNew);
     const [saving, setSaving] = useState(false);
     const [savingStatus, setSavingStatus] = useState('');
+    const [deleting, setDeleting] = useState(false);
 
     // ── Load existing ────────────────────────────────────────────────────────
     const load = useCallback(async () => {
@@ -238,6 +241,7 @@ const ProviderServiceEditor = () => {
                     depositValue:       svc.deposit_value != null ? svc.deposit_value : 50,
                     clientNotesEnabled: svc.client_notes_enabled !== false,
                     is_active:          svc.is_active !== false,
+                    group_id:           svc.group_id || null,
                 });
             }
             setQuestions(data.questions || []);
@@ -249,6 +253,13 @@ const ProviderServiceEditor = () => {
     }, [id, isNew]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Load groups for the group selector
+    useEffect(() => {
+        request('/provider/services')
+            .then((data) => setGroups(data.groups || []))
+            .catch(() => {});
+    }, []);
 
     const set = (field) => (val) =>
         setForm((p) => ({ ...p, [field]: val?.target ? val.target.value : val }));
@@ -329,17 +340,19 @@ const ProviderServiceEditor = () => {
 
             let serviceId = id;
 
+            // Resolve effective group: form selection > preGroupId (from "Add to group" nav)
+            const effectiveGroupId = form.group_id || preGroupId || null;
+
             if (isNew) {
                 const res = await request('/services', {
                     method: 'POST',
                     body: JSON.stringify({ ...servicePayload, unit: 'visit' }),
                 });
                 serviceId = res.service?.id;
-                // Assign to group if coming from "Add to group"
-                if (serviceId && preGroupId) {
+                if (serviceId && effectiveGroupId) {
                     await request(`/provider/services/${serviceId}/group`, {
                         method: 'PATCH',
-                        body: JSON.stringify({ group_id: preGroupId }),
+                        body: JSON.stringify({ group_id: effectiveGroupId }),
                     }).catch(() => {});
                 }
             } else {
@@ -347,6 +360,11 @@ const ProviderServiceEditor = () => {
                     method: 'PUT',
                     body: JSON.stringify(servicePayload),
                 });
+                // Update group assignment
+                await request(`/provider/services/${id}/group`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ group_id: effectiveGroupId }),
+                }).catch(() => {});
             }
 
             // Persist intake questions: delete-all + re-insert
@@ -395,7 +413,21 @@ const ProviderServiceEditor = () => {
         }
     };
 
-    // ── Loading ──────────────────────────────────────────────────────────────
+    // ── Delete ───────────────────────────────────────────────────────────────
+    const handleDelete = async () => {
+        if (!window.confirm('Delete this service? This cannot be undone.')) return;
+        setDeleting(true);
+        try {
+            await request(`/services/${id}`, { method: 'DELETE' });
+            toast.push({ title: 'Service deleted', variant: 'success' });
+            navigate('/provider/services');
+        } catch (err) {
+            toast.push({ title: 'Failed to delete', description: err.message, variant: 'error' });
+            setDeleting(false);
+        }
+    };
+
+    // ── Loading ───────────────────────────────────────────────────────────────
     if (loading) {
         return (
             <div className="flex flex-col min-h-screen bg-base items-center justify-center">
@@ -464,7 +496,7 @@ const ProviderServiceEditor = () => {
                         <FieldError msg={errors.duration} />
                     </div>
 
-                    <div>
+                    <div className="mb-4">
                         <FieldLabel>Description</FieldLabel>
                         <textarea
                             value={form.description}
@@ -473,6 +505,20 @@ const ProviderServiceEditor = () => {
                             rows={3}
                             style={{ ...inputBase, resize: 'vertical' }}
                         />
+                    </div>
+
+                    <div>
+                        <FieldLabel>Group</FieldLabel>
+                        <select
+                            value={form.group_id || ''}
+                            onChange={(e) => set('group_id')(e.target.value || null)}
+                            style={{ ...inputBase, appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%238C6A64' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center', paddingRight: 40 }}
+                        >
+                            <option value="">General (no group)</option>
+                            {groups.map((g) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
                     </div>
                 </Section>
 
@@ -645,13 +691,26 @@ const ProviderServiceEditor = () => {
 
             {/* ── Sticky bottom bar ── */}
             <div
-                className="fixed bottom-0 left-0 right-0 flex gap-3 px-5 py-3"
+                className="fixed bottom-0 left-0 right-0 px-5 py-3"
                 style={{
                     background: '#FBF7F2',
                     borderTop: '1px solid rgba(140,106,100,0.15)',
                     paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                 }}
             >
+                {/* Delete row — only for existing services */}
+                {!isNew && (
+                    <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="w-full py-3 mb-2 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                        style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1 }}
+                    >
+                        {deleting ? 'Deleting…' : 'Delete Service'}
+                    </button>
+                )}
+                <div className="flex gap-3">
                 <button
                     type="button"
                     onClick={() => navigate('/provider/services')}
@@ -682,6 +741,7 @@ const ProviderServiceEditor = () => {
                         {saving ? (savingStatus || 'Saving…') : 'Save Service'}
                     </span>
                 </button>
+                </div>
             </div>
 
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
