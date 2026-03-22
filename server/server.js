@@ -344,6 +344,19 @@ function getProviderId(req) {
   return req.headers["x-provider-id"] || getUserId(req);
 }
 
+// Resolves the providers.id (PK) from the caller's user_id.
+// Needed when inserting rows with a FK to providers.id (e.g. service_groups).
+async function resolveProviderId(req) {
+  const userId = getUserId(req);
+  const { data, error } = await supabase
+    .from("providers")
+    .select("id")
+    .eq("user_id", userId)
+    .single();
+  if (error || !data) throw new Error("Provider record not found for this user.");
+  return data.id;
+}
+
 // Admin user IDs from environment variable (comma-separated UUIDs)
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
@@ -584,10 +597,10 @@ app.get("/api/provider/services", async (req, res) => {
 // POST /api/provider/service-groups — create a new service group
 app.post("/api/provider/service-groups", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
-  const providerId = getProviderId(req);
   const { name, description } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
   try {
+    const providerId = await resolveProviderId(req);
     const { data: existing } = await supabase
       .from("service_groups")
       .select("sort_order")
@@ -611,10 +624,10 @@ app.post("/api/provider/service-groups", async (req, res) => {
 // PATCH /api/provider/services/:id/group — assign a service to a group
 app.patch("/api/provider/services/:id/group", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
-  const providerId = getProviderId(req);
   const { id } = req.params;
   const { group_id } = req.body || {};
   try {
+    const providerId = await resolveProviderId(req);
     const { data, error } = await supabase
       .from("services")
       .update({ group_id: group_id || null })
@@ -636,7 +649,6 @@ app.post("/api/services", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
   const { id, name, description, category, basePrice, unit, duration } = req.body || {};
 
   if (!name || !category || !basePrice) {
@@ -647,6 +659,13 @@ app.post("/api/services", async (req, res) => {
     paymentType, depositType, depositValue, clientNotesEnabled,
     isActive, photos,
   } = req.body || {};
+
+  let providerId;
+  try {
+    providerId = await resolveProviderId(req);
+  } catch (err) {
+    return res.status(400).json({ error: "Provider record not found for this user." });
+  }
 
   const payload = {
     id: id || crypto.randomUUID(),
