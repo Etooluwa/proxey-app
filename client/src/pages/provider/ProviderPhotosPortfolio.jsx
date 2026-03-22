@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { request } from '../../data/apiClient';
+import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 
 const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', base: '#FBF7F2', hero: '#FDDCC6', success: '#5A8A5E', successBg: '#EBF2EC' };
 const F = "'Sora',system-ui,sans-serif";
@@ -16,7 +16,6 @@ const Divider = ({ style }) => (
 );
 
 export default function ProviderPhotosPortfolio() {
-  const navigate = useNavigate();
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -30,23 +29,7 @@ export default function ProviderPhotosPortfolio() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: T.base, display: 'flex', flexDirection: 'column', fontFamily: F }}>
-      {/* Nav bar */}
-      <div style={{ padding: '20px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-        >
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <path d="M15 19l-7-7 7-7" stroke={T.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 500, color: T.muted }}>Photos & Portfolio</span>
-        <div style={{ width: 28 }} />
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: '12px 24px 0', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600, width: '100%', margin: '0 auto' }}>
+    <SettingsPageLayout title="Photos & Portfolio">
 
         {/* Profile Photo */}
         <Lbl>PROFILE PHOTO</Lbl>
@@ -118,7 +101,6 @@ export default function ProviderPhotosPortfolio() {
           <p style={{ fontSize: 12, color: T.faded, margin: '0 0 16px' }}>No portfolio photos yet.</p>
         )}
 
-      </div>
-    </div>
+    </SettingsPageLayout>
   );
 }

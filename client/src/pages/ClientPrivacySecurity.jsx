@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
 import { useSession } from '../auth/authContext';
+import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
   ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F',
@@ -56,20 +57,7 @@ export default function ClientPrivacySecurity() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: T.base, display: 'flex', flexDirection: 'column', fontFamily: F }}>
-      {/* Nav */}
-      <div style={{ padding: '20px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Go back">
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={T.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 500, color: T.muted }}>Privacy & Security</span>
-        <div style={{ width: 28 }} />
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: '12px 24px 0', flex: 1, maxWidth: 600, width: '100%', margin: '0 auto' }}>
+    <SettingsPageLayout title="Privacy & Security">
         {identityRows.map((row) => (
           <div key={row.label}>
             <button style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: F }}>
@@ -103,7 +91,6 @@ export default function ClientPrivacySecurity() {
             <Divider />
           </div>
         ))}
-      </div>
-    </div>
+    </SettingsPageLayout>
   );
 }

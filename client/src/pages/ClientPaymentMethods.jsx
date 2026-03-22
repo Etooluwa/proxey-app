@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
+import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
   ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -25,7 +25,6 @@ function BrandBadge({ brand }) {
 }
 
 export default function ClientPaymentMethods() {
-  const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(null);
@@ -51,20 +50,7 @@ export default function ClientPaymentMethods() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: T.base, display: 'flex', flexDirection: 'column', fontFamily: F }}>
-      {/* Nav */}
-      <div style={{ padding: '20px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Go back">
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={T.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 500, color: T.muted }}>Payment Methods</span>
-        <div style={{ width: 28 }} />
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: '12px 24px 0', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600, width: '100%', margin: '0 auto' }}>
+    <SettingsPageLayout title="Payment Methods">
         <Lbl>Saved Cards</Lbl>
 
         {loading ? (
@@ -146,9 +132,7 @@ export default function ClientPaymentMethods() {
             </button>
           </div>
         )}
-      </div>
-
       <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
-    </div>
+    </SettingsPageLayout>
   );
 }

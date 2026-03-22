@@ -17,6 +17,7 @@ import { request } from '../../data/apiClient';
 import BackBtn from '../../components/ui/BackBtn';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
+import Toggle from '../../components/ui/Toggle';
 import { useToast } from '../../components/ui/ToastProvider';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,33 +55,6 @@ const inputBase = {
 const inputError = { border: '1.5px solid #C25E4A' };
 
 // Toggle
-const Toggle = ({ on, onToggle }) => (
-    <button
-        type="button"
-        onClick={onToggle}
-        className="focus:outline-none flex-shrink-0"
-        style={{
-            width: 44, height: 26, borderRadius: 13,
-            background: on ? '#3D231E' : 'rgba(140,106,100,0.2)',
-            position: 'relative',
-            border: 'none',
-            transition: 'background 0.2s',
-        }}
-    >
-        <div
-            style={{
-                position: 'absolute',
-                top: 3,
-                left: on ? 21 : 3,
-                width: 20, height: 20,
-                borderRadius: '50%',
-                background: '#FFFFFF',
-                transition: 'left 0.2s',
-            }}
-        />
-    </button>
-);
-
 // Segment control (two options)
 const Segment = ({ options, value, onChange }) => (
     <div className="flex gap-2">
@@ -642,7 +616,8 @@ const ProviderServiceEditor = () => {
                         </div>
                         <Toggle
                             on={form.clientNotesEnabled}
-                            onToggle={() => set('clientNotesEnabled')(!form.clientNotesEnabled)}
+                            onChange={() => set('clientNotesEnabled')(!form.clientNotesEnabled)}
+                            activeColor="#3D231E"
                         />
                     </div>
                 </Section>
@@ -660,7 +635,8 @@ const ProviderServiceEditor = () => {
                         </div>
                         <Toggle
                             on={form.is_active}
-                            onToggle={() => set('is_active')(!form.is_active)}
+                            onChange={() => set('is_active')(!form.is_active)}
+                            activeColor="#3D231E"
                         />
                     </div>
                 </Section>
