@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
 import { useSession } from '../auth/authContext';
 import { useToast } from '../components/ui/ToastProvider';
+import { useIsDesktop } from '../hooks/useIsDesktop';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
@@ -98,6 +99,7 @@ export default function DeleteAccountPage() {
     const navigate = useNavigate();
     const { logout } = useSession();
     const { push: pushToast } = useToast();
+    const isDesktop = useIsDesktop();
 
     const [confirmed, setConfirmed] = useState(false);
     const [typed, setTyped] = useState('');
@@ -136,9 +138,8 @@ export default function DeleteAccountPage() {
         }
     };
 
-    return (
+    const content = (
         <>
-            <SettingsPageLayout title="Delete Account">
 
                     {/* Warning icon */}
                     <div style={{
@@ -247,7 +248,28 @@ export default function DeleteAccountPage() {
                             Delete Account
                         </button>
                     </div>
-            </SettingsPageLayout>
+        </>
+    );
+
+    return (
+        <>
+            {isDesktop ? (
+                <div style={{ minHeight: '100vh', background: T.base, fontFamily: F, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '64px 24px' }}>
+                    <div style={{ width: '100%', maxWidth: 560 }}>
+                        <button onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16, padding: 0, fontFamily: F, fontSize: 13, color: T.muted }}>
+                            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M15 19l-7-7 7-7" /></svg>
+                            Back
+                        </button>
+                        <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${T.line}`, padding: '40px 40px 48px' }}>
+                            {content}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <SettingsPageLayout title="Delete Account">
+                    {content}
+                </SettingsPageLayout>
+            )}
 
             {/* Final confirmation modal */}
             {showModal && (

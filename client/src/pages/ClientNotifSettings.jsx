@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { request } from '../data/apiClient';
+import { useIsDesktop } from '../hooks/useIsDesktop';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 import Toggle from '../components/ui/Toggle';
 import Lbl from '../components/ui/Lbl';
@@ -33,6 +34,7 @@ export default function ClientNotifSettings() {
     const [prefs, setPrefs] = useState(DEFAULT_PREFS);
     const [loading, setLoading] = useState(true);
     const saveTimer = useRef(null);
+    const isDesktop = useIsDesktop();
 
     useEffect(() => {
         request('/client/me')
@@ -67,33 +69,36 @@ export default function ClientNotifSettings() {
         });
     };
 
+    const NotifGroup = ({ items, label }) => (
+        <div>
+            <Lbl>{label}</Lbl>
+            {items.map((item, i) => (
+                <div key={item.key}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0' }}>
+                        <span style={{ fontFamily: F, fontSize: 15, color: T.ink }}>{item.label}</span>
+                        <Toggle on={prefs[item.key]} onChange={() => toggle(item.key)} />
+                    </div>
+                    {i < items.length - 1 && <Divider />}
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <SettingsPageLayout title="Notifications">
             {loading ? (
                 <p style={{ fontFamily: F, fontSize: 14, color: T.muted, marginTop: 24 }}>Loading…</p>
+            ) : isDesktop ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+                    <NotifGroup items={PUSH_ITEMS} label="Push Notifications" />
+                    <NotifGroup items={EMAIL_ITEMS} label="Email Notifications" />
+                </div>
             ) : (
                 <>
-                    <Lbl>Push Notifications</Lbl>
-                    {PUSH_ITEMS.map((item, i) => (
-                        <div key={item.key}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0' }}>
-                                <span style={{ fontFamily: F, fontSize: 15, color: T.ink }}>{item.label}</span>
-                                <Toggle on={prefs[item.key]} onChange={() => toggle(item.key)} />
-                            </div>
-                            {i < PUSH_ITEMS.length - 1 && <Divider />}
-                        </div>
-                    ))}
-
-                    <Lbl style={{ marginTop: 24, marginBottom: 0 }}>Email Notifications</Lbl>
-                    {EMAIL_ITEMS.map((item, i) => (
-                        <div key={item.key}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0' }}>
-                                <span style={{ fontFamily: F, fontSize: 15, color: T.ink }}>{item.label}</span>
-                                <Toggle on={prefs[item.key]} onChange={() => toggle(item.key)} />
-                            </div>
-                            {i < EMAIL_ITEMS.length - 1 && <Divider />}
-                        </div>
-                    ))}
+                    <NotifGroup items={PUSH_ITEMS} label="Push Notifications" />
+                    <div style={{ marginTop: 24 }}>
+                        <NotifGroup items={EMAIL_ITEMS} label="Email Notifications" />
+                    </div>
                 </>
             )}
         </SettingsPageLayout>

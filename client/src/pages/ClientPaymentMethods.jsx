@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { request } from '../data/apiClient';
+import { useIsDesktop } from '../hooks/useIsDesktop';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
@@ -29,6 +30,7 @@ export default function ClientPaymentMethods() {
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     request('/client/payment-methods')
@@ -54,22 +56,24 @@ export default function ClientPaymentMethods() {
         <Lbl>Saved Cards</Lbl>
 
         {loading ? (
-          <>
+          <div style={{ display: 'flex', flexWrap: isDesktop ? 'wrap' : undefined, gap: 12 }}>
             {[0, 1].map((i) => (
-              <div key={i} style={{ height: 72, borderRadius: 14, background: 'rgba(140,106,100,0.08)', marginBottom: 12, animation: 'pulse 1.5s infinite' }} />
+              <div key={i} style={{ height: 72, borderRadius: 14, background: 'rgba(140,106,100,0.08)', flex: isDesktop ? '1 1 200px' : undefined, animation: 'pulse 1.5s infinite' }} />
             ))}
-          </>
+          </div>
         ) : cards.length === 0 ? (
           <p style={{ fontSize: 14, color: T.muted, marginBottom: 20 }}>No saved cards yet.</p>
         ) : (
-          cards.map((card, i) => (
+          <div style={{ display: isDesktop ? 'flex' : 'block', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+          {cards.map((card, i) => (
             <div
               key={card.id}
               style={{
                 padding: 18, background: T.card, borderRadius: 14,
                 border: `1px solid ${T.line}`, display: 'flex',
                 justifyContent: 'space-between', alignItems: 'center',
-                marginBottom: 12,
+                flex: isDesktop ? '1 1 220px' : undefined,
+                marginBottom: isDesktop ? 0 : 12,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -98,7 +102,8 @@ export default function ClientPaymentMethods() {
                 </button>
               )}
             </div>
-          ))
+          ))}
+          </div>
         )}
 
         {/* Add new card */}

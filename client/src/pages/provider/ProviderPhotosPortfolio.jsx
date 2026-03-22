@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { request } from '../../data/apiClient';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 
 const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', base: '#FBF7F2', hero: '#FDDCC6', success: '#5A8A5E', successBg: '#EBF2EC' };
@@ -20,6 +21,7 @@ export default function ProviderPhotosPortfolio() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     request('/provider/portfolio')
@@ -62,7 +64,7 @@ export default function ProviderPhotosPortfolio() {
           style={{ display: 'none' }}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: isDesktop ? 12 : 8, marginBottom: 16 }}>
           {loading ? (
             [0, 1, 2, 3].map(i => (
               <div

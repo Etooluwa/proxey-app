@@ -1,4 +1,5 @@
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 const T = {
   ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -19,35 +20,52 @@ const HELP_ITEMS = [
 ];
 
 export default function HelpSupport() {
+  const isDesktop = useIsDesktop();
+
   const handleItemClick = (item) => {
     if (item.href) {
       window.open(item.href, '_blank');
     }
   };
 
+  const ItemCard = ({ item }) => (
+    <button
+      onClick={() => handleItemClick(item)}
+      style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: isDesktop ? '20px 24px' : '18px 0',
+        width: '100%', background: isDesktop ? T.avatarBg : 'none',
+        border: isDesktop ? `1px solid ${T.line}` : 'none',
+        borderRadius: isDesktop ? 14 : 0,
+        cursor: 'pointer', textAlign: 'left', fontFamily: F,
+      }}
+    >
+      <div>
+        <p style={{ fontSize: 15, color: T.ink, margin: '0 0 3px' }}>{item.label}</p>
+        <p style={{ fontSize: 13, color: T.muted, margin: 0 }}>{item.sub}</p>
+      </div>
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.faded} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 17L17 7M17 7H7M17 7v10" />
+      </svg>
+    </button>
+  );
+
   return (
     <SettingsPageLayout title="Help & Support">
-      {HELP_ITEMS.map((item, i) => (
-        <div key={item.label}>
-          <button
-            onClick={() => handleItemClick(item)}
-            style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 0', width: '100%', background: 'none', border: 'none',
-              cursor: 'pointer', textAlign: 'left', fontFamily: F,
-            }}
-          >
-            <div>
-              <p style={{ fontSize: 15, color: T.ink, margin: '0 0 3px' }}>{item.label}</p>
-              <p style={{ fontSize: 13, color: T.muted, margin: 0 }}>{item.sub}</p>
-            </div>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.faded} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 17L17 7M17 7H7M17 7v10" />
-            </svg>
-          </button>
-          {i < HELP_ITEMS.length - 1 && <Divider />}
+      {isDesktop ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {HELP_ITEMS.map((item) => (
+            <ItemCard key={item.label} item={item} />
+          ))}
         </div>
-      ))}
+      ) : (
+        HELP_ITEMS.map((item, i) => (
+          <div key={item.label}>
+            <ItemCard item={item} />
+            {i < HELP_ITEMS.length - 1 && <Divider />}
+          </div>
+        ))
+      )}
     </SettingsPageLayout>
   );
 }
