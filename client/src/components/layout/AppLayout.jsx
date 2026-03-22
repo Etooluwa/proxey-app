@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 // ─── Client nav items ─────────────────────────────────────────────────────────
@@ -71,7 +70,6 @@ const AppLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
-    const { notifications, unreadCount } = useNotifications();
     const isDesktop = useIsDesktop();
 
     const activeId = useActiveId(CLIENT_MENU, '/app');
@@ -87,11 +85,6 @@ const AppLayout = () => {
 
     const handleSignOut = () => {
         logout().then(() => navigate('/login'));
-    };
-
-    const handleNotifNavigate = (notif) => {
-        // Navigate to notifications page; specific notif routing can be added later
-        navigate('/app/notifications');
     };
 
     // ── Desktop layout ────────────────────────────────────────────────────────
@@ -111,9 +104,6 @@ const AppLayout = () => {
                     <DesktopHeader
                         title={title}
                         subtitle={subtitle}
-                        notifications={notifications}
-                        unreadCount={unreadCount}
-                        onNotifNavigate={handleNotifNavigate}
                     />
                     <main>
                         <Outlet context={{ onMenu: () => {}, isDesktop: true }} />

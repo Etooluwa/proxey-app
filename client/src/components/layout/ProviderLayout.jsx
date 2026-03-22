@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 // ─── Provider nav items ───────────────────────────────────────────────────────
@@ -112,7 +111,6 @@ const ProviderLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
-    const { notifications, unreadCount } = useNotifications();
     const isDesktop = useIsDesktop();
 
     const activeId = useActiveId(PROVIDER_MENU, '/provider');
@@ -128,10 +126,6 @@ const ProviderLayout = () => {
 
     const handleSignOut = () => {
         logout().then(() => navigate('/login'));
-    };
-
-    const handleNotifNavigate = () => {
-        navigate('/provider/notifications');
     };
 
     // ── Desktop layout ────────────────────────────────────────────────────────
@@ -151,9 +145,6 @@ const ProviderLayout = () => {
                     <DesktopHeader
                         title={title}
                         subtitle={subtitle}
-                        notifications={notifications}
-                        unreadCount={unreadCount}
-                        onNotifNavigate={handleNotifNavigate}
                     />
                     <main>
                         <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
