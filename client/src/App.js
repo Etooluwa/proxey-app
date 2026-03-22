@@ -65,6 +65,10 @@ import ProviderNotifSettings from './pages/provider/ProviderNotifSettings';
 import ProviderBookingSettings from './pages/provider/ProviderBookingSettings';
 import HelpSupport from './pages/provider/HelpSupport';
 import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
+import ClientPersonalDetails from './pages/ClientPersonalDetails';
+import ClientPaymentMethods from './pages/ClientPaymentMethods';
+import ClientNotifSettings from './pages/ClientNotifSettings';
+import ClientPrivacySecurity from './pages/ClientPrivacySecurity';
 
 // ── Admin pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -170,6 +174,11 @@ function App() {
                       <Route path="notifications/all" element={<AllNotificationsPage />} />
                       {/* Profile / account */}
                       <Route path="profile" element={<AccountPage />} />
+                      <Route path="profile/personal" element={<ClientPersonalDetails />} />
+                      <Route path="profile/payment-methods" element={<ClientPaymentMethods />} />
+                      <Route path="profile/notifications" element={<ClientNotifSettings />} />
+                      <Route path="profile/privacy" element={<ClientPrivacySecurity />} />
+                      <Route path="profile/help" element={<HelpSupport />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="account" element={<Navigate to="/app/profile" replace />} />
                       <Route path="browse" element={<Navigate to="/app" replace />} />

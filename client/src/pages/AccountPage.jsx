@@ -17,11 +17,11 @@ const F = "'Sora',system-ui,sans-serif";
 // ─── Settings rows ────────────────────────────────────────────────────────────
 
 const SETTINGS = [
-    { label: 'Personal details',   sub: 'Name, email, phone' },
-    { label: 'Payment methods',    sub: 'Manage your cards' },
-    { label: 'Notifications',      sub: 'Email, push, SMS' },
-    { label: 'Privacy & security', sub: 'Password, data' },
-    { label: 'Help & support',     sub: 'FAQ, contact us' },
+    { label: 'Personal details',   sub: 'Name, email, phone',  route: '/app/profile/personal' },
+    { label: 'Payment methods',    sub: 'Manage your cards',   route: '/app/profile/payment-methods' },
+    { label: 'Notifications',      sub: 'Email, push, SMS',    route: '/app/profile/notifications' },
+    { label: 'Privacy & security', sub: 'Password, data',      route: '/app/profile/privacy' },
+    { label: 'Help & support',     sub: 'FAQ, contact us',     route: '/app/profile/help' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -37,6 +37,8 @@ const AccountPage = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile, logout } = useSession();
     const navigate = useNavigate();
+
+    const handleRowTap = (row) => { if (row.route) navigate(row.route); };
 
     // Providers have a dedicated profile page
     useEffect(() => {
@@ -61,11 +63,11 @@ const AccountPage = () => {
 
                     {/* Settings list */}
                     <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden', marginBottom: 16 }}>
-                        {SETTINGS.map(({ label, sub }, i) => (
-                            <button key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', borderBottom: i < SETTINGS.length - 1 ? `1px solid ${T.line}` : 'none', cursor: 'pointer', textAlign: 'left' }}>
+                        {SETTINGS.map((row, i) => (
+                            <button key={row.label} onClick={() => handleRowTap(row)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', borderBottom: i < SETTINGS.length - 1 ? `1px solid ${T.line}` : 'none', cursor: 'pointer', textAlign: 'left' }}>
                                 <div>
-                                    <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{label}</p>
-                                    <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{sub}</p>
+                                    <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{row.label}</p>
+                                    <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{row.sub}</p>
                                 </div>
                                 <svg width="16" height="16" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
                             </button>
@@ -96,12 +98,12 @@ const AccountPage = () => {
             <div className="px-5 flex-1 flex flex-col">
                 <Divider />
 
-                {SETTINGS.map(({ label, sub }) => (
-                    <div key={label}>
-                        <button className="w-full flex items-center justify-between py-5 text-left focus:outline-none active:bg-avatarBg/40 transition-colors">
+                {SETTINGS.map((row) => (
+                    <div key={row.label}>
+                        <button onClick={() => handleRowTap(row)} className="w-full flex items-center justify-between py-5 text-left focus:outline-none active:bg-avatarBg/40 transition-colors">
                             <div>
-                                <p className="text-[16px] text-ink m-0 mb-0.5">{label}</p>
-                                <p className="text-[13px] text-muted m-0">{sub}</p>
+                                <p className="text-[16px] text-ink m-0 mb-0.5">{row.label}</p>
+                                <p className="text-[13px] text-muted m-0">{row.sub}</p>
                             </div>
                             <ArrowIcon size={18} />
                         </button>
