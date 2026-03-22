@@ -197,8 +197,9 @@ function App() {
                     >
                       {/* /provider → Dashboard */}
                       <Route index element={<ProviderDashboard />} />
-                      {/* Bookings (pending + upcoming) */}
+                      {/* Bookings — 3-tab view (Pending / Upcoming / Past) */}
                       <Route path="bookings" element={<ProviderAppointments />} />
+                      <Route path="bookings/all" element={<ProviderAppointments />} />
                       <Route path="appointments/:id" element={<ProviderAppointmentDetail />} />
                       {/* My kliques (client list) */}
                       <Route path="clients" element={<ProviderClients />} />
