@@ -35,6 +35,7 @@ const SETTINGS = [
     { label: 'Notifications',       sub: 'Email, push, SMS',           route: '/provider/profile/notifications' },
     { label: 'Booking settings',    sub: 'Cancellation, buffer times', route: '/provider/profile/booking-settings' },
     { label: 'Help & support',      sub: 'FAQ, contact Kliques',       route: '/provider/profile/help' },
+    { label: 'Delete account',      sub: 'Permanently remove account', route: '/provider/profile/delete', danger: true },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ function buildName(profile) {
 
 // ─── Settings row ─────────────────────────────────────────────────────────────
 
-const SettingsRow = ({ label, sub, onClick }) => (
+const SettingsRow = ({ label, sub, onClick, danger }) => (
     <>
         <button
             onClick={onClick}
@@ -69,10 +70,10 @@ const SettingsRow = ({ label, sub, onClick }) => (
             style={{ background: 'none', border: 'none' }}
         >
             <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-ink m-0">{label}</p>
+                <p className="text-[15px] font-semibold m-0" style={{ color: danger ? '#B04040' : undefined }}>{label}</p>
                 <p className="text-[13px] text-muted m-0 mt-0.5">{sub}</p>
             </div>
-            <ArrowUpRight size={18} color="#B0948F" weight="regular" className="flex-shrink-0" />
+            <ArrowUpRight size={18} color={danger ? '#B04040' : '#B0948F'} weight="regular" className="flex-shrink-0" />
         </button>
         <Divider />
     </>
@@ -180,10 +181,10 @@ const ProviderProfile = () => {
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '20px 24px', background: 'none', border: 'none', borderBottom: `1px solid ${DT.line}`, cursor: 'pointer', textAlign: 'left' }}
                             >
                                 <div>
-                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: DT.ink, margin: '0 0 2px' }}>{row.label}</p>
+                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: row.danger ? '#B04040' : DT.ink, margin: '0 0 2px' }}>{row.label}</p>
                                     <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: 0 }}>{row.sub}</p>
                                 </div>
-                                <ArrowUpRight size={18} color={DT.accent} weight="regular" />
+                                <ArrowUpRight size={18} color={row.danger ? '#B04040' : DT.accent} weight="regular" />
                             </button>
                         ))}
                         <div style={{ padding: '20px 24px' }}>
@@ -310,6 +311,7 @@ const ProviderProfile = () => {
                         label={row.label}
                         sub={row.sub}
                         onClick={() => handleRowTap(row)}
+                        danger={row.danger}
                     />
                 ))}
 

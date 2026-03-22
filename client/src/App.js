@@ -69,6 +69,7 @@ import ClientPersonalDetails from './pages/ClientPersonalDetails';
 import ClientPaymentMethods from './pages/ClientPaymentMethods';
 import ClientNotifSettings from './pages/ClientNotifSettings';
 import ClientPrivacySecurity from './pages/ClientPrivacySecurity';
+import DeleteAccountPage from './pages/DeleteAccountPage';
 
 // ── Admin pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -178,6 +179,7 @@ function App() {
                       <Route path="profile/payment-methods" element={<ClientPaymentMethods />} />
                       <Route path="profile/notifications" element={<ClientNotifSettings />} />
                       <Route path="profile/privacy" element={<ClientPrivacySecurity />} />
+                      <Route path="profile/privacy/delete" element={<DeleteAccountPage />} />
                       <Route path="profile/help" element={<HelpSupport />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="account" element={<Navigate to="/app/profile" replace />} />
@@ -228,6 +230,7 @@ function App() {
                       <Route path="profile/notifications" element={<ProviderNotifSettings />} />
                       <Route path="profile/booking-settings" element={<ProviderBookingSettings />} />
                       <Route path="profile/help" element={<HelpSupport />} />
+                      <Route path="profile/delete" element={<DeleteAccountPage />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="appointments" element={<Navigate to="/provider/bookings" replace />} />
                       <Route path="schedule" element={<Navigate to="/provider/calendar" replace />} />

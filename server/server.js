@@ -7956,5 +7956,120 @@ app.get("/api/invoices/:id/pdf", async (req, res) => {
   }
 });
 
+// ============================================
+// ACCOUNT DELETION
+// ============================================
+
+/**
+ * DELETE /api/accounts/me
+ *
+ * Soft-deletes the calling user's account:
+ *   1. Verify auth (x-user-id header)
+ *   2. Cancel any pending bookings and notify the other party
+ *   3. Anonymise PII in client_profiles / provider_profiles
+ *   4. Set account_status = 'deleted' + deleted_at timestamp
+ *   5. Schedule hard delete by storing scheduled_hard_delete_at (30 days out)
+ *   6. Supabase Auth: disable the user so tokens no longer work
+ *
+ * The frontend signs the user out client-side after receiving 200.
+ * Hard deletion of auth user + all rows is handled by a scheduled job / cron.
+ */
+app.delete("/api/accounts/me", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId || userId === "demo-user") {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+
+  if (!supabase) {
+    return res.status(503).json({ error: "Database unavailable." });
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const hardDeleteAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const anonName = "Deleted User";
+    const anonEmail = `deleted+${userId}@kliques.invalid`;
+
+    // ── 1. Cancel pending bookings and notify the other party ──────────────
+    const { data: pendingBookings } = await supabase
+      .from("bookings")
+      .select("id, provider_id, client_id")
+      .eq("status", "pending")
+      .or(`provider_id.eq.${userId},client_id.eq.${userId}`);
+
+    if (pendingBookings && pendingBookings.length > 0) {
+      const bookingIds = pendingBookings.map((b) => b.id);
+
+      await supabase
+        .from("bookings")
+        .update({ status: "cancelled", cancelled_at: now, cancellation_reason: "Account deleted" })
+        .in("id", bookingIds);
+
+      // Notify the other party for each cancelled booking
+      for (const booking of pendingBookings) {
+        const isProvider = booking.provider_id === userId;
+        const otherPartyId = isProvider ? booking.client_id : booking.provider_id;
+        const notification = {
+          type: "booking_cancelled",
+          title: "Booking cancelled",
+          body: "A booking was cancelled because the other party deleted their account.",
+          data: { booking_id: booking.id },
+        };
+        if (isProvider) {
+          await createClientNotification(otherPartyId, notification).catch(() => {});
+        } else {
+          await createProviderNotification(otherPartyId, notification).catch(() => {});
+        }
+      }
+    }
+
+    // ── 2. Anonymise client profile ────────────────────────────────────────
+    await supabase
+      .from("client_profiles")
+      .update({
+        name: anonName,
+        email: anonEmail,
+        phone: null,
+        city: null,
+        avatar: null,
+        account_status: "deleted",
+        deleted_at: now,
+        scheduled_hard_delete_at: hardDeleteAt,
+      })
+      .eq("user_id", userId);
+
+    // ── 3. Anonymise provider profile (if the user is also a provider) ─────
+    await supabase
+      .from("provider_profiles")
+      .update({
+        name: anonName,
+        email: anonEmail,
+        phone: null,
+        bio: null,
+        city: null,
+        address_line1: null,
+        address_line2: null,
+        avatar: null,
+        account_status: "deleted",
+        deleted_at: now,
+        scheduled_hard_delete_at: hardDeleteAt,
+      })
+      .eq("provider_id", userId);
+
+    // ── 4. Disable the Supabase Auth user (invalidates all sessions) ───────
+    // Uses admin API — requires service role key
+    await supabase.auth.admin.updateUserById(userId, { ban_duration: "876600h" }); // ~100 years
+
+    res.status(200).json({
+      ok: true,
+      message: "Account scheduled for deletion. All sessions have been invalidated.",
+      scheduled_hard_delete_at: hardDeleteAt,
+    });
+  } catch (err) {
+    console.error("[accounts/me DELETE]", err);
+    res.status(500).json({ error: "Failed to delete account. Please contact support." });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
