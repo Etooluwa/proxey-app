@@ -8071,5 +8071,349 @@ app.delete("/api/accounts/me", async (req, res) => {
   }
 });
 
+// ============================================
+// SERVICE GROUPS (providers/:id/service-groups)
+// ============================================
+
+// POST /api/providers/:id/service-groups
+app.post("/api/providers/:id/service-groups", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { name, description } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
+
+  try {
+    const { data: existing } = await supabase
+      .from("service_groups")
+      .select("sort_order")
+      .eq("provider_id", providerId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    const sort_order = existing && existing.length > 0 ? (existing[0].sort_order ?? 0) + 1 : 0;
+
+    const { data, error } = await supabase
+      .from("service_groups")
+      .insert({ provider_id: providerId, name: name.trim(), description: description?.trim() || null, sort_order })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ group: data });
+  } catch (err) {
+    console.error("[POST /providers/:id/service-groups]", err);
+    res.status(500).json({ error: "Failed to create service group." });
+  }
+});
+
+// PUT /api/providers/:id/service-groups/:groupId
+app.put("/api/providers/:id/service-groups/:groupId", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { groupId } = req.params;
+  const { name, description } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
+
+  try {
+    const { data, error } = await supabase
+      .from("service_groups")
+      .update({ name: name.trim(), description: description?.trim() ?? null, updated_at: new Date().toISOString() })
+      .eq("id", groupId)
+      .eq("provider_id", providerId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Group not found." });
+    res.status(200).json({ group: data });
+  } catch (err) {
+    console.error("[PUT /providers/:id/service-groups/:groupId]", err);
+    res.status(500).json({ error: "Failed to update service group." });
+  }
+});
+
+// DELETE /api/providers/:id/service-groups/:groupId
+// Reassigns all services in this group to ungrouped (group_id = null)
+app.delete("/api/providers/:id/service-groups/:groupId", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { groupId } = req.params;
+
+  try {
+    // Verify group belongs to this provider
+    const { data: group, error: findErr } = await supabase
+      .from("service_groups")
+      .select("id")
+      .eq("id", groupId)
+      .eq("provider_id", providerId)
+      .single();
+    if (findErr || !group) return res.status(404).json({ error: "Group not found." });
+
+    // Reassign services to ungrouped
+    await supabase
+      .from("services")
+      .update({ group_id: null })
+      .eq("group_id", groupId)
+      .eq("provider_id", providerId);
+
+    // Delete the group
+    const { error: delErr } = await supabase
+      .from("service_groups")
+      .delete()
+      .eq("id", groupId)
+      .eq("provider_id", providerId);
+    if (delErr) throw delErr;
+
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /providers/:id/service-groups/:groupId]", err);
+    res.status(500).json({ error: "Failed to delete service group." });
+  }
+});
+
+// PUT /api/services/:id/group — move a service to a different group (or ungrouped)
+app.put("/api/services/:id/group", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const callerId = getProviderId(req);
+  const { id } = req.params;
+  const { group_id } = req.body || {};
+
+  try {
+    // Verify service ownership
+    const { data: svc, error: findErr } = await supabase
+      .from("services")
+      .select("id, provider_id")
+      .eq("id", id)
+      .single();
+    if (findErr || !svc) return res.status(404).json({ error: "Service not found." });
+    if (svc.provider_id !== callerId) return res.status(403).json({ error: "Forbidden." });
+
+    // If a group_id is provided, verify it belongs to the same provider
+    if (group_id) {
+      const { data: grp } = await supabase
+        .from("service_groups")
+        .select("id")
+        .eq("id", group_id)
+        .eq("provider_id", callerId)
+        .single();
+      if (!grp) return res.status(404).json({ error: "Group not found." });
+    }
+
+    const { data, error } = await supabase
+      .from("services")
+      .update({ group_id: group_id || null })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(200).json({ service: data });
+  } catch (err) {
+    console.error("[PUT /services/:id/group]", err);
+    res.status(500).json({ error: "Failed to move service." });
+  }
+});
+
+// ============================================
+// BOOKINGS — provider and client filtered views
+// ============================================
+
+/**
+ * GET /api/providers/:id/bookings
+ * Query params:
+ *   status   — comma-separated list e.g. "confirmed" or "completed,cancelled"
+ *   timeframe — "upcoming" | "past" | omitted (all)
+ *
+ * Returns bookings enriched with service name + client name.
+ */
+app.get("/api/providers/:id/bookings", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { status, timeframe } = req.query;
+  const now = new Date().toISOString();
+
+  try {
+    // bookings table has denormalized service_name and client_name columns
+    let query = supabase
+      .from("bookings")
+      .select("*")
+      .eq("provider_id", providerId);
+
+    // Filter by one or more statuses
+    if (status) {
+      const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
+      if (statuses.length === 1) {
+        query = query.eq("status", statuses[0]);
+      } else {
+        query = query.in("status", statuses);
+      }
+    }
+
+    // Timeframe filter
+    if (timeframe === "upcoming") {
+      query = query.gte("scheduled_at", now).order("scheduled_at", { ascending: true });
+    } else if (timeframe === "past") {
+      query = query.lt("scheduled_at", now).order("scheduled_at", { ascending: false });
+    } else {
+      query = query.order("scheduled_at", { ascending: false });
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const bookings = data || [];
+
+    res.status(200).json({ bookings });
+  } catch (err) {
+    console.error("[GET /providers/:id/bookings]", err);
+    res.status(500).json({ error: "Failed to load bookings." });
+  }
+});
+
+/**
+ * GET /api/clients/:id/bookings
+ * Query params:
+ *   timeframe — "upcoming" | "past" | omitted (all)
+ *
+ * Returns bookings enriched with service name + provider name.
+ */
+app.get("/api/clients/:id/bookings", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const clientId = req.params.id;
+  const callerId = getUserId(req);
+  if (callerId !== clientId) return res.status(403).json({ error: "Forbidden." });
+
+  const { timeframe } = req.query;
+  const now = new Date().toISOString();
+
+  try {
+    // bookings table has denormalized service_name and provider_name columns
+    let query = supabase
+      .from("bookings")
+      .select("*")
+      .eq("client_id", clientId);
+
+    if (timeframe === "upcoming") {
+      query = query
+        .in("status", ["pending", "confirmed"])
+        .gte("scheduled_at", now)
+        .order("scheduled_at", { ascending: true });
+    } else if (timeframe === "past") {
+      query = query
+        .in("status", ["completed", "cancelled", "declined"])
+        .order("scheduled_at", { ascending: false });
+    } else {
+      query = query.order("scheduled_at", { ascending: false });
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const bookings = data || [];
+
+    res.status(200).json({ bookings });
+  } catch (err) {
+    console.error("[GET /clients/:id/bookings]", err);
+    res.status(500).json({ error: "Failed to load bookings." });
+  }
+});
+
+// ============================================
+// PROFILE SETTINGS
+// ============================================
+
+// PUT /api/providers/:id/notification-preferences
+app.put("/api/providers/:id/notification-preferences", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { preferences } = req.body || {};
+  if (!preferences || typeof preferences !== "object") {
+    return res.status(400).json({ error: "preferences object is required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_profiles")
+      .upsert(
+        { provider_id: providerId, notification_preferences: preferences, updated_at: new Date().toISOString() },
+        { onConflict: "provider_id" }
+      )
+      .select("notification_preferences")
+      .single();
+    if (error) throw error;
+    res.status(200).json({ notification_preferences: data.notification_preferences });
+  } catch (err) {
+    console.error("[PUT /providers/:id/notification-preferences]", err);
+    res.status(500).json({ error: "Failed to update notification preferences." });
+  }
+});
+
+// PUT /api/providers/:id/booking-settings
+app.put("/api/providers/:id/booking-settings", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const providerId = req.params.id;
+  const callerId = getProviderId(req);
+  if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
+
+  const { settings } = req.body || {};
+  if (!settings || typeof settings !== "object") {
+    return res.status(400).json({ error: "settings object is required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_profiles")
+      .upsert(
+        { provider_id: providerId, booking_settings: settings, updated_at: new Date().toISOString() },
+        { onConflict: "provider_id" }
+      )
+      .select("booking_settings")
+      .single();
+    if (error) throw error;
+    res.status(200).json({ booking_settings: data.booking_settings });
+  } catch (err) {
+    console.error("[PUT /providers/:id/booking-settings]", err);
+    res.status(500).json({ error: "Failed to update booking settings." });
+  }
+});
+
+// PUT /api/clients/:id/notification-preferences
+app.put("/api/clients/:id/notification-preferences", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Database unavailable." });
+  const clientId = req.params.id;
+  const callerId = getUserId(req);
+  if (callerId !== clientId) return res.status(403).json({ error: "Forbidden." });
+
+  const { preferences } = req.body || {};
+  if (!preferences || typeof preferences !== "object") {
+    return res.status(400).json({ error: "preferences object is required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("client_profiles")
+      .upsert(
+        { user_id: clientId, notification_preferences: preferences, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      )
+      .select("notification_preferences")
+      .single();
+    if (error) throw error;
+    res.status(200).json({ notification_preferences: data.notification_preferences });
+  } catch (err) {
+    console.error("[PUT /clients/:id/notification-preferences]", err);
+    res.status(500).json({ error: "Failed to update notification preferences." });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
