@@ -51,7 +51,7 @@ export default function ProviderNewServiceGroup() {
 
   useEffect(() => {
     setLoadingServices(true);
-    request('GET', '/provider/services')
+    request('/provider/services')
       .then((data) => {
         setServices(data.services || []);
       })
@@ -80,14 +80,14 @@ export default function ProviderNewServiceGroup() {
     setSaving(true);
     setError(null);
     try {
-      const result = await request('POST', '/provider/service-groups', {
-        name: name.trim(),
-        description: description.trim(),
+      const result = await request('/provider/service-groups', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
       });
       const groupId = result.group.id;
       await Promise.all(
         Array.from(selectedIds).map((id) =>
-          request('PATCH', `/provider/services/${id}/group`, { group_id: groupId })
+          request(`/provider/services/${id}/group`, { method: 'PATCH', body: JSON.stringify({ group_id: groupId }) })
         )
       );
       navigate('/provider/services', { replace: true });
