@@ -237,6 +237,15 @@ const ChatPage = () => {
         : (conversation?.provider_name || 'Provider');
     const otherInitials = getInitials(otherName);
 
+    // Profile link for the other person in the header
+    const otherProfilePath = isProvider
+        ? (conversation?.client_id ? `/provider/clients/${conversation.client_id}` : null)
+        : (conversation?.provider_id ? `/app/relationship/${conversation.provider_id}` : null);
+
+    const handleOtherProfile = () => {
+        if (otherProfilePath) navigate(otherProfilePath);
+    };
+
     // Group clusters by day for date dividers
     const dateGroups = [];
     let lastDateLabel = null;
@@ -288,13 +297,21 @@ const ChatPage = () => {
                     </svg>
                 </button>
 
-                {/* Avatar */}
-                <Avatar initials={otherInitials} size={36} />
-
-                {/* Name */}
-                <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-semibold text-ink m-0 truncate">{otherName}</p>
-                </div>
+                {/* Avatar + Name — clickable if profile path available */}
+                <button
+                    onClick={handleOtherProfile}
+                    disabled={!otherProfilePath}
+                    className="flex items-center gap-3 flex-1 min-w-0 focus:outline-none group"
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: otherProfilePath ? 'pointer' : 'default', textAlign: 'left' }}
+                >
+                    <Avatar initials={otherInitials} size={36} />
+                    <p
+                        className="text-[15px] font-semibold text-ink m-0 truncate"
+                        style={{ textDecoration: otherProfilePath ? 'underline' : 'none', textDecorationColor: 'rgba(140,106,100,0.4)', textUnderlineOffset: '3px' }}
+                    >
+                        {otherName}
+                    </p>
+                </button>
 
                 {/* Three-dot menu */}
                 <ThreeDot />
