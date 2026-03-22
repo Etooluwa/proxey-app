@@ -548,7 +548,12 @@ app.get("/api/provider/services", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
+  let providerId;
+  try {
+    providerId = await resolveProviderId(req);
+  } catch {
+    return res.status(200).json({ services: [], groups: [] });
+  }
 
   try {
     const [{ data: services, error: svcError }, { data: groups, error: grpError }] = await Promise.all([
@@ -706,10 +711,10 @@ app.delete("/api/services/:id", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
   const serviceId = req.params.id;
 
   try {
+    const providerId = await resolveProviderId(req);
     const { data, error } = await supabase
       .from("services")
       .delete()
@@ -733,10 +738,10 @@ app.delete("/api/services/:id", async (req, res) => {
 // ─── GET /api/provider/services/:id — single service with intake questions + options
 app.get("/api/provider/services/:id", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
   const { id } = req.params;
 
   try {
+    const providerId = await resolveProviderId(req);
     const { data: service, error: svcErr } = await supabase
       .from("services")
       .select("*")
@@ -799,7 +804,6 @@ app.get("/api/services/:serviceId/intake", async (req, res) => {
 // ─── PUT /api/provider/services/:id — full update including payment/notes fields
 app.put("/api/provider/services/:id", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
   const { id } = req.params;
   const {
     name, description, category, basePrice, duration, isActive,
@@ -807,6 +811,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   } = req.body || {};
 
   try {
+    const providerId = await resolveProviderId(req);
     const updates = {
       updated_at: new Date().toISOString(),
     };
