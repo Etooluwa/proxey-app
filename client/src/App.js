@@ -56,6 +56,7 @@ import ProviderEarnings from './pages/provider/ProviderEarnings';
 import ProviderNotifications from './pages/provider/ProviderNotifications';
 import ProviderAllNotifications from './pages/provider/ProviderAllNotifications';
 import ProviderProfile from './pages/provider/ProviderProfile';
+import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
 
 // ── Admin pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -185,6 +186,7 @@ function App() {
                       <Route path="clients/:clientId" element={<ProviderClientTimeline />} />
                       {/* Services */}
                       <Route path="services" element={<ProviderServices />} />
+                      <Route path="services/groups/new" element={<ProviderNewServiceGroup />} />
                       <Route path="services/new" element={<ProviderServiceEditor />} />
                       <Route path="services/:id/edit" element={<ProviderServiceEditor />} />
                       {/* Calendar */}

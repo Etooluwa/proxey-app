@@ -13,7 +13,6 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
-import { createServiceGroup } from '../../data/provider';
 import Header from '../../components/ui/Header';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
@@ -260,8 +259,6 @@ const ProviderServices = () => {
     const [services, setServices] = useState([]);
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showAddGroup, setShowAddGroup] = useState(false);
-    const [savingGroup, setSavingGroup] = useState(false);
 
     const initials = (profile?.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
@@ -291,20 +288,7 @@ const ProviderServices = () => {
         navigate('/provider/services/new', { state: { groupId: group.id, groupName: group.name } });
     };
 
-    const handleCreateGroup = async (name) => {
-        setSavingGroup(true);
-        try {
-            await createServiceGroup(name);
-            setShowAddGroup(false);
-            await load();
-        } catch (err) {
-            console.error('[createGroup]', err);
-        } finally {
-            setSavingGroup(false);
-        }
-    };
-
-      const subtitle = loading
+    const subtitle = loading
         ? '…'
         : `${totalServices} service${totalServices !== 1 ? 's' : ''}${totalGroups > 0 ? ` · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}` : ''}`;
 
@@ -320,7 +304,7 @@ const ProviderServices = () => {
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button
-                                onClick={() => setShowAddGroup(true)}
+                                onClick={() => navigate('/provider/services/groups/new')}
                                 style={{ padding: '8px 16px', borderRadius: 10, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 12, fontWeight: 500, color: T.muted, cursor: 'pointer' }}
                             >
                                 + Group
@@ -402,14 +386,6 @@ const ProviderServices = () => {
                     })}
                 </div>
 
-                {/* Add Group sheet (shared) */}
-                {showAddGroup && (
-                    <AddGroupSheet
-                        onConfirm={handleCreateGroup}
-                        onCancel={() => setShowAddGroup(false)}
-                        saving={savingGroup}
-                    />
-                )}
             </div>
         );
     }
@@ -487,7 +463,7 @@ const ProviderServices = () => {
 
                         {/* + Add Group dashed button */}
                         <button
-                            onClick={() => setShowAddGroup(true)}
+                            onClick={() => navigate('/provider/services/groups/new')}
                             className="w-full py-4 rounded-[14px] flex items-center justify-center gap-2 text-[13px] font-semibold focus:outline-none active:opacity-60 mb-6"
                             style={{
                                 border: '1.5px dashed rgba(140,106,100,0.4)',
@@ -506,14 +482,6 @@ const ProviderServices = () => {
                 <Footer />
             </div>
 
-            {/* Add Group sheet */}
-            {showAddGroup && (
-                <AddGroupSheet
-                    onConfirm={handleCreateGroup}
-                    onCancel={() => setShowAddGroup(false)}
-                    saving={savingGroup}
-                />
-            )}
         </div>
     );
 };

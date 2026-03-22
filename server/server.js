@@ -582,7 +582,7 @@ app.get("/api/provider/services", async (req, res) => {
 app.post("/api/provider/service-groups", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
   const providerId = getProviderId(req);
-  const { name } = req.body || {};
+  const { name, description } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: "Group name is required." });
   try {
     const { data: existing } = await supabase
@@ -594,7 +594,7 @@ app.post("/api/provider/service-groups", async (req, res) => {
     const sort_order = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
     const { data, error } = await supabase
       .from("service_groups")
-      .insert({ provider_id: providerId, name: name.trim(), sort_order })
+      .insert({ provider_id: providerId, name: name.trim(), description: description?.trim() || null, sort_order })
       .select()
       .single();
     if (error) throw error;
