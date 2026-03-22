@@ -11,6 +11,9 @@ import Divider from '../components/ui/Divider';
 import ArrowIcon from '../components/ui/ArrowIcon';
 import Footer from '../components/ui/Footer';
 
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', success: '#5A8A5E', successBg: '#EBF2EC', dangerBg: '#FDEDEA' };
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Settings rows ────────────────────────────────────────────────────────────
 
 const SETTINGS = [
@@ -31,7 +34,7 @@ function memberSince(ts) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const AccountPage = () => {
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile, logout } = useSession();
     const navigate = useNavigate();
 
@@ -44,6 +47,38 @@ const AccountPage = () => {
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const since = memberSince(profile?.created_at || session?.user?.created_at);
+
+
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 640, margin: '0 auto' }}>
+                    {/* Identity */}
+                    <div style={{ marginBottom: 32 }}>
+                        <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 600, color: T.ink, letterSpacing: '-0.02em', margin: '0 0 4px' }}>{displayName}</h1>
+                        {since && <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Member since {since}</span>}
+                    </div>
+
+                    {/* Settings list */}
+                    <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden', marginBottom: 16 }}>
+                        {SETTINGS.map(({ label, sub }, i) => (
+                            <button key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', borderBottom: i < SETTINGS.length - 1 ? `1px solid ${T.line}` : 'none', cursor: 'pointer', textAlign: 'left' }}>
+                                <div>
+                                    <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{label}</p>
+                                    <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{sub}</p>
+                                </div>
+                                <svg width="16" height="16" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </button>
+                        ))}
+                    </div>
+
+                    <button onClick={logout} style={{ width: '100%', padding: '13px', borderRadius: 12, background: T.dangerBg, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#B04040', cursor: 'pointer' }}>
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

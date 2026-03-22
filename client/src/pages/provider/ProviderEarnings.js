@@ -19,6 +19,10 @@ import Divider from '../../components/ui/Divider';
 import HeroCard from '../../components/ui/HeroCard';
 import Footer from '../../components/ui/Footer';
 
+// ─── Desktop tokens ────────────────────────────────────────────────────────────
+const T = { ink: '#3D231E', muted: '#8C6A64', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', hero: '#FDDCC6', success: '#5A8A5E', successBg: '#EBF2EC' };
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtMoney(val) {
@@ -74,7 +78,7 @@ const EarningsEmpty = () => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderEarnings = () => {
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile } = useSession();
 
     const [earnings, setEarnings] = useState(null);
@@ -126,8 +130,109 @@ const ProviderEarnings = () => {
     const trendPositive = trend !== null && trend >= 0;
     const trendLabel = trend !== null ? `${trend >= 0 ? '+' : ''}${trend}%` : null;
 
-    const initials = (profile?.name || profile?.first_name || '?')
+      const initials = (profile?.name || profile?.first_name || '?')
         .split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+
+    // ── Desktop layout ─────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {/* Top 2-col: hero total + next payout */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+                        {/* Hero: monthly total */}
+                        <div style={{ background: T.hero, borderRadius: 20, padding: '28px 28px 24px', position: 'relative', overflow: 'hidden' }}>
+                            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, opacity: 0.08, pointerEvents: 'none', backgroundSize: 'cover', backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")` }} />
+                            <div style={{ position: 'relative' }}>
+                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Total This Month</span>
+                                {loading ? (
+                                    <div style={{ height: 48, width: 120, background: 'rgba(61,35,30,0.1)', borderRadius: 8 }} />
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                                        <span style={{ fontFamily: F, fontSize: 44, fontWeight: 600, color: T.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>{fmtMoney(totalThisMonth)}</span>
+                                        {trendLabel && (
+                                            <span style={{ fontFamily: F, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: trendPositive ? T.successBg : '#FDEDEA', color: trendPositive ? T.success : T.accent }}>{trendLabel}</span>
+                                        )}
+                                    </div>
+                                )}
+                                <span style={{ fontFamily: F, fontSize: 12, color: T.muted, display: 'block', marginTop: 6 }}>{monthLabel}</span>
+                            </div>
+                        </div>
+
+                        {/* Next payout */}
+                        <div style={{ background: T.successBg, borderRadius: 20, padding: '28px 28px 24px' }}>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.success, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Next Payout</span>
+                            {loading ? (
+                                <div style={{ height: 48, width: 100, background: 'rgba(90,138,94,0.15)', borderRadius: 8 }} />
+                            ) : (
+                                <>
+                                    <span style={{ fontFamily: F, fontSize: 40, fontWeight: 600, color: '#3D6B41', letterSpacing: '-0.03em', lineHeight: 1, display: 'block', marginBottom: 6 }}>{fmtMoney(nextPayoutAmount)}</span>
+                                    <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>
+                                        {nextPayoutDate ? `Arrives via Stripe · ${nextPayoutDate}` : 'Connect Stripe to receive payouts'}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Bar chart */}
+                    {(loading || hasEarnings) && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, padding: '20px 24px', marginBottom: 24 }}>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 16 }}>6-Month Trend</span>
+                            {loading ? (
+                                <div style={{ height: 120, background: 'rgba(140,106,100,0.08)', borderRadius: 10 }} />
+                            ) : (
+                                <div style={{ height: 120 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }} barCategoryGap="24%">
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontFamily: 'Sora, sans-serif', fontSize: 11, fill: '#8C6A64' }} />
+                                            <Bar dataKey="income" radius={[6, 6, 3, 3]}>
+                                                {chartData.map((entry, i) => (
+                                                    <Cell key={`cell-${i}`} fill={entry.isCurrent ? T.accent : '#F2EBE5'} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Breakdown table */}
+                    {(loading || hasEarnings) && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                            <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Breakdown</span>
+                            </div>
+                            {loading ? [1, 2, 3].map((i) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                    <div style={{ height: 14, width: 140, background: 'rgba(140,106,100,0.1)', borderRadius: 6 }} />
+                                    <div style={{ height: 14, width: 60, background: 'rgba(140,106,100,0.1)', borderRadius: 6 }} />
+                                </div>
+                            )) : breakdown.map((item, i) => (
+                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < breakdown.length - 1 ? `1px solid ${T.line}` : 'none' }}>
+                                    <div>
+                                        <p style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, margin: '0 0 2px' }}>{item.name}</p>
+                                        <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{item.sessions} {item.sessions === 1 ? 'session' : 'sessions'}</p>
+                                    </div>
+                                    <span style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent }}>{fmtMoney(item.revenue)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Empty state */}
+                    {!loading && !hasEarnings && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <span style={{ fontFamily: F, fontSize: 48, fontWeight: 600, color: T.muted, letterSpacing: '-0.03em', display: 'block', marginBottom: 16 }}>$0</span>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Your first dollar is coming.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>Earnings from completed sessions will appear here.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

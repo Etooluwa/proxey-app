@@ -18,6 +18,11 @@ import HeroCard from '../../components/ui/HeroCard';
 import ShareLinks from '../../components/ui/ShareLinks';
 import Footer from '../../components/ui/Footer';
 import { fetchProviderProfile } from '../../data/provider';
+import DesktopShareLinks from '../../components/DesktopShareLinks';
+
+// ─── Desktop tokens ────────────────────────────────────────────────────────────
+const T = { ink: '#3D231E', muted: '#8C6A64', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', success: '#5A8A5E' };
+const F = "'Sora',system-ui,sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,7 +126,7 @@ const ClientRow = ({ client, onClick }) => {
 
 const ProviderClients = () => {
     const navigate = useNavigate();
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { profile } = useSession();
     const { unreadCount } = useNotifications();
 
@@ -153,6 +158,79 @@ const ProviderClients = () => {
         load();
         return () => { cancelled = true; };
     }, []);
+
+  
+    // ── Desktop layout ─────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                        {loading ? '…' : `${clients.length} client${clients.length !== 1 ? 's' : ''}`}
+                    </span>
+
+                    {/* Loading skeleton */}
+                    {loading && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', borderBottom: i < 3 ? `1px solid ${T.line}` : 'none' }}>
+                                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(140,106,100,0.1)', flexShrink: 0 }} />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ height: 14, width: 140, background: 'rgba(140,106,100,0.1)', borderRadius: 6, marginBottom: 6 }} />
+                                        <div style={{ height: 12, width: 80, background: 'rgba(140,106,100,0.08)', borderRadius: 4 }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Empty state */}
+                    {!loading && clients.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Your people are out there.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>Share your invite link to start building your klique.</p>
+                        </div>
+                    )}
+
+                    {/* Data table */}
+                    {!loading && clients.length > 0 && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden', marginBottom: 8 }}>
+                            {/* Table header */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 120px 40px', gap: 0, padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                {['Client', 'Status', 'Visits', 'Last Visit', ''].map((h) => (
+                                    <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+                                ))}
+                            </div>
+                            {clients.map((client, i) => {
+                                const statusCfg = STATUS[client.status] || STATUS.active;
+                                const lastVisit = fmtLastVisit(client.last_visit);
+                                return (
+                                    <button
+                                        key={client.client_id}
+                                        onClick={() => navigate(`/provider/client/${client.client_id}`)}
+                                        style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 120px 40px', alignItems: 'center', gap: 0, padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < clients.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                            <Avatar initials={getInitials(client.name)} size={36} />
+                                            <span style={{ fontFamily: F, fontSize: 14, color: T.ink }}>{client.name}</span>
+                                        </div>
+                                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: statusCfg.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{statusCfg.label}</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{client.visits}</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{lastVisit || '—'}</span>
+                                        <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                                            <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <DesktopShareLinks handle={handle} />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

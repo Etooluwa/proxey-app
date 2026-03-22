@@ -15,6 +15,14 @@ import Divider from '../components/ui/Divider';
 import Avatar from '../components/ui/Avatar';
 import HeroCard from '../components/ui/HeroCard';
 import Footer from '../components/ui/Footer';
+import { useIsDesktop } from '../hooks/useIsDesktop';
+
+const DT = { base: '#FBF7F2' };
+const wrapDesktop = (node) => (
+    <div style={{ minHeight: '100vh', background: DT.base, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 600 }}>{node}</div>
+    </div>
+);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1027,10 +1035,12 @@ function BookingFlowPage() {
 
     const handleClose = () => navigate(-1);
 
+    const isDesktop = useIsDesktop();
+
     // ── Render step ──────────────────────────────────────────────────────────
 
     if (stepKey === 'time-request') {
-        return (
+        const node = (
             <StepTimeRequest
                 providerId={providerId}
                 service={service}
@@ -1040,14 +1050,16 @@ function BookingFlowPage() {
                 onClose={handleClose}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'time-request-sent') {
-        return <StepTimeRequestSent onDone={() => navigate('/app')} />;
+        const node = <StepTimeRequestSent onDone={() => navigate('/app')} />;
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'confirmed') {
-        return (
+        const node = (
             <StepConfirmed
                 booking={confirmResult?.booking}
                 service={service}
@@ -1058,10 +1070,11 @@ function BookingFlowPage() {
                 onDone={() => navigate('/app')}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'payment') {
-        return (
+        const node = (
             <StepPayment
                 service={service}
                 selectedOption={selectedOption}
@@ -1075,10 +1088,11 @@ function BookingFlowPage() {
                 onClose={handleClose}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'time') {
-        return (
+        const node = (
             <StepTime
                 providerId={providerId}
                 service={service}
@@ -1088,10 +1102,11 @@ function BookingFlowPage() {
                 onTimeRequest={() => setStepKey('time-request')}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'intake') {
-        return (
+        const node = (
             <StepIntake
                 questions={intakeQuestions}
                 clientNotesEnabled={clientNotesEnabled}
@@ -1100,20 +1115,22 @@ function BookingFlowPage() {
                 onClose={handleClose}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     if (stepKey === 'detail') {
-        return (
+        const node = (
             <StepDetail
                 service={service}
                 onContinue={handleDetailNext}
                 onBack={handleBack}
             />
         );
+        return isDesktop ? wrapDesktop(node) : node;
     }
 
     // Default: services
-    return (
+    const node = (
         <StepServices
             providerId={providerId}
             preSelectedId={preServiceId}
@@ -1121,6 +1138,7 @@ function BookingFlowPage() {
             onClose={handleClose}
         />
     );
+    return isDesktop ? wrapDesktop(node) : node;
 }
 
 export default BookingFlowPage;

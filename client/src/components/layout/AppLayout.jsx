@@ -4,6 +4,8 @@ import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
+import { useMessages } from '../../contexts/MessageContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 // ─── Client nav items ─────────────────────────────────────────────────────────
 const CLIENT_MENU = [
@@ -71,12 +73,23 @@ const AppLayout = () => {
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
     const isDesktop = useIsDesktop();
+    const { getUnreadCount } = useMessages();
+    const { unreadCount: notifUnread } = useNotifications();
+
+    const msgUnread = getUnreadCount();
 
     const activeId = useActiveId(CLIENT_MENU, '/app');
     const { title, subtitle } = usePageMeta(CLIENT_MENU, '/app');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+    // Inject live counts into nav items
+    const navItems = CLIENT_MENU.map((item) => {
+        if (item.id === 'messages') return { ...item, count: msgUnread > 0 ? msgUnread : undefined };
+        if (item.id === 'notifications') return { ...item, count: notifUnread > 0 ? notifUnread : undefined };
+        return item;
+    });
 
     const handleNav = (id) => {
         const item = CLIENT_MENU.find((m) => m.id === id);
@@ -92,7 +105,7 @@ const AppLayout = () => {
         return (
             <div style={{ minHeight: '100vh', background: '#FBF7F2' }}>
                 <DesktopSidebar
-                    items={CLIENT_MENU}
+                    items={navItems}
                     active={activeId}
                     onNav={handleNav}
                     userName={displayName}
@@ -101,10 +114,7 @@ const AppLayout = () => {
                     onSignOut={handleSignOut}
                 />
                 <div style={{ marginLeft: '260px', minHeight: '100vh' }}>
-                    <DesktopHeader
-                        title={title}
-                        subtitle={subtitle}
-                    />
+                    <DesktopHeader title={title} subtitle={subtitle} />
                     <main>
                         <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
                     </main>
@@ -122,7 +132,7 @@ const AppLayout = () => {
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                items={CLIENT_MENU}
+                items={navItems}
                 active={activeId}
                 onNav={handleNav}
                 userName={displayName}

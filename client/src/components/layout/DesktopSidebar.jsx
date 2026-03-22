@@ -61,8 +61,8 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, i
             {/* Wordmark */}
             <div style={{ padding: '28px 28px 8px' }}>
                 <p style={{
-                    fontFamily: "'Playfair Display',serif", fontSize: '22px',
-                    fontWeight: 500, color: T.accent, letterSpacing: '-0.02em', margin: 0,
+                    fontFamily: F, fontSize: '22px',
+                    fontWeight: 600, color: T.accent, letterSpacing: '-0.02em', margin: 0,
                 }}>
                     kliques
                 </p>

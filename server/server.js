@@ -3284,6 +3284,24 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
   }
 });
 
+// GET /api/provider/bookings/pending-count — count of pending bookings for this provider
+app.get("/api/provider/bookings/pending-count", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase client is not configured." });
+  const providerId = getProviderId(req);
+  try {
+    const { count, error } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", providerId)
+      .eq("status", "pending");
+    if (error) throw error;
+    res.json({ count: count || 0 });
+  } catch (err) {
+    console.error("[supabase] Failed to load pending count", err);
+    res.status(500).json({ error: "Failed to load pending count." });
+  }
+});
+
 // GET /api/provider/calendar?year=YYYY&month=M(0-based) — bookings for this provider
 // grouped by YYYY-MM-DD for the given month, used by the calendar view.
 app.get("/api/provider/calendar", async (req, res) => {

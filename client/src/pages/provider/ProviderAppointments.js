@@ -17,6 +17,14 @@ import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
 
+// ─── Desktop design tokens ─────────────────────────────────────────────────────
+const T = {
+    ink: '#3D231E', muted: '#8C6A64', accent: '#C25E4A',
+    line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5',
+    success: '#5A8A5E', successBg: '#EBF2EC', dangerBg: '#FDEDEA',
+};
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getInitials(name) {
@@ -218,7 +226,7 @@ const ReviewedRow = ({ job }) => {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderAppointments = () => {
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { profile } = useSession();
     const { unreadCount } = useNotifications();
 
@@ -284,9 +292,85 @@ const ProviderAppointments = () => {
         }
     };
 
-    const subtitle = loading
+      const subtitle = loading
         ? 'Loading…'
         : `${pending.length} pending · ${reviewed.length} reviewed`;
+
+    // ── Desktop layout ─────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {/* Subtitle + title */}
+                    <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                        {subtitle}
+                    </span>
+
+                    {/* Pending section */}
+                    {!loading && pending.length > 0 && (
+                        <div style={{ marginBottom: 40 }}>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 14 }}>Pending</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
+                                {pending.map((job) => (
+                                    <PendingCard
+                                        key={job.id}
+                                        job={job}
+                                        declining={declining}
+                                        declineReason={declineReason}
+                                        onDeclineStart={handleDeclineStart}
+                                        onDeclineCancel={handleDeclineCancel}
+                                        onDeclineReasonChange={setDeclineReason}
+                                        onConfirmDecline={handleConfirmDecline}
+                                        onAccept={handleAccept}
+                                        actioning={actioning}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* All caught up */}
+                    {!loading && pending.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: 16, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                <svg width="24" height="24" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M3 9l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Inbox zero. Feels good.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No pending requests right now.</p>
+                        </div>
+                    )}
+
+                    {/* Reviewed section */}
+                    {!loading && reviewed.length > 0 && (
+                        <div>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 12 }}>Reviewed</span>
+                            <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                                {reviewed.map((job, i) => {
+                                    const isAccepted = ['confirmed', 'accepted', 'completed'].includes(job.status);
+                                    return (
+                                        <div key={job.id}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', opacity: 0.55 }}>
+                                                <Avatar initials={getInitials(job.client_name)} size={36} />
+                                                <span style={{ flex: 1, fontFamily: F, fontSize: 14, color: T.ink }}>{job.client_name || 'Client'}</span>
+                                                <span style={{ fontFamily: F, fontSize: 12, fontWeight: 500, color: isAccepted ? T.success : '#B04040', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                                    {isAccepted ? 'Accepted' : 'Declined'}
+                                                </span>
+                                                <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtDateTime(job.scheduled_at)}</span>
+                                            </div>
+                                            {i < reviewed.length - 1 && <div style={{ height: 1, background: T.line, marginLeft: 70 }} />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
 import { useSession } from '../../auth/authContext';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
+import { useMessages } from '../../contexts/MessageContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { request } from '../../data/apiClient';
 
 // ─── Provider nav items ───────────────────────────────────────────────────────
 const PROVIDER_MENU = [
@@ -109,15 +112,35 @@ function usePageMeta(rootPath) {
 
 const ProviderLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
+    const [pendingCount, setPendingCount] = useState(0);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
     const isDesktop = useIsDesktop();
+    const { getUnreadCount } = useMessages();
+    const { unreadCount: notifUnread } = useNotifications();
+
+    const msgUnread = getUnreadCount();
+
+    // Fetch pending booking count for the Bookings badge
+    useEffect(() => {
+        request('/provider/bookings/pending-count')
+            .then((d) => setPendingCount(d?.count ?? 0))
+            .catch(() => setPendingCount(0));
+    }, []);
 
     const activeId = useActiveId(PROVIDER_MENU, '/provider');
     const { title, subtitle } = usePageMeta('/provider');
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+    // Inject live counts into nav items
+    const navItems = PROVIDER_MENU.map((item) => {
+        if (item.id === 'bookings') return { ...item, count: pendingCount > 0 ? pendingCount : undefined };
+        if (item.id === 'messages') return { ...item, count: msgUnread > 0 ? msgUnread : undefined };
+        if (item.id === 'notifications') return { ...item, count: notifUnread > 0 ? notifUnread : undefined };
+        return item;
+    });
 
     const handleNav = (id) => {
         const item = PROVIDER_MENU.find((m) => m.id === id);
@@ -133,7 +156,7 @@ const ProviderLayout = () => {
         return (
             <div style={{ minHeight: '100vh', background: '#FBF7F2' }}>
                 <DesktopSidebar
-                    items={PROVIDER_MENU}
+                    items={navItems}
                     active={activeId}
                     onNav={handleNav}
                     userName={displayName}
@@ -142,10 +165,7 @@ const ProviderLayout = () => {
                     onSignOut={handleSignOut}
                 />
                 <div style={{ marginLeft: '260px', minHeight: '100vh' }}>
-                    <DesktopHeader
-                        title={title}
-                        subtitle={subtitle}
-                    />
+                    <DesktopHeader title={title} subtitle={subtitle} />
                     <main>
                         <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
                     </main>
@@ -163,7 +183,7 @@ const ProviderLayout = () => {
             <SideMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                items={PROVIDER_MENU}
+                items={navItems}
                 active={activeId}
                 onNav={handleNav}
                 userName={displayName}

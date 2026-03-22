@@ -10,7 +10,7 @@
  *           reminder / upcoming_session            → "reminder"
  *           (default)                              → "reminder"
  */
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useOutletContext } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
@@ -18,6 +18,11 @@ import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
 import Footer from '../components/ui/Footer';
 import HeroCard from '../components/ui/HeroCard';
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', base: '#FBF7F2' };
+const F = "'Sora',system-ui,sans-serif";
 
 // ─── Type normalisation ───────────────────────────────────────────────────────
 
@@ -231,6 +236,7 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
     const showAll = showAllProp || searchParams.get('all') === '1';
 
     const { notifications, markAsRead, markAllAsRead, loading } = useNotifications();
+    const { isDesktop } = useOutletContext() || {};
 
     const displayed = showAll ? notifications : notifications.slice(0, 3);
     const unreadCount = notifications.filter((n) => !n.is_read && !n.read).length;
@@ -254,6 +260,100 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
             navigate(-1);
         }
     };
+
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 680, margin: '0 auto' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {showAll ? 'All Notifications' : 'Recent Notifications'}
+                        </span>
+                        {unreadCount > 0 && (
+                            <button onClick={handleMarkAllRead} style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: T.accent, background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Mark all read
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Loading */}
+                    {loading && (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                            <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent' }} />
+                        </div>
+                    )}
+
+                    {/* Empty */}
+                    {!loading && notifications.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(194,94,74,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                <svg width="22" height="22" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.ink, margin: '0 0 6px' }}>All caught up</p>
+                            <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>No notifications yet.</p>
+                        </div>
+                    )}
+
+                    {/* Notification items */}
+                    {!loading && notifications.length > 0 && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                            {displayed.map((n, i) => {
+                                const type = normaliseType(n.type);
+                                const badge = BADGE[type];
+                                const unread = !n.is_read && !n.read;
+                                const reason = declineReason(n);
+                                const bid = bookingId(n);
+                                const ts = n.timestamp || n.created_at;
+                                return (
+                                    <div key={n.id} style={{ padding: '18px 20px', borderBottom: i < displayed.length - 1 ? `1px solid ${T.line}` : 'none', opacity: unread ? 1 : 0.55 }}>
+                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                                            {/* Avatar + badge */}
+                                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                <Avatar initials={initialsFromNotif(n)} size={44} />
+                                                <div style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: badge.bg, border: '2px solid #FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {badge.icon}
+                                                </div>
+                                            </div>
+                                            {/* Content */}
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+                                                    <p style={{ fontFamily: F, fontSize: 14, fontWeight: unread ? 600 : 400, color: T.ink, margin: 0 }}>{n.title}</p>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                                        <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>{formatRelTime(ts)}</span>
+                                                        {unread && <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.accent }} />}
+                                                    </div>
+                                                </div>
+                                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 6px', lineHeight: 1.5 }}>{n.message || n.body}</p>
+                                                {reason && (
+                                                    <div style={{ padding: '8px 12px', borderRadius: 8, background: T.avatarBg, marginBottom: 8 }}>
+                                                        <p style={{ fontFamily: F, fontSize: 13, color: T.ink, margin: 0, fontStyle: 'italic' }}>"{reason}"</p>
+                                                    </div>
+                                                )}
+                                                {type === 'accepted' && bid && unread && (
+                                                    <button onClick={() => handlePayNow(bid)} style={{ padding: '6px 14px', borderRadius: 8, background: T.ink, border: 'none', fontFamily: F, fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                                                        Pay Now
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* View all button */}
+                    {!loading && !showAll && notifications.length > 3 && (
+                        <button onClick={handleViewAll} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: 14, padding: '14px', borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
+                            View All Notifications
+                            <span style={{ fontFamily: F, fontSize: 10, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{notifications.length}</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

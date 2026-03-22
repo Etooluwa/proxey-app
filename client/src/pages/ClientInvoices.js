@@ -1,9 +1,45 @@
 import { useEffect, useState } from 'react';
-import { Icons } from '../components/Icons';
+import { useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+
+const T = {
+    ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
+    line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5',
+    success: '#5A8A5E', successBg: '#EBF2EC', dangerBg: '#FDEDEA', base: '#FBF7F2',
+};
+const F = "'Sora',system-ui,sans-serif";
+
+function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtMoney(amount) {
+    if (!amount && amount !== 0) return '$0.00';
+    const dollars = typeof amount === 'number' ? amount / 100 : parseFloat(amount) / 100;
+    return `$${dollars.toFixed(2)}`;
+}
+
+function statusStyle(status) {
+    const s = status?.toLowerCase();
+    if (s === 'paid' || s === 'succeeded') return { bg: '#EBF2EC', color: '#5A8A5E' };
+    if (s === 'pending') return { bg: '#FFF5E6', color: '#92400E' };
+    if (s === 'overdue') return { bg: '#FDEDEA', color: '#B04040' };
+    return { bg: T.avatarBg, color: T.muted };
+}
+
+const StatusPill = ({ status }) => {
+    const { bg, color } = statusStyle(status);
+    return (
+        <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '3px 10px', borderRadius: 9999, background: bg, color }}>
+            {status || 'Unknown'}
+        </span>
+    );
+};
 
 const ClientInvoices = () => {
     const { session } = useSession();
+    const { isDesktop } = useOutletContext() || {};
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -12,86 +48,29 @@ const ClientInvoices = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
 
-    useEffect(() => {
-        loadInvoices();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useEffect(() => { loadInvoices(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadInvoices = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/client/invoices', {
-                headers: {
-                    'Authorization': `Bearer ${session?.access_token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch invoices');
-            }
-
-            const data = await response.json();
+            const res = await fetch('/api/client/invoices', { headers: { Authorization: `Bearer ${session?.access_token}` } });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
             setInvoices(Array.isArray(data.invoices) ? data.invoices : []);
-        } catch (error) {
-            console.error('Failed to load invoices:', error);
+        } catch (e) {
+            console.error(e);
             setInvoices([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // Format date nicely
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-    };
-
-    // Get status badge styling
-    const getStatusStyle = (status) => {
-        switch (status?.toLowerCase()) {
-            case 'paid':
-            case 'succeeded':
-                return 'bg-green-100 text-green-700 border-green-200';
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'overdue':
-                return 'bg-red-100 text-red-700 border-red-200';
-            case 'cancelled':
-            case 'refunded':
-                return 'bg-gray-100 text-gray-600 border-gray-200';
-            default:
-                return 'bg-gray-100 text-gray-600 border-gray-200';
-        }
-    };
-
-    // Format currency
-    const formatCurrency = (amount) => {
-        if (!amount && amount !== 0) return '$0.00';
-        // Assume amount is in cents
-        const dollars = typeof amount === 'number' ? amount / 100 : parseFloat(amount) / 100;
-        return `$${dollars.toFixed(2)}`;
-    };
-
-    // Download invoice PDF
-    const handleDownloadInvoice = async (invoice) => {
+    const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
-            const response = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, {
-                headers: {
-                    'Authorization': `Bearer ${session?.access_token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to generate invoice');
-            }
-
-            const blob = await response.blob();
+            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+            if (!res.ok) throw new Error('Failed');
+            const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -100,375 +79,212 @@ const ClientInvoices = () => {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-        } catch (error) {
-            console.error('Failed to download invoice:', error);
-            alert('Failed to download invoice. Please try again.');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to download invoice.');
         } finally {
             setDownloadingId(null);
         }
     };
 
-    // Filter and sort invoices
-    const filteredInvoices = invoices
+    const filtered = invoices
         .filter(inv => {
-            // Status filter
+            const s = inv.payment_status?.toLowerCase() || inv.status?.toLowerCase();
             if (statusFilter !== 'all') {
-                const invStatus = inv.payment_status?.toLowerCase() || inv.status?.toLowerCase();
-                if (statusFilter === 'paid' && !['paid', 'succeeded'].includes(invStatus)) return false;
-                if (statusFilter === 'pending' && invStatus !== 'pending') return false;
-                if (statusFilter === 'overdue' && invStatus !== 'overdue') return false;
+                if (statusFilter === 'paid' && !['paid', 'succeeded'].includes(s)) return false;
+                if (statusFilter === 'pending' && s !== 'pending') return false;
+                if (statusFilter === 'overdue' && s !== 'overdue') return false;
             }
-
-            // Search filter
             if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                const matchesNumber = (inv.invoice_number || '').toLowerCase().includes(query);
-                const matchesProvider = (inv.provider_name || '').toLowerCase().includes(query);
-                const matchesService = (inv.service_name || '').toLowerCase().includes(query);
-                if (!matchesNumber && !matchesProvider && !matchesService) return false;
+                const q = searchQuery.toLowerCase();
+                return (inv.invoice_number || '').toLowerCase().includes(q) ||
+                    (inv.provider_name || '').toLowerCase().includes(q) ||
+                    (inv.service_name || '').toLowerCase().includes(q);
             }
-
             return true;
         })
         .sort((a, b) => {
-            if (sortBy === 'newest') {
-                return new Date(b.created_at || b.issued_at) - new Date(a.created_at || a.issued_at);
-            } else if (sortBy === 'oldest') {
-                return new Date(a.created_at || a.issued_at) - new Date(b.created_at || b.issued_at);
-            } else if (sortBy === 'highest') {
-                return (b.price || b.total_amount || 0) - (a.price || a.total_amount || 0);
-            } else if (sortBy === 'lowest') {
-                return (a.price || a.total_amount || 0) - (b.price || b.total_amount || 0);
-            }
+            if (sortBy === 'newest') return new Date(b.created_at || b.issued_at) - new Date(a.created_at || a.issued_at);
+            if (sortBy === 'oldest') return new Date(a.created_at || a.issued_at) - new Date(b.created_at || b.issued_at);
+            if (sortBy === 'highest') return (b.price || b.total_amount || 0) - (a.price || a.total_amount || 0);
+            if (sortBy === 'lowest') return (a.price || a.total_amount || 0) - (b.price || b.total_amount || 0);
             return 0;
         });
 
-    // Calculate totals
-    const totalPaid = invoices
-        .filter(inv => ['paid', 'succeeded'].includes(inv.payment_status?.toLowerCase() || inv.status?.toLowerCase()))
-        .reduce((sum, inv) => sum + (inv.price || inv.total_amount || 0), 0);
+    const totalPaid = invoices.filter(inv => ['paid', 'succeeded'].includes(inv.payment_status?.toLowerCase() || inv.status?.toLowerCase())).reduce((s, inv) => s + (inv.price || inv.total_amount || 0), 0);
+    const totalPending = invoices.filter(inv => (inv.payment_status?.toLowerCase() || inv.status?.toLowerCase()) === 'pending').reduce((s, inv) => s + (inv.price || inv.total_amount || 0), 0);
 
-    const totalPending = invoices
-        .filter(inv => inv.payment_status?.toLowerCase() === 'pending' || inv.status?.toLowerCase() === 'pending')
-        .reduce((sum, inv) => sum + (inv.price || inv.total_amount || 0), 0);
+    // ── Shared: filter bar ───────────────────────────────────────────────────
+    const FilterBar = () => (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search invoices…"
+                style={{ flex: 1, minWidth: 180, padding: '9px 14px', borderRadius: 10, border: `1px solid ${T.line}`, background: T.avatarBg, fontFamily: F, fontSize: 13, color: T.ink, outline: 'none' }}
+            />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${T.line}`, background: T.avatarBg, fontFamily: F, fontSize: 13, color: T.ink, outline: 'none', cursor: 'pointer' }}>
+                <option value="all">All Status</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+            </select>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${T.line}`, background: T.avatarBg, fontFamily: F, fontSize: 13, color: T.ink, outline: 'none', cursor: 'pointer' }}>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest">Highest Amount</option>
+                <option value="lowest">Lowest Amount</option>
+            </select>
+        </div>
+    );
 
-    return (
-        <div className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-            <div className="px-4 md:px-10 py-8 max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Invoices</h1>
-                        <p className="text-gray-600">View and download your payment history</p>
+    // ── Detail modal (shared) ───────────────────────────────────────────────
+    const DetailModal = () => (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(61,35,30,0.35)' }} onClick={() => setSelectedInvoice(null)}>
+            <div style={{ background: T.card, borderRadius: 20, width: '100%', maxWidth: 480, overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${T.line}` }}>
+                    <span style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.ink }}>Invoice Details</span>
+                    <button onClick={() => setSelectedInvoice(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                        <svg width="18" height="18" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" /></svg>
+                    </button>
+                </div>
+                <div style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <div>
+                            <span style={{ fontFamily: F, fontSize: 11, color: T.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoice</span>
+                            <span style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.ink }}>{selectedInvoice?.invoice_number || `INV-${selectedInvoice?.id?.substring(0, 8).toUpperCase()}`}</span>
+                        </div>
+                        <StatusPill status={selectedInvoice?.payment_status || selectedInvoice?.status} />
+                    </div>
+                    <div style={{ background: T.avatarBg, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+                        {[['Provider', selectedInvoice?.provider_name || '—'], ['Service', selectedInvoice?.service_name || '—'], ['Date', fmtDate(selectedInvoice?.scheduled_at || selectedInvoice?.created_at)]].map(([label, value]) => (
+                            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{label}</span>
+                                <span style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink }}>{value}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: `1px solid ${T.line}`, marginBottom: 20 }}>
+                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Total Amount</span>
+                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.ink }}>{fmtMoney(selectedInvoice?.price || selectedInvoice?.total_amount)}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => setSelectedInvoice(null)} style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, cursor: 'pointer' }}>Close</button>
+                        <button onClick={() => handleDownload(selectedInvoice)} disabled={downloadingId === selectedInvoice?.id} style={{ flex: 2, padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer', opacity: downloadingId === selectedInvoice?.id ? 0.6 : 1 }}>
+                            {downloadingId === selectedInvoice?.id ? 'Downloading…' : 'Download PDF'}
+                        </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                                <Icons.FileText size={24} className="text-blue-600" />
+    // ── Desktop layout ───────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {/* Summary stat cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+                        {[
+                            { label: 'Total Invoices', value: invoices.length, mono: false },
+                            { label: 'Total Paid', value: fmtMoney(totalPaid), mono: true },
+                            { label: 'Pending', value: fmtMoney(totalPending), mono: true },
+                        ].map(({ label, value }) => (
+                            <div key={label} style={{ background: T.card, borderRadius: 14, border: `1px solid ${T.line}`, padding: '18px 20px' }}>
+                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>{label}</span>
+                                <span style={{ fontFamily: F, fontSize: 24, fontWeight: 600, color: T.ink, letterSpacing: '-0.02em' }}>{value}</span>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">Total Invoices</p>
-                                <p className="text-2xl font-bold text-gray-900">{invoices.length}</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                                <Icons.Check size={24} className="text-green-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500">Total Paid</p>
-                                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPaid)}</p>
-                            </div>
+
+                    <FilterBar />
+
+                    {/* Loading */}
+                    {loading && <div style={{ textAlign: 'center', padding: '48px 0' }}><div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', display: 'inline-block' }} /></div>}
+
+                    {/* Empty */}
+                    {!loading && filtered.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>{searchQuery || statusFilter !== 'all' ? 'No invoices found' : 'No invoices yet'}</p>
+                            <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{searchQuery || statusFilter !== 'all' ? 'Try adjusting filters.' : 'Completed bookings will appear here.'}</p>
                         </div>
-                    </div>
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                                <Icons.Clock size={24} className="text-yellow-600" />
+                    )}
+
+                    {/* Data table */}
+                    {!loading && filtered.length > 0 && (
+                        <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 130px 100px 120px 80px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                {['Invoice', 'Provider / Service', 'Date', 'Amount', 'Status', ''].map((h) => (
+                                    <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+                                ))}
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">Pending</p>
-                                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPending)}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="bg-white rounded-2xl p-4 md:p-6 mb-6 border border-gray-100">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        {/* Search */}
-                        <div className="relative flex-1">
-                            <Icons.Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type="text"
-                                placeholder="Search invoices..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-300 transition-all"
-                            />
-                        </div>
-
-                        {/* Status Filter */}
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-300 font-medium text-gray-700"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="paid">Paid</option>
-                            <option value="pending">Pending</option>
-                            <option value="overdue">Overdue</option>
-                        </select>
-
-                        {/* Sort */}
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-300 font-medium text-gray-700"
-                        >
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="highest">Highest Amount</option>
-                            <option value="lowest">Lowest Amount</option>
-                        </select>
-                    </div>
-                </div>
-
-                {/* Loading State */}
-                {loading && (
-                    <div className="bg-white rounded-2xl p-16 text-center border border-gray-100">
-                        <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading invoices...</p>
-                    </div>
-                )}
-
-                {/* Invoices List */}
-                {!loading && filteredInvoices.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                        {/* Desktop Table */}
-                        <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-100">
-                                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500 font-bold">
-                                        <th className="px-6 py-4">Invoice</th>
-                                        <th className="px-6 py-4">Provider / Service</th>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4">Amount</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {filteredInvoices.map((invoice) => (
-                                        <tr key={invoice.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-gray-900">
-                                                    {invoice.invoice_number || `INV-${invoice.id?.substring(0, 8).toUpperCase()}`}
-                                                </p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="font-medium text-gray-900">{invoice.provider_name || 'Provider'}</p>
-                                                <p className="text-sm text-gray-500">{invoice.service_name || 'Service'}</p>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">
-                                                {formatDate(invoice.created_at || invoice.issued_at || invoice.scheduled_at)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="font-bold text-gray-900">
-                                                    {formatCurrency(invoice.price || invoice.total_amount)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(invoice.payment_status || invoice.status)}`}>
-                                                    {(invoice.payment_status || invoice.status || 'Unknown').toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => setSelectedInvoice(selectedInvoice?.id === invoice.id ? null : invoice)}
-                                                        className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                                        title="View Details"
-                                                    >
-                                                        <Icons.Eye size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDownloadInvoice(invoice)}
-                                                        disabled={downloadingId === invoice.id}
-                                                        className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
-                                                        title="Download PDF"
-                                                    >
-                                                        {downloadingId === invoice.id ? (
-                                                            <div className="w-4 h-4 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
-                                                        ) : (
-                                                            <Icons.Download size={18} />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile Cards */}
-                        <div className="md:hidden divide-y divide-gray-100">
-                            {filteredInvoices.map((invoice) => (
-                                <div key={invoice.id} className="p-4">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                            <p className="font-bold text-gray-900">
-                                                {invoice.invoice_number || `INV-${invoice.id?.substring(0, 8).toUpperCase()}`}
-                                            </p>
-                                            <p className="text-sm text-gray-500">{invoice.provider_name || 'Provider'}</p>
-                                        </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(invoice.payment_status || invoice.status)}`}>
-                                            {(invoice.payment_status || invoice.status || 'Unknown').toUpperCase()}
-                                        </span>
+                            {filtered.map((inv, i) => (
+                                <div key={inv.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 130px 100px 120px 80px', alignItems: 'center', padding: '13px 20px', borderBottom: i < filtered.length - 1 ? `1px solid ${T.line}` : 'none' }}>
+                                    <span style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>{inv.invoice_number || `INV-${inv.id?.substring(0, 8).toUpperCase()}`}</span>
+                                    <div>
+                                        <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{inv.provider_name || 'Provider'}</p>
+                                        <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{inv.service_name || 'Service'}</p>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-500">{formatDate(invoice.created_at || invoice.issued_at)}</p>
-                                            <p className="text-lg font-bold text-gray-900">{formatCurrency(invoice.price || invoice.total_amount)}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleDownloadInvoice(invoice)}
-                                            disabled={downloadingId === invoice.id}
-                                            className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl font-semibold text-sm flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            {downloadingId === invoice.id ? (
-                                                <div className="w-4 h-4 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
-                                            ) : (
-                                                <>
-                                                    <Icons.Download size={16} />
-                                                    Download
-                                                </>
-                                            )}
-                                        </button>
+                                    <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{fmtDate(inv.created_at || inv.issued_at || inv.scheduled_at)}</span>
+                                    <span style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink }}>{fmtMoney(inv.price || inv.total_amount)}</span>
+                                    <StatusPill status={inv.payment_status || inv.status} />
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                        <button onClick={() => setSelectedInvoice(inv)} style={{ padding: '6px 10px', borderRadius: 8, background: T.avatarBg, border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted }}>View</button>
+                                        <button onClick={() => handleDownload(inv)} disabled={downloadingId === inv.id} style={{ padding: '6px 10px', borderRadius: 8, background: T.ink, border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 500, color: '#fff', opacity: downloadingId === inv.id ? 0.5 : 1 }}>PDF</button>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {/* Empty State */}
-                {!loading && filteredInvoices.length === 0 && (
-                    <div className="bg-white rounded-2xl p-16 text-center border border-gray-100">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Icons.FileText size={32} className="text-gray-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {searchQuery || statusFilter !== 'all' ? 'No invoices found' : 'No invoices yet'}
-                        </h3>
-                        <p className="text-gray-600 max-w-md mx-auto">
-                            {searchQuery || statusFilter !== 'all'
-                                ? 'Try adjusting your search or filters.'
-                                : 'When you complete bookings, your invoices will appear here.'}
-                        </p>
-                    </div>
-                )}
-
-                {/* Invoice Detail Modal */}
-                {selectedInvoice && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                        <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                            {/* Header */}
-                            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                <h2 className="text-lg font-bold text-gray-900">Invoice Details</h2>
-                                <button
-                                    onClick={() => setSelectedInvoice(null)}
-                                    className="p-2 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
-                                >
-                                    <Icons.X size={20} />
-                                </button>
-                            </div>
-
-                            {/* Body */}
-                            <div className="p-6 space-y-6">
-                                {/* Invoice Number */}
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-sm text-gray-500">Invoice Number</p>
-                                        <p className="text-lg font-bold text-gray-900">
-                                            {selectedInvoice.invoice_number || `INV-${selectedInvoice.id?.substring(0, 8).toUpperCase()}`}
-                                        </p>
-                                    </div>
-                                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${getStatusStyle(selectedInvoice.payment_status || selectedInvoice.status)}`}>
-                                        {(selectedInvoice.payment_status || selectedInvoice.status || 'Unknown').toUpperCase()}
-                                    </span>
-                                </div>
-
-                                {/* Service Details */}
-                                <div className="bg-gray-50 p-4 rounded-xl space-y-3">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Provider</span>
-                                        <span className="font-medium text-gray-900">{selectedInvoice.provider_name || 'Provider'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Service</span>
-                                        <span className="font-medium text-gray-900">{selectedInvoice.service_name || 'Service'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Date</span>
-                                        <span className="font-medium text-gray-900">
-                                            {formatDate(selectedInvoice.scheduled_at || selectedInvoice.created_at)}
-                                        </span>
-                                    </div>
-                                    {selectedInvoice.location && (
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-500">Location</span>
-                                            <span className="font-medium text-gray-900">{selectedInvoice.location}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Amount */}
-                                <div className="border-t border-gray-100 pt-4">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-lg text-gray-700">Total Amount</span>
-                                        <span className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(selectedInvoice.price || selectedInvoice.total_amount)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-                                <button
-                                    onClick={() => setSelectedInvoice(null)}
-                                    className="flex-1 py-3 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors"
-                                >
-                                    Close
-                                </button>
-                                <button
-                                    onClick={() => handleDownloadInvoice(selectedInvoice)}
-                                    disabled={downloadingId === selectedInvoice.id}
-                                    className="flex-1 py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                >
-                                    {downloadingId === selectedInvoice.id ? (
-                                        <>Downloading...</>
-                                    ) : (
-                                        <>
-                                            <Icons.Download size={18} />
-                                            Download PDF
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {selectedInvoice && <DetailModal />}
             </div>
+        );
+    }
+
+    // ── Mobile layout ────────────────────────────────────────────────────────
+    return (
+        <div style={{ minHeight: '100vh', background: T.base, paddingBottom: 96 }}>
+            <div style={{ padding: '32px 20px 0' }}>
+                <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 600, color: T.ink, letterSpacing: '-0.02em', margin: '0 0 20px' }}>My Invoices</h1>
+
+                <FilterBar />
+
+                {loading && <div style={{ textAlign: 'center', padding: '48px 0' }}><div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', display: 'inline-block' }} /></div>}
+
+                {!loading && filtered.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.ink, margin: '0 0 6px' }}>{searchQuery || statusFilter !== 'all' ? 'No invoices found' : 'No invoices yet'}</p>
+                        <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>Completed bookings will appear here.</p>
+                    </div>
+                )}
+
+                {!loading && filtered.map((inv) => (
+                    <div key={inv.id} style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, padding: '16px', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                            <div>
+                                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, margin: '0 0 2px' }}>{inv.invoice_number || `INV-${inv.id?.substring(0, 8).toUpperCase()}`}</p>
+                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{inv.provider_name || 'Provider'}</p>
+                            </div>
+                            <StatusPill status={inv.payment_status || inv.status} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: '0 0 2px' }}>{fmtDate(inv.created_at || inv.issued_at)}</p>
+                                <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: 0 }}>{fmtMoney(inv.price || inv.total_amount)}</p>
+                            </div>
+                            <button onClick={() => handleDownload(inv)} disabled={downloadingId === inv.id} style={{ padding: '8px 16px', borderRadius: 10, background: T.avatarBg, border: 'none', fontFamily: F, fontSize: 12, fontWeight: 600, color: T.ink, cursor: 'pointer', opacity: downloadingId === inv.id ? 0.5 : 1 }}>
+                                {downloadingId === inv.id ? 'Downloading…' : 'Download'}
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {selectedInvoice && <DetailModal />}
         </div>
     );
 };

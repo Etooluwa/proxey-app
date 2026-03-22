@@ -9,12 +9,15 @@
  *   POST /api/tips     — tip charge via saved payment method (if tip > 0)
  */
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import BackBtn from '../components/ui/BackBtn';
 import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
 import Footer from '../components/ui/Footer';
+
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', success: '#5A8A5E', successBg: '#EBF2EC', dangerBg: '#FDEDEA' };
+const F = "'Sora',system-ui,sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,6 +128,7 @@ const ReviewPage = () => {
 
     const initials = getInitials(providerName);
     const canSubmit = rating > 0 && !submitting;
+    const { isDesktop } = useOutletContext() || {};
 
     const handleToggleTip = (type) => setTipType((prev) => (prev === type ? null : type));
 
@@ -194,6 +198,96 @@ const ReviewPage = () => {
 
     const handleSkip = () =>
         navigate(providerId ? `/app/relationship/${providerId}` : '/app', { replace: true });
+
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 500, margin: '0 auto' }}>
+                    {/* Back / title / skip */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+                        <button onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M19 12H5M5 12l7-7M5 12l7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Back
+                        </button>
+                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rate Your Session</span>
+                        <button onClick={handleSkip} style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: T.accent, background: 'none', border: 'none', cursor: 'pointer' }}>Skip</button>
+                    </div>
+
+                    {/* Provider avatar + heading */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 600, color: T.ink, fontFamily: F, marginBottom: 12 }}>{initials}</div>
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 4px', textAlign: 'center' }}>How was your session with</p>
+                        <p style={{ fontFamily: F, fontSize: 22, fontWeight: 600, color: T.ink, letterSpacing: '-0.02em', margin: 0, textAlign: 'center' }}>{providerName}?</p>
+                    </div>
+
+                    {/* Stars */}
+                    <StarRow rating={rating} hover={hover} onRate={setRating} onHover={setHover} onLeave={() => setHover(0)} />
+
+                    {/* Post-rating content */}
+                    {rating > 0 && (
+                        <>
+                            <div style={{ marginBottom: 24 }}>
+                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Tell us more (optional)</span>
+                                <textarea
+                                    value={reviewText}
+                                    onChange={(e) => setReviewText(e.target.value)}
+                                    placeholder="What made this session great? Or what could be improved?"
+                                    rows={3}
+                                    style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${T.line}`, background: T.avatarBg, fontFamily: F, fontSize: 13, color: T.ink, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                                />
+                            </div>
+
+                            <div style={{ height: 1, background: T.line, marginBottom: 20 }} />
+
+                            {/* Tip section */}
+                            <div style={{ marginBottom: 24 }}>
+                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Add a Tip</span>
+                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 14px' }}>100% of your tip goes directly to {providerName.split(' ')[0]}.</p>
+
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                                    {TIP_PRESETS.map((pct) => {
+                                        const dollars = serviceTotal ? Math.round((serviceTotal / 100) * parseInt(pct, 10)) : null;
+                                        const sel = tipType === pct;
+                                        return (
+                                            <button key={pct} onClick={() => handleToggleTip(pct)} style={{ flex: 1, padding: '12px 8px', borderRadius: 12, border: sel ? `2px solid ${T.accent}` : `1px solid ${T.line}`, background: sel ? T.hero : 'transparent', cursor: 'pointer', textAlign: 'center' }}>
+                                                <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: sel ? T.accent : T.ink, margin: '0 0 2px' }}>{pct}%</p>
+                                                <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{dollars != null ? `$${dollars}` : '—'}</p>
+                                            </button>
+                                        );
+                                    })}
+                                    <button onClick={() => handleToggleTip('custom')} style={{ flex: 1, padding: '12px 8px', borderRadius: 12, border: tipType === 'custom' ? `2px solid ${T.accent}` : `1px solid ${T.line}`, background: tipType === 'custom' ? T.hero : 'transparent', cursor: 'pointer' }}>
+                                        <p style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: tipType === 'custom' ? T.accent : T.ink, margin: 0, textAlign: 'center' }}>Custom</p>
+                                    </button>
+                                </div>
+
+                                {tipType === 'custom' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                        <span style={{ fontFamily: F, fontSize: 16, color: T.muted }}>$</span>
+                                        <input type="number" min="1" value={customTip} onChange={(e) => setCustomTip(e.target.value)} placeholder="0" style={{ width: 96, padding: '10px 14px', borderRadius: 12, border: `1px solid ${T.line}`, background: T.avatarBg, fontFamily: F, fontSize: 16, color: T.ink, outline: 'none' }} />
+                                    </div>
+                                )}
+
+                                {tipDollars > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: '#FFF5E6', marginBottom: 4 }}>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: '#92400E' }}>Tip amount</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: '#92400E' }}>${tipDollars}</span>
+                                    </div>
+                                )}
+
+                                <button onClick={() => setTipType(null)} style={{ width: '100%', padding: '10px', textAlign: 'center', fontFamily: F, fontSize: 13, color: T.faded, background: 'none', border: 'none', cursor: 'pointer' }}>No tip this time</button>
+                            </div>
+                        </>
+                    )}
+
+                    {error && <p style={{ fontFamily: F, fontSize: 13, color: '#B04040', textAlign: 'center', marginBottom: 12 }}>{error}</p>}
+
+                    <button onClick={handleSubmit} disabled={!canSubmit} style={{ width: '100%', padding: '14px', borderRadius: 9999, background: canSubmit ? T.ink : T.faded, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: canSubmit ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        {submitting ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #fff', borderTopColor: 'transparent' }} />Submitting…</> : tipDollars > 0 ? `Submit Review & Pay $${tipDollars} Tip` : 'Submit Review'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

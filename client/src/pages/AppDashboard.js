@@ -9,6 +9,9 @@ import ArrowIcon from '../components/ui/ArrowIcon';
 import HeroCard from '../components/ui/HeroCard';
 import Footer from '../components/ui/Footer';
 
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', success: '#5A8A5E' };
+const F = "'Sora',system-ui,sans-serif";
+
 function formatDate(iso) {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -148,7 +151,7 @@ const ProviderRow = ({ provider, onClick, showDivider }) => (
 
 const AppDashboard = () => {
     const navigate = useNavigate();
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { session } = useSession();
 
     const [kliques, setKliques] = useState([]);
@@ -178,6 +181,68 @@ const AppDashboard = () => {
 
         fetchKliques();
     }, [session]);
+
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 800, margin: '0 auto' }}>
+                    {/* Loading */}
+                    {loading && (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+                        </div>
+                    )}
+
+                    {/* Error */}
+                    {!loading && error && (
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, textAlign: 'center' }}>{error}</p>
+                    )}
+
+                    {/* Empty state */}
+                    {!loading && !error && kliques.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Your circle starts here.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 24px' }}>Book with a provider or accept an invite to start building your history.</p>
+                            <button onClick={() => navigate('/app/browse')} style={{ padding: '10px 24px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Find a Provider</button>
+                        </div>
+                    )}
+
+                    {/* Provider list */}
+                    {!loading && !error && kliques.length > 0 && (
+                        <>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 14 }}>
+                                {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
+                            </span>
+                            <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                                {/* Table header */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 80px 120px 40px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                    {['Provider', 'Role', 'Visits', 'Last Visit', ''].map((h) => (
+                                        <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+                                    ))}
+                                </div>
+                                {kliques.map((provider, i) => (
+                                    <button
+                                        key={provider.provider_id}
+                                        onClick={() => navigate(`/app/relationship/${provider.provider_id}`)}
+                                        style={{ display: 'grid', gridTemplateColumns: '1fr 160px 80px 120px 40px', alignItems: 'center', padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < kliques.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                            <Avatar initials={getInitials(provider.name)} size={36} />
+                                            <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{provider.name}</span>
+                                        </div>
+                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{provider.role || '—'}</span>
+                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{provider.visits}</span>
+                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{formatDate(provider.last_visit)}</span>
+                                        <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

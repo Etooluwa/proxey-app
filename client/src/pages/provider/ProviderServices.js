@@ -21,6 +21,10 @@ import ArrowIcon from '../../components/ui/ArrowIcon';
 import HeroCard from '../../components/ui/HeroCard';
 import Footer from '../../components/ui/Footer';
 
+// ─── Desktop tokens ────────────────────────────────────────────────────────────
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', success: '#5A8A5E' };
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtPrice(val) {
@@ -249,7 +253,7 @@ const AddGroupSheet = ({ onConfirm, onCancel, saving }) => {
 
 const ProviderServices = () => {
     const navigate = useNavigate();
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { profile } = useSession();
     const { unreadCount } = useNotifications();
 
@@ -300,9 +304,115 @@ const ProviderServices = () => {
         }
     };
 
-    const subtitle = loading
+      const subtitle = loading
         ? '…'
         : `${totalServices} service${totalServices !== 1 ? 's' : ''}${totalGroups > 0 ? ` · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}` : ''}`;
+
+    // ── Desktop layout ─────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28 }}>
+                        <div>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>{subtitle}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                                onClick={() => setShowAddGroup(true)}
+                                style={{ padding: '8px 16px', borderRadius: 10, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 12, fontWeight: 500, color: T.muted, cursor: 'pointer' }}
+                            >
+                                + Group
+                            </button>
+                            <button
+                                onClick={() => navigate('/provider/services/new')}
+                                style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: T.ink, fontFamily: F, fontSize: 12, fontWeight: 500, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                            >
+                                <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                                Add Service
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Empty state */}
+                    {!loading && services.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Set up your menu.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 20px' }}>Add the services you offer — name, duration, price.</p>
+                            <button onClick={() => navigate('/provider/services/new')} style={{ padding: '10px 20px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Create first service</button>
+                        </div>
+                    )}
+
+                    {/* Grouped tables */}
+                    {!loading && services.length > 0 && grouped.map((section) => {
+                        const groupName = section.group ? section.group.name : 'General';
+                        return (
+                            <div key={section.group?.id || 'ungrouped'} style={{ marginBottom: 28 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <div>
+                                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{groupName}</span>
+                                        <span style={{ fontFamily: F, fontSize: 11, color: T.faded, marginLeft: 8 }}>{section.services.length} service{section.services.length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    {section.group && (
+                                        <button
+                                            onClick={() => handleAddToGroup(section.group)}
+                                            style={{ fontFamily: F, fontSize: 12, fontWeight: 500, color: T.accent, background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            + Add to group
+                                        </button>
+                                    )}
+                                </div>
+                                <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+                                    {/* Table header */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 32px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                        {['Service', 'Duration', 'Price', 'Booked', ''].map((h) => (
+                                            <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+                                        ))}
+                                    </div>
+                                    {section.services.length === 0 ? (
+                                        <div style={{ padding: '16px 20px' }}>
+                                            <span style={{ fontFamily: F, fontSize: 13, color: T.faded }}>No services yet.</span>
+                                        </div>
+                                    ) : section.services.map((svc, i) => {
+                                        const duration = fmtDuration(svc.duration);
+                                        const price = fmtPrice(svc.base_price || svc.basePrice);
+                                        const booked = svc.bookings_this_month || 0;
+                                        const isDraft = svc.is_active === false;
+                                        return (
+                                            <button
+                                                key={svc.id}
+                                                onClick={() => handleServiceClick(svc)}
+                                                style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 32px', alignItems: 'center', padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < section.services.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
+                                            >
+                                                <div>
+                                                    <span style={{ fontFamily: F, fontSize: 14, color: T.ink }}>{svc.name}</span>
+                                                    {isDraft && <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, color: T.faded, textTransform: 'uppercase', letterSpacing: '0.04em', marginLeft: 8 }}>Draft</span>}
+                                                </div>
+                                                <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{duration || '—'}</span>
+                                                <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{price || '—'}</span>
+                                                <span style={{ fontFamily: F, fontSize: 13, color: booked > 0 ? T.success : T.faded }}>{booked > 0 ? booked : '—'}</span>
+                                                <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Add Group sheet (shared) */}
+                {showAddGroup && (
+                    <AddGroupSheet
+                        onConfirm={handleCreateGroup}
+                        onCancel={() => setShowAddGroup(false)}
+                        saving={savingGroup}
+                    />
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

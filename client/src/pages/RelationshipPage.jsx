@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
@@ -8,6 +8,9 @@ import HeroPill from '../components/ui/HeroPill';
 import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
 import Footer from '../components/ui/Footer';
+
+const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', success: '#5A8A5E' };
+const F = "'Sora',system-ui,sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -167,6 +170,7 @@ const RelationshipPage = () => {
     const { providerId } = useParams();
     const navigate = useNavigate();
     const { session } = useSession();
+    const { isDesktop } = useOutletContext() || {};
 
     const [provider, setProvider] = useState(null);
     const [stats, setStats] = useState(null);
@@ -204,6 +208,122 @@ const RelationshipPage = () => {
     const role = provider?.categories?.[0] || null;
     const connectedSince = stats?.together_since ? formatShortDate(stats.together_since) : null;
     const lastVisit = bookings.find(b => b.status === 'completed')?.scheduled_at;
+
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 960, margin: '0 auto' }}>
+                    {/* Back button */}
+                    <button onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 28, padding: 0 }}>
+                        <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M19 12H5M5 12l7-7M5 12l7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        Back
+                    </button>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 28, alignItems: 'start' }}>
+                        {/* Left: HeroCard provider info */}
+                        <div style={{ background: '#FDDCC6', borderRadius: 24, padding: '28px 24px', position: 'relative', overflow: 'hidden' }}>
+                            {/* Topo texture */}
+                            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, opacity: 0.08, pointerEvents: 'none', backgroundSize: 'cover', backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")` }} />
+                            <div style={{ position: 'relative' }}>
+                                {/* Avatar + name */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+                                    {loading ? (
+                                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(61,35,30,0.1)' }} />
+                                    ) : (
+                                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: T.ink, fontFamily: F, flexShrink: 0 }}>{initials}</div>
+                                    )}
+                                    <div>
+                                        {loading ? (
+                                            <>
+                                                <div style={{ height: 20, width: 120, background: 'rgba(61,35,30,0.1)', borderRadius: 6, marginBottom: 6 }} />
+                                                <div style={{ height: 14, width: 80, background: 'rgba(61,35,30,0.08)', borderRadius: 4 }} />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.ink, margin: '0 0 4px', letterSpacing: '-0.02em' }}>{provider?.name || 'Provider'}</p>
+                                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{role || 'Professional'}</p>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Connected pill */}
+                                {!loading && connectedSince && (
+                                    <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: 9999, background: 'rgba(61,35,30,0.1)', fontFamily: F, fontSize: 11, fontWeight: 500, color: T.ink, marginBottom: 20, letterSpacing: '0.03em' }}>
+                                        Connected · {connectedSince}
+                                    </div>
+                                )}
+
+                                {/* Stats */}
+                                <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
+                                    <div>
+                                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Sessions</span>
+                                        <span style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.accent, letterSpacing: '-0.02em', lineHeight: 1 }}>{loading ? '—' : (stats?.sessions ?? 0)}</span>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Last Visit</span>
+                                        <span style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.accent, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                                            {loading ? '—' : (lastVisit ? new Date(lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* CTA buttons */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <button onClick={() => navigate('/app/booking-flow', { state: { providerId } })} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                                        Book a Session →
+                                    </button>
+                                    <button onClick={() => navigate('/app/messages', { state: { providerId } })} style={{ padding: '12px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(61,35,30,0.25)', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
+                                        Message →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right: Timeline */}
+                        <div>
+                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 16 }}>Connected Timeline</span>
+
+                            {error && <p style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{error}</p>}
+
+                            {/* Loading skeleton */}
+                            {loading && [1, 2, 3].map((i) => (
+                                <div key={i} style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
+                                        <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'rgba(140,106,100,0.2)', marginTop: 4 }} />
+                                        {i < 3 && <div style={{ flex: 1, width: 1, background: 'rgba(140,106,100,0.15)', marginTop: 4 }} />}
+                                    </div>
+                                    <div style={{ flex: 1, paddingBottom: 12 }}>
+                                        <div style={{ height: 14, width: 160, background: 'rgba(140,106,100,0.1)', borderRadius: 6, marginBottom: 6 }} />
+                                        <div style={{ height: 12, width: 100, background: 'rgba(140,106,100,0.08)', borderRadius: 4 }} />
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Empty */}
+                            {!loading && !error && bookings.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 4px' }}>No sessions yet</p>
+                                    <p style={{ fontFamily: F, fontSize: 13, color: T.faded, margin: 0 }}>Book your first session to start your timeline.</p>
+                                </div>
+                            )}
+
+                            {/* Bookings — reuse the existing BookingCard component */}
+                            {!loading && !error && bookings.length > 0 && bookings.map((booking, i) => (
+                                <BookingCard
+                                    key={booking.id}
+                                    booking={booking}
+                                    isFirst={i === bookings.length - 1}
+                                    isLast={i === bookings.length - 1}
+                                    onRebook={() => navigate('/app/booking-flow', { state: { providerId, serviceId: booking.service_id } })}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

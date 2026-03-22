@@ -16,6 +16,10 @@ import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
 import { ArrowUpRight } from '@phosphor-icons/react';
 
+// ─── Desktop tokens ────────────────────────────────────────────────────────────
+const DT = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5' };
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Topo texture ─────────────────────────────────────────────────────────────
 
 const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M100 50 Q 200 -50 300 50 T 500 50' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M200 350 Q 250 250 350 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
@@ -77,7 +81,7 @@ const SettingsRow = ({ label, sub, onClick }) => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ProviderProfile = () => {
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const navigate = useNavigate();
     const { logout } = useSession();
 
@@ -127,6 +131,74 @@ const ProviderProfile = () => {
         await logout();
         navigate('/login', { replace: true });
     };
+
+    // ── Desktop layout ─────────────────────────────────────────────────────────
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '40px', fontFamily: F }}>
+                <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24, alignItems: 'start' }}>
+                    {/* Left: Profile card */}
+                    <div style={{ background: DT.card, borderRadius: 20, border: `1px solid ${DT.line}`, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        {/* Avatar */}
+                        {loadingProfile ? (
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: DT.avatarBg, marginBottom: 16 }} />
+                        ) : (
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: DT.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 600, color: DT.muted, fontFamily: F, marginBottom: 16, flexShrink: 0 }}>{initials}</div>
+                        )}
+                        {/* Name */}
+                        {loadingProfile ? (
+                            <div style={{ height: 22, width: 140, background: DT.avatarBg, borderRadius: 6, marginBottom: 6 }} />
+                        ) : (
+                            <h2 style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: DT.ink, margin: '0 0 4px', letterSpacing: '-0.02em' }}>{name}</h2>
+                        )}
+                        <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: '0 0 20px' }}>{subtitle}</p>
+
+                        {/* Divider */}
+                        <div style={{ width: '100%', height: 1, background: DT.line, marginBottom: 20 }} />
+
+                        {/* Stats row */}
+                        <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
+                            {[{ label: 'Rating', value: rating }, { label: 'Reviews', value: reviews }, { label: 'Clients', value: clients }].map(({ label, value }) => (
+                                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    {loadingStats ? (
+                                        <div style={{ height: 20, width: 36, background: DT.avatarBg, borderRadius: 4, marginBottom: 4 }} />
+                                    ) : (
+                                        <span style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: DT.accent, letterSpacing: '-0.02em', marginBottom: 2 }}>{value}</span>
+                                    )}
+                                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 500, color: DT.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Right: Settings list */}
+                    <div style={{ background: DT.card, borderRadius: 20, border: `1px solid ${DT.line}`, overflow: 'hidden' }}>
+                        {SETTINGS.map((row, i) => (
+                            <button
+                                key={row.label}
+                                onClick={() => handleRowTap(row)}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '20px 24px', background: 'none', border: 'none', borderBottom: `1px solid ${DT.line}`, cursor: 'pointer', textAlign: 'left' }}
+                            >
+                                <div>
+                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: DT.ink, margin: '0 0 2px' }}>{row.label}</p>
+                                    <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: 0 }}>{row.sub}</p>
+                                </div>
+                                <ArrowUpRight size={18} color={DT.accent} weight="regular" />
+                            </button>
+                        ))}
+                        <div style={{ padding: '20px 24px' }}>
+                            <button
+                                onClick={handleSignOut}
+                                style={{ width: '100%', padding: '13px', borderRadius: 12, background: '#FDEDEA', border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#B04040', cursor: 'pointer' }}
+                            >
+                                Sign out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen bg-base">

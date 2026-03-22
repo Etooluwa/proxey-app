@@ -239,7 +239,7 @@ export const MessageProvider = ({ children }) => {
         conversations,
         currentConversation,
         setCurrentConversation,
-        messages: messages[currentConversation] || [],
+        messages,
         loadMessages,
         getOrCreateConversation,
         sendMessage,
