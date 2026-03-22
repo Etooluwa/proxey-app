@@ -23,6 +23,18 @@ import DesktopShareLinks from '../../components/DesktopShareLinks';
 import Footer from '../../components/ui/Footer';
 import AppointmentDrawer from '../../components/AppointmentDrawer';
 
+// ─── Design tokens (desktop inline styles) ────────────────────────────────────
+const T = {
+    ink: '#3D231E',
+    muted: '#8C6A64',
+    faded: '#B0948F',
+    accent: '#C25E4A',
+    line: 'rgba(140,106,100,0.18)',
+    card: '#FFFFFF',
+    avatarBg: '#F2EBE5',
+};
+const F = "'Sora',system-ui,sans-serif";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getInitials(name) {
@@ -58,7 +70,7 @@ function fmtEarnings(cents) {
     return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
-// ─── Schedule row ─────────────────────────────────────────────────────────────
+// ─── Mobile: schedule row ─────────────────────────────────────────────────────
 
 const ApptRow = ({ appt, onClick }) => (
     <>
@@ -82,6 +94,73 @@ const ApptRow = ({ appt, onClick }) => (
             </div>
         </button>
         <Divider />
+    </>
+);
+
+// ─── Desktop: stat card ───────────────────────────────────────────────────────
+
+const DesktopStatCard = ({ label, value, onClick }) => {
+    const [hovered, setHovered] = useState(false);
+    return (
+        <button
+            onClick={onClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                background: T.card, borderRadius: '20px', border: `1px solid ${T.line}`,
+                padding: '24px', display: 'flex', flexDirection: 'column',
+                justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left',
+                transition: 'transform 0.15s, box-shadow 0.2s', width: '100%',
+                transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+                boxShadow: hovered ? '0 8px 24px rgba(61,35,30,0.08)' : 'none',
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {label}
+                </span>
+                <ArrowIcon size={16} />
+            </div>
+            <span style={{ fontFamily: F, fontSize: '40px', fontWeight: 400, letterSpacing: '-0.04em', lineHeight: 0.9, color: T.accent, display: 'block', marginTop: '12px' }}>
+                {value}
+            </span>
+        </button>
+    );
+};
+
+// ─── Desktop: schedule row inside white card ──────────────────────────────────
+
+const DesktopApptRow = ({ appt, onClick }) => (
+    <>
+        <button
+            onClick={onClick}
+            style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '18px 0', width: '100%', background: 'none', border: 'none',
+                cursor: 'pointer', textAlign: 'left', fontFamily: F,
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                    width: 38, height: 38, borderRadius: '50%', background: T.avatarBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: F, fontSize: '13px', fontWeight: 500, color: T.muted, flexShrink: 0,
+                }}>
+                    {getInitials(appt.clientName)}
+                </div>
+                <div>
+                    <p style={{ fontFamily: F, fontSize: '15px', color: T.ink, margin: '0 0 2px' }}>{appt.clientName}</p>
+                    <p style={{ fontFamily: F, fontSize: '13px', color: T.muted, margin: 0 }}>
+                        {appt.serviceName}{appt.duration ? ` · ${fmtDuration(appt.duration)}` : ''}
+                    </p>
+                </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontFamily: F, fontSize: '14px', color: T.ink }}>{fmtTime(appt.scheduledAt)}</span>
+                <ArrowIcon size={16} />
+            </div>
+        </button>
+        <div style={{ height: '1px', background: T.line }} />
     </>
 );
 
@@ -133,35 +212,31 @@ const ProviderDashboard = () => {
     const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
     const upNext = schedule[0] || null;
 
-    // Stats display — faded color when empty
+    // Mobile-only color
     const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
-    const clientsColor = isEmpty ? '#B0948F' : '#C25E4A';
+    const clientsColor  = isEmpty ? '#B0948F' : '#C25E4A';
 
-    const handleApptClick = (appt) => {
-        if (isDesktop) {
-            setDrawerAppt({
-                id: appt.id,
-                name: appt.clientName,
-                initials: getInitials(appt.clientName),
-                scheduledDate: new Date(appt.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                time: fmtTime(appt.scheduledAt),
-                service: appt.serviceName,
-                duration: fmtDuration(appt.duration),
-                status: appt.status,
-                messagesPath: '/provider/messages',
-            });
-            setDrawerOpen(true);
-        } else {
-            navigate(`/provider/appointments/${appt.id}`);
-        }
+    const openDrawer = (appt) => {
+        setDrawerAppt({
+            id: appt.id,
+            name: appt.clientName,
+            initials: getInitials(appt.clientName),
+            scheduledDate: new Date(appt.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+            time: fmtTime(appt.scheduledAt),
+            service: appt.serviceName,
+            duration: fmtDuration(appt.duration),
+            status: appt.status,
+            messagesPath: '/provider/messages',
+        });
+        setDrawerOpen(true);
     };
 
-    const handleDrawerNavigate = (path) => {
-        navigate(path);
+    const handleApptClick = (appt) => {
+        if (isDesktop) openDrawer(appt);
+        else navigate(`/provider/appointments/${appt.id}`);
     };
 
     const handleDrawerCompleted = () => {
-        // Refresh schedule after completion
         request('/provider/dashboard').then((dash) => {
             setSchedule(dash.schedule || []);
             setWeeklyEarnings(dash.weeklyEarnings || 0);
@@ -169,6 +244,127 @@ const ProviderDashboard = () => {
         }).catch(() => {});
     };
 
+    // ── Loading skeleton (shared) ─────────────────────────────────────────────
+    const schedSkeleton = (
+        <div className="py-5 flex flex-col gap-4">
+            {[1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-line/60 animate-pulse" />
+                    <div className="flex-1">
+                        <div className="h-4 w-32 bg-line/60 rounded animate-pulse mb-2" />
+                        <div className="h-3 w-24 bg-line/60 rounded animate-pulse" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DESKTOP LAYOUT
+    // ══════════════════════════════════════════════════════════════════════════
+    if (isDesktop) {
+        return (
+            <div style={{ padding: '32px 40px', fontFamily: F }}>
+
+                {/* ── Top grid: HeroCard + two stat cards ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+
+                    {/* HeroCard — clickable → opens drawer for upNext */}
+                    <HeroCard onClick={upNext ? () => openDrawer(upNext) : undefined}>
+                        <div>
+                            <HeroPill className="mb-3">{todayPill()}</HeroPill>
+                            <h2 style={{ fontFamily: F, fontSize: '28px', fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1.15, color: T.ink, margin: 0 }}>
+                                {greeting()},<br />{firstName}
+                            </h2>
+                        </div>
+                        <div>
+                            <div style={{ height: '1px', background: 'rgba(61,35,30,0.1)', margin: '20px 0 12px' }} />
+                            {upNext ? (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <span style={{ fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
+                                            Up Next
+                                        </span>
+                                        <p style={{ fontFamily: F, fontSize: '14px', color: T.ink, margin: 0 }}>
+                                            {upNext.clientName} · {upNext.serviceName}
+                                        </p>
+                                    </div>
+                                    <ArrowIcon size={18} />
+                                </div>
+                            ) : (
+                                <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>
+                                    No upcoming sessions today.
+                                </p>
+                            )}
+                        </div>
+                    </HeroCard>
+
+                    {/* Two stacked stat cards */}
+                    <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: '16px' }}>
+                        <DesktopStatCard
+                            label="Weekly Earnings"
+                            value={fmtEarnings(weeklyEarnings)}
+                            onClick={() => navigate('/provider/earnings')}
+                        />
+                        <DesktopStatCard
+                            label="New Clients This Week"
+                            value={newClients}
+                            onClick={() => navigate('/provider/clients')}
+                        />
+                    </div>
+                </div>
+
+                {/* ── Schedule card ── */}
+                <div style={{ background: T.card, borderRadius: '20px', border: `1px solid ${T.line}`, padding: '28px', marginBottom: '0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <span style={{ fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Today's Schedule
+                        </span>
+                        <button
+                            onClick={() => navigate('/provider/calendar')}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.accent, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        >
+                            View Calendar →
+                        </button>
+                    </div>
+                    <div style={{ height: '1px', background: T.line }} />
+
+                    {loading && schedSkeleton}
+
+                    {!loading && schedule.length === 0 && (
+                        <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                            <p style={{ fontFamily: F, fontSize: '16px', color: T.ink, margin: '0 0 6px' }}>Your day is wide open.</p>
+                            <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>Once clients book, their sessions show up here.</p>
+                        </div>
+                    )}
+
+                    {!loading && schedule.map((appt) => (
+                        <DesktopApptRow
+                            key={appt.id}
+                            appt={appt}
+                            onClick={() => openDrawer(appt)}
+                        />
+                    ))}
+                </div>
+
+                {/* ── Share Links ── */}
+                <DesktopShareLinks handle={handle} />
+
+                {/* ── Appointment Drawer ── */}
+                <AppointmentDrawer
+                    open={drawerOpen}
+                    onClose={() => setDrawerOpen(false)}
+                    appointment={drawerAppt}
+                    onNavigate={(path) => navigate(path)}
+                    onCompleted={handleDrawerCompleted}
+                />
+            </div>
+        );
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MOBILE LAYOUT
+    // ══════════════════════════════════════════════════════════════════════════
     return (
         <div className="flex flex-col min-h-screen bg-base">
             <Header
@@ -182,15 +378,12 @@ const ProviderDashboard = () => {
             {/* ── Hero card ── */}
             <div className="px-5 mb-6">
                 <HeroCard>
-                    {/* Date pill + greeting */}
                     <div className="mb-5">
                         <HeroPill className="mb-3">{todayPill()}</HeroPill>
                         <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
                             {greeting()},<br />{firstName}
                         </h1>
                     </div>
-
-                    {/* Up Next / empty message */}
                     <div>
                         <div className="h-px mb-4" style={{ background: 'rgba(61,35,30,0.1)' }} />
                         {upNext ? (
@@ -217,36 +410,24 @@ const ProviderDashboard = () => {
             <div className="px-5 flex-1 flex flex-col">
                 <Divider />
                 <div className="flex gap-6 pt-5 pb-5 relative">
-                    {/* Vertical divider */}
                     <div className="absolute inset-y-5 left-1/2 w-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
-
-                    {/* Weekly Earnings */}
                     <div className="flex-1">
                         <Lbl className="block mb-2">Weekly Earnings</Lbl>
                         <div className="flex items-end gap-1">
                             <ArrowIcon size={28} color={earningsColor} />
-                            <span
-                                className="text-[52px] font-semibold tracking-[-0.05em] leading-none"
-                                style={{ color: earningsColor }}
-                            >
+                            <span className="text-[52px] font-semibold tracking-[-0.05em] leading-none" style={{ color: earningsColor }}>
                                 {fmtEarnings(weeklyEarnings)}
                             </span>
                         </div>
                     </div>
-
-                    {/* New Clients */}
                     <div className="flex-1 flex flex-col items-end">
                         <Lbl className="block mb-2">New Clients</Lbl>
-                        <span
-                            className="text-[52px] font-semibold tracking-[-0.05em] leading-none"
-                            style={{ color: clientsColor }}
-                        >
+                        <span className="text-[52px] font-semibold tracking-[-0.05em] leading-none" style={{ color: clientsColor }}>
                             {newClients}
                         </span>
                     </div>
                 </div>
 
-                {/* Context line */}
                 <p className="text-[15px] text-muted mb-7 mt-0">
                     {isEmpty
                         ? 'Share your links below to start booking clients.'
@@ -267,35 +448,18 @@ const ProviderDashboard = () => {
                 </div>
                 <Divider />
 
-                {/* Loading skeleton */}
-                {loading && (
-                    <div className="py-5 flex flex-col gap-4">
-                        {[1, 2].map((i) => (
-                            <div key={i} className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-line/60 animate-pulse" />
-                                <div className="flex-1">
-                                    <div className="h-4 w-32 bg-line/60 rounded animate-pulse mb-2" />
-                                    <div className="h-3 w-24 bg-line/60 rounded animate-pulse" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                {loading && schedSkeleton}
 
-                {/* Empty schedule */}
                 {!loading && schedule.length === 0 && (
                     <>
                         <div className="py-8 text-center">
                             <p className="text-[16px] text-ink m-0 mb-1">Your day is wide open.</p>
-                            <p className="text-[14px] text-muted m-0">
-                                Once clients book, their sessions show up here.
-                            </p>
+                            <p className="text-[14px] text-muted m-0">Once clients book, their sessions show up here.</p>
                         </div>
                         <Divider />
                     </>
                 )}
 
-                {/* Appointment rows */}
                 {!loading && schedule.map((appt) => (
                     <ApptRow
                         key={appt.id}
@@ -306,25 +470,11 @@ const ProviderDashboard = () => {
 
                 {/* ── Share Links ── */}
                 <div className="mt-7">
-                    {isDesktop
-                        ? <DesktopShareLinks handle={handle} />
-                        : <ShareLinks handle={handle} />
-                    }
+                    <ShareLinks handle={handle} />
                 </div>
 
                 <Footer />
             </div>
-
-            {/* Desktop appointment drawer */}
-            {isDesktop && (
-                <AppointmentDrawer
-                    open={drawerOpen}
-                    onClose={() => setDrawerOpen(false)}
-                    appointment={drawerAppt}
-                    onNavigate={handleDrawerNavigate}
-                    onCompleted={handleDrawerCompleted}
-                />
-            )}
         </div>
     );
 };
