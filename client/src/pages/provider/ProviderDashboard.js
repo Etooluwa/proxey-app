@@ -20,6 +20,7 @@ import Avatar from '../../components/ui/Avatar';
 import ArrowIcon from '../../components/ui/ArrowIcon';
 import ShareLinks from '../../components/ui/ShareLinks';
 import Footer from '../../components/ui/Footer';
+import AppointmentDrawer from '../../components/AppointmentDrawer';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ const ApptRow = ({ appt, onClick }) => (
 
 const ProviderDashboard = () => {
     const navigate = useNavigate();
-    const { onMenu } = useOutletContext() || {};
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const { profile: sessionProfile } = useSession();
     const { unreadCount } = useNotifications();
 
@@ -96,6 +97,10 @@ const ProviderDashboard = () => {
     const [newClients, setNewClients] = useState(0);
     const [handle, setHandle] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // Drawer state (desktop only)
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [drawerAppt, setDrawerAppt] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -132,7 +137,35 @@ const ProviderDashboard = () => {
     const clientsColor = isEmpty ? '#B0948F' : '#C25E4A';
 
     const handleApptClick = (appt) => {
-        navigate(`/provider/appointments/${appt.id}`);
+        if (isDesktop) {
+            setDrawerAppt({
+                id: appt.id,
+                name: appt.clientName,
+                initials: getInitials(appt.clientName),
+                scheduledDate: new Date(appt.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                time: fmtTime(appt.scheduledAt),
+                service: appt.serviceName,
+                duration: fmtDuration(appt.duration),
+                status: appt.status,
+                messagesPath: '/provider/messages',
+            });
+            setDrawerOpen(true);
+        } else {
+            navigate(`/provider/appointments/${appt.id}`);
+        }
+    };
+
+    const handleDrawerNavigate = (path) => {
+        navigate(path);
+    };
+
+    const handleDrawerCompleted = () => {
+        // Refresh schedule after completion
+        request('/provider/dashboard').then((dash) => {
+            setSchedule(dash.schedule || []);
+            setWeeklyEarnings(dash.weeklyEarnings || 0);
+            setNewClients(dash.newClientsThisWeek || 0);
+        }).catch(() => {});
     };
 
     return (
@@ -277,6 +310,17 @@ const ProviderDashboard = () => {
 
                 <Footer />
             </div>
+
+            {/* Desktop appointment drawer */}
+            {isDesktop && (
+                <AppointmentDrawer
+                    open={drawerOpen}
+                    onClose={() => setDrawerOpen(false)}
+                    appointment={drawerAppt}
+                    onNavigate={handleDrawerNavigate}
+                    onCompleted={handleDrawerCompleted}
+                />
+            )}
         </div>
     );
 };
