@@ -6721,78 +6721,142 @@ app.get("/api/provider/invites/join/:code", async (req, res) => {
 
     if (invErr) throw invErr;
     if (!invite) return res.json({ valid: false, reason: "not_found" });
-    if (invite.status === "accepted") return res.json({ valid: false, reason: "already_accepted" });
     if (invite.status === "expired") return res.json({ valid: false, reason: "expired" });
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-      // Mark expired
       await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
       return res.json({ valid: false, reason: "expired" });
     }
 
-    // Fetch provider info
+    // Fetch provider info (join via user_id since provider_invites.provider_id stores the auth UUID)
     const { data: provider } = await supabase
       .from("providers")
-      .select("id, name, business_name, category, city, photo, bio, avatar")
+      .select("id, user_id, name, business_name, category, city, photo, bio, avatar")
       .eq("user_id", invite.provider_id)
       .maybeSingle();
 
-    res.json({ valid: true, invite: { id: invite.id, code, status: invite.status }, provider: provider || null });
+    if (!provider) return res.json({ valid: false, reason: "provider_not_found" });
+
+    res.json({ valid: true, invite: { id: invite.id, code, status: invite.status }, provider });
   } catch (err) {
     console.error("[provider/invites/join GET]", err);
     res.status(500).json({ error: "Failed to look up invite." });
   }
 });
 
-// ─── POST /api/provider/invites/join/:code/accept — accept invite ─────────────
-app.post("/api/provider/invites/join/:code/accept", async (req, res) => {
+// ─── POST /api/invites/:code/accept — accept invite (multi-use link) ──────────
+app.post("/api/invites/:code/accept", async (req, res) => {
   const { code } = req.params;
   const clientId = getUserId(req);
 
-  if (!supabase) return res.json({ ok: true });
+  if (!supabase) return res.json({ connected: true, already_connected: false });
   try {
+    // 1. Validate invite
     const { data: invite, error: invErr } = await supabase
       .from("provider_invites")
-      .select("id, provider_id, status")
+      .select("id, provider_id, status, expires_at")
       .eq("code", code)
       .maybeSingle();
 
     if (invErr) throw invErr;
-    if (!invite) return res.status(404).json({ error: "Invite not found." });
-    if (invite.status === "expired") return res.status(410).json({ error: "This invite has expired." });
-
-    // Upsert the provider_clients relationship (idempotent — safe to call twice)
-    await supabase
-      .from("provider_clients")
-      .upsert(
-        {
-          provider_id: invite.provider_id,
-          client_id: clientId,
-          invite_id: invite.id,
-          connected_at: new Date().toISOString(),
-        },
-        { onConflict: "provider_id,client_id" }
-      );
-
-    // Mark invite as accepted (only if it was active — don't re-close already-accepted ones)
-    if (invite.status === "active") {
-      await supabase
-        .from("provider_invites")
-        .update({ status: "accepted", accepted_by: clientId, accepted_at: new Date().toISOString() })
-        .eq("id", invite.id);
+    if (!invite) return res.status(404).json({ error: "invalid" });
+    if (invite.status === "expired") return res.status(410).json({ error: "expired" });
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
+      return res.status(410).json({ error: "expired" });
     }
 
-    // Notify provider
+    // 2. Edge case: client trying to accept their own invite
+    if (invite.provider_id === clientId) {
+      return res.status(400).json({ error: "own_invite" });
+    }
+
+    // 3. Check if already connected
+    const { data: existing } = await supabase
+      .from("provider_clients")
+      .select("id")
+      .eq("provider_id", invite.provider_id)
+      .eq("client_id", clientId)
+      .maybeSingle();
+
+    if (existing) {
+      // Fetch provider info for response
+      const { data: provider } = await supabase
+        .from("providers")
+        .select("id, name, business_name, category, city, photo, avatar")
+        .eq("user_id", invite.provider_id)
+        .maybeSingle();
+      return res.json({ already_connected: true, connected: false, provider: provider || null });
+    }
+
+    // 4. Insert provider_clients connection
+    await supabase.from("provider_clients").insert({
+      provider_id: invite.provider_id,
+      client_id: clientId,
+      invite_id: invite.id,
+      connected_at: new Date().toISOString(),
+      source: "invite",
+    });
+
+    // 5. Increment uses_count (multi-use — never mark as accepted/closed)
+    await supabase
+      .from("provider_invites")
+      .update({ uses_count: (invite.uses_count || 0) + 1 })
+      .eq("id", invite.id);
+
+    // 6. Get client name for notification
+    const { data: clientProfile } = await supabase
+      .from("client_profiles")
+      .select("name")
+      .eq("user_id", clientId)
+      .maybeSingle();
+    const clientName = clientProfile?.name || "Someone";
+
+    // 7. Notify provider
     await createProviderNotification(invite.provider_id, {
       type: "new_client",
       title: "New client connected",
-      body: "A client accepted your invite link.",
+      body: `${clientName} accepted your invite and joined your klique.`,
       data: { client_id: clientId },
     }).catch(() => {});
 
+    // 8. Fetch provider info for response
+    const { data: provider } = await supabase
+      .from("providers")
+      .select("id, name, business_name, category, city, photo, avatar")
+      .eq("user_id", invite.provider_id)
+      .maybeSingle();
+
+    res.json({ connected: true, already_connected: false, provider: provider || null });
+  } catch (err) {
+    console.error("[invites/accept POST]", err);
+    res.status(500).json({ error: "Failed to accept invite." });
+  }
+});
+
+// Keep legacy path working too
+app.post("/api/provider/invites/join/:code/accept", async (req, res) => {
+  req.params.code = req.params.code;
+  // Forward to new handler by re-using same logic path
+  const { code } = req.params;
+  const clientId = getUserId(req);
+  if (!supabase) return res.json({ ok: true });
+  try {
+    const { data: invite } = await supabase
+      .from("provider_invites")
+      .select("id, provider_id, status, expires_at")
+      .eq("code", code)
+      .maybeSingle();
+    if (!invite) return res.status(404).json({ error: "Invite not found." });
+    if (invite.status === "expired") return res.status(410).json({ error: "expired" });
+    await supabase.from("provider_clients").upsert(
+      { provider_id: invite.provider_id, client_id: clientId, invite_id: invite.id, connected_at: new Date().toISOString(), source: "invite" },
+      { onConflict: "provider_id,client_id" }
+    );
+    await supabase.from("provider_invites").update({ uses_count: (invite.uses_count || 0) + 1 }).eq("id", invite.id);
     res.json({ ok: true });
   } catch (err) {
-    console.error("[provider/invites/join/accept POST]", err);
-    res.status(500).json({ error: "Failed to accept invite." });
+    console.error("[provider/invites/join/accept legacy]", err);
+    res.status(500).json({ error: "Failed." });
   }
 });
 

@@ -24,7 +24,7 @@ import ProviderOnboarding from './pages/ProviderOnboarding';
 
 // ── Public (no auth) ─────────────────────────────────────────────────────────
 import ProviderPublicProfile from './pages/ProviderPublicProfile';
-import InviteFlow from './pages/InviteFlow';
+import InviteAcceptPage from './pages/InviteAcceptPage';
 
 // ── Client pages ─────────────────────────────────────────────────────────────
 import AppDashboard from './pages/AppDashboard';
@@ -98,7 +98,7 @@ function App() {
 
                     {/* ── Public routes (no auth) ──────────────────────────── */}
                     <Route path="/book/:handle" element={<ProviderPublicProfile />} />
-                    <Route path="/join/:code" element={<InviteFlow />} />
+                    <Route path="/join/:code" element={<InviteAcceptPage />} />
 
                     {/* ── Auth routes ──────────────────────────────────────── */}
                     <Route path="/login" element={<LoginPage />} />
