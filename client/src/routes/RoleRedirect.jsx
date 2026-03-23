@@ -1,6 +1,5 @@
 import { Navigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
-import LoginSignup from "../pages/LoginSignup";
 
 function resolveUserRole(session) {
   return (
@@ -12,15 +11,7 @@ function resolveUserRole(session) {
 }
 
 function RoleRedirect() {
-  const {
-    session,
-    loading,
-    login,
-    register,
-    isProfileComplete,
-    authError,
-    clearAuthError,
-  } = useSession();
+  const { session, loading, isProfileComplete } = useSession();
 
   if (loading) {
     return (
@@ -31,18 +22,7 @@ function RoleRedirect() {
   }
 
   if (!session?.user) {
-    return (
-      <LoginSignup
-        onLogin={async ({ role, email, password }) => {
-          await login({ email, password, role });
-        }}
-        onSignup={async ({ role, email, password }) => {
-          await register({ email, password, role });
-        }}
-        globalError={authError}
-        onClearError={clearAuthError}
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   const userRole = resolveUserRole(session);

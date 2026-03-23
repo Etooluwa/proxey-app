@@ -87,7 +87,7 @@ function BookingCheckoutPage() {
     <div className="page page--centered">
       <div className="card">
         <div className="card__header">
-          <Link className="link link--muted" to="/auth/sign-in">
+          <Link className="link link--muted" to="/login">
             ← Back to login
           </Link>
         </div>

@@ -130,7 +130,7 @@ const AccountPage = () => {
     const handleLogout = async () => {
         try {
             await signOut();
-            navigate('/auth/sign-in');
+            navigate('/login');
         } catch (error) {
             console.error('Sign out error:', error);
             toast.push({

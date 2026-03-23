@@ -18,8 +18,6 @@ import AdminShell from './components/layout/AdminShell';
 
 // ── Auth / onboarding ────────────────────────────────────────────────────────
 import LoginPage from './pages/auth/LoginPage';
-import SignIn from './pages/auth/SignInPage';
-import SignUp from './pages/auth/SignUpPage';
 import AuthCallback from './pages/AuthCallback';
 import ClientOnboarding from './pages/ClientOnboarding';
 import ProviderOnboarding from './pages/ProviderOnboarding';
@@ -104,10 +102,10 @@ function App() {
 
                     {/* ── Auth routes ──────────────────────────────────────── */}
                     <Route path="/login" element={<LoginPage />} />
-                    {/* Legacy auth paths kept for email-link compatibility */}
-                    <Route path="/auth/login" element={<LoginPage />} />
-                    <Route path="/auth/sign-in" element={<SignIn />} />
-                    <Route path="/auth/sign-up" element={<SignUp />} />
+                    {/* Legacy auth paths — redirect to /login */}
+                    <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+                    <Route path="/auth/sign-in" element={<Navigate to="/login" replace />} />
+                    <Route path="/auth/sign-up" element={<Navigate to="/login" replace />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
 
                     {/* ── Onboarding ───────────────────────────────────────── */}

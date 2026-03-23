@@ -1,382 +1,642 @@
 /**
- * LoginPage — v6 Warm Editorial
- * Route: /auth/login
+ * LoginPage — v6 Warm Editorial Auth Flow
+ * Route: /login  (also /auth/login)
  *
- * Three modes:
- *   "login"  — email field + Send Login Link + social buttons
- *   "signup" — role toggle + name/email/phone + Create Account
- *   "magic"  — "Check your email." confirmation screen
+ * Screens (managed by `screen` state):
+ *   role           — choose client or provider
+ *   client_login   — email + password, magic link, Google
+ *   provider_login — same for providers
+ *   client_signup  — name + email + password, Google
+ *   provider_signup — name + email + phone + password, Google
+ *   magic_link     — email entry for passwordless
+ *   magic_sent     — confirmation after OTP sent
  *
- * Auth: Supabase magic link (signInWithOtp) for login/signup
- *       Google OAuth via loginWithGoogle from authContext
+ * Desktop: split layout — form (left, flex:1) + image panel (right, 50%)
+ * Mobile: form only, full width
  */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
-// ─── Topographic SVG texture ──────────────────────────────────────────────────
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const T = {
+    ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
+    hero: '#FDDCC6', abg: '#F2EBE5', line: 'rgba(140,106,100,0.18)',
+    base: '#FBF7F2', card: '#FFFFFF', danger: '#B04040', callout: '#FFF5E6',
+};
+const F = "'Sora',system-ui,sans-serif";
 
-const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M100 50 Q 200 -50 300 50 T 500 50' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M200 350 Q 250 250 350 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
+// ─── Right-panel images & captions ─────────────────────────────────────────────
+const IMG = {
+    role: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=960&h=1200&fit=crop&crop=faces',
+    client: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=960&h=1200&fit=crop&crop=faces',
+    provider: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=960&h=1200&fit=crop&crop=faces',
+    magic: 'https://images.unsplash.com/photo-1516387938699-a93567ec168e?w=960&h=1200&fit=crop&crop=center',
+};
+const TX = {
+    role: 'Build relationships, not just bookings.',
+    client: 'Book your favourite providers in seconds.',
+    provider: 'Manage clients, bookings, and payments — all in one place.',
+    magic: 'A secure link is on its way to your inbox.',
+};
 
-// ─── Shared input ─────────────────────────────────────────────────────────────
+function imgKey(screen) {
+    if (screen.startsWith('client')) return 'client';
+    if (screen.startsWith('provider')) return 'provider';
+    if (screen === 'magic_link' || screen === 'magic_sent') return 'magic';
+    return 'role';
+}
 
-const Field = ({ label, value, onChange, type = 'text', placeholder }) => (
-    <div className="mb-5">
-        <span
-            className="block mb-2 text-[11px] font-medium uppercase tracking-[0.05em]"
-            style={{ color: '#8C6A64' }}
-        >
-            {label}
-        </span>
-        <input
-            type={type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            autoComplete={type === 'email' ? 'email' : type === 'tel' ? 'tel' : 'name'}
-            className="w-full px-4 py-3.5 rounded-[12px] text-[14px] text-ink focus:outline-none"
-            style={{
-                background: '#F2EBE5',
-                border: '1px solid rgba(140,106,100,0.2)',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box',
-            }}
-        />
+// ─── SVG icons ──────────────────────────────────────────────────────────────────
+const GoogleIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+);
+
+const BoltIcon = () => (
+    <svg width="15" height="15" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+const EnvelopeIcon = () => (
+    <svg width="36" height="36" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M3 9l9 6 9-6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+const ArrowIcon = () => (
+    <svg width="20" height="20" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+const BackArrow = () => (
+    <svg width="22" height="22" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+// ─── Sub-components ─────────────────────────────────────────────────────────────
+
+const Lbl = ({ children }) => (
+    <span style={{ display: 'block', fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.muted, marginBottom: 8 }}>
+        {children}
+    </span>
+);
+
+const inputBase = {
+    width: '100%', padding: '14px 16px', borderRadius: 12,
+    border: `1px solid ${T.line}`, fontFamily: F, fontSize: 14,
+    color: T.ink, outline: 'none', background: T.abg,
+    boxSizing: 'border-box', transition: 'border-color .15s, box-shadow .15s',
+};
+
+const Divider = ({ label = 'or' }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '20px 0' }}>
+        <div style={{ flex: 1, height: 1, background: T.line }} />
+        <span style={{ fontFamily: F, fontSize: 11, color: T.faded, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{label}</span>
+        <div style={{ flex: 1, height: 1, background: T.line }} />
     </div>
 );
 
-// ─── Magic link sent screen ───────────────────────────────────────────────────
+const BtnPrimary = ({ onClick, disabled, children }) => (
+    <button onClick={onClick} disabled={disabled} style={{
+        width: '100%', padding: 16, borderRadius: 12, background: disabled ? T.muted : T.ink,
+        color: '#fff', fontFamily: F, fontSize: 14, fontWeight: 500,
+        border: 'none', cursor: disabled ? 'default' : 'pointer', transition: 'opacity .15s',
+    }}>
+        {children}
+    </button>
+);
 
-const MagicSentScreen = ({ onBack }) => (
-    <div
-        className="flex flex-col items-center justify-center flex-1 px-6 py-12 text-center"
-        style={{ minHeight: '100dvh', background: '#FBF7F2' }}
-    >
-        {/* Open envelope icon */}
-        <div
-            className="flex items-center justify-center mb-6 rounded-[20px]"
-            style={{ width: 72, height: 72, background: '#FDDCC6' }}
-        >
-            <svg width="32" height="32" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path d="M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 9l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+const BtnOutlined = ({ onClick, children, style = {} }) => (
+    <button onClick={onClick} style={{
+        width: '100%', padding: 14, borderRadius: 12,
+        border: `1px solid ${T.line}`, background: 'transparent',
+        fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        cursor: 'pointer', transition: 'background .15s', ...style,
+    }}>
+        {children}
+    </button>
+);
+
+// ─── Password input with toggle ──────────────────────────────────────────────────
+const EyeIcon = ({ off }) => off ? (
+    <svg width="18" height="18" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/>
+    </svg>
+) : (
+    <svg width="18" height="18" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+);
+
+function PwInput({ id, value, onChange, placeholder, hasError }) {
+    const [show, setShow] = useState(false);
+    return (
+        <div style={{ position: 'relative' }}>
+            <input
+                id={id}
+                type={show ? 'text' : 'password'}
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                autoComplete="current-password"
+                style={{
+                    ...inputBase,
+                    paddingRight: 44,
+                    borderColor: hasError ? T.danger : undefined,
+                    boxShadow: hasError ? `0 0 0 3px rgba(176,64,64,0.08)` : undefined,
+                }}
+            />
+            <button
+                type="button"
+                onClick={() => setShow(s => !s)}
+                style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', padding: 4, background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+            >
+                <EyeIcon off={show} />
+            </button>
         </div>
+    );
+}
 
-        <h1
-            className="text-[26px] font-semibold tracking-[-0.03em] text-ink mb-2"
-            style={{ lineHeight: 1.1 }}
-        >
-            Check your email.
-        </h1>
-        <p className="text-[15px] text-muted leading-relaxed mb-8 max-w-[300px]">
-            We sent a login link to your email address. Tap the link to sign in — no password needed.
-        </p>
+// ─── Email validation ────────────────────────────────────────────────────────────
+function isValidEmail(e) { return e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 
+// ─── Option card (role screen) ───────────────────────────────────────────────────
+function OptionCard({ icon, title, subtitle, onClick }) {
+    const [hov, setHov] = useState(false);
+    return (
         <button
-            onClick={onBack}
-            className="text-[14px] font-medium focus:outline-none"
-            style={{ color: '#C25E4A', background: 'none', border: 'none' }}
+            onClick={onClick}
+            onMouseEnter={() => setHov(true)}
+            onMouseLeave={() => setHov(false)}
+            style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '22px 24px', borderRadius: 16,
+                border: `1px solid ${hov ? T.accent : T.line}`,
+                background: T.card, cursor: 'pointer', width: '100%', textAlign: 'left',
+                marginBottom: 12, transition: 'all .15s',
+                boxShadow: hov ? '0 4px 16px rgba(194,94,74,0.06)' : 'none',
+                transform: hov ? 'translateY(-1px)' : 'none',
+                fontFamily: F,
+            }}
         >
-            Back to login
+            <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                    {icon}
+                    <span style={{ fontSize: 16, fontWeight: 500, color: T.ink }}>{title}</span>
+                </div>
+                <p style={{ fontSize: 13, color: T.muted, margin: 0, paddingLeft: 30 }}>{subtitle}</p>
+            </div>
+            <ArrowIcon />
         </button>
-    </div>
-);
+    );
+}
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Screens ────────────────────────────────────────────────────────────────────
 
-const LoginPage = () => {
-    const navigate = useNavigate();
-    const { loginWithGoogle, setLocalRole } = useSession();
+function RoleScreen({ onSelectClient, onSelectProvider }) {
+    return (
+        <div>
+            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', textAlign: 'center', margin: '0 0 6px' }}>Sign up or log in</h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, textAlign: 'center', margin: '0 0 40px' }}>Choose how you use Kliques</p>
+            <OptionCard
+                icon={<svg width="20" height="20" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                title="Kliques for clients"
+                subtitle="Book and manage your appointments"
+                onClick={onSelectClient}
+            />
+            <OptionCard
+                icon={<svg width="20" height="20" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                title="Kliques for professionals"
+                subtitle="Manage and grow your business"
+                onClick={onSelectProvider}
+            />
+        </div>
+    );
+}
 
-    const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'magic'
-    const [role, setRole] = useState('client');
-    const [name, setName] = useState('');
+function LoginScreen({ role, onSignup, onMagicLink, onSuccess, onGoogleLogin }) {
     const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [submitting, setSubmitting] = useState(false);
+    const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
 
-    // ── Send magic link ──────────────────────────────────────────────────────
     const handleSubmit = async () => {
         setError(null);
-        if (!email.trim()) {
-            setError('Please enter your email address.');
-            return;
-        }
-        if (mode === 'signup' && !name.trim()) {
-            setError('Please enter your full name.');
-            return;
-        }
-
+        if (!email.trim() || !password) { setError('Please enter your email and password.'); return; }
         setSubmitting(true);
         try {
-            if (supabase) {
-                const { error: otpError } = await supabase.auth.signInWithOtp({
-                    email: email.trim(),
-                    options: {
-                        shouldCreateUser: mode === 'signup',
-                        data: mode === 'signup' ? {
-                            role,
-                            full_name: name.trim(),
-                            phone: phone.trim() || null,
-                        } : undefined,
-                        emailRedirectTo: `${window.location.origin}/auth/callback`,
-                    },
-                });
-                if (otpError) throw otpError;
-                // Store role locally so callback knows which onboarding to send to
-                if (mode === 'signup') {
-                    window.localStorage.setItem('proxey.pendingRole', role);
-                    window.localStorage.setItem('proxey.pendingName', name.trim());
-                }
-            }
-            setMode('magic');
+            const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+            if (err) throw err;
+            onSuccess();
         } catch (err) {
-            setError(err.message || 'Something went wrong. Please try again.');
+            setError(err.message || 'Sign in failed. Please check your credentials.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    // ── Google OAuth ─────────────────────────────────────────────────────────
-    const handleGoogle = async () => {
+    const label = role === 'client' ? 'client' : 'provider';
+    return (
+        <div>
+            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Welcome back</h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px' }}>Sign in to your {label} account</p>
+
+            <div style={{ marginBottom: 20 }}>
+                <Lbl>Email</Lbl>
+                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoComplete="email" style={inputBase} />
+            </div>
+            <div style={{ marginBottom: 8 }}>
+                <Lbl>Password</Lbl>
+                <PwInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" />
+            </div>
+            <div style={{ textAlign: 'right', marginBottom: 24 }}>
+                <button onClick={onMagicLink} style={{ fontFamily: F, fontSize: 12, color: T.accent, fontWeight: 500, padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Forgot password?
+                </button>
+            </div>
+
+            {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 12px' }}>{error}</p>}
+
+            <BtnPrimary onClick={handleSubmit} disabled={submitting}>{submitting ? 'Signing in…' : 'Sign In'}</BtnPrimary>
+            <Divider />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <BtnOutlined onClick={onMagicLink}><BoltIcon /> Sign in without password</BtnOutlined>
+                <BtnOutlined onClick={onGoogleLogin}><GoogleIcon /> Continue with Google</BtnOutlined>
+            </div>
+            <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
+                <button onClick={onSignup} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Don't have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign up</span>
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
+    const isClient = role === 'client';
+
+    const handleSubmit = async () => {
         setError(null);
+        if (!name.trim()) { setError('Please enter your full name.'); return; }
+        if (!email.trim()) { setError('Please enter your email.'); return; }
+        if (!password || password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+        setSubmitting(true);
         try {
-            await loginWithGoogle(mode === 'signup' ? role : 'client');
-            // OAuth redirect — page will leave
+            const { error: err } = await supabase.auth.signUp({
+                email: email.trim(),
+                password,
+                options: {
+                    data: { role, full_name: name.trim(), phone: phone.trim() || null },
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+            if (err) throw err;
+            window.localStorage.setItem('proxey.pendingRole', role);
+            window.localStorage.setItem('proxey.pendingName', name.trim());
+            onSuccess();
         } catch (err) {
-            setError(err.message || 'Google sign-in failed.');
+            setError(err.message || 'Signup failed. Please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    // ── Magic sent screen ────────────────────────────────────────────────────
-    if (mode === 'magic') {
-        return <MagicSentScreen onBack={() => setMode('login')} />;
-    }
-
-    const isLogin = mode === 'login';
-
     return (
-        <div
-            className="flex flex-col"
-            style={{ minHeight: '100dvh', background: '#FBF7F2' }}
-        >
-            {/* ── Top section with topo texture ── */}
-            <div className="relative px-6 pt-16 pb-10 overflow-hidden">
-                {/* Texture overlay */}
-                <div
-                    aria-hidden="true"
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                        backgroundImage: TOPO_SVG,
-                        backgroundSize: 'cover',
-                        opacity: 0.06,
-                    }}
-                />
-                <div className="relative z-10">
-                    {/* Wordmark */}
-                    <span
-                        className="block font-semibold mb-7 tracking-[-0.02em]"
-                        style={{ fontSize: 15, color: '#C25E4A' }}
-                    >
-                        kliques
-                    </span>
-                    <h1
-                        className="text-[32px] font-semibold tracking-[-0.03em] text-ink mb-2"
-                        style={{ lineHeight: 1.1 }}
-                    >
-                        {isLogin ? 'Welcome back.' : 'Create your\naccount.'}
-                    </h1>
-                    <p className="text-[15px] text-muted leading-relaxed m-0">
-                        {isLogin
-                            ? 'Sign in to continue where you left off.'
-                            : 'Join Kliques and start building lasting relationships.'}
-                    </p>
-                </div>
+        <div>
+            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>
+                {isClient ? 'Create your account' : 'Start your business'}
+            </h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px' }}>
+                {isClient ? 'Join Kliques as a client' : 'Create your provider account'}
+            </p>
+
+            <div style={{ marginBottom: 20 }}>
+                <Lbl>Full Name</Lbl>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" style={inputBase} />
             </div>
+            <div style={{ marginBottom: 20 }}>
+                <Lbl>Email</Lbl>
+                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoComplete="email" style={inputBase} />
+            </div>
+            {!isClient && (
+                <div style={{ marginBottom: 20 }}>
+                    <Lbl>Phone Number</Lbl>
+                    <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" type="tel" autoComplete="tel" style={inputBase} />
+                </div>
+            )}
+            <div style={{ marginBottom: 6 }}>
+                <Lbl>Password</Lbl>
+                <PwInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Create a password" />
+            </div>
+            <p style={{ fontFamily: F, fontSize: 11, color: T.faded, margin: '0 0 24px' }}>At least 8 characters</p>
 
-            {/* ── Form section ── */}
-            <div className="flex-1 flex flex-col px-6 pb-8">
+            {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 12px' }}>{error}</p>}
 
-                {/* Role toggle — signup only */}
-                {!isLogin && (
-                    <div className="mb-6">
-                        <span
-                            className="block mb-2.5 text-[11px] font-medium uppercase tracking-[0.05em]"
-                            style={{ color: '#8C6A64' }}
-                        >
-                            I am a
-                        </span>
-                        <div className="flex gap-2">
-                            {[
-                                { id: 'client', label: 'Client' },
-                                { id: 'provider', label: 'Service Provider' },
-                            ].map((r) => {
-                                const active = role === r.id;
-                                return (
-                                    <button
-                                        key={r.id}
-                                        onClick={() => setRole(r.id)}
-                                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-medium focus:outline-none"
-                                        style={{
-                                            border: active ? '2px solid #C25E4A' : '1px solid rgba(140,106,100,0.2)',
-                                            background: active ? '#FDDCC6' : 'transparent',
-                                            color: active ? '#C25E4A' : '#3D231E',
-                                            letterSpacing: '0.02em',
-                                        }}
-                                    >
-                                        {r.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Name — signup only */}
-                {!isLogin && (
-                    <Field
-                        label="Full Name"
-                        value={name}
-                        onChange={setName}
-                        placeholder="Your name"
-                    />
-                )}
-
-                {/* Email */}
-                <Field
-                    label="Email"
-                    value={email}
-                    onChange={setEmail}
-                    type="email"
-                    placeholder="you@email.com"
-                />
-
-                {/* Phone — signup only */}
-                {!isLogin && (
-                    <Field
-                        label="Phone Number"
-                        value={phone}
-                        onChange={setPhone}
-                        type="tel"
-                        placeholder="+1 (555) 000-0000"
-                    />
-                )}
-
-                {/* Hint */}
-                <p
-                    className="text-[12px] -mt-2 mb-6"
-                    style={{ color: '#B0948F' }}
-                >
-                    {isLogin
-                        ? "We'll send you a magic link — no password needed."
-                        : "We'll email you a link to verify your account."}
-                </p>
-
-                {/* Error */}
-                {error && (
-                    <div
-                        className="px-4 py-3 rounded-[10px] text-[13px] mb-4"
-                        style={{ background: '#FDEDEA', color: '#B04040' }}
-                    >
-                        {error}
-                    </div>
-                )}
-
-                {/* Primary CTA */}
-                <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="w-full py-4 rounded-[12px] text-[14px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 mb-4"
-                    style={{
-                        background: '#3D231E',
-                        border: 'none',
-                        opacity: submitting ? 0.7 : 1,
-                    }}
-                >
-                    {submitting && (
-                        <div
-                            style={{
-                                width: 14, height: 14, borderRadius: '50%',
-                                border: '2px solid rgba(255,255,255,0.3)',
-                                borderTop: '2px solid #fff',
-                                animation: 'spin 0.8s linear infinite',
-                                flexShrink: 0,
-                            }}
-                        />
-                    )}
-                    {submitting
-                        ? 'Sending…'
-                        : isLogin ? 'Send Login Link' : 'Create Account'}
+            <BtnPrimary onClick={handleSubmit} disabled={submitting}>{submitting ? 'Creating account…' : 'Create Account'}</BtnPrimary>
+            <Divider />
+            <BtnOutlined onClick={onGoogleSignup}><GoogleIcon /> Sign up with Google</BtnOutlined>
+            <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
+                <button onClick={onLogin} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Already have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign in</span>
                 </button>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="flex-1 h-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
-                    <span
-                        className="text-[11px] font-medium uppercase tracking-[0.05em]"
-                        style={{ color: '#8C6A64' }}
-                    >
-                        Or continue with
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
-                </div>
-
-                {/* Social buttons */}
-                <div className="flex gap-2 mb-8">
-                    {/* Google */}
-                    <button
-                        onClick={handleGoogle}
-                        className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[12px] text-[13px] font-medium text-ink focus:outline-none"
-                        style={{ border: '1px solid rgba(140,106,100,0.2)', background: 'transparent' }}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                        Google
-                    </button>
-
-                    {/* Apple */}
-                    <button
-                        className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[12px] text-[13px] font-medium text-ink focus:outline-none"
-                        style={{ border: '1px solid rgba(140,106,100,0.2)', background: 'transparent' }}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#3D231E">
-                            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                        </svg>
-                        Apple
-                    </button>
-                </div>
-
-                {/* Toggle login / signup */}
-                <div className="mt-auto pt-2 text-center">
-                    <button
-                        onClick={() => { setMode(isLogin ? 'signup' : 'login'); setError(null); }}
-                        className="text-[14px] focus:outline-none"
-                        style={{ background: 'none', border: 'none', color: '#8C6A64' }}
-                    >
-                        {isLogin ? (
-                            <>Don't have an account?{' '}
-                                <span style={{ color: '#C25E4A', fontWeight: 500 }}>Sign up</span>
-                            </>
-                        ) : (
-                            <>Already have an account?{' '}
-                                <span style={{ color: '#C25E4A', fontWeight: 500 }}>Log in</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-
             </div>
-
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
-};
+}
 
-export default LoginPage;
+function MagicLinkScreen({ onSent }) {
+    const [email, setEmail] = useState('');
+    const [emailErr, setEmailErr] = useState(false);
+    const [shake, setShake] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSend = async () => {
+        if (!isValidEmail(email.trim())) {
+            setEmailErr(true);
+            setShake(true);
+            setTimeout(() => setShake(false), 300);
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await supabase.auth.signInWithOtp({
+                email: email.trim(),
+                options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+            });
+            onSent(email.trim());
+        } catch (err) {
+            // still show magic_sent even if rate-limited to avoid email enumeration
+            onSent(email.trim());
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div>
+            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Sign in without password</h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px', lineHeight: 1.6 }}>
+                Enter your email and we'll send you a secure link. Click it and you're signed in — no password needed.
+            </p>
+            <Lbl>Email</Lbl>
+            <input
+                value={email}
+                onChange={e => { setEmail(e.target.value); setEmailErr(false); }}
+                placeholder="you@email.com"
+                type="email"
+                autoComplete="email"
+                style={{
+                    ...inputBase,
+                    borderColor: emailErr ? T.danger : undefined,
+                    boxShadow: emailErr ? `0 0 0 3px rgba(176,64,64,0.08)` : undefined,
+                    animation: shake ? 'shake .3s ease' : 'none',
+                }}
+            />
+            {emailErr && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '6px 0 0' }}>Please enter a valid email address</p>}
+            <div style={{ height: 24 }} />
+            <BtnPrimary onClick={handleSend} disabled={submitting}>{submitting ? 'Sending…' : 'Send Magic Link'}</BtnPrimary>
+            <div style={{ paddingTop: 20, textAlign: 'center' }}>
+                <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: 0, lineHeight: 1.6 }}>
+                    This also works if you forgot your password.<br />
+                    You can set a new one from your profile after signing in.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function MagicSentScreen({ email, onResend, onSignInWithPassword }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flex: 1, padding: '32px 0' }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
+                <EnvelopeIcon />
+            </div>
+            <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Check your email</h2>
+            <p style={{ fontFamily: F, fontSize: 15, color: T.muted, margin: '0 0 6px', lineHeight: 1.6 }}>We sent a magic link to</p>
+            <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, margin: '0 0 28px' }}>{email}</p>
+            <div style={{ padding: '14px 24px', background: T.callout, borderRadius: 12, marginBottom: 12, maxWidth: 340 }}>
+                <p style={{ fontFamily: F, fontSize: 13, color: '#92400E', margin: 0, lineHeight: 1.5 }}>
+                    Click the link to sign in instantly. The link expires in 1 hour.
+                </p>
+            </div>
+            <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '0 0 28px', maxWidth: 300, lineHeight: 1.5 }}>
+                If you don't have an account yet, one will be created for you automatically.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                <button onClick={onResend} style={{ fontFamily: F, fontSize: 13, color: T.ink, fontWeight: 500, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Resend magic link
+                </button>
+                <button onClick={onSignInWithPassword} style={{ fontFamily: F, fontSize: 13, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Sign in with password instead
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ─── Right image panel ───────────────────────────────────────────────────────────
+function ImagePanel({ screen }) {
+    const key = imgKey(screen);
+    const [currentKey, setCurrentKey] = useState(key);
+    const [opacity, setOpacity] = useState(1);
+    const prevKey = useRef(key);
+
+    if (prevKey.current !== key) {
+        prevKey.current = key;
+        setOpacity(0);
+        setTimeout(() => { setCurrentKey(key); setOpacity(1); }, 150);
+    }
+
+    return (
+        <div style={{ width: '50%', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+            <img
+                src={IMG[currentKey]}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity .4s' }}
+            />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 36px', background: 'linear-gradient(transparent,rgba(0,0,0,0.55))', zIndex: 2 }}>
+                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 500, color: '#fff', marginBottom: 8, letterSpacing: '-0.02em' }}>
+                    kliques
+                </div>
+                <p style={{ fontFamily: F, color: '#fff', fontSize: 13, lineHeight: 1.6, margin: 0, opacity: 0.9 }}>
+                    {TX[currentKey]}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ─── Back button ─────────────────────────────────────────────────────────────────
+function BackBtn({ onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            style={{
+                position: 'absolute', top: 28, left: 28,
+                padding: 8, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'none', border: 'none', cursor: 'pointer',
+                transition: 'background .15s', zIndex: 2,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = T.abg}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        >
+            <BackArrow />
+        </button>
+    );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────────
+export default function LoginPage() {
+    const navigate = useNavigate();
+    const { loginWithGoogle } = useSession();
+    const isDesktop = useIsDesktop();
+
+    const [screen, setScreen] = useState('role'); // role | client_login | provider_login | client_signup | provider_signup | magic_link | magic_sent
+    const [flowRole, setFlowRole] = useState('client');
+    const [sentEmail, setSentEmail] = useState('');
+
+    const goBack = () => {
+        if (screen === 'client_signup') setScreen('client_login');
+        else if (screen === 'provider_signup') setScreen('provider_login');
+        else if (screen === 'magic_sent') setScreen('magic_link');
+        else if (screen === 'magic_link') setScreen(flowRole + '_login');
+        else setScreen('role');
+    };
+
+    const handleAuthSuccess = () => {
+        // AuthContext / onAuthStateChange will redirect; just push to default
+        navigate('/');
+    };
+
+    const handleGoogle = async () => {
+        try { await loginWithGoogle(flowRole); } catch (e) { /* handled by context */ }
+    };
+
+    const renderScreen = () => {
+        switch (screen) {
+            case 'role':
+                return (
+                    <RoleScreen
+                        onSelectClient={() => { setFlowRole('client'); setScreen('client_login'); }}
+                        onSelectProvider={() => { setFlowRole('provider'); setScreen('provider_login'); }}
+                    />
+                );
+            case 'client_login':
+            case 'provider_login':
+                return (
+                    <LoginScreen
+                        role={flowRole}
+                        onSignup={() => setScreen(flowRole + '_signup')}
+                        onMagicLink={() => setScreen('magic_link')}
+                        onSuccess={handleAuthSuccess}
+                        onGoogleLogin={handleGoogle}
+                    />
+                );
+            case 'client_signup':
+            case 'provider_signup':
+                return (
+                    <SignupScreen
+                        role={flowRole}
+                        onLogin={() => setScreen(flowRole + '_login')}
+                        onGoogleSignup={handleGoogle}
+                        onSuccess={() => setScreen('magic_sent')}
+                    />
+                );
+            case 'magic_link':
+                return (
+                    <MagicLinkScreen
+                        onSent={(email) => { setSentEmail(email); setScreen('magic_sent'); }}
+                    />
+                );
+            case 'magic_sent':
+                return (
+                    <MagicSentScreen
+                        email={sentEmail}
+                        onResend={() => setScreen('magic_link')}
+                        onSignInWithPassword={() => setScreen(flowRole + '_login')}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
+    const showBack = screen !== 'role';
+
+    const formPanel = (
+        <div style={{ flex: 1, background: T.card, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? 640 : '100dvh' }}>
+            {showBack && <BackBtn onClick={goBack} />}
+
+            {/* Content area */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '48px 56px' : '48px 28px', maxWidth: 520, margin: '0 auto', width: '100%' }}>
+                {renderScreen()}
+            </div>
+
+            {/* Footer links */}
+            <div style={{ padding: '20px 56px 28px' }}>
+                <div style={{ display: 'flex', gap: 24, justifyContent: 'center', alignItems: 'center' }}>
+                    {[
+                        { label: 'English', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> },
+                        { label: 'Help and support', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg> },
+                    ].map(({ label, icon }) => (
+                        <a key={label} href="#" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {icon}{label}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
+    if (isDesktop) {
+        return (
+            <div style={{ minHeight: '100vh', background: T.base, fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <style>{`
+                    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+                    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+                    * { box-sizing: border-box; }
+                    button:active { transform: scale(0.98); }
+                `}</style>
+                <div style={{
+                    width: '100%', maxWidth: 1100, minHeight: 640, borderRadius: 24,
+                    overflow: 'hidden', boxShadow: '0 20px 60px rgba(61,35,30,0.06)',
+                    display: 'flex', border: `1px solid ${T.line}`,
+                }}>
+                    {formPanel}
+                    <ImagePanel screen={screen} />
+                </div>
+            </div>
+        );
+    }
+
+    // Mobile
+    return (
+        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
+            <style>{`
+                @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+                * { box-sizing: border-box; }
+            `}</style>
+            {formPanel}
+        </div>
+    );
+}

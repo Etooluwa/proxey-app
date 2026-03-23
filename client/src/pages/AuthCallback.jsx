@@ -26,7 +26,7 @@ export default function AuthCallback() {
 
     async function handle() {
       if (!session?.user) {
-        navigate("/auth/sign-in", { replace: true });
+        navigate("/login", { replace: true });
         return;
       }
 
