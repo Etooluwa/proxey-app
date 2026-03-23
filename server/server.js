@@ -3199,8 +3199,9 @@ app.put("/api/client/profile", async (req, res) => {
   }
 });
 
-// GET /api/client/kliques — distinct providers this client has booked,
-// with total visits, last visit date, and provider profile info + avg rating.
+// GET /api/client/kliques — all providers this client is connected to
+// Source of truth: provider_clients table (includes invite-only connections)
+// Booking data merged in for visit count + last visit.
 app.get("/api/client/kliques", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -3209,52 +3210,49 @@ app.get("/api/client/kliques", async (req, res) => {
   const userId = getUserId(req);
 
   try {
-    // Fetch all non-cancelled bookings for this client
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("provider_id, provider_name, scheduled_at, status")
-      .eq("client_id", userId)
-      .neq("status", "cancelled");
+    // 1. All connections for this client
+    const { data: connections, error: connErr } = await supabase
+      .from("provider_clients")
+      .select("provider_id, connected_at, source")
+      .eq("client_id", userId);
 
-    if (bookingsError) throw bookingsError;
-
-    if (!bookings || bookings.length === 0) {
+    if (connErr) throw connErr;
+    if (!connections || connections.length === 0) {
       return res.status(200).json({ kliques: [] });
     }
 
-    // Aggregate per provider: visit count + last visit
-    const providerMap = {};
-    for (const b of bookings) {
-      if (!b.provider_id) continue;
-      if (!providerMap[b.provider_id]) {
-        providerMap[b.provider_id] = {
-          provider_id: b.provider_id,
-          provider_name: b.provider_name,
-          visits: 0,
-          last_visit: null,
-        };
-      }
-      providerMap[b.provider_id].visits += 1;
+    const providerIds = connections.map((c) => c.provider_id);
+
+    // 2. Booking aggregates (visits + last visit) — optional, providers with no bookings still show
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("provider_id, scheduled_at, status")
+      .eq("client_id", userId)
+      .in("provider_id", providerIds)
+      .neq("status", "cancelled");
+
+    const bookingMap = {};
+    for (const b of bookings || []) {
+      if (!bookingMap[b.provider_id]) bookingMap[b.provider_id] = { visits: 0, last_visit: null };
+      bookingMap[b.provider_id].visits += 1;
       const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
-      if (bDate && (!providerMap[b.provider_id].last_visit || bDate > new Date(providerMap[b.provider_id].last_visit))) {
-        providerMap[b.provider_id].last_visit = b.scheduled_at;
+      if (bDate && (!bookingMap[b.provider_id].last_visit || bDate > new Date(bookingMap[b.provider_id].last_visit))) {
+        bookingMap[b.provider_id].last_visit = b.scheduled_at;
       }
     }
 
-    const providerIds = Object.keys(providerMap);
+    // 3. Provider profiles (try providers table first, fall back to provider_profiles)
+    const { data: providers } = await supabase
+      .from("providers")
+      .select("user_id, name, business_name, avatar, photo, category, categories, city")
+      .in("user_id", providerIds);
 
-    // Fetch provider profiles
-    const { data: profiles } = await supabase
-      .from("provider_profiles")
-      .select("provider_id, name, avatar, categories")
-      .in("provider_id", providerIds);
-
-    const profileMap = {};
-    for (const p of profiles || []) {
-      profileMap[p.provider_id] = p;
+    const providerMap = {};
+    for (const p of providers || []) {
+      providerMap[p.user_id] = p;
     }
 
-    // Fetch avg ratings from reviews
+    // 4. Avg ratings
     const { data: reviews } = await supabase
       .from("reviews")
       .select("provider_id, rating")
@@ -3268,34 +3266,41 @@ app.get("/api/client/kliques", async (req, res) => {
       ratingMap[r.provider_id].count += 1;
     }
 
+    // 5. Build response
+    const connMap = {};
+    for (const c of connections) connMap[c.provider_id] = c;
+
     const kliques = providerIds.map((pid) => {
-      const agg = providerMap[pid];
-      const profile = profileMap[pid] || {};
-      const ratingData = ratingMap[pid];
-      const avgRating = ratingData && ratingData.count > 0
-        ? (ratingData.sum / ratingData.count).toFixed(1)
-        : null;
-      const role = profile.categories && profile.categories.length > 0
-        ? profile.categories[0]
-        : null;
+      const conn = connMap[pid];
+      const p = providerMap[pid] || {};
+      const bk = bookingMap[pid] || { visits: 0, last_visit: null };
+      const rd = ratingMap[pid];
+      const avgRating = rd && rd.count > 0 ? (rd.sum / rd.count).toFixed(1) : null;
+      const category = p.category || (p.categories && p.categories[0]) || null;
 
       return {
         provider_id: pid,
-        name: profile.name || agg.provider_name || "Provider",
-        avatar: profile.avatar || null,
-        role,
+        name: p.business_name || p.name || "Provider",
+        avatar: p.avatar || p.photo || null,
+        role: category,
+        city: p.city || null,
         rating: avgRating,
-        visits: agg.visits,
-        last_visit: agg.last_visit,
+        visits: bk.visits,
+        last_visit: bk.last_visit,
+        connected_at: conn.connected_at,
+        source: conn.source,
       };
     });
 
-    // Sort by most visits desc, then most recent visit desc
-    kliques.sort((a, b) => b.visits - a.visits || new Date(b.last_visit) - new Date(a.last_visit));
+    // Sort: most recent connection first, then most visits
+    kliques.sort((a, b) =>
+      new Date(b.connected_at) - new Date(a.connected_at) ||
+      b.visits - a.visits
+    );
 
     res.status(200).json({ kliques });
   } catch (err) {
-    console.error("[supabase] Failed to load kliques", err);
+    console.error("[client/kliques]", err);
     res.status(500).json({ error: "Failed to load kliques." });
   }
 });
@@ -3433,8 +3438,9 @@ app.get("/api/provider/calendar", async (req, res) => {
   }
 });
 
-// GET /api/provider/clients — all distinct clients this provider has served,
-// with visit count, lifetime value, last visit date, and client name.
+// GET /api/provider/clients — all clients connected to this provider
+// Source of truth: provider_clients table (includes invite-only connections)
+// Booking data merged in for visits, LTV, and last visit.
 app.get("/api/provider/clients", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
@@ -3443,64 +3449,75 @@ app.get("/api/provider/clients", async (req, res) => {
   const userId = getUserId(req);
 
   try {
-    // All non-cancelled bookings for this provider
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("client_id, client_name, scheduled_at, price, status")
-      .eq("provider_id", userId)
-      .neq("status", "cancelled");
+    // Resolve providers.id from user_id (provider_clients uses the providers PK)
+    let providerId = userId;
+    const { data: providerRow } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (providerRow) providerId = providerRow.id;
 
-    if (bookingsError) throw bookingsError;
+    // 1. All connections for this provider
+    const { data: connections, error: connErr } = await supabase
+      .from("provider_clients")
+      .select("client_id, connected_at, source")
+      .eq("provider_id", userId); // provider_clients stores auth UUID
 
-    if (!bookings || bookings.length === 0) {
+    if (connErr) throw connErr;
+    if (!connections || connections.length === 0) {
       return res.status(200).json({ clients: [] });
     }
 
-    // Aggregate per client
-    const clientMap = {};
-    for (const b of bookings) {
-      if (!b.client_id) continue;
-      if (!clientMap[b.client_id]) {
-        clientMap[b.client_id] = {
-          client_id: b.client_id,
-          client_name: b.client_name || "Client",
-          visits: 0,
-          ltv: 0,
-          last_visit: null,
-        };
+    const clientIds = connections.map((c) => c.client_id);
+
+    // 2. Booking aggregates — optional enrichment
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("client_id, client_name, scheduled_at, price, status")
+      .eq("provider_id", userId)
+      .in("client_id", clientIds)
+      .neq("status", "cancelled");
+
+    const bookingMap = {};
+    for (const b of bookings || []) {
+      if (!bookingMap[b.client_id]) {
+        bookingMap[b.client_id] = { client_name: b.client_name, visits: 0, ltv: 0, last_visit: null };
       }
-      clientMap[b.client_id].visits += 1;
-      clientMap[b.client_id].ltv += b.price || 0;
+      bookingMap[b.client_id].visits += 1;
+      bookingMap[b.client_id].ltv += b.price || 0;
       const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
-      if (bDate && (!clientMap[b.client_id].last_visit || bDate > new Date(clientMap[b.client_id].last_visit))) {
-        clientMap[b.client_id].last_visit = b.scheduled_at;
+      if (bDate && (!bookingMap[b.client_id].last_visit || bDate > new Date(bookingMap[b.client_id].last_visit))) {
+        bookingMap[b.client_id].last_visit = b.scheduled_at;
       }
     }
 
-    const clientIds = Object.keys(clientMap);
-
-    // Fetch client profiles for avatar/name
+    // 3. Client profiles for name + avatar
     const { data: profiles } = await supabase
       .from("client_profiles")
       .select("user_id, name, avatar")
       .in("user_id", clientIds);
 
     const profileMap = {};
-    for (const p of profiles || []) {
-      profileMap[p.user_id] = p;
-    }
+    for (const p of profiles || []) profileMap[p.user_id] = p;
 
-    // Determine status + merge profile
+    // 4. Build response
+    const connMap = {};
+    for (const c of connections) connMap[c.client_id] = c;
+
     const threeWeeksAgo = new Date();
     threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
 
     const clients = clientIds.map((cid) => {
-      const agg = clientMap[cid];
+      const conn = connMap[cid];
       const profile = profileMap[cid] || {};
-      const lastVisitDate = agg.last_visit ? new Date(agg.last_visit) : null;
+      const bk = bookingMap[cid] || { visits: 0, ltv: 0, last_visit: null };
+      const lastVisitDate = bk.last_visit ? new Date(bk.last_visit) : null;
 
       let status;
-      if (agg.visits < 3) {
+      if (bk.visits === 0) {
+        status = "new"; // connected via invite, no bookings yet
+      } else if (bk.visits < 3) {
         status = "new";
       } else if (lastVisitDate && lastVisitDate < threeWeeksAgo) {
         status = "at-risk";
@@ -3510,25 +3527,27 @@ app.get("/api/provider/clients", async (req, res) => {
 
       return {
         client_id: cid,
-        name: profile.name || agg.client_name,
+        name: profile.name || bk.client_name || "Client",
         avatar: profile.avatar || null,
-        visits: agg.visits,
-        ltv: agg.ltv,
-        last_visit: agg.last_visit,
+        visits: bk.visits,
+        ltv: bk.ltv,
+        last_visit: bk.last_visit,
+        connected_at: conn.connected_at,
+        source: conn.source,
         status,
       };
     });
 
-    // Sort: active first, then at-risk, then new; within each group by visits desc
+    // Sort: active → at-risk → new; within group by most recent connection
     const statusOrder = { active: 0, "at-risk": 1, new: 2 };
     clients.sort((a, b) =>
       (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3) ||
-      b.visits - a.visits
+      new Date(b.connected_at) - new Date(a.connected_at)
     );
 
     res.status(200).json({ clients });
   } catch (err) {
-    console.error("[supabase] Failed to load provider clients", err);
+    console.error("[provider/clients]", err);
     res.status(500).json({ error: "Failed to load provider clients." });
   }
 });
