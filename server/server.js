@@ -6797,13 +6797,18 @@ app.post("/api/invites/:code/accept", async (req, res) => {
       source: "invite",
     });
 
-    // 5. Increment uses_count (multi-use — never mark as accepted/closed)
+    // 5. Ensure client_profiles row exists (new users won't have one yet)
+    await supabase
+      .from("client_profiles")
+      .upsert({ user_id: clientId }, { onConflict: "user_id", ignoreDuplicates: true });
+
+    // 6. Increment uses_count (multi-use — never mark as accepted/closed)
     await supabase
       .from("provider_invites")
       .update({ uses_count: (invite.uses_count || 0) + 1 })
       .eq("id", invite.id);
 
-    // 6. Get client name for notification
+    // 7. Get client name for notification
     const { data: clientProfile } = await supabase
       .from("client_profiles")
       .select("name")
@@ -6811,7 +6816,7 @@ app.post("/api/invites/:code/accept", async (req, res) => {
       .maybeSingle();
     const clientName = clientProfile?.name || "Someone";
 
-    // 7. Notify provider
+    // 8. Notify provider
     await createProviderNotification(invite.provider_id, {
       type: "new_client",
       title: "New client connected",
@@ -6819,7 +6824,7 @@ app.post("/api/invites/:code/accept", async (req, res) => {
       data: { client_id: clientId },
     }).catch(() => {});
 
-    // 8. Fetch provider info for response
+    // 9. Fetch provider info for response
     const { data: provider } = await supabase
       .from("providers")
       .select("id, name, business_name, category, city, photo, avatar")
