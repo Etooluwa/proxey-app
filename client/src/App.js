@@ -23,7 +23,7 @@ import ClientOnboarding from './pages/ClientOnboarding';
 import ProviderOnboarding from './pages/ProviderOnboarding';
 
 // ── Public (no auth) ─────────────────────────────────────────────────────────
-import ProviderPublicProfile from './pages/ProviderPublicProfile';
+import PublicBookingPage from './pages/PublicBookingPage';
 import InviteAcceptPage from './pages/InviteAcceptPage';
 
 // ── Client pages ─────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ function App() {
                   <Routes>
 
                     {/* ── Public routes (no auth) ──────────────────────────── */}
-                    <Route path="/book/:handle" element={<ProviderPublicProfile />} />
+                    <Route path="/book/:handle" element={<PublicBookingPage />} />
                     <Route path="/join/:code" element={<InviteAcceptPage />} />
 
                     {/* ── Auth routes ──────────────────────────────────────── */}

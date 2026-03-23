@@ -5422,6 +5422,105 @@ app.get("/api/provider/:providerId/availability/closest", async (req, res) => {
   }
 });
 
+// GET /api/public/provider/:providerId/slots?date=YYYY-MM-DD&duration=60
+// Returns available time slots for a specific date by cross-referencing:
+//   1. provider_availability (weekly schedule, day_index 0=Sun…6=Sat)
+//   2. Existing confirmed/pending bookings on that date
+//   3. provider_time_blocks on that date
+app.get("/api/public/provider/:providerId/slots", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const { providerId } = req.params;
+  const { date, duration = 60, buffer = 0 } = req.query;
+  if (!date) return res.status(400).json({ error: "date is required (YYYY-MM-DD)." });
+
+  try {
+    const dateObj = new Date(date + "T00:00:00");
+    const dayIndex = dateObj.getDay(); // 0=Sun, 6=Sat
+
+    // 1. Provider's weekly schedule for this day
+    const { data: schedules } = await supabase
+      .from("provider_availability")
+      .select("start_time, end_time, is_available")
+      .eq("provider_id", providerId)
+      .eq("day_index", dayIndex)
+      .eq("is_available", true);
+
+    if (!schedules || schedules.length === 0) {
+      return res.json({ slots: [] });
+    }
+
+    // 2. Existing bookings on this date (pending + confirmed)
+    const dayStart = date + "T00:00:00";
+    const dayEnd = date + "T23:59:59";
+    const { data: bookings } = await supabase
+      .from("bookings")
+      .select("scheduled_at, duration")
+      .eq("provider_id", providerId)
+      .in("status", ["pending", "confirmed"])
+      .gte("scheduled_at", dayStart)
+      .lte("scheduled_at", dayEnd);
+
+    // 3. Time blocks on this date
+    const { data: blocks } = await supabase
+      .from("provider_time_blocks")
+      .select("start_time, end_time")
+      .eq("provider_id", providerId)
+      .eq("date", date);
+
+    // Build set of blocked minute-ranges
+    const blockedRanges = [];
+    for (const b of bookings || []) {
+      const start = new Date(b.scheduled_at);
+      const startMins = start.getHours() * 60 + start.getMinutes();
+      const dur = b.duration || parseInt(duration);
+      const buf = parseInt(buffer);
+      blockedRanges.push({ start: startMins, end: startMins + dur + buf });
+    }
+    for (const bl of blocks || []) {
+      const [sh, sm] = bl.start_time.split(":").map(Number);
+      const [eh, em] = bl.end_time.split(":").map(Number);
+      blockedRanges.push({ start: sh * 60 + sm, end: eh * 60 + em });
+    }
+
+    // Generate slots in 30-min increments within each available window
+    const slotDuration = parseInt(duration);
+    const slotIncrement = 30;
+    const slots = [];
+
+    for (const schedule of schedules) {
+      const [startH, startM] = schedule.start_time.split(":").map(Number);
+      const [endH, endM] = schedule.end_time.split(":").map(Number);
+      const windowStart = startH * 60 + startM;
+      const windowEnd = endH * 60 + endM;
+
+      for (let t = windowStart; t + slotDuration <= windowEnd; t += slotIncrement) {
+        const slotEnd = t + slotDuration + parseInt(buffer);
+        const isBlocked = blockedRanges.some(r => t < r.end && slotEnd > r.start);
+        if (!isBlocked) {
+          const h = Math.floor(t / 60).toString().padStart(2, "0");
+          const m = (t % 60).toString().padStart(2, "0");
+          slots.push(`${h}:${m}`);
+        }
+      }
+    }
+
+    // Remove past slots if date is today
+    const today = new Date().toISOString().slice(0, 10);
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const filtered = date === today
+      ? slots.filter(s => {
+          const [h, m] = s.split(":").map(Number);
+          return h * 60 + m > nowMins + 30; // 30 min buffer for same-day
+        })
+      : slots;
+
+    res.json({ slots: filtered });
+  } catch (err) {
+    console.error("[public/provider/slots]", err);
+    res.status(500).json({ error: "Failed to load slots." });
+  }
+});
+
 // POST /api/provider/availability
 // Provider creates/updates their availability
 app.post("/api/provider/availability", async (req, res) => {
@@ -7156,27 +7255,60 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
 // PUBLIC BOOKING FLOW ENDPOINTS
 // ============================================================================
 
-// GET /api/provider/public/:handle — public provider profile + services
+// GET /api/provider/public/:handle — public provider profile + services + groups + reviews
 app.get("/api/provider/public/:handle", async (req, res) => {
   const { handle } = req.params;
   if (!supabase) return res.status(503).json({ error: "Database unavailable." });
   try {
     const { data: provider, error } = await supabase
       .from("providers")
-      .select("id, name, business_name, avatar, category, city, bio, rating, handle")
+      .select("id, user_id, name, business_name, avatar, photo, category, categories, city, bio, rating, review_count, handle, booking_window_weeks, buffer_minutes")
       .eq("handle", handle)
       .maybeSingle();
     if (error) throw error;
     if (!provider) return res.status(404).json({ error: "Provider not found." });
 
-    const { data: services } = await supabase
-      .from("services")
-      .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description")
-      .eq("provider_id", provider.id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true });
+    // Also grab booking_settings from provider_profiles
+    const { data: profile } = await supabase
+      .from("provider_profiles")
+      .select("booking_settings")
+      .eq("provider_id", provider.user_id)
+      .maybeSingle();
 
-    res.json({ provider, services: services || [] });
+    const [servicesRes, groupsRes, reviewsRes] = await Promise.all([
+      supabase
+        .from("services")
+        .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description, group_id, metadata")
+        .eq("provider_id", provider.id)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("service_groups")
+        .select("id, name, description, sort_order")
+        .eq("provider_id", provider.id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("reviews")
+        .select("id, client_name, client_avatar, rating, comment, created_at, service_name")
+        .eq("provider_id", provider.id)
+        .eq("is_visible", true)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const bookingWindow = provider.booking_window_weeks
+      || profile?.booking_settings?.booking_window
+      || 8;
+    const bufferMins = provider.buffer_minutes
+      || profile?.booking_settings?.buffer_time
+      || 0;
+
+    res.json({
+      provider: { ...provider, booking_window_weeks: bookingWindow, buffer_minutes: bufferMins },
+      services: servicesRes.data || [],
+      groups: groupsRes.data || [],
+      reviews: reviewsRes.data || [],
+    });
   } catch (err) {
     console.error("[provider/public/:handle]", err);
     res.status(500).json({ error: "Failed to load provider." });
