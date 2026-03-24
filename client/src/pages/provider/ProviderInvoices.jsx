@@ -544,14 +544,21 @@ function ProviderInvoices() {
           ))}
         </div>
       ) : (
-        <Card className="provider-invoices__empty">
-          <h3>No invoices found</h3>
-          <p>
-            {invoices.length === 0
-              ? "You don't have any completed appointments yet. Invoices will appear here once services are completed."
-              : "No invoices match your search criteria."}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '56px 24px', textAlign: 'center' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+            <svg width="26" height="26" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: '18px', fontWeight: 400, letterSpacing: '-0.02em', color: '#3D231E', margin: '0 0 8px' }}>
+            {invoices.length === 0 ? 'No invoices yet.' : 'No invoices match your search.'}
           </p>
-        </Card>
+          <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: '14px', color: '#8C6A64', margin: 0, lineHeight: 1.6, maxWidth: '280px' }}>
+            {invoices.length === 0
+              ? 'Invoices are generated automatically when you mark a session as complete. They\'ll show your business name — not Kliques.'
+              : 'Try adjusting your filters or search term.'}
+          </p>
+        </div>
       )}
 
       {/* Invoice Details Modal */}
