@@ -28,7 +28,7 @@ const BookingsPage = () => {
         try {
             const response = await fetch('/api/bookings/me', {
                 headers: {
-                    'Authorization': `Bearer ${session?.access_token}`
+                    'Authorization': `Bearer ${session?.accessToken}`
                 }
             });
 
@@ -121,7 +121,7 @@ const BookingsPage = () => {
         try {
             const response = await fetch(`${process.env.REACT_APP_API_BASE || '/api'}/bookings/${bookingId}/invoice`, {
                 headers: {
-                    'Authorization': `Bearer ${session?.access_token}`
+                    'Authorization': `Bearer ${session?.accessToken}`
                 }
             });
 

@@ -143,7 +143,7 @@ const ReviewPage = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${session.accessToken}`,
                 },
                 body: JSON.stringify({
                     bookingId,
@@ -166,7 +166,7 @@ const ReviewPage = () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: `Bearer ${session.access_token}`,
+                        Authorization: `Bearer ${session.accessToken}`,
                     },
                     body: JSON.stringify({
                         bookingId,

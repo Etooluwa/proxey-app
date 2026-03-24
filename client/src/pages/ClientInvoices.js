@@ -53,7 +53,7 @@ const ClientInvoices = () => {
     const loadInvoices = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/client/invoices', { headers: { Authorization: `Bearer ${session?.access_token}` } });
+            const res = await fetch('/api/client/invoices', { headers: { Authorization: `Bearer ${session?.accessToken}` } });
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             setInvoices(Array.isArray(data.invoices) ? data.invoices : []);
@@ -68,7 +68,7 @@ const ClientInvoices = () => {
     const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
-            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, { headers: { Authorization: `Bearer ${session?.accessToken}` } });
             if (!res.ok) throw new Error('Failed');
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);

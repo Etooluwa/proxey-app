@@ -159,14 +159,17 @@ const AppDashboard = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!session?.access_token) return;
+        if (!session?.accessToken) {
+            setLoading(false);
+            return;
+        }
 
         const fetchKliques = async () => {
             setLoading(true);
             setError(null);
             try {
                 const res = await fetch('/api/client/kliques', {
-                    headers: { Authorization: `Bearer ${session.access_token}` },
+                    headers: { Authorization: `Bearer ${session.accessToken}` },
                 });
                 if (!res.ok) throw new Error('Failed to load');
                 const data = await res.json();
