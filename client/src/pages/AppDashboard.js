@@ -28,90 +28,78 @@ function getInitials(name) {
 
 // ─── Empty state ────────────────────────────────────────────────────────────
 
-const FEATURES = [
-    {
-        icon: (
-            <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.75" viewBox="0 0 24 24">
-                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-        label: 'Full history in one place',
-    },
-    {
-        icon: (
-            <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.75" viewBox="0 0 24 24">
-                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-        label: 'Rebook in seconds',
-    },
-    {
-        icon: (
-            <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.75" viewBox="0 0 24 24">
-                <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-        label: 'Message directly',
-    },
-];
-
-const ClientEmptyKliques = ({ onBrowse }) => (
-    <div className="flex-1 flex flex-col gap-5 pb-4">
-        {/* Hero card with ghost avatars */}
+const ClientEmptyKliques = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
+        {/* Hero card with topo texture + ghost avatars */}
         <HeroCard>
-            {/* Ghost avatar circles */}
-            <div className="flex justify-center items-center gap-[-8px] mb-6">
+            <div style={{ display: 'flex', marginBottom: 28 }}>
                 {[0, 1, 2].map((i) => (
                     <div
                         key={i}
-                        className="w-14 h-14 rounded-full border-2 border-white/60 -mx-1.5"
-                        style={{ background: 'rgba(194,94,74,0.12)' }}
-                    />
+                        style={{
+                            width: 48, height: 48, borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.5)',
+                            border: '2px solid rgba(255,255,255,0.7)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginLeft: i > 0 ? -12 : 0, zIndex: 3 - i,
+                        }}
+                    >
+                        <svg width="20" height="20" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
+                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </div>
                 ))}
             </div>
-
-            <p className="text-[24px] font-semibold text-ink text-center leading-tight tracking-[-0.02em] mb-2">
+            <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, color: T.ink, margin: '0 0 10px' }}>
                 Your circle<br />starts here.
+            </h2>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
+                Every great relationship begins with a first step. Book with a provider or accept an invite — your shared history will live here.
             </p>
-            <p className="text-[14px] text-muted text-center leading-relaxed mb-6">
-                Book with a provider or accept an invite to start building your history together.
-            </p>
-
-            <button
-                onClick={onBrowse}
-                className="w-full py-3 rounded-pill bg-ink text-white text-[14px] font-semibold"
-            >
-                Find a Provider
-            </button>
         </HeroCard>
 
-        {/* Feature rows */}
-        <div className="flex flex-col">
-            {FEATURES.map((f, i) => (
-                <React.Fragment key={f.label}>
-                    <div className="flex items-center gap-3 py-3.5 px-1">
-                        <div className="w-8 h-8 rounded-full bg-avatarBg flex items-center justify-center flex-shrink-0">
-                            {f.icon}
-                        </div>
-                        <span className="text-[14px] font-medium text-ink">{f.label}</span>
-                    </div>
-                    {i < FEATURES.length - 1 && <Divider />}
-                </React.Fragment>
-            ))}
-        </div>
+        <Divider />
 
-        {/* Invite link callout */}
-        <div className="flex items-start gap-3 px-4 py-4 rounded-[14px] bg-callout">
-            <div className="w-8 h-8 rounded-full bg-white/60 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="16" height="16" fill="none" stroke="#C25E4A" strokeWidth="1.75" viewBox="0 0 24 24">
+        {/* Got an invite? */}
+        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#FFF5E6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" fill="none" stroke="#92400E" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             </div>
             <div>
-                <p className="text-[14px] font-semibold text-ink mb-0.5">Got an invite link?</p>
-                <p className="text-[13px] text-muted leading-relaxed">
-                    If a provider sent you a link, tap it to connect and start building your history together.
-                </p>
+                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Got an invite?</p>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Tap the link your provider sent you. One tap and you're connected.</p>
+            </div>
+        </div>
+
+        <Divider />
+
+        {/* Everything in one place */}
+        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+            <div>
+                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Everything in one place</p>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Session history, provider notes, bookings, and messages — all tied to each relationship.</p>
+            </div>
+        </div>
+
+        <Divider />
+
+        {/* Built around people */}
+        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+            <div>
+                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Built around people, not transactions</p>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Kliques remembers your journey with each provider so the relationship only gets better.</p>
             </div>
         </div>
     </div>
@@ -203,10 +191,38 @@ const AppDashboard = () => {
 
                     {/* Empty state */}
                     {!loading && !error && kliques.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Your circle starts here.</p>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 24px' }}>Book with a provider or accept an invite to start building your history.</p>
-                            <button onClick={() => navigate('/app/browse')} style={{ padding: '10px 24px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Find a Provider</button>
+                        <div style={{ maxWidth: 480, margin: '60px auto 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', marginBottom: 24, justifyContent: 'center' }}>
+                                {[0, 1, 2].map((i) => (
+                                    <div key={i} style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(194,94,74,0.1)', border: '2px solid rgba(194,94,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i > 0 ? -12 : 0 }}>
+                                        <svg width="20" height="20" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
+                                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </div>
+                                ))}
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 20, fontWeight: 500, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>Your circle starts here.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px', lineHeight: 1.7 }}>Book with a provider or accept an invite to start building your history together.</p>
+                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                {[
+                                    { bg: '#FFF5E6', iconColor: '#92400E', path: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', label: 'Got an invite?', desc: 'Tap the link your provider sent you.' },
+                                    { bg: '#F2EBE5', iconColor: '#8C6A64', path: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Everything in one place', desc: 'History, bookings, and messages — all per relationship.' },
+                                    { bg: '#F2EBE5', iconColor: '#8C6A64', path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', label: 'Built around people', desc: 'Your relationship only gets better over time.' },
+                                ].map((r, i, arr) => (
+                                    <React.Fragment key={r.label}>
+                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '16px 0', textAlign: 'left' }}>
+                                            <div style={{ width: 40, height: 40, borderRadius: 12, background: r.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <svg width="18" height="18" fill="none" stroke={r.iconColor} strokeWidth="1.5" viewBox="0 0 24 24"><path d={r.path} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            </div>
+                                            <div>
+                                                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 3px' }}>{r.label}</p>
+                                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.6 }}>{r.desc}</p>
+                                            </div>
+                                        </div>
+                                        {i < arr.length - 1 && <div style={{ height: 1, background: 'rgba(140,106,100,0.2)' }} />}
+                                    </React.Fragment>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -267,9 +283,7 @@ const AppDashboard = () => {
                 )}
 
                 {/* Empty state */}
-                {!loading && !error && kliques.length === 0 && (
-                    <ClientEmptyKliques onBrowse={() => navigate('/app/browse')} />
-                )}
+                {!loading && !error && kliques.length === 0 && <ClientEmptyKliques />}
 
                 {/* Provider list */}
                 {!loading && !error && kliques.length > 0 && (

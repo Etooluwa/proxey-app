@@ -41,28 +41,38 @@ function getInitials(name) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 const MessagesEmpty = () => (
-    <HeroCard>
-        <div className="flex justify-center mb-5">
-            <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(194,94,74,0.12)' }}
-            >
-                <svg width="24" height="24" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path
-                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
+        {/* Two overlapping chat bubble shapes */}
+        <div style={{ position: 'relative', width: 120, height: 90, marginBottom: 32 }}>
+            <div style={{
+                position: 'absolute', left: 0, top: 0,
+                width: 72, height: 56,
+                borderRadius: '20px 20px 4px 20px',
+                background: '#FDDCC6',
+                transform: 'rotate(-3deg)',
+            }} />
+            <div style={{
+                position: 'absolute', right: 0, bottom: 0,
+                width: 72, height: 56,
+                borderRadius: '20px 20px 20px 4px',
+                background: '#F2EBE5',
+                transform: 'rotate(3deg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', paddingTop: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F' }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F', opacity: 0.6 }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F', opacity: 0.3 }} />
+                </div>
             </div>
         </div>
-        <p className="text-[20px] font-semibold text-ink text-center leading-tight tracking-[-0.02em] mb-2">
-            No messages yet
+        <h2 style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 22, fontWeight: 400, letterSpacing: '-0.02em', color: '#3D231E', margin: '0 0 10px', textAlign: 'center' }}>
+            Quiet in here... for now.
+        </h2>
+        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, color: '#8C6A64', margin: 0, lineHeight: 1.7, textAlign: 'center', maxWidth: 280 }}>
+            Once you're connected with a provider, this is where the conversation happens. Questions, updates, session prep — all in one thread.
         </p>
-        <p className="text-[14px] text-muted text-center leading-relaxed">
-            When you connect with a provider, you can message them here about bookings, questions, or updates.
-        </p>
-    </HeroCard>
+    </div>
 );
 
 // ─── Conversation row ─────────────────────────────────────────────────────────

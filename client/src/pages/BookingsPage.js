@@ -403,38 +403,16 @@ const BookingsPage = () => {
 
                 {/* Empty State */}
                 {!loading && currentBookings.length === 0 && (
-                    <div className="bg-white rounded-2xl p-16 text-center border border-gray-100">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Icons.Calendar size={32} className="text-gray-400" />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px', textAlign: 'center' }}>
+                        <div style={{ width: 56, height: 56, borderRadius: 16, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                            <svg width="24" height="24" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
+                                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {activeTab === 'upcoming' && 'No upcoming bookings'}
-                            {activeTab === 'past' && 'No past bookings'}
-                            {activeTab === 'cancelled' && 'No cancelled bookings'}
-                        </h3>
-                        <p className="text-gray-600 max-w-md mx-auto mb-6">
-                            {activeTab === 'upcoming' && "You don't have any upcoming appointments. Book a service to get started!"}
-                            {activeTab === 'past' && "You don't have any completed bookings yet."}
-                            {activeTab === 'cancelled' && "You haven't cancelled any bookings."}
+                        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 18, fontWeight: 600, color: '#3D231E', margin: '0 0 8px', letterSpacing: '-0.02em' }}>No bookings yet</p>
+                        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, color: '#8C6A64', margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
+                            Pending requests, upcoming sessions, and your full history will all appear here.
                         </p>
-                        {activeTab !== 'upcoming' && (
-                            <button
-                                onClick={() => setActiveTab('upcoming')}
-                                className="text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-2 mx-auto"
-                            >
-                                <Icons.ArrowLeft size={16} />
-                                View Upcoming
-                            </button>
-                        )}
-                        {activeTab === 'upcoming' && (
-                            <button
-                                onClick={() => navigate('/app/booking-flow')}
-                                className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition-colors inline-flex items-center gap-2"
-                            >
-                                <Icons.Plus size={20} />
-                                Book a Service
-                            </button>
-                        )}
                     </div>
                 )}
             </div>

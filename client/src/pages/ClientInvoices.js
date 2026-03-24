@@ -205,10 +205,22 @@ const ClientInvoices = () => {
                     {loading && <div style={{ textAlign: 'center', padding: '48px 0' }}><div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', display: 'inline-block' }} /></div>}
 
                     {/* Empty */}
-                    {!loading && filtered.length === 0 && (
+                    {!loading && filtered.length === 0 && !searchQuery && statusFilter === 'all' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px', textAlign: 'center' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: 16, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                <svg width="24" height="24" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 2.5 2 2.5-2 3.5 2z" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>No invoices yet</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 320 }}>
+                                After a provider completes your session, an invoice will be generated automatically from their business.
+                            </p>
+                        </div>
+                    )}
+                    {!loading && filtered.length === 0 && (searchQuery || statusFilter !== 'all') && (
                         <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>{searchQuery || statusFilter !== 'all' ? 'No invoices found' : 'No invoices yet'}</p>
-                            <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{searchQuery || statusFilter !== 'all' ? 'Try adjusting filters.' : 'Completed bookings will appear here.'}</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No invoices match your search.</p>
                         </div>
                     )}
 
@@ -255,10 +267,22 @@ const ClientInvoices = () => {
 
                 {loading && <div style={{ textAlign: 'center', padding: '48px 0' }}><div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', display: 'inline-block' }} /></div>}
 
-                {!loading && filtered.length === 0 && (
+                {!loading && filtered.length === 0 && !searchQuery && statusFilter === 'all' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px', textAlign: 'center' }}>
+                        <div style={{ width: 56, height: 56, borderRadius: 16, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                            <svg width="24" height="24" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                                <path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 2.5 2 2.5-2 3.5 2z" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                        <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>No invoices yet</p>
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
+                            After a provider completes your session, an invoice will be generated automatically from their business.
+                        </p>
+                    </div>
+                )}
+                {!loading && filtered.length === 0 && (searchQuery || statusFilter !== 'all') && (
                     <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.ink, margin: '0 0 6px' }}>{searchQuery || statusFilter !== 'all' ? 'No invoices found' : 'No invoices yet'}</p>
-                        <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>Completed bookings will appear here.</p>
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>No invoices match your search.</p>
                     </div>
                 )}
 

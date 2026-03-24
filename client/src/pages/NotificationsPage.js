@@ -124,17 +124,16 @@ function bookingId(n) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 const Empty = () => (
-    <div className="py-14 flex flex-col items-center">
-        <div
-            className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-            style={{ background: 'rgba(194,94,74,0.08)' }}
-        >
-            <svg width="24" height="24" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 24px', textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <svg width="24" height="24" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         </div>
-        <p className="text-[15px] font-semibold text-ink mb-1">All caught up</p>
-        <p className="text-[13px] text-muted text-center px-8">No notifications yet. Check back after your next booking.</p>
+        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 18, fontWeight: 600, color: '#3D231E', margin: '0 0 8px', letterSpacing: '-0.02em' }}>All clear</p>
+        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, color: '#8C6A64', margin: 0, lineHeight: 1.7, maxWidth: 260 }}>
+            No notifications yet. Check back after your next booking.
+        </p>
     </div>
 );
 
@@ -286,12 +285,14 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
 
                     {/* Empty */}
                     {!loading && notifications.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(194,94,74,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                                <svg width="22" height="22" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px', textAlign: 'center' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: 16, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                                <svg width="22" height="22" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
                             </div>
-                            <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.ink, margin: '0 0 6px' }}>All caught up</p>
-                            <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>No notifications yet.</p>
+                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>All clear</p>
+                            <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.7 }}>No notifications yet.</p>
                         </div>
                     )}
 
