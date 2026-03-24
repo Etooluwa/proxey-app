@@ -594,7 +594,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
                     options: { data: { role: 'client', full_name: name.trim() } },
                 });
                 if (err) throw err;
-                window.localStorage.setItem('proxey.pendingRole', 'client');
+                window.localStorage.setItem('proxey.pending_role', 'client');
                 window.localStorage.setItem('proxey.pendingName', name.trim());
             } else {
                 const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });

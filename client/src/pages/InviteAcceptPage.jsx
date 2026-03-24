@@ -284,7 +284,7 @@ function ScreenSignup({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToLog
                 },
             });
             if (err) throw err;
-            window.localStorage.setItem('proxey.pendingRole', 'client');
+            window.localStorage.setItem('proxey.pending_role', 'client');
             window.localStorage.setItem('proxey.pendingName', name.trim());
             onSuccess();
         } catch (err) {

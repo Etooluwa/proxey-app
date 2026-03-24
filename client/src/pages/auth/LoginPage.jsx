@@ -309,7 +309,7 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
                 },
             });
             if (err) throw err;
-            window.localStorage.setItem('proxey.pendingRole', role);
+            window.localStorage.setItem('proxey.pending_role', role);
             window.localStorage.setItem('proxey.pendingName', name.trim());
             onSuccess();
         } catch (err) {

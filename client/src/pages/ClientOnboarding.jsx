@@ -9,7 +9,7 @@
  *
  * API: PUT /api/client/profile → { name, email, phone, city, is_profile_complete }
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
@@ -364,6 +364,16 @@ const ClientOnboarding = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
 
+    useEffect(() => {
+        if (!session?.user) return;
+        const pendingName = localStorage.getItem('proxey.pendingName');
+        setForm(prev => ({
+            ...prev,
+            name: prev.name || pendingName || session.user.metadata?.full_name || '',
+            email: prev.email || session.user.email || '',
+        }));
+    }, [session]);
+
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
         if (error) setError(null);
@@ -403,6 +413,7 @@ const ClientOnboarding = () => {
                 isProfileComplete: true,
             });
 
+            localStorage.removeItem('proxey.pendingName');
             setStep(2);
         } catch (err) {
             console.error('[ClientOnboarding] save error:', err);
