@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { request } from '../data/apiClient';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
 import Lbl from '../components/ui/Lbl';
@@ -156,11 +157,7 @@ const AppDashboard = () => {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/client/kliques', {
-                    headers: { Authorization: `Bearer ${session.accessToken}` },
-                });
-                if (!res.ok) throw new Error('Failed to load');
-                const data = await res.json();
+                const data = await request('/client/kliques');
                 setKliques(data.kliques || []);
             } catch (err) {
                 console.error('Failed to load kliques:', err);

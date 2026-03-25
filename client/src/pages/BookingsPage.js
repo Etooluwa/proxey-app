@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useSession } from '../auth/authContext';
+import { request } from '../data/apiClient';
 import ReviewModal from '../components/ui/ReviewModal';
 import DisputeModal from '../components/ui/DisputeModal';
 import { submitReview } from '../data/bookings';
@@ -26,17 +27,7 @@ const BookingsPage = () => {
     const loadBookings = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/bookings/me', {
-                headers: {
-                    'Authorization': `Bearer ${session?.accessToken}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch bookings');
-            }
-
-            const data = await response.json();
+            const data = await request('/bookings/me');
             setBookings(Array.isArray(data.bookings) ? data.bookings : []);
         } catch (error) {
             console.error('Failed to load bookings:', error);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { request } from '../data/apiClient';
 
 const T = {
     ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -53,9 +54,7 @@ const ClientInvoices = () => {
     const loadInvoices = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/client/invoices', { headers: { Authorization: `Bearer ${session?.accessToken}` } });
-            if (!res.ok) throw new Error('Failed');
-            const data = await res.json();
+            const data = await request('/client/invoices');
             setInvoices(Array.isArray(data.invoices) ? data.invoices : []);
         } catch (e) {
             console.error(e);
@@ -68,7 +67,9 @@ const ClientInvoices = () => {
     const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
-            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, { headers: { Authorization: `Bearer ${session?.accessToken}` } });
+            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, {
+                headers: { 'x-user-id': session?.user?.id },
+            });
             if (!res.ok) throw new Error('Failed');
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
