@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
 import { useSession } from '../auth/authContext';
 import { useIsDesktop } from '../hooks/useIsDesktop';
+import { useToast } from '../components/ui/ToastProvider';
 import supabase from '../utils/supabase';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
@@ -152,6 +153,7 @@ function ChangePasswordPanel({ onClose }) {
 export default function ClientPrivacySecurity() {
   const navigate = useNavigate();
   const { session } = useSession();
+  const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [showPasswordPanel, setShowPasswordPanel] = useState(false);
   const isDesktop = useIsDesktop();
@@ -213,6 +215,7 @@ export default function ClientPrivacySecurity() {
 
       <div>
         <button
+          onClick={() => toast({ title: 'Coming soon', description: 'Data export will be available in a future update.', variant: 'info' })}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: F }}
         >
           <div>
