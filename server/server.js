@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import PDFDocument from "pdfkit";
+import https from "node:https";
 
 dotenv.config();
 
@@ -167,8 +168,6 @@ async function createClientNotification(userId, notification) {
 }
 
 // ─── Email helper (Resend REST API via built-in https) ───────────────────────
-const https = require('https');
-
 async function sendEmail({ to, subject, html }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !to) return; // silently skip if not configured
