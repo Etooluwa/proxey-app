@@ -7445,29 +7445,41 @@ app.post("/api/payments/setup-intent", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
   try {
     // Find or create Stripe customer
-    const customers = await stripe.customers.list({ limit: 100 });
     let customerId;
-    const existing = customers.data.find((c) => c.metadata?.userId === userId);
-    if (existing) {
-      customerId = existing.id;
-    } else {
+    // Check Supabase first for an existing customer ID
+    if (supabase) {
+      const { data: cp } = await supabase
+        .from("client_profiles")
+        .select("stripe_customer_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      customerId = cp?.stripe_customer_id;
+    }
+    // If not in DB, search Stripe by metadata
+    if (!customerId) {
+      const customers = await stripe.customers.list({ limit: 100 });
+      const existing = customers.data.find((c) => c.metadata?.userId === userId);
+      customerId = existing?.id;
+    }
+    // Still nothing — create a new Stripe customer
+    if (!customerId) {
       const customer = await stripe.customers.create({
         email,
         name,
         metadata: { userId, userType: "client" },
       });
       customerId = customer.id;
-      // Store customer id on client_profiles row
-      if (supabase) {
-        try {
-          await supabase
-            .from("client_profiles")
-            .upsert(
-              { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
-              { onConflict: "user_id" }
-            );
-        } catch (_) {}
-      }
+    }
+    // Always ensure stripe_customer_id is persisted in Supabase
+    if (supabase) {
+      try {
+        await supabase
+          .from("client_profiles")
+          .upsert(
+            { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+            { onConflict: "user_id" }
+          );
+      } catch (_) {}
     }
     const intent = await stripe.setupIntents.create({
       customer: customerId,
