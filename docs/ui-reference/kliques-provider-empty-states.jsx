@@ -286,6 +286,29 @@ function ProviderEmptyEarnings({onMenu}){return(
   </div>
 )}
 
+// ─── Invoices (empty) ───────────────────
+function ProviderEmptyInvoices({onMenu}){return(
+  <div style={{minHeight:"100%",background:t.base,display:"flex",flexDirection:"column"}}>
+    <Header onMenu={onMenu}/>
+    <div style={{padding:"0 24px 24px"}}>
+      <Lbl style={{marginBottom:"6px"}}>0 invoices</Lbl>
+      <h1 style={{fontFamily:f,fontSize:"32px",fontWeight:400,letterSpacing:"-0.03em",lineHeight:1.1,color:t.ink,margin:0}}>Invoices</h1>
+    </div>
+    <div style={{padding:"0 24px",flex:1,display:"flex",flexDirection:"column"}}>
+      <Divider/>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 0"}}>
+        <div style={{width:"72px",height:"72px",borderRadius:"20px",background:t.avatarBg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"20px"}}>
+          <svg width="32" height="32" fill="none" stroke={t.faded} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <p style={{fontFamily:f,fontSize:"20px",fontWeight:400,letterSpacing:"-0.02em",color:t.ink,margin:"0 0 8px",textAlign:"center"}}>No invoices yet.</p>
+        <p style={{fontFamily:f,fontSize:"14px",color:t.muted,margin:0,textAlign:"center",lineHeight:1.6,maxWidth:"280px"}}>Invoices are generated automatically when you mark a session as complete. They'll show your business name — not Kliques.</p>
+      </div>
+      <Divider/>
+      <Footer/>
+    </div>
+  </div>
+)}
+
 // ═══════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════
@@ -300,6 +323,7 @@ export default function ProviderEmptyStatesApp(){
     {id:"calendar",l:"Calendar",comp:<ProviderEmptyCalendar onMenu={noop}/>},
     {id:"messages",l:"Messages",comp:<ProviderEmptyMessages onMenu={noop}/>},
     {id:"earnings",l:"Earnings",comp:<ProviderEmptyEarnings onMenu={noop}/>},
+    {id:"invoices",l:"Invoices",comp:<ProviderEmptyInvoices onMenu={noop}/>},
   ];
   return(
     <div style={{padding:"1rem 0 2rem",minHeight:"100vh",background:"#EDE6DD"}}>

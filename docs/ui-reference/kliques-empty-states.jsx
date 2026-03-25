@@ -101,12 +101,6 @@ function ClientEmptyKliques({onMenu}){return(
         </div>
       </div>
 
-      {/* Find a provider CTA */}
-      <button style={{width:"100%",padding:"16px",borderRadius:"12px",border:"none",background:t.ink,color:"#fff",fontFamily:f,fontSize:"14px",fontWeight:500,cursor:"pointer",letterSpacing:"0.02em",marginBottom:"20px",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-        <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        Find a Provider
-      </button>
-
       <Divider/>
 
       {/* Invite link hint */}

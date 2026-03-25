@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kliques — Accept Invite</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--base:#FBF7F2;--ink:#3D231E;--muted:#8C6A64;--faded:#B0948F;--accent:#C25E4A;--hero:#FDDCC6;--abg:#F2EBE5;--line:rgba(140,106,100,0.18);--card:#FFF;--callout:#FFF5E6;--success:#5A8A5E;--sbg:#EBF2EC}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',system-ui,sans-serif;background:#EDE6DD;color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 48px}
+button{font-family:inherit;cursor:pointer;border:none;background:none}button:active{transform:scale(0.98)}
+input:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(194,94,74,0.1)!important}
+::-webkit-scrollbar{display:none}
+.topo{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");background-size:cover;pointer-events:none}
+.inp{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);font-family:'Sora',sans-serif;font-size:14px;color:var(--ink);outline:none;background:var(--abg);box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.lbl{font-size:11px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px}
+.bm{width:100%;padding:16px;border-radius:12px;background:var(--ink);color:#fff;font-size:14px;font-weight:500;transition:opacity .15s;border:none}.bm:hover{opacity:.9}
+.bo{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:transparent;font-size:13px;font-weight:500;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}.bo:hover{background:var(--abg)}
+.dt{display:flex;align-items:center;gap:16px;margin:20px 0}.dt span{font-size:11px;color:var(--faded);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}.dt::before,.dt::after{content:'';flex:1;height:1px;background:var(--line)}
+.pt{position:absolute;right:14px;top:50%;transform:translateY(-50%);padding:4px;display:flex;cursor:pointer}
+.phone{width:414px;height:896px;border-radius:40px;border:1px solid var(--line);overflow:hidden;box-shadow:0 0 40px rgba(61,35,30,0.05);background:var(--base);display:flex;flex-direction:column}
+.phone-inner{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.switcher{display:flex;justify-content:center;gap:4px;margin-bottom:20px;padding:4px;background:var(--abg);border-radius:12px;width:fit-content}
+.switcher button{padding:10px 20px;border-radius:10px;font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.02em}
+.switcher button.ac{background:#fff;font-weight:600;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.fade{animation:fadeIn .3s ease both}
+@keyframes pop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}.pop{animation:pop .4s cubic-bezier(0.34,1.56,0.64,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}.draw{animation:draw .6s ease .3s both}
+</style>
+</head>
+<body>
+
+<!-- Scenario switcher -->
+<div class="switcher">
+  <button class="ac" onclick="setScenario('none')">No account</button>
+  <button onclick="setScenario('logged_out')">Logged out</button>
+  <button onclick="setScenario('logged_in')">Logged in</button>
+</div>
+
+<div class="phone"><div class="phone-inner" id="screen"></div></div>
+
+<script>
+var scenario = 'none'; // none, logged_out, logged_in
+var step = 'landing'; // landing, signup, login, connecting, connected, already
+
+var GG='<svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>';
+var EY='<svg width="18" height="18" fill="none" stroke="var(--faded)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EO='<svg width="18" height="18" fill="none" stroke="var(--faded)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>';
+
+function setScenario(s) {
+  scenario = s;
+  step = (s === 'logged_in') ? 'connecting' : 'landing';
+  document.querySelectorAll('.switcher button').forEach(function(b){b.classList.remove('ac')});
+  event.target.classList.add('ac');
+  render();
+  // If logged in, auto-advance to connected after 1.5s
+  if (s === 'logged_in') {
+    setTimeout(function(){ step = 'connected'; render(); }, 1500);
+  }
+}
+
+function render() {
+  var el = document.getElementById('screen');
+  if (step === 'landing') el.innerHTML = landingH();
+  else if (step === 'signup') el.innerHTML = signupH();
+  else if (step === 'login') el.innerHTML = loginH();
+  else if (step === 'connecting') el.innerHTML = connectingH();
+  else if (step === 'connected') el.innerHTML = connectedH();
+  else if (step === 'already') el.innerHTML = alreadyH();
+}
+
+function landingH() {
+  var btnLabel = scenario === 'none' ? 'Accept Invite & Sign Up' : 'Accept Invite & Sign In';
+  var btnAction = scenario === 'none' ? 'signup' : 'login';
+  var altLabel = scenario === 'none' ? 'I already have an account' : '';
+
+  return '<div class="fade" style="display:flex;flex-direction:column;flex:1">' +
+    // Hero area with provider info
+    '<div style="position:relative;padding:48px 24px 32px;overflow:hidden;background:var(--hero);margin:16px;border-radius:28px;min-height:280px;display:flex;flex-direction:column;justify-content:flex-end">' +
+      '<div class="topo" style="opacity:.12;border-radius:28px"></div>' +
+      '<div style="position:relative;z-index:1">' +
+        '<div style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:var(--muted);margin-bottom:16px;border:3px solid rgba(255,255,255,0.8)">AW</div>' +
+        '<p style="font-family:\'Playfair Display\',serif;font-size:13px;color:var(--accent);margin:0 0 8px;letter-spacing:-0.02em">kliques</p>' +
+        '<h1 style="font-size:24px;font-weight:400;letter-spacing:-0.03em;line-height:1.2;margin:0 0 8px">Anny invited you<br>to join her klique.</h1>' +
+        '<p style="font-size:14px;color:var(--muted);margin:0">Anny Wong · Vocal Coach · Ottawa</p>' +
+      '</div>' +
+    '</div>' +
+
+    // Benefits
+    '<div style="padding:24px 24px 0;flex:1;display:flex;flex-direction:column">' +
+      '<div style="margin-bottom:24px">' +
+        benefitRow('Book sessions directly', 'Skip the back-and-forth. Book with Anny in a few taps.') +
+        benefitRow('Stay connected', 'Get reminders, updates, and session notes in one place.') +
+        benefitRow('Secure payments', 'Pay safely through Stripe. No cash needed.') +
+      '</div>' +
+
+      '<button class="bm" onclick="step=\''+btnAction+'\';render()" style="margin-bottom:12px">' + btnLabel + '</button>' +
+
+      (scenario === 'none' ?
+        '<button class="bo" onclick="step=\'login\';render()">I already have an account</button>' :
+        '<button class="bo" onclick="step=\'signup\';render()">I don\'t have an account yet</button>'
+      ) +
+
+      '<div style="margin-top:auto;padding:20px 0 24px;text-align:center"><p style="font-size:11px;color:var(--faded)">By continuing, you agree to Kliques\' Terms & Privacy Policy</p></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function benefitRow(title, sub) {
+  return '<div style="display:flex;gap:14px;padding:12px 0;align-items:flex-start">' +
+    '<div style="width:36px;height:36px;border-radius:10px;background:var(--abg);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+    '<div><p style="font-size:14px;font-weight:500;margin:0 0 2px">' + title + '</p><p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5">' + sub + '</p></div>' +
+  '</div>';
+}
+
+function signupH() {
+  return '<div class="fade" style="display:flex;flex-direction:column;flex:1">' +
+    '<div style="padding:32px 24px 0;display:flex;align-items:center;gap:12px;margin-bottom:24px">' +
+      '<button onclick="step=\'landing\';render()" style="padding:4px;display:flex"><svg width="22" height="22" fill="none" stroke="var(--ink)" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '</div>' +
+    '<div style="padding:0 24px;flex:1;display:flex;flex-direction:column">' +
+      '<h1 style="font-size:24px;font-weight:400;letter-spacing:-0.03em;margin:0 0 6px">Create your account</h1>' +
+      '<p style="font-size:14px;color:var(--muted);margin:0 0 28px">Sign up to connect with Anny Wong</p>' +
+
+      '<label class="lbl">Full Name</label><input class="inp" placeholder="Your name" style="margin-bottom:16px">' +
+      '<label class="lbl">Email</label><input class="inp" placeholder="you@email.com" type="email" style="margin-bottom:16px">' +
+      '<label class="lbl">Password</label><div style="position:relative;margin-bottom:6px"><input class="inp" id="su-pw" placeholder="Create a password" type="password"><button class="pt" onclick="tP(\'su-pw\',this)">' + EY + '</button></div>' +
+      '<p style="font-size:11px;color:var(--faded);margin:0 0 24px">At least 8 characters</p>' +
+
+      '<button class="bm" onclick="step=\'connecting\';render();setTimeout(function(){step=\'connected\';render()},1500)">Create Account & Connect</button>' +
+
+      '<div class="dt"><span>or</span></div>' +
+      '<button class="bo" onclick="step=\'connecting\';render();setTimeout(function(){step=\'connected\';render()},1500)">' + GG + ' Sign up with Google</button>' +
+
+      '<div style="margin-top:auto;padding:20px 0 24px;text-align:center"><button onclick="step=\'login\';render()" style="font-size:13px;color:var(--muted)">Already have an account? <span style="color:var(--accent);font-weight:500">Sign in</span></button></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function loginH() {
+  return '<div class="fade" style="display:flex;flex-direction:column;flex:1">' +
+    '<div style="padding:32px 24px 0;display:flex;align-items:center;gap:12px;margin-bottom:24px">' +
+      '<button onclick="step=\'landing\';render()" style="padding:4px;display:flex"><svg width="22" height="22" fill="none" stroke="var(--ink)" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+    '</div>' +
+    '<div style="padding:0 24px;flex:1;display:flex;flex-direction:column">' +
+      '<h1 style="font-size:24px;font-weight:400;letter-spacing:-0.03em;margin:0 0 6px">Welcome back</h1>' +
+      '<p style="font-size:14px;color:var(--muted);margin:0 0 28px">Sign in to connect with Anny Wong</p>' +
+
+      '<label class="lbl">Email</label><input class="inp" placeholder="you@email.com" type="email" style="margin-bottom:16px">' +
+      '<label class="lbl">Password</label><div style="position:relative;margin-bottom:24px"><input class="inp" id="li-pw" placeholder="Enter your password" type="password"><button class="pt" onclick="tP(\'li-pw\',this)">' + EY + '</button></div>' +
+
+      '<button class="bm" onclick="step=\'connecting\';render();setTimeout(function(){step=\'connected\';render()},1500)">Sign In & Connect</button>' +
+
+      '<div class="dt"><span>or</span></div>' +
+      '<button class="bo" onclick="step=\'connecting\';render();setTimeout(function(){step=\'connected\';render()},1500)">' + GG + ' Continue with Google</button>' +
+
+      '<div style="margin-top:auto;padding:20px 0 24px;text-align:center"><button onclick="step=\'signup\';render()" style="font-size:13px;color:var(--muted)">Don\'t have an account? <span style="color:var(--accent);font-weight:500">Sign up</span></button></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function connectingH() {
+  return '<div class="fade" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center">' +
+    // Animated connecting visual
+    '<div style="display:flex;align-items:center;margin-bottom:32px">' +
+      '<div class="pop" style="width:64px;height:64px;border-radius:50%;background:var(--hero);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:var(--muted);border:3px solid var(--base);z-index:2">AW</div>' +
+      '<svg width="48" height="4" style="margin:0 -6px;z-index:1"><line x1="0" y1="2" x2="48" y2="2" stroke="var(--accent)" stroke-width="2" stroke-dasharray="48" stroke-dashoffset="48" class="draw" stroke-linecap="round"/></svg>' +
+      '<div class="pop" style="width:64px;height:64px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:var(--muted);border:3px solid var(--base);z-index:2;animation-delay:.15s">ET</div>' +
+    '</div>' +
+    '<p style="font-size:16px;color:var(--muted);margin:0">Connecting you with Anny...</p>' +
+  '</div>';
+}
+
+function connectedH() {
+  return '<div class="fade" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center">' +
+    // Connected visual
+    '<div style="display:flex;align-items:center;margin-bottom:28px">' +
+      '<div class="pop" style="width:64px;height:64px;border-radius:50%;background:var(--hero);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:var(--muted);border:3px solid var(--base);z-index:2">AW</div>' +
+      '<div style="width:48px;height:4px;margin:0 -6px;z-index:1;background:var(--accent);border-radius:2px"></div>' +
+      '<div class="pop" style="width:64px;height:64px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:var(--muted);border:3px solid var(--base);z-index:2;animation-delay:.1s">ET</div>' +
+    '</div>' +
+
+    '<h1 style="font-size:24px;font-weight:400;letter-spacing:-0.02em;margin:0 0 10px">You\'re connected.</h1>' +
+    '<p style="font-size:15px;color:var(--muted);margin:0 0 20px;line-height:1.6">You and Anny Wong are now in each other\'s klique.</p>' +
+
+    // Connected pill
+    '<div style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9999px;background:var(--sbg);margin-bottom:32px">' +
+      '<svg width="14" height="14" fill="none" stroke="var(--success)" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '<span style="font-size:13px;font-weight:500;color:var(--success)">Connected</span>' +
+    '</div>' +
+
+    // What's next
+    '<div style="width:100%;text-align:left;padding:20px;background:var(--abg);border-radius:16px;margin-bottom:24px">' +
+      '<span class="lbl" style="margin-bottom:12px">What you can do now</span>' +
+      miniRow('Browse Anny\'s services and book a session') +
+      miniRow('Message Anny directly') +
+      miniRow('See your relationship timeline grow') +
+    '</div>' +
+
+    '<button class="bm" style="margin-bottom:10px">Book a Session</button>' +
+    '<button class="bo">Go to My Kliques</button>' +
+  '</div>';
+}
+
+function miniRow(text) {
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0">' +
+    '<svg width="14" height="14" fill="none" stroke="var(--accent)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<span style="font-size:13px;color:var(--ink)">' + text + '</span>' +
+  '</div>';
+}
+
+function alreadyH() {
+  return '<div class="fade" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center">' +
+    '<div style="width:64px;height:64px;border-radius:50%;background:var(--hero);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:var(--muted);margin-bottom:20px">AW</div>' +
+    '<h1 style="font-size:24px;font-weight:400;letter-spacing:-0.02em;margin:0 0 10px">Already connected</h1>' +
+    '<p style="font-size:15px;color:var(--muted);margin:0 0 28px;line-height:1.6">You\'re already in Anny Wong\'s klique.</p>' +
+    '<button class="bm" style="margin-bottom:10px">Book a Session</button>' +
+    '<button class="bo">Go to My Kliques</button>' +
+  '</div>';
+}
+
+function tP(id,btn){var i=document.getElementById(id);if(!i)return;if(i.type==='password'){i.type='text';btn.innerHTML=EO}else{i.type='password';btn.innerHTML=EY}}
+
+render();
+</script>
+</body>
+</html>
