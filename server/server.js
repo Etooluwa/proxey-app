@@ -166,6 +166,106 @@ async function createClientNotification(userId, notification) {
   }
 }
 
+// ─── Email helper (Resend REST API via built-in https) ───────────────────────
+const https = require('https');
+
+async function sendEmail({ to, subject, html }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !to) return; // silently skip if not configured
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      from: 'Kliques <noreply@mykliques.com>',
+      to: [to],
+      subject,
+      html,
+    });
+    const req = https.request({
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      res.resume();
+      res.on('end', resolve);
+    });
+    req.on('error', (e) => console.warn('[sendEmail] error:', e.message));
+    req.write(body);
+    req.end();
+  });
+}
+
+// ─── Helper: fetch client notification preferences ────────────────────────────
+async function getClientNotifPrefs(userId) {
+  if (!supabase || !userId) return {};
+  const { data } = await supabase
+    .from('client_profiles')
+    .select('notification_preferences, email, name')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return {
+    prefs: data?.notification_preferences || {},
+    email: data?.email || null,
+    name: data?.name || null,
+  };
+}
+
+// ─── Session reminder scheduler (runs every 5 min) ───────────────────────────
+// Sends a push notification 3 hours before confirmed appointments
+setInterval(async () => {
+  if (!supabase) return;
+  try {
+    const now = new Date();
+    const windowStart = new Date(now.getTime() + 2.75 * 60 * 60 * 1000); // 2h45m from now
+    const windowEnd   = new Date(now.getTime() + 3.25 * 60 * 60 * 1000); // 3h15m from now
+
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('id, client_id, provider_id, scheduled_at, service_name, services(name)')
+      .eq('status', 'confirmed')
+      .gte('scheduled_at', windowStart.toISOString())
+      .lte('scheduled_at', windowEnd.toISOString());
+
+    if (!bookings?.length) return;
+
+    for (const booking of bookings) {
+      // Check if reminder already sent for this booking
+      const { data: existing } = await supabase
+        .from('client_notifications')
+        .select('id')
+        .eq('user_id', booking.client_id)
+        .eq('type', 'session_reminder')
+        .eq('booking_id', booking.id)
+        .maybeSingle();
+      if (existing) continue; // already sent
+
+      const { prefs } = await getClientNotifPrefs(booking.client_id);
+      if (prefs.push_reminders === false) continue; // opted out
+
+      const svcName = booking.services?.name || booking.service_name || 'your session';
+      const displayTime = new Date(booking.scheduled_at).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit',
+      });
+      const displayDate = new Date(booking.scheduled_at).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+      });
+
+      await createClientNotification(booking.client_id, {
+        type: 'session_reminder',
+        title: 'Session in 3 hours',
+        body: `Reminder: ${svcName} on ${displayDate} at ${displayTime}`,
+        booking_id: booking.id,
+        data: { provider_id: booking.provider_id, scheduled_at: booking.scheduled_at },
+      });
+    }
+  } catch (err) {
+    console.warn('[session-reminder] error:', err.message);
+  }
+}, 5 * 60 * 1000);
+
 // ============================================
 
 // Service categories endpoint
@@ -3179,6 +3279,9 @@ app.put("/api/client/profile", async (req, res) => {
     avatar: updates.avatar || null,
     is_profile_complete: updates.is_profile_complete ?? false,
     updated_at: new Date().toISOString(),
+    ...(updates.notification_preferences !== undefined && {
+      notification_preferences: updates.notification_preferences,
+    }),
   };
 
   try {
@@ -3196,6 +3299,28 @@ app.put("/api/client/profile", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to upsert client profile", err);
     res.status(500).json({ error: "Failed to save client profile." });
+  }
+});
+
+// PATCH /api/client/notification-preferences
+app.patch("/api/client/notification-preferences", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  const { notification_preferences } = req.body || {};
+  if (!notification_preferences) return res.status(400).json({ error: "notification_preferences required." });
+  try {
+    const { error } = await supabase
+      .from("client_profiles")
+      .upsert(
+        { user_id: userId, notification_preferences, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[client/notification-preferences]", err);
+    res.status(500).json({ error: "Failed to save preferences." });
   }
 });
 
@@ -7768,21 +7893,51 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
     });
     const sessionLabel = serviceName || "your session";
 
-    // Notify client to proceed to payment
+    // Notify client to proceed to payment (respects push_booking_confirmations pref)
     if (booking.client_id) {
-      await createClientNotification(booking.client_id, {
-        type: "booking_accepted",
-        title: "Request accepted!",
-        body: `Your request for ${sessionLabel} on ${displayDate} at ${displayTime} was accepted. Complete payment to confirm.`,
-        booking_id: bookingId,
-        data: {
-          provider_id: requestingUserId,
+      const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
+
+      // Push notification
+      if (prefs.push_booking_confirmations !== false) {
+        await createClientNotification(booking.client_id, {
+          type: "booking_accepted",
+          title: "Request accepted!",
+          body: `Your request for ${sessionLabel} on ${displayDate} at ${displayTime} was accepted. Complete payment to confirm.`,
           booking_id: bookingId,
-          scheduled_at: booking.scheduled_at,
-          price: booking.price,
-          action: "pay",
-        },
-      }).catch(() => {});
+          data: {
+            provider_id: requestingUserId,
+            booking_id: bookingId,
+            scheduled_at: booking.scheduled_at,
+            price: booking.price,
+            action: "pay",
+          },
+        }).catch(() => {});
+      }
+
+      // Email: booking confirmation
+      if (prefs.email_booking_confirmations !== false && clientEmail) {
+        const priceStr = booking.price ? `$${(booking.price / 100).toFixed(2)}` : 'TBD';
+        await sendEmail({
+          to: clientEmail,
+          subject: `Booking confirmed — ${sessionLabel}`,
+          html: `
+            <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+              <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
+                <h1 style="margin:0;font-size:22px;font-weight:700">Booking Confirmed</h1>
+              </div>
+              <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+                <p style="margin:0 0 8px">Hi ${clientName || 'there'},</p>
+                <p style="margin:0 0 20px;color:#8C6A64">Your booking has been confirmed by your provider.</p>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${sessionLabel}</td></tr>
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Date</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${displayDate} at ${displayTime}</td></tr>
+                  <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px">Amount</td><td style="padding:10px 0;text-align:right;font-weight:600">${priceStr}</td></tr>
+                </table>
+                <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+              </div>
+            </div>`,
+        });
+      }
     }
 
     return res.status(200).json({ ok: true, booking_id: bookingId });
@@ -7913,17 +8068,49 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
 
     // 8. Notify client
     if (booking.client_id) {
-      await createClientNotification(booking.client_id, {
-        type: "booking_completed",
-        title: "Session complete",
-        body: `Your session with ${providerDisplayName} has been marked complete. Leave a review?`,
-        booking_id: bookingId,
-        data: {
-          provider_id: booking.provider_id,
-          invoice_id: invoice?.id || null,
-          invoice_number: invoiceNumber,
-        },
-      }).catch(() => {});
+      const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
+
+      // Push: review request
+      if (prefs.push_review_requests !== false) {
+        await createClientNotification(booking.client_id, {
+          type: "booking_completed",
+          title: "Session complete",
+          body: `Your session with ${providerDisplayName} has been marked complete. Leave a review?`,
+          booking_id: bookingId,
+          data: {
+            provider_id: booking.provider_id,
+            invoice_id: invoice?.id || null,
+            invoice_number: invoiceNumber,
+          },
+        }).catch(() => {});
+      }
+
+      // Email: booking invoice
+      if (prefs.email_invoices !== false && clientEmail) {
+        const totalStr = `$${(totalCents / 100).toFixed(2)}`;
+        const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
+        await sendEmail({
+          to: clientEmail,
+          subject: `Invoice #${invoiceNumber} — ${serviceName}`,
+          html: `
+            <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+              <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
+                <h1 style="margin:0;font-size:22px;font-weight:700">Invoice #${invoiceNumber}</h1>
+              </div>
+              <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+                <p style="margin:0 0 8px">Hi ${clientName || 'there'},</p>
+                <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}.</p>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
+                  ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ''}
+                  <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
+                </table>
+                <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+              </div>
+            </div>`,
+        });
+      }
     }
 
     // 9. Return summary

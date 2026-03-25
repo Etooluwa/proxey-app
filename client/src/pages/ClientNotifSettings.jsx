@@ -11,23 +11,23 @@ const F = "'Sora',system-ui,sans-serif";
 
 const DEFAULT_PREFS = {
     push_booking_confirmations: true,
-    push_messages:              true,
     push_reminders:             true,
     push_review_requests:       true,
-    email_receipts:             true,
+    email_booking_confirmations: true,
+    email_invoices:             true,
     email_monthly_summary:      false,
 };
 
 const PUSH_ITEMS = [
     { key: 'push_booking_confirmations', label: 'Booking confirmations' },
-    { key: 'push_messages',              label: 'Provider messages' },
     { key: 'push_reminders',             label: 'Session reminders' },
     { key: 'push_review_requests',       label: 'Review requests' },
 ];
 
 const EMAIL_ITEMS = [
-    { key: 'email_receipts',        label: 'Booking receipts' },
-    { key: 'email_monthly_summary', label: 'Monthly summary' },
+    { key: 'email_booking_confirmations', label: 'Booking confirmations' },
+    { key: 'email_invoices',              label: 'Booking invoices' },
+    { key: 'email_monthly_summary',       label: 'Monthly summary' },
 ];
 
 export default function ClientNotifSettings() {
@@ -37,7 +37,7 @@ export default function ClientNotifSettings() {
     const isDesktop = useIsDesktop();
 
     useEffect(() => {
-        request('/client/me')
+        request('/client/profile')
             .then((data) => {
                 const p = data?.profile || data || {};
                 setPrefs({ ...DEFAULT_PREFS, ...(p.notification_preferences || {}) });
@@ -51,7 +51,7 @@ export default function ClientNotifSettings() {
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(async () => {
             try {
-                await request('/client/me', {
+                await request('/client/notification-preferences', {
                     method: 'PATCH',
                     body: JSON.stringify({ notification_preferences: nextPrefs }),
                 });
