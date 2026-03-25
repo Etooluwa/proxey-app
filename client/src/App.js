@@ -69,6 +69,9 @@ import ClientPaymentMethods from './pages/ClientPaymentMethods';
 import ClientNotifSettings from './pages/ClientNotifSettings';
 import ClientPrivacySecurity from './pages/ClientPrivacySecurity';
 import DeleteAccountPage from './pages/DeleteAccountPage';
+import FAQPage from './pages/FAQPage';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // ── Admin pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -180,6 +183,9 @@ function App() {
                       <Route path="profile/privacy" element={<ClientPrivacySecurity />} />
                       <Route path="profile/privacy/delete" element={<DeleteAccountPage />} />
                       <Route path="profile/help" element={<HelpSupport />} />
+                      <Route path="profile/help/faq" element={<FAQPage />} />
+                      <Route path="profile/help/terms" element={<TermsOfService />} />
+                      <Route path="profile/help/privacy-policy" element={<PrivacyPolicy />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="account" element={<Navigate to="/app/profile" replace />} />
                       <Route path="browse" element={<Navigate to="/app" replace />} />
@@ -231,6 +237,9 @@ function App() {
                       <Route path="profile/notifications" element={<ProviderNotifSettings />} />
                       <Route path="profile/booking-settings" element={<ProviderBookingSettings />} />
                       <Route path="profile/help" element={<HelpSupport />} />
+                      <Route path="profile/help/faq" element={<FAQPage />} />
+                      <Route path="profile/help/terms" element={<TermsOfService />} />
+                      <Route path="profile/help/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="profile/delete" element={<DeleteAccountPage />} />
                       {/* Legacy paths — redirect to canonical routes */}
                       <Route path="appointments" element={<Navigate to="/provider/bookings" replace />} />

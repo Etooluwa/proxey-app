@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 
@@ -11,20 +12,23 @@ const F = "'Sora',system-ui,sans-serif";
 const Divider = () => <div style={{ height: 1, background: T.line }} />;
 
 const HELP_ITEMS = [
-  { label: 'FAQ', sub: 'Common questions answered', href: null },
-  { label: 'Contact Support', sub: 'Email us at help@mykliques.com', href: 'mailto:help@mykliques.com' },
-  { label: 'Report a Bug', sub: "Let us know what's broken", href: 'mailto:bugs@mykliques.com' },
-  { label: 'Feature Request', sub: "Tell us what you'd like to see", href: 'mailto:feedback@mykliques.com' },
-  { label: 'Terms of Service', sub: 'Legal stuff', href: 'https://mykliques.com/terms' },
-  { label: 'Privacy Policy', sub: 'How we handle your data', href: 'https://mykliques.com/privacy' },
+  { label: 'FAQ', sub: 'Common questions answered', route: 'faq' },
+  { label: 'Contact Support', sub: 'Email us at info@mykliques.com', href: 'mailto:info@mykliques.com?subject=Support%20Request' },
+  { label: 'Report a Bug', sub: "Let us know what's broken", href: 'mailto:info@mykliques.com?subject=Bug%20Report' },
+  { label: 'Feature Request', sub: "Tell us what you'd like to see", href: 'mailto:info@mykliques.com?subject=Feature%20Request' },
+  { label: 'Terms of Service', sub: 'Legal stuff', route: 'terms' },
+  { label: 'Privacy Policy', sub: 'How we handle your data', route: 'privacy-policy' },
 ];
 
 export default function HelpSupport() {
   const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
 
   const handleItemClick = (item) => {
-    if (item.href) {
-      window.open(item.href, '_blank');
+    if (item.route) {
+      navigate(item.route);
+    } else if (item.href) {
+      window.location.href = item.href;
     }
   };
 
