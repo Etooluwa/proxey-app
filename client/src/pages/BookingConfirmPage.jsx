@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/ui/Card";
 import { useToast } from "../components/ui/ToastProvider";
-import { useSession } from "../auth/authContext";
 import useBookings from "../data/useBookings";
 import useProviders from "../data/useProviders";
 import useServices from "../data/useServices";
 import { requestCheckout } from "../data/bookings";
+import { request } from "../data/apiClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,6 @@ function fmtDateTime(iso) {
 function BookingConfirmPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { profile } = useSession();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get("bookingId");
   const { bookings, loading: bookingsLoading, refresh } = useBookings();
@@ -62,30 +61,19 @@ function BookingConfirmPage() {
 
   // Fetch saved payment methods
   useEffect(() => {
-    if (profile?.stripeCustomerId) {
-      setLoadingPaymentMethods(true);
-      fetch("/api/client/payment-methods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: profile.stripeCustomerId }),
+    setLoadingPaymentMethods(true);
+    request('/payments/methods')
+      .then((data) => {
+        const methods = data?.paymentMethods || [];
+        setSavedPaymentMethods(methods);
+        if (methods.length > 0) {
+          const defaultMethod = methods.find((m) => m.isDefault) || methods[0];
+          setSelectedPaymentMethodId(defaultMethod.id);
+        }
       })
-        .then((res) => res.json())
-        .then((data) => {
-          setSavedPaymentMethods(data.paymentMethods || []);
-          if (data.paymentMethods?.length > 0) {
-            setSelectedPaymentMethodId(data.paymentMethods[0].id);
-          }
-        })
-        .catch(() => {
-          toast.push({
-            title: "Could not load saved payment methods",
-            description: "You can still use a new card at checkout",
-            variant: "warning",
-          });
-        })
-        .finally(() => setLoadingPaymentMethods(false));
-    }
-  }, [profile?.stripeCustomerId, toast]);
+      .catch(() => {})
+      .finally(() => setLoadingPaymentMethods(false));
+  }, []);
 
   const provider = providers.find((p) => p.id === booking?.providerId);
   const service = services.find((s) => s.id === booking?.serviceId);
@@ -97,26 +85,16 @@ function BookingConfirmPage() {
       const chargeAmount = booking.depositAmount || booking.price;
       const paymentType = booking.depositAmount ? "deposit" : "full payment";
 
-      if (selectedPaymentMethodId && profile?.stripeCustomerId) {
-        const chargeResponse = await fetch("/api/charge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+      if (selectedPaymentMethodId) {
+        await request('/charge', {
+          method: 'POST',
           body: JSON.stringify({
             amount: chargeAmount,
             paymentMethodId: selectedPaymentMethodId,
-            customerId: profile.stripeCustomerId,
             bookingId: booking.id,
             providerId: booking.providerId,
-            paymentType,
-            depositAmount: booking.depositAmount,
-            finalAmount: booking.finalAmount,
           }),
         });
-
-        if (!chargeResponse.ok) {
-          const error = await chargeResponse.json();
-          throw new Error(error.error || "Payment failed");
-        }
 
         toast.push({
           title: "Payment successful!",

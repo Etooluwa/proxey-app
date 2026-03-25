@@ -4808,16 +4808,31 @@ app.delete("/api/client/payment-methods/:paymentMethodId", async (req, res) => {
 });
 
 // POST /api/charge
-// Charge an existing payment method
+// Charge a saved payment method for a booking
 app.post("/api/charge", async (req, res) => {
-  const { amount, paymentMethodId, customerId, bookingId, providerId } = req.body;
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
-  if (!amount || !paymentMethodId || !customerId) {
+  const { amount, paymentMethodId, bookingId, providerId } = req.body;
+
+  if (!amount || !paymentMethodId) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    const charge = await stripe.charges.create({
+    // Look up Stripe customer ID server-side — never trust client-supplied customerId
+    const { data: clientProfile } = await supabase
+      .from("client_profiles")
+      .select("stripe_customer_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const customerId = clientProfile?.stripe_customer_id;
+    if (!customerId) {
+      return res.status(400).json({ error: "No saved payment method on file." });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
       currency: "cad",
       customer: customerId,
@@ -4830,10 +4845,22 @@ app.post("/api/charge", async (req, res) => {
       },
     });
 
+    // Update booking payment status
+    if (bookingId && supabase) {
+      await supabase
+        .from("bookings")
+        .update({
+          payment_status: "paid",
+          payment_intent_id: paymentIntent.id,
+        })
+        .eq("id", bookingId)
+        .catch(() => {});
+    }
+
     res.json({
-      chargeId: charge.id,
-      status: charge.status,
-      amount: charge.amount,
+      chargeId: paymentIntent.id,
+      status: paymentIntent.status,
+      amount: paymentIntent.amount,
     });
   } catch (error) {
     console.error("Charge error:", error);
