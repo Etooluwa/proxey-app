@@ -4847,14 +4847,15 @@ app.post("/api/charge", async (req, res) => {
 
     // Update booking payment status
     if (bookingId && supabase) {
-      await supabase
-        .from("bookings")
-        .update({
-          payment_status: "paid",
-          payment_intent_id: paymentIntent.id,
-        })
-        .eq("id", bookingId)
-        .catch(() => {});
+      try {
+        await supabase
+          .from("bookings")
+          .update({
+            payment_status: "paid",
+            payment_intent_id: paymentIntent.id,
+          })
+          .eq("id", bookingId);
+      } catch (_) {}
     }
 
     res.json({
@@ -7458,13 +7459,14 @@ app.post("/api/payments/setup-intent", async (req, res) => {
       customerId = customer.id;
       // Store customer id on client_profiles row
       if (supabase) {
-        await supabase
-          .from("client_profiles")
-          .upsert(
-            { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
-            { onConflict: "user_id" }
-          )
-          .catch(() => {});
+        try {
+          await supabase
+            .from("client_profiles")
+            .upsert(
+              { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+              { onConflict: "user_id" }
+            );
+        } catch (_) {}
       }
     }
     const intent = await stripe.setupIntents.create({
