@@ -8,7 +8,7 @@
  *   DELETE /api/provider/blocked-dates/:id
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { request } from '../../data/apiClient';
 import BackBtn from '../../components/ui/BackBtn';
 import Lbl from '../../components/ui/Lbl';
@@ -70,9 +70,10 @@ const TimeSelect = ({ value, onChange, placeholder }) => (
 
 const BlockTimePage = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
 
-    const [blockType, setBlockType] = useState('full_day'); // 'full_day' | 'hours'
+    const [blockType, setBlockType] = useState('full_day'); // 'full_day' | 'hours' | 'custom_hours'
     const [date, setDate] = useState('');
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
@@ -96,7 +97,13 @@ const BlockTimePage = () => {
         }
     }, []);
 
-    useEffect(() => { loadBlocks(); }, [loadBlocks]);
+    useEffect(() => {
+        const prefDate = searchParams.get('date');
+        const prefMode = searchParams.get('mode');
+        if (prefDate) setDate(prefDate);
+        if (prefMode === 'custom_hours') setBlockType('custom_hours');
+        loadBlocks();
+    }, [loadBlocks, searchParams]);
 
     // ── Block this time ──────────────────────────────────────────────────────
     const handleBlock = async () => {
@@ -104,7 +111,7 @@ const BlockTimePage = () => {
             toast.push({ title: 'Pick a date first', variant: 'error' });
             return;
         }
-        if (blockType === 'hours' && (!startTime || !endTime)) {
+        if ((blockType === 'hours' || blockType === 'custom_hours') && (!startTime || !endTime)) {
             toast.push({ title: 'Pick start and end time', variant: 'error' });
             return;
         }
@@ -169,9 +176,10 @@ const BlockTimePage = () => {
 
                 {/* ─ Block type segment ─ */}
                 <div className="flex gap-2 mb-5">
-                    {[
+                        {[
                         { id: 'full_day', label: 'Full Day' },
                         { id: 'hours',    label: 'Specific Hours' },
+                        { id: 'custom_hours', label: 'Custom Hours (open window)' },
                     ].map((opt) => {
                         const active = blockType === opt.id;
                         return (
@@ -209,8 +217,8 @@ const BlockTimePage = () => {
                     />
                 </div>
 
-                {/* ─ Time range (specific hours only) ─ */}
-                {blockType === 'hours' && (
+                {/* ─ Time range (specific/custom hours) ─ */}
+                {(blockType === 'hours' || blockType === 'custom_hours') && (
                     <div className="mb-4">
                         <Lbl className="block mb-2">Time range</Lbl>
                         <div className="flex items-center gap-3">
@@ -248,7 +256,7 @@ const BlockTimePage = () => {
                     {saving && (
                         <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
                     )}
-                    {saving ? 'Blocking…' : 'Block This Time'}
+                    {saving ? 'Saving…' : blockType === 'custom_hours' ? 'Set Custom Hours' : 'Block This Time'}
                 </button>
 
                 {/* ─ Upcoming blocks ─ */}
@@ -275,9 +283,11 @@ const BlockTimePage = () => {
 
                 {!loadingBlocks && blocks.map((block, i) => {
                     const barColor = BAR_COLORS[i % BAR_COLORS.length];
-                    const timeLabel = block.block_type === 'hours' && block.start_time
-                        ? `${fmtTime12(block.start_time)} – ${fmtTime12(block.end_time)}`
-                        : 'All day';
+                    let timeLabel = 'All day';
+                    if ((block.block_type === 'hours' || block.block_type === 'custom_hours') && block.start_time) {
+                        timeLabel = `${fmtTime12(block.start_time)} – ${fmtTime12(block.end_time)}`;
+                    }
+                    const labelPrefix = block.block_type === 'custom_hours' ? 'Custom hours' : 'Blocked';
                     return (
                         <div key={block.id}>
                             <div className="flex items-start gap-3 py-4">
@@ -291,7 +301,7 @@ const BlockTimePage = () => {
                                         {fmtDisplayDate(block.date)}
                                     </p>
                                     <p className="text-[13px] text-muted m-0">
-                                        {timeLabel}
+                                        {labelPrefix}: {timeLabel}
                                         {block.reason ? ` · ${block.reason}` : ''}
                                     </p>
                                 </div>

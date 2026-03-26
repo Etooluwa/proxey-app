@@ -1336,6 +1336,44 @@ app.get("/api/bookings/me", async (req, res) => {
   res.status(200).json({ bookings });
 });
 
+// GET /api/bookings/:id — single booking for client (used by ReviewPage)
+app.get("/api/bookings/:id", async (req, res) => {
+  const userId = getUserId(req);
+  const bookingId = req.params.id;
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+
+  try {
+    const { data: booking, error } = await supabase
+      .from("bookings")
+      .select("*, services(name, description, duration_minutes), provider_profiles!bookings_provider_id_fkey(name, business_name, handle, avatar_url)")
+      .eq("id", bookingId)
+      .single();
+
+    if (error || !booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.client_id !== userId && booking.provider_id !== userId) {
+      return res.status(403).json({ error: "Not authorized." });
+    }
+
+    // Enrich with provider info
+    const pp = booking.provider_profiles;
+    const enriched = {
+      ...booking,
+      provider_name: pp?.business_name || pp?.name || booking.provider_name || "Provider",
+      provider_handle: pp?.handle || null,
+      service_name: booking.services?.name || booking.service_name || "Service",
+      duration_minutes: booking.services?.duration_minutes || booking.duration_minutes || null,
+    };
+    delete enriched.provider_profiles;
+    delete enriched.services;
+
+    return res.status(200).json({ booking: enriched });
+  } catch (err) {
+    console.error("[bookings/:id] GET error:", err);
+    return res.status(500).json({ error: "Failed to load booking." });
+  }
+});
+
+
 app.post("/api/bookings", async (req, res) => {
   const userId = getUserId(req);
   const {
@@ -2774,12 +2812,41 @@ app.get("/api/provider/:id/reviews", async (req, res) => {
   }
 });
 
+// GET /api/reviews/booking/:bookingId — fetch existing review for a booking
+app.get("/api/reviews/booking/:bookingId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  const { bookingId } = req.params;
+
+  try {
+    const { data: review, error } = await supabase
+      .from("reviews")
+      .select("*")
+      .eq("booking_id", bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!review) return res.status(404).json({ error: "No review found." });
+
+    // Only the reviewer or the reviewed provider can see it
+    if (review.client_id !== userId && review.provider_id !== userId) {
+      return res.status(403).json({ error: "Not authorized." });
+    }
+
+    return res.status(200).json({ review });
+  } catch (err) {
+    console.error("[reviews/booking/:id] GET error:", err);
+    return res.status(500).json({ error: "Failed to load review." });
+  }
+});
+
+
 app.post("/api/reviews", async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const { bookingId, providerId, userId, rating, comment } = req.body || {};
+  const { bookingId, providerId, userId, rating, comment, tip_amount } = req.body || {};
 
   if (!bookingId || !providerId || !userId || typeof rating !== "number") {
     return res.status(400).json({
@@ -2791,34 +2858,195 @@ app.post("/api/reviews", async (req, res) => {
     return res.status(400).json({ error: "rating must be between 1 and 5." });
   }
 
+  // Verify booking belongs to client and is completed
+  const { data: booking, error: bookingErr } = await supabase
+    .from("bookings")
+    .select("id, client_id, provider_id, status, service_name, scheduled_at, payment_intent_id, metadata")
+    .eq("id", bookingId)
+    .single();
+
+  if (bookingErr || !booking) {
+    return res.status(404).json({ error: "Booking not found." });
+  }
+  if (booking.client_id !== userId) {
+    return res.status(403).json({ error: "Not authorized to review this booking." });
+  }
+  if (booking.status !== "completed") {
+    return res.status(400).json({ error: "Booking is not completed yet." });
+  }
+
+  const now = new Date().toISOString();
   const payload = {
     booking_id: bookingId,
     provider_id: providerId,
-    user_id: userId,
+    client_id: userId,   // reviews table uses client_id (not user_id)
     rating,
     comment: comment || "",
-    created_at: new Date().toISOString(),
+    created_at: now,
   };
 
   try {
-    const { data, error } = await supabase
+    const { data: review, error } = await supabase
       .from("reviews")
       .insert(payload)
       .select()
       .single();
 
-    if (error) {
-      throw error;
+    if (error) throw error;
+
+    // Mark booking as reviewed
+    await supabase
+      .from("bookings")
+      .update({ reviewed_at: now, updated_at: now })
+      .eq("id", bookingId)
+      .catch((err) => console.warn("[reviews] reviewed_at update failed:", err.message));
+
+    // Handle tip if provided
+    let tipResult = null;
+    let tipError = null;
+    const tipAmountCents = tip_amount ? Math.round(tip_amount) : 0;
+
+    if (tipAmountCents > 0) {
+      try {
+        // Record tip as a provider_earnings entry (platform fee = 0 on tips)
+        const { data: tipRecord } = await supabase
+          .from("provider_earnings")
+          .insert({
+            provider_id: providerId,
+            booking_id: bookingId,
+            type: "tip",
+            gross_amount: tipAmountCents,
+            platform_fee: 0,
+            net_amount: tipAmountCents,
+            payout_status: "pending",
+            created_at: now,
+          })
+          .select()
+          .single();
+        tipResult = tipRecord;
+
+        // Charge tip via Stripe if payment info available
+        if (stripe && booking.metadata?.payment_method_id && booking.metadata?.customer_id) {
+          const tipIntent = await stripe.paymentIntents.create({
+            amount: tipAmountCents,
+            currency: "usd",
+            customer: booking.metadata.customer_id,
+            payment_method: booking.metadata.payment_method_id,
+            confirm: true,
+            off_session: true,
+            description: `Tip for booking ${bookingId}`,
+            metadata: { booking_id: bookingId, provider_id: providerId, type: "tip" },
+          });
+          if (tipRecord) {
+            await supabase
+              .from("provider_earnings")
+              .update({ stripe_payment_intent_id: tipIntent.id })
+              .eq("id", tipRecord.id)
+              .catch(() => {});
+          }
+        }
+      } catch (tipErr) {
+        console.error("[reviews] Tip failed:", tipErr);
+        tipError = tipErr.message || "Tip payment failed.";
+      }
     }
 
-    res.status(201).json({ review: data });
+    // Notify provider about new review
+    try {
+      const clientName = booking.metadata?.client_name || "A client";
+      const tipNote = tipAmountCents > 0 && !tipError
+        ? ` and left a $${(tipAmountCents / 100).toFixed(0)} tip`
+        : "";
+      await createProviderNotification(providerId, {
+        type: "new_review",
+        title: "New review",
+        body: `${clientName} left you a ${rating}-star review${tipNote}.`,
+        booking_id: bookingId,
+        data: { client_id: userId, rating, tip_amount: tipAmountCents },
+      });
+    } catch (notifErr) {
+      console.warn("[reviews] Provider notification failed:", notifErr.message);
+    }
+
+    const response = { review };
+    if (tipError) {
+      response.tip_error = "Your review was submitted but the tip couldn't be processed. Try again from your booking history.";
+    } else if (tipAmountCents > 0) {
+      response.tip_amount = tipAmountCents;
+    }
+
+    res.status(201).json(response);
   } catch (err) {
     const isUniqueViolation = err?.code === "23505";
     if (isUniqueViolation) {
-      return res.status(409).json({ error: "A review already exists for this booking." });
+      // Return existing review so client can display it
+      const { data: existingReview } = await supabase
+        .from("reviews")
+        .select("*")
+        .eq("booking_id", bookingId)
+        .single();
+      return res.status(409).json({
+        error: "A review already exists for this booking.",
+        existing_review: existingReview || null,
+      });
     }
     console.error("[supabase] Failed to create review", err);
     res.status(500).json({ error: "Failed to create review." });
+  }
+});
+
+// POST /api/tips — standalone tip charge (retry after failed tip on review submit)
+app.post("/api/tips", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+
+  const { bookingId, providerId, amountCents, paymentMethodId, customerId } = req.body || {};
+  if (!bookingId || !providerId || !amountCents) {
+    return res.status(400).json({ error: "bookingId, providerId, and amountCents are required." });
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const { data: tipRecord } = await supabase
+      .from("provider_earnings")
+      .insert({
+        provider_id: providerId,
+        booking_id: bookingId,
+        type: "tip",
+        gross_amount: Math.round(amountCents),
+        platform_fee: 0,
+        net_amount: Math.round(amountCents),
+        payout_status: "pending",
+        created_at: now,
+      })
+      .select()
+      .single();
+
+    let stripeIntentId = null;
+    if (stripe && paymentMethodId && customerId) {
+      const tipIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amountCents),
+        currency: "usd",
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirm: true,
+        off_session: true,
+        description: `Tip for booking ${bookingId}`,
+        metadata: { booking_id: bookingId, provider_id: providerId, type: "tip" },
+      });
+      stripeIntentId = tipIntent.id;
+      if (tipRecord) {
+        await supabase
+          .from("provider_earnings")
+          .update({ stripe_payment_intent_id: stripeIntentId })
+          .eq("id", tipRecord.id)
+          .catch(() => {});
+      }
+    }
+
+    res.status(201).json({ tip: tipRecord, stripe_intent_id: stripeIntentId });
+  } catch (err) {
+    console.error("[tips] Failed to process tip:", err);
+    res.status(500).json({ error: err.message || "Failed to process tip." });
   }
 });
 
@@ -3573,29 +3801,65 @@ app.get("/api/provider/clients", async (req, res) => {
   const userId = getUserId(req);
 
   try {
-    // Resolve providers.id from user_id (provider_clients uses the providers PK)
+    // Resolve providers.id from user_id (provider_clients uses the providers PK in some envs)
     let providerId = userId;
     const { data: providerRow } = await supabase
       .from("providers")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
-    if (providerRow) providerId = providerRow.id;
+    if (providerRow?.id) providerId = providerRow.id;
 
-    // 1. All connections for this provider
+    // 1. Existing connections for this provider (auth UUID as provider_id)
     const { data: connections, error: connErr } = await supabase
       .from("provider_clients")
       .select("client_id, connected_at, source")
-      .eq("provider_id", userId); // provider_clients stores auth UUID
+      .eq("provider_id", userId);
 
     if (connErr) throw connErr;
-    if (!connections || connections.length === 0) {
-      return res.status(200).json({ clients: [] });
+
+    // 2. Include any clients who have booked but aren't yet in provider_clients
+    const { data: bookingRows } = await supabase
+      .from("bookings")
+      .select("client_id, client_name, scheduled_at, price, status")
+      .eq("provider_id", userId)
+      .neq("status", "cancelled");
+
+    const connMap = {};
+    for (const c of connections || []) connMap[c.client_id] = c;
+
+    const bookingClientIds = new Set();
+    for (const b of bookingRows || []) {
+      if (b.client_id) bookingClientIds.add(b.client_id);
     }
 
-    const clientIds = connections.map((c) => c.client_id);
+    const missingClientIds = [...bookingClientIds].filter((cid) => !connMap[cid]);
 
-    // 2. Booking aggregates — optional enrichment
+    if (missingClientIds.length > 0) {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("provider_clients")
+        .upsert(
+          missingClientIds.map((cid) => ({
+            provider_id: userId,
+            client_id: cid,
+            source: "booking",
+            connected_at: nowIso,
+          })),
+          { onConflict: "provider_id,client_id" }
+        )
+        .catch((err) => console.warn("[provider/clients] upsert from bookings:", err.message));
+
+      // Add to local map so response includes them immediately
+      for (const cid of missingClientIds) {
+        connMap[cid] = { client_id: cid, connected_at: nowIso, source: "booking" };
+      }
+    }
+
+    const clientIds = Array.from(new Set([...(connections || []).map((c) => c.client_id), ...bookingClientIds]));
+    if (clientIds.length === 0) return res.status(200).json({ clients: [] });
+
+    // 3. Booking aggregates — optional enrichment
     const { data: bookings } = await supabase
       .from("bookings")
       .select("client_id, client_name, scheduled_at, price, status")
@@ -3616,7 +3880,7 @@ app.get("/api/provider/clients", async (req, res) => {
       }
     }
 
-    // 3. Client profiles for name + avatar
+    // 4. Client profiles for name + avatar
     const { data: profiles } = await supabase
       .from("client_profiles")
       .select("user_id, name, avatar")
@@ -3625,10 +3889,8 @@ app.get("/api/provider/clients", async (req, res) => {
     const profileMap = {};
     for (const p of profiles || []) profileMap[p.user_id] = p;
 
-    // 4. Build response
-    const connMap = {};
-    for (const c of connections) connMap[c.client_id] = c;
-
+    // 5. Build response
+    
     const threeWeeksAgo = new Date();
     threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
 
@@ -4109,13 +4371,18 @@ app.get("/api/provider/blocked-dates", async (req, res) => {
   }
 });
 
-// POST /api/provider/blocked-dates — add a blocked date
+// POST /api/provider/blocked-dates — add a blocked date or custom hours
 // body: { date, blockType, startTime, endTime, reason }
 app.post("/api/provider/blocked-dates", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
   const providerId = getProviderId(req);
   const { date, blockType = "full_day", startTime, endTime, reason } = req.body || {};
   if (!date) return res.status(400).json({ error: "date is required." });
+
+  // Validation for custom hours
+  if ((blockType === "hours" || blockType === "custom_hours") && (!startTime || !endTime)) {
+    return res.status(400).json({ error: "startTime and endTime are required for hour-level blocks." });
+  }
   try {
     const { data, error } = await supabase
       .from("provider_blocked_dates")
@@ -8069,15 +8336,22 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
     if (booking.client_id) {
       const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
 
-      // Push: review request
+      // Derive service name for notification
+      const notifServiceName = booking.services?.name || booking.service_name || 'your service';
+
+      // Push: session_complete with review prompt (per spec)
       if (prefs.push_review_requests !== false) {
         await createClientNotification(booking.client_id, {
-          type: "booking_completed",
+          type: "session_complete",
           title: "Session complete",
-          body: `Your session with ${providerDisplayName} has been marked complete. Leave a review?`,
+          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete.`,
           booking_id: bookingId,
           data: {
             provider_id: booking.provider_id,
+            provider_name: providerDisplayName,
+            service_name: notifServiceName,
+            booking_date: booking.scheduled_at,
+            show_review_prompt: true,
             invoice_id: invoice?.id || null,
             invoice_number: invoiceNumber,
           },
