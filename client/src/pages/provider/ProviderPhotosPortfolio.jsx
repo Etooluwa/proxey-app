@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { request } from '../../data/apiClient';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
@@ -28,8 +28,6 @@ export default function ProviderPhotosPortfolio() {
   const [uploading, setUploading] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
-  const profileInputRef = useRef(null);
   const isDesktop = useIsDesktop();
 
   useEffect(() => {
@@ -157,10 +155,12 @@ export default function ProviderPhotosPortfolio() {
           </div>
           <div>
             <button
-              onClick={() => profileInputRef.current?.click()}
+              type="button"
               style={{ padding: '10px 20px', borderRadius: 10, border: `1px solid ${T.line}`, fontSize: 12, fontWeight: 500, color: T.ink, cursor: 'pointer', marginBottom: 6, display: 'block', background: T.card }}
             >
-              {photoUploading ? 'Updating…' : 'Change Photo'}
+              <label htmlFor="provider-profile-photo-input" style={{ cursor: 'pointer', display: 'block' }}>
+                {photoUploading ? 'Updating…' : 'Change Photo'}
+              </label>
             </button>
             <p style={{ fontSize: 11, color: T.faded, margin: 0 }}>JPG or PNG · Max 5MB</p>
           </div>
@@ -168,7 +168,7 @@ export default function ProviderPhotosPortfolio() {
 
         <input
           type="file"
-          ref={profileInputRef}
+          id="provider-profile-photo-input"
           accept="image/png,image/jpeg,image/webp"
           style={{ display: 'none' }}
           onChange={handleProfilePhotoChange}
@@ -184,7 +184,7 @@ export default function ProviderPhotosPortfolio() {
 
         <input
           type="file"
-          ref={fileInputRef}
+          id="provider-portfolio-upload-input"
           accept="image/png,image/jpeg,image/webp"
           style={{ display: 'none' }}
           onChange={handlePortfolioUpload}
@@ -234,14 +234,19 @@ export default function ProviderPhotosPortfolio() {
                 </div>
               ))}
               <button
-                onClick={() => fileInputRef.current?.click()}
+                type="button"
                 disabled={uploading}
                 style={{ aspectRatio: '1', borderRadius: 12, border: `1px dashed ${T.line}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', background: 'none' }}
               >
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5v14M5 12h14" stroke={T.accent} strokeWidth={2} strokeLinecap="round" />
-                </svg>
-                <span style={{ fontSize: 10, color: T.accent }}>{uploading ? 'Adding…' : 'Add'}</span>
+                <label
+                  htmlFor="provider-portfolio-upload-input"
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: uploading ? 'default' : 'pointer', width: '100%', height: '100%' }}
+                >
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke={T.accent} strokeWidth={2} strokeLinecap="round" />
+                  </svg>
+                  <span style={{ fontSize: 10, color: T.accent }}>{uploading ? 'Adding…' : 'Add'}</span>
+                </label>
               </button>
             </>
           )}
