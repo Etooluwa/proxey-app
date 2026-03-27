@@ -93,8 +93,8 @@ const AppLayout = () => {
 
     // Inject live counts into nav items
     const navItems = CLIENT_MENU.map((item) => {
-        if (item.id === 'messages') return { ...item, count: msgUnread > 0 ? msgUnread : undefined };
-        if (item.id === 'notifications') return { ...item, count: notifUnread > 0 ? notifUnread : undefined };
+        if (item.id === 'messages') return { ...item, badge: false, count: msgUnread > 0 ? msgUnread : undefined };
+        if (item.id === 'notifications') return { ...item, badge: false, count: notifUnread > 0 ? notifUnread : undefined };
         return item;
     });
 

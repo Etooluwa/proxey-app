@@ -20,6 +20,11 @@ const T = {
 
 const F = "'Sora',system-ui,sans-serif";
 
+function formatBadgeCount(value) {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value > 99 ? '99+' : String(value);
+}
+
 // ─── Desktop Header ───────────────────────────────────────────────────────────
 export function DesktopHeader({ title, subtitle }) {
     return (
@@ -105,6 +110,7 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
             <nav style={{ flex: 1, padding: '0 8px', overflowY: 'auto' }}>
                 {items.map((item) => {
                     const isActive = active === item.id;
+                    const badgeCount = formatBadgeCount(item.count);
                     return (
                         <button
                             key={item.id}
@@ -121,16 +127,17 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
                             }}
                         >
                             <span>{item.label}</span>
-                            {item.count && (
+                            {badgeCount && (
                                 <span style={{
+                                    minWidth: '22px',
                                     fontSize: '11px', fontWeight: 600, color: '#fff',
                                     background: T.accent, borderRadius: '9999px',
-                                    padding: '2px 8px', lineHeight: '16px',
+                                    padding: '2px 8px', lineHeight: '16px', textAlign: 'center',
                                 }}>
-                                    {item.count}
+                                    {badgeCount}
                                 </span>
                             )}
-                            {item.badge && !item.count && (
+                            {item.badge && !badgeCount && (
                                 <span style={{
                                     width: '7px', height: '7px', borderRadius: '50%',
                                     background: T.accent, flexShrink: 0,

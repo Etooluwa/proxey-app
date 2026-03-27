@@ -1,6 +1,11 @@
 import React, { useEffect } from 'react';
 import Avatar from './Avatar';
 
+function formatBadgeCount(value) {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value > 99 ? '99+' : String(value);
+}
+
 /**
  * v6 offcanvas side menu — slides in from the left over a dark scrim.
  * 280px wide, cream base background, active item has terracotta left border.
@@ -72,6 +77,7 @@ const SideMenu = ({
                 <nav className="flex-1 overflow-y-auto py-2">
                     {items.map((item) => {
                         const isActive = active === item.id;
+                        const badgeCount = formatBadgeCount(item.count);
                         return (
                             <button
                                 key={item.id}
@@ -105,12 +111,12 @@ const SideMenu = ({
                                     {item.label}
                                 </span>
 
-                                {item.badge && (
+                                {item.badge && !badgeCount && (
                                     <span className="ml-auto w-2 h-2 rounded-full bg-accent flex-shrink-0" />
                                 )}
-                                {item.count && (
-                                    <span className="ml-auto px-2 py-0.5 rounded-pill bg-accent text-white text-[11px] font-semibold leading-none">
-                                        {item.count}
+                                {badgeCount && (
+                                    <span className="ml-auto min-w-[22px] px-2 py-1 rounded-pill bg-accent text-white text-[11px] font-semibold leading-none text-center">
+                                        {badgeCount}
                                     </span>
                                 )}
                             </button>
