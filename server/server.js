@@ -4045,21 +4045,23 @@ app.get("/api/client/kliques", async (req, res) => {
 
     const providerIds = connections.map((c) => c.provider_id);
 
-    // 2. Booking aggregates (visits + last visit) — optional, providers with no bookings still show
+    // 2. Booking aggregates (completed visits + last visit) — optional, providers with no bookings still show
     const { data: bookings } = await supabase
       .from("bookings")
       .select("provider_id, scheduled_at, status")
       .eq("client_id", userId)
       .in("provider_id", providerIds)
-      .neq("status", "cancelled");
+      .in("status", ["pending", "confirmed", "completed"]);
 
     const bookingMap = {};
     for (const b of bookings || []) {
       if (!bookingMap[b.provider_id]) bookingMap[b.provider_id] = { visits: 0, last_visit: null };
-      bookingMap[b.provider_id].visits += 1;
       const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
-      if (bDate && (!bookingMap[b.provider_id].last_visit || bDate > new Date(bookingMap[b.provider_id].last_visit))) {
-        bookingMap[b.provider_id].last_visit = b.scheduled_at;
+      if (b.status === "completed") {
+        bookingMap[b.provider_id].visits += 1;
+        if (bDate && (!bookingMap[b.provider_id].last_visit || bDate > new Date(bookingMap[b.provider_id].last_visit))) {
+          bookingMap[b.provider_id].last_visit = b.scheduled_at;
+        }
       }
     }
 
@@ -4137,19 +4139,36 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
   const { providerId } = req.params;
 
   try {
-    // Fetch provider profile
-    const { data: profile, error: profileError } = await supabase
-      .from("provider_profiles")
-      .select("provider_id, name, avatar, bio, categories")
-      .eq("provider_id", providerId)
-      .single();
+    const [{ data: connection, error: connectionError }, { data: providerRow, error: providerError }, { data: profile, error: profileError }] = await Promise.all([
+      supabase
+        .from("provider_clients")
+        .select("id, provider_id, client_id, connected_at, source")
+        .eq("provider_id", providerId)
+        .eq("client_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("providers")
+        .select("user_id, name, business_name, avatar, photo, bio, category, categories, city")
+        .eq("user_id", providerId)
+        .maybeSingle(),
+      supabase
+        .from("provider_profiles")
+        .select("provider_id, name, avatar, bio, categories")
+        .eq("provider_id", providerId)
+        .maybeSingle(),
+    ]);
 
+    if (connectionError) throw connectionError;
+    if (providerError) throw providerError;
     if (profileError && profileError.code !== "PGRST116") throw profileError;
+    if (!connection) {
+      return res.status(404).json({ error: "Relationship not found." });
+    }
 
     // Fetch all bookings between this client and provider, newest first
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, created_at")
+      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, created_at, reviewed_at")
       .eq("client_id", userId)
       .eq("provider_id", providerId)
       .order("scheduled_at", { ascending: false });
@@ -4159,24 +4178,39 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
     const allBookings = bookings || [];
 
     // Aggregate stats
-    const nonCancelled = allBookings.filter((b) => b.status !== "cancelled");
-    const totalSessions = nonCancelled.length;
-    const totalSpent = nonCancelled.reduce((sum, b) => sum + (b.price || 0), 0);
-    const togetherSince = nonCancelled.length > 0
-      ? nonCancelled.reduce((earliest, b) => {
-          const d = new Date(b.scheduled_at || b.created_at);
-          return d < new Date(earliest) ? b.scheduled_at || b.created_at : earliest;
-        }, nonCancelled[0].scheduled_at || nonCancelled[0].created_at)
-      : null;
+    const completedBookings = allBookings.filter((b) => b.status === "completed");
+    const totalSessions = completedBookings.length;
+    const totalSpent = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    const togetherSince = connection.connected_at || null;
+
+    const mergedCategories =
+      Array.isArray(providerRow?.categories) && providerRow.categories.length > 0
+        ? providerRow.categories
+        : Array.isArray(profile?.categories) && profile.categories.length > 0
+          ? profile.categories
+          : providerRow?.category
+            ? [providerRow.category]
+            : [];
 
     res.status(200).json({
-      provider: profile || { provider_id: providerId, name: "Provider", avatar: null, categories: [] },
+      provider: {
+        provider_id: providerId,
+        name: providerRow?.business_name || providerRow?.name || profile?.name || "Provider",
+        avatar: providerRow?.avatar || providerRow?.photo || profile?.avatar || null,
+        photo: providerRow?.photo || providerRow?.avatar || null,
+        bio: providerRow?.bio || profile?.bio || null,
+        categories: mergedCategories,
+        city: providerRow?.city || null,
+        source: connection.source || "booking",
+        connected_at: connection.connected_at,
+      },
       stats: {
         together_since: togetherSince,
         sessions: totalSessions,
         total_spent: totalSpent,
       },
       bookings: allBookings,
+      connection,
     });
   } catch (err) {
     console.error("[supabase] Failed to load relationship data", err);

@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { request } from '../data/apiClient';
+import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
 import Lbl from '../components/ui/Lbl';
@@ -115,7 +116,7 @@ const ProviderRow = ({ provider, onClick, showDivider }) => (
             onClick={onClick}
             className="w-full flex items-center gap-3.5 py-3.5 px-1 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
         >
-            <Avatar initials={getInitials(provider.name)} size={44} />
+            <Avatar initials={getInitials(provider.name)} size={44} src={provider.avatar || ''} />
 
             <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink m-0 mb-0.5 truncate">
@@ -181,6 +182,37 @@ const AppDashboard = () => {
 
         fetchKliques();
     }, [session]);
+
+    useEffect(() => {
+        if (!supabase || !session?.user?.id) return undefined;
+
+        const refresh = async () => {
+            try {
+                const data = await request('/client/kliques');
+                setKliques(data.kliques || []);
+            } catch (_) {}
+        };
+
+        const channel = supabase
+            .channel(`client-kliques:${session.user.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'provider_clients',
+                filter: `client_id=eq.${session.user.id}`,
+            }, refresh)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `client_id=eq.${session.user.id}`,
+            }, refresh)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [session?.user?.id]);
 
     if (isDesktop) {
         return (
@@ -276,7 +308,7 @@ const AppDashboard = () => {
                                         style={{ display: 'grid', gridTemplateColumns: '1fr 160px 80px 120px 40px', alignItems: 'center', padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < kliques.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <Avatar initials={getInitials(provider.name)} size={36} />
+                                            <Avatar initials={getInitials(provider.name)} size={36} src={provider.avatar || ''} />
                                             <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{provider.name}</span>
                                         </div>
                                         <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{provider.role || '—'}</span>

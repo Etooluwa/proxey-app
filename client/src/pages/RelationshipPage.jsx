@@ -59,12 +59,12 @@ function dotColor(booking, isFirst) {
 
 // ─── Hero provider avatar — translucent white circle ─────────────────────────
 
-const HeroAvatar = ({ initials }) => (
+const HeroAvatar = ({ initials, src }) => (
     <div
         className="w-16 h-16 rounded-full flex items-center justify-center text-[22px] font-semibold text-ink flex-shrink-0"
-        style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+        style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', overflow: 'hidden' }}
     >
-        {initials}
+        {src ? <img src={src} alt={initials} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
     </div>
 );
 
@@ -205,6 +205,7 @@ const RelationshipPage = () => {
     }, [providerId, session]);
 
     const initials = getInitials(provider?.name);
+    const avatarSrc = provider?.avatar || provider?.photo || '';
     const role = provider?.categories?.[0] || null;
     const connectedSince = stats?.together_since ? formatShortDate(stats.together_since) : null;
     const lastVisit = bookings.find(b => b.status === 'completed')?.scheduled_at;
@@ -234,7 +235,9 @@ const RelationshipPage = () => {
                                     {loading ? (
                                         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(61,35,30,0.1)' }} />
                                     ) : (
-                                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: T.ink, fontFamily: F, flexShrink: 0 }}>{initials}</div>
+                                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: T.ink, fontFamily: F, flexShrink: 0, overflow: 'hidden' }}>
+                                            {avatarSrc ? <img src={avatarSrc} alt={provider?.name || 'Provider'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                                        </div>
                                     )}
                                     <div>
                                         {loading ? (
@@ -363,7 +366,7 @@ const RelationshipPage = () => {
                         {loading ? (
                             <Shimmer className="w-16 h-16 rounded-full" />
                         ) : (
-                            <HeroAvatar initials={initials} />
+                            <HeroAvatar initials={initials} src={avatarSrc} />
                         )}
                         <div className="flex-1 min-w-0">
                             {loading ? (
