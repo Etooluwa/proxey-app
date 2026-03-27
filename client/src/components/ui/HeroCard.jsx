@@ -25,7 +25,7 @@ const HeroCard = ({ children, className = '', style }) => (
                 opacity: 0.15,
             }}
         />
-        <div className="relative z-10">
+        <div className="relative" style={{ zIndex: 1 }}>
             {children}
         </div>
     </div>

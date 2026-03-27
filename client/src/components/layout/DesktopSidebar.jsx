@@ -26,7 +26,7 @@ export function DesktopHeader({ title, subtitle }) {
         <header style={{
             padding: '24px 40px 20px', display: 'flex', justifyContent: 'space-between',
             alignItems: 'center', borderBottom: `1px solid ${T.line}`,
-            position: 'sticky', top: 0, background: T.base, zIndex: 5,
+            position: 'sticky', top: 0, background: T.base, zIndex: 30,
         }}>
             <div>
                 {subtitle && (

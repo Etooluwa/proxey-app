@@ -5,10 +5,11 @@ import React from 'react';
  * Shows an accent dot + uppercase label.
  *
  * @param {ReactNode} children
+ * @param {string}    className
  */
-const HeroPill = ({ children }) => (
+const HeroPill = ({ children, className = '' }) => (
     <div
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill"
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill ${className}`}
         style={{
             background: 'rgba(255,255,255,0.45)',
             backdropFilter: 'blur(8px)',
