@@ -7,6 +7,61 @@ const MessageContext = createContext();
 
 export const useMessages = () => useContext(MessageContext);
 
+async function enrichConversations(conversations = []) {
+    if (!supabase || !Array.isArray(conversations) || conversations.length === 0) {
+        return conversations;
+    }
+
+    const providerIds = Array.from(new Set(conversations.map((c) => c.provider_id).filter(Boolean)));
+    const clientIds = Array.from(new Set(conversations.map((c) => c.client_id).filter(Boolean)));
+
+    const [providersRes, clientsRes] = await Promise.all([
+        providerIds.length > 0
+            ? supabase
+                .from('providers')
+                .select('user_id, name, business_name, avatar, photo')
+                .in('user_id', providerIds)
+            : Promise.resolve({ data: [], error: null }),
+        clientIds.length > 0
+            ? supabase
+                .from('client_profiles')
+                .select('user_id, name, avatar')
+                .in('user_id', clientIds)
+            : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (providersRes.error) throw providersRes.error;
+    if (clientsRes.error) throw clientsRes.error;
+
+    const providerMap = Object.fromEntries(
+        (providersRes.data || []).map((provider) => [
+            provider.user_id,
+            {
+                name: provider.business_name || provider.name || 'Provider',
+                avatar: provider.avatar || provider.photo || null,
+            },
+        ])
+    );
+
+    const clientMap = Object.fromEntries(
+        (clientsRes.data || []).map((client) => [
+            client.user_id,
+            {
+                name: client.name || 'Client',
+                avatar: client.avatar || null,
+            },
+        ])
+    );
+
+    return conversations.map((conversation) => ({
+        ...conversation,
+        provider_name: providerMap[conversation.provider_id]?.name || conversation.provider_name || 'Provider',
+        provider_avatar: providerMap[conversation.provider_id]?.avatar || conversation.provider_avatar || null,
+        client_name: clientMap[conversation.client_id]?.name || conversation.client_name || 'Client',
+        client_avatar: clientMap[conversation.client_id]?.avatar || conversation.client_avatar || null,
+    }));
+}
+
 export const MessageProvider = ({ children }) => {
     const { session, profile } = useSession();
     const userId = session?.user?.id;
@@ -15,6 +70,16 @@ export const MessageProvider = ({ children }) => {
     const [conversations, setConversations] = useState([]);
     const [currentConversation, setCurrentConversation] = useState(null);
     const [messages, setMessages] = useState({});
+
+    const updateConversationLocally = useCallback((conversationId, updater) => {
+        setConversations((prev) =>
+            prev.map((conversation) =>
+                conversation.id === conversationId
+                    ? { ...conversation, ...updater(conversation) }
+                    : conversation
+            )
+        );
+    }, []);
 
     // Load conversations from Supabase
     const loadConversations = useCallback(async () => {
@@ -32,7 +97,8 @@ export const MessageProvider = ({ children }) => {
 
             if (error) throw error;
 
-            setConversations(data || []);
+            const enriched = await enrichConversations(data || []);
+            setConversations(enriched);
         } catch (error) {
             console.error('[messages] Failed to load conversations:', error);
             setConversations([]);
@@ -76,7 +142,19 @@ export const MessageProvider = ({ children }) => {
                     event: '*',
                     schema: 'public',
                     table: 'conversations',
-                    filter: `client_id=eq.${userId},provider_id=eq.${userId}`
+                    filter: `client_id=eq.${userId}`
+                },
+                () => {
+                    loadConversations();
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'conversations',
+                    filter: `provider_id=eq.${userId}`
                 },
                 () => {
                     loadConversations();
@@ -101,7 +179,7 @@ export const MessageProvider = ({ children }) => {
                         setMessages(prev => ({
                             ...prev,
                             [currentConversation]: [
-                                ...(prev[currentConversation] || []),
+                                ...(prev[currentConversation] || []).filter((msg) => msg.id !== payload.new.id),
                                 payload.new
                             ]
                         }));
@@ -134,16 +212,32 @@ export const MessageProvider = ({ children }) => {
 
         try {
             // Check if conversation exists
-            const { data: existing } = await supabase
+            const { data: existing, error: existingError } = await supabase
                 .from('conversations')
                 .select('*')
                 .eq('client_id', clientId)
                 .eq('provider_id', providerId)
-                .single();
+                .maybeSingle();
+
+            if (existingError) throw existingError;
 
             if (existing) {
-                return existing;
+                const [enriched] = await enrichConversations([existing]);
+                return enriched;
             }
+
+            const [{ data: providerProfile }, { data: clientProfile }] = await Promise.all([
+                supabase
+                    .from('providers')
+                    .select('name, business_name')
+                    .eq('user_id', providerId)
+                    .maybeSingle(),
+                supabase
+                    .from('client_profiles')
+                    .select('name')
+                    .eq('user_id', clientId)
+                    .maybeSingle(),
+            ]);
 
             // Create new conversation
             const { data: newConv, error: createError } = await supabase
@@ -151,8 +245,8 @@ export const MessageProvider = ({ children }) => {
                 .insert({
                     client_id: clientId,
                     provider_id: providerId,
-                    client_name: isClient ? profile?.name : null,
-                    provider_name: isClient ? null : profile?.name
+                    client_name: clientProfile?.name || (isClient ? profile?.name : null),
+                    provider_name: providerProfile?.business_name || providerProfile?.name || (!isClient ? profile?.name : null),
                 })
                 .select()
                 .single();
@@ -160,7 +254,8 @@ export const MessageProvider = ({ children }) => {
             if (createError) throw createError;
 
             loadConversations();
-            return newConv;
+            const [enriched] = await enrichConversations([newConv]);
+            return enriched;
         } catch (error) {
             console.error('[messages] Failed to create conversation:', error);
             throw error;
@@ -202,6 +297,32 @@ export const MessageProvider = ({ children }) => {
 
             if (error) throw error;
 
+            const conversation = conversations.find((item) => item.id === conversationId);
+            const unreadField = userRole === 'client' ? 'provider_unread_count' : 'client_unread_count';
+            const nextUnreadCount = (conversation?.[unreadField] || 0) + 1;
+
+            const { error: conversationError } = await supabase
+                .from('conversations')
+                .update({
+                    last_message: content || '[Image]',
+                    last_message_at: data.created_at,
+                    [unreadField]: nextUnreadCount,
+                })
+                .eq('id', conversationId);
+
+            if (conversationError) throw conversationError;
+
+            setMessages((prev) => ({
+                ...prev,
+                [conversationId]: [...(prev[conversationId] || []), data],
+            }));
+
+            updateConversationLocally(conversationId, (current) => ({
+                last_message: content || '[Image]',
+                last_message_at: data.created_at,
+                [unreadField]: nextUnreadCount,
+            }));
+
             return data;
         } catch (error) {
             console.error('[messages] Failed to send message:', error);
@@ -214,12 +335,43 @@ export const MessageProvider = ({ children }) => {
         if (!userId || !userRole || !supabase) return;
 
         try {
-            await supabase.rpc('mark_messages_as_read', {
-                p_conversation_id: conversationId,
-                p_user_role: userRole
-            });
+            if (userRole === 'client') {
+                const [{ error: messageError }, { error: conversationError }] = await Promise.all([
+                    supabase
+                        .from('messages')
+                        .update({ read_by_client: true })
+                        .eq('conversation_id', conversationId)
+                        .eq('read_by_client', false),
+                    supabase
+                        .from('conversations')
+                        .update({ client_unread_count: 0 })
+                        .eq('id', conversationId),
+                ]);
 
-            loadConversations(); // Refresh to update unread counts
+                if (messageError) throw messageError;
+                if (conversationError) throw conversationError;
+            } else {
+                const [{ error: messageError }, { error: conversationError }] = await Promise.all([
+                    supabase
+                        .from('messages')
+                        .update({ read_by_provider: true })
+                        .eq('conversation_id', conversationId)
+                        .eq('read_by_provider', false),
+                    supabase
+                        .from('conversations')
+                        .update({ provider_unread_count: 0 })
+                        .eq('id', conversationId),
+                ]);
+
+                if (messageError) throw messageError;
+                if (conversationError) throw conversationError;
+            }
+
+            updateConversationLocally(conversationId, () => (
+                userRole === 'client'
+                    ? { client_unread_count: 0 }
+                    : { provider_unread_count: 0 }
+            ));
         } catch (error) {
             console.error('[messages] Failed to mark as read:', error);
         }
