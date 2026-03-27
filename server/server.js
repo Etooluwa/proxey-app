@@ -2676,12 +2676,14 @@ app.patch("/api/notifications/:id/read", async (req, res) => {
   }
 
   const notificationId = req.params.id;
+  const providerId = getProviderId(req);
 
   try {
     const { data, error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("id", notificationId)
+      .eq("provider_id", providerId)
       .select()
       .single();
 
@@ -2697,6 +2699,76 @@ app.patch("/api/notifications/:id/read", async (req, res) => {
   } catch (err) {
     console.error("[supabase] Failed to mark notification read", err);
     res.status(500).json({ error: "Failed to update notification." });
+  }
+});
+
+app.post("/api/conversations/:id/message-notification", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const conversationId = req.params.id;
+  const senderId = getUserId(req);
+  const { messageId = null, content = "", imageUrl = null } = req.body || {};
+
+  if (!senderId) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+
+  try {
+    const { data: conversation, error: conversationError } = await supabase
+      .from("conversations")
+      .select("id, client_id, client_name, provider_id, provider_name")
+      .eq("id", conversationId)
+      .maybeSingle();
+
+    if (conversationError) throw conversationError;
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found." });
+    }
+
+    const isClientSender = conversation.client_id === senderId;
+    const isProviderSender = conversation.provider_id === senderId;
+
+    if (!isClientSender && !isProviderSender) {
+      return res.status(403).json({ error: "Not authorized for this conversation." });
+    }
+
+    const receiverId = isClientSender ? conversation.provider_id : conversation.client_id;
+    const bodyPreview = content?.trim()
+      ? (content.trim().length > 80 ? `${content.trim().slice(0, 80)}...` : content.trim())
+      : "[Image]";
+
+    const senderName = isClientSender
+      ? conversation.client_name || "Client"
+      : conversation.provider_name || "Provider";
+
+    const notification = {
+      type: "new_message",
+      title: "New message",
+      body: `${senderName}: ${bodyPreview}`,
+      data: {
+        conversation_id: conversation.id,
+        message_id: messageId,
+        sender_id: senderId,
+        sender_name: senderName,
+        client_id: conversation.client_id,
+        provider_id: conversation.provider_id,
+        client_name: conversation.client_name || null,
+        provider_name: conversation.provider_name || null,
+      },
+    };
+
+    if (isClientSender) {
+      await createProviderNotification(receiverId, notification);
+    } else {
+      await createClientNotification(receiverId, notification);
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("[conversations/:id/message-notification POST]", err);
+    return res.status(500).json({ error: "Failed to create message notification." });
   }
 });
 

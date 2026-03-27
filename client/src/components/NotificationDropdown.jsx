@@ -19,7 +19,7 @@ const F = "'Sora',system-ui,sans-serif";
 // ─── Type normalisation (mirrors ProviderNotifications) ───────────────────────
 const BOOKING_TYPES = new Set([
     'booking_request', 'new_booking', 'time_request', 'appointment_request',
-    'accepted', 'rejected', 'booking_accepted', 'appointment_accepted', 'booking_declined', 'appointment_declined',
+    'accepted', 'rejected', 'booking_accepted', 'appointment_accepted', 'booking_declined', 'appointment_declined', 'booking_cancelled',
 ]);
 const COMPLETED_TYPES = new Set([
     'booking_completed', 'completed', 'session_completed',
@@ -27,6 +27,8 @@ const COMPLETED_TYPES = new Set([
 const CONNECTED_TYPES = new Set([
     'connected', 'new_client', 'new_connection',
 ]);
+const MESSAGE_TYPES = new Set(['new_message']);
+const REVIEW_TYPES = new Set(['new_review']);
 
 function normaliseType(rawType) {
     if (!rawType) return 'reminder';
@@ -34,6 +36,8 @@ function normaliseType(rawType) {
     if (BOOKING_TYPES.has(t)) return 'booking';
     if (COMPLETED_TYPES.has(t)) return 'completed';
     if (CONNECTED_TYPES.has(t)) return 'connected';
+    if (MESSAGE_TYPES.has(t)) return 'message';
+    if (REVIEW_TYPES.has(t)) return 'review';
     return 'reminder';
 }
 
@@ -43,6 +47,8 @@ const BADGE_COLOR = {
     connected: T.success,
     completed: T.success,
     reminder: T.muted,
+    message: T.ink,
+    review: T.success,
 };
 
 // ─── Badge icons ──────────────────────────────────────────────────────────────
@@ -61,6 +67,20 @@ function BadgeIcon({ type }) {
         return (
             <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M8.5 3a4 4 0 100 8 4 4 0 000-8zM20 8v6m3-3h-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (type === 'message') {
+        return (
+            <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (type === 'review') {
+        return (
+            <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         );
     }
@@ -93,6 +113,7 @@ function getNavPath(n, isProvider) {
     const bookingId = data.booking_id || data.bookingId;
     const clientId = data.client_id || data.clientId;
     const providerId = data.provider_id || data.providerId;
+    const conversationId = data.conversation_id || data.conversationId;
 
     if (isProvider) {
         if (type === 'booking') {
@@ -103,6 +124,12 @@ function getNavPath(n, isProvider) {
         }
         if (type === 'completed') {
             return bookingId ? `/provider/appointments/${bookingId}` : '/provider/bookings';
+        }
+        if (type === 'message') {
+            return conversationId ? `/provider/messages/${conversationId}` : '/provider/messages';
+        }
+        if (type === 'review') {
+            return bookingId ? `/provider/appointments/${bookingId}` : '/provider/profile';
         }
         return '/provider/notifications';
     } else {

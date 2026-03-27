@@ -23,12 +23,19 @@ import Footer from '../../components/ui/Footer';
 const BOOKING_TYPES = new Set([
     'booking_request', 'new_booking', 'time_request', 'appointment_request',
     'booking_accepted', 'appointment_accepted',
+    'booking_cancelled',
 ]);
 const COMPLETED_TYPES = new Set([
     'booking_completed', 'completed', 'session_completed',
 ]);
 const CONNECTED_TYPES = new Set([
     'connected', 'new_client', 'new_connection',
+]);
+const MESSAGE_TYPES = new Set([
+    'new_message',
+]);
+const REVIEW_TYPES = new Set([
+    'new_review',
 ]);
 
 function normaliseType(rawType) {
@@ -37,6 +44,8 @@ function normaliseType(rawType) {
     if (BOOKING_TYPES.has(t)) return 'booking';
     if (COMPLETED_TYPES.has(t)) return 'completed';
     if (CONNECTED_TYPES.has(t)) return 'connected';
+    if (MESSAGE_TYPES.has(t)) return 'message';
+    if (REVIEW_TYPES.has(t)) return 'review';
     return 'reminder';
 }
 
@@ -76,6 +85,22 @@ const BADGE = {
             </svg>
         ),
     },
+    message: {
+        bg: '#3D231E',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+    },
+    review: {
+        bg: '#5A8A5E',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+    },
     // Muted clock — reminder / default
     reminder: {
         bg: '#B0948F',
@@ -109,6 +134,7 @@ function getInitials(name) {
 function initialsFromNotif(n) {
     const name =
         n.data?.client_name ||
+        n.data?.sender_name ||
         n.data?.other_name ||
         n.title?.split(' ')[0] ||
         '?';
@@ -210,6 +236,24 @@ const NotifItem = ({ n, onAction }) => {
                                 View Client
                             </button>
                         )}
+                        {type === 'message' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold text-white focus:outline-none"
+                                style={{ background: '#3D231E' }}
+                            >
+                                Open Chat
+                            </button>
+                        )}
+                        {type === 'review' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold focus:outline-none"
+                                style={{ background: '#EBF2EC', color: '#3D6B41' }}
+                            >
+                                View Review
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -257,6 +301,15 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
             const bookingId = n.data?.booking_id;
             if (bookingId) navigate(`/provider/appointments/${bookingId}`);
             else navigate('/provider/appointments');
+        } else if (type === 'message') {
+            const conversationId = n.data?.conversation_id;
+            const clientId = n.data?.client_id;
+            if (conversationId) navigate(`/provider/messages/${conversationId}`);
+            else navigate('/provider/messages', clientId ? { state: { clientId } } : undefined);
+        } else if (type === 'review') {
+            const bookingId = n.data?.booking_id || n.booking_id;
+            if (bookingId) navigate(`/provider/appointments/${bookingId}`);
+            else navigate('/provider/profile');
         }
     };
 

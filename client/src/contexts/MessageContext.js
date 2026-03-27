@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { uploadMessageImage } from '../utils/messageImageUpload';
+import { request } from '../data/apiClient';
 
 const MessageContext = createContext();
 
@@ -322,6 +323,17 @@ export const MessageProvider = ({ children }) => {
                 last_message_at: data.created_at,
                 [unreadField]: nextUnreadCount,
             }));
+
+            request(`/conversations/${conversationId}/message-notification`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    messageId: data.id,
+                    content: content || '',
+                    imageUrl,
+                }),
+            }).catch((notifyError) => {
+                console.error('[messages] Failed to create notification:', notifyError);
+            });
 
             return data;
         } catch (error) {
