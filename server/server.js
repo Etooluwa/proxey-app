@@ -8395,7 +8395,7 @@ app.get("/api/provider/public/:handle", async (req, res) => {
       supabase
         .from("services")
         .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description, group_id, metadata")
-        .eq("provider_id", provider.id)
+        .eq("provider_id", provider.user_id)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
       supabase
@@ -8406,7 +8406,7 @@ app.get("/api/provider/public/:handle", async (req, res) => {
       supabase
         .from("reviews")
         .select("id, client_name, client_avatar, rating, comment, created_at, service_name")
-        .eq("provider_id", provider.id)
+        .eq("provider_id", provider.user_id)
         .eq("is_visible", true)
         .order("created_at", { ascending: false })
         .limit(5),
