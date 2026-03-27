@@ -5,9 +5,9 @@
  * API: GET /api/provider/calendar?year=YYYY&month=M(0-based)
  *   → { byDate: { "YYYY-MM-DD": [...bookings] }, blockedDates: { "YYYY-MM-DD": [...] } }
  */
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { CalendarBlank, Clock, MinusCircle, SlidersHorizontal, Trash } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, Clock, MinusCircle, SlidersHorizontal, Trash } from '@phosphor-icons/react';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
@@ -83,6 +83,29 @@ function getTimeOptionLabel(value) {
     return TIME_OPTIONS.find((option) => option.value === value)?.label || value;
 }
 
+function parseTimeValue(value) {
+    const fallback = { hour: '09', minute: '00', meridiem: 'AM' };
+    if (!value) return fallback;
+
+    const [rawHour = '09', rawMinute = '00'] = String(value).split(':');
+    const hour24 = Number(rawHour);
+    const minute = rawMinute === '30' ? '30' : '00';
+
+    if (Number.isNaN(hour24)) return fallback;
+
+    return {
+        hour: String((hour24 % 12) || 12).padStart(2, '0'),
+        minute,
+        meridiem: hour24 >= 12 ? 'PM' : 'AM',
+    };
+}
+
+function buildTimeValue(hour, minute, meridiem) {
+    let hour24 = Number(hour) % 12;
+    if (meridiem === 'PM') hour24 += 12;
+    return `${String(hour24).padStart(2, '0')}:${minute}`;
+}
+
 function getInitials(name) {
     return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -133,49 +156,82 @@ function removeBlockedDate(blockedDates, dateKey, blockId) {
     };
 }
 
-function TimePickerSheet({ label, value, onSelect, onClose }) {
+function TimePickerPopover({ value, onSelect, onClose }) {
+    const hours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+    const minutes = ['00', '30'];
+    const periods = ['AM', 'PM'];
+    const parts = parseTimeValue(value);
+
+    const ColumnButton = ({ item, active, onClick }) => (
+        <button
+            type="button"
+            onClick={onClick}
+            className="w-full text-center rounded-[10px] py-2.5 mb-1.5 focus:outline-none"
+            style={{
+                background: active ? T.accent : 'transparent',
+                color: active ? '#FFFFFF' : T.ink,
+                border: 'none',
+                fontFamily: F,
+                fontSize: 15,
+                fontWeight: active ? 600 : 500,
+            }}
+        >
+            {item}
+        </button>
+    );
+
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end"
-            style={{ background: 'rgba(61,35,30,0.35)' }}
-            onClick={onClose}
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 overflow-hidden rounded-[14px]"
+            style={{
+                background: T.base,
+                border: '1px solid rgba(61,35,30,0.18)',
+                boxShadow: '0 14px 32px rgba(61,35,30,0.16)',
+            }}
         >
-            <div
-                className="w-full rounded-t-[24px] pb-8"
-                style={{ background: T.base, maxHeight: '60vh', overflowY: 'auto' }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${T.line}` }}>
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] m-0 mb-1" style={{ color: T.muted }}>
-                            {label}
-                        </p>
-                        <p className="text-[16px] font-semibold m-0" style={{ color: T.ink }}>
-                            Select time
-                        </p>
-                    </div>
-                    <button onClick={onClose} className="focus:outline-none text-[14px] font-medium" style={{ color: T.muted }}>
-                        Done
-                    </button>
+            <div className="flex items-center justify-between px-3.5 py-2.5" style={{ borderBottom: `1px solid ${T.line}` }}>
+                <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.05em]" style={{ color: T.muted }}>
+                    Select time
+                </p>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="focus:outline-none text-[12px] font-semibold"
+                    style={{ color: T.muted, fontFamily: F }}
+                >
+                    Done
+                </button>
+            </div>
+
+            <div className="flex items-start px-1.5 py-1.5" style={{ background: '#F6EFE8' }}>
+                <div style={{ width: '33.33%', padding: '8px 6px' }}>
+                    {hours.map((hour) => (
+                        <ColumnButton
+                            key={hour}
+                            item={hour}
+                            active={parts.hour === hour}
+                            onClick={() => onSelect(buildTimeValue(hour, parts.minute, parts.meridiem))}
+                        />
+                    ))}
                 </div>
-                <div>
-                    {TIME_OPTIONS.map((option) => (
-                        <button
-                            key={option.value}
-                            onClick={() => {
-                                onSelect(option.value);
-                                onClose();
-                            }}
-                            className="w-full flex items-center justify-between px-5 py-3.5 focus:outline-none"
-                            style={{ borderBottom: '1px solid rgba(140,106,100,0.08)' }}
-                        >
-                            <span className="text-[15px]" style={{ color: T.ink }}>{option.label}</span>
-                            {value === option.value && (
-                                <svg width="16" height="16" fill="none" stroke={T.accent} strokeWidth="2.5" viewBox="0 0 24 24">
-                                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            )}
-                        </button>
+                <div style={{ width: '33.33%', padding: '8px 6px' }}>
+                    {minutes.map((minute) => (
+                        <ColumnButton
+                            key={minute}
+                            item={minute}
+                            active={parts.minute === minute}
+                            onClick={() => onSelect(buildTimeValue(parts.hour, minute, parts.meridiem))}
+                        />
+                    ))}
+                </div>
+                <div style={{ width: '33.33%', padding: '8px 6px' }}>
+                    {periods.map((period) => (
+                        <ColumnButton
+                            key={period}
+                            item={period}
+                            active={parts.meridiem === period}
+                            onClick={() => onSelect(buildTimeValue(parts.hour, parts.minute, period))}
+                        />
                     ))}
                 </div>
             </div>
@@ -185,19 +241,38 @@ function TimePickerSheet({ label, value, onSelect, onClose }) {
 
 function TimeInput({ value, onChange, label }) {
     const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (!containerRef.current?.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('touchstart', handlePointerDown);
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('touchstart', handlePointerDown);
+        };
+    }, [isOpen]);
 
     return (
-        <label className="flex-1 min-w-0">
+        <label className="flex-1 min-w-0 relative" ref={containerRef}>
             <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted mb-2">
                 {label}
             </span>
             <button
                 type="button"
-                onClick={() => setIsOpen(true)}
+                onClick={() => setIsOpen((prev) => !prev)}
                 className="w-full px-3.5 py-3 rounded-[12px] text-[14px] focus:outline-none flex items-center justify-between gap-3"
                 style={{
                     background: T.avatarBg,
-                    border: `1px solid ${T.line}`,
+                    border: isOpen ? '1px solid rgba(194,94,74,0.35)' : `1px solid ${T.line}`,
                     boxShadow: 'none',
                     fontFamily: F,
                     minHeight: 50,
@@ -217,8 +292,7 @@ function TimeInput({ value, onChange, label }) {
                 </span>
             </button>
             {isOpen && (
-                <TimePickerSheet
-                    label={label}
+                <TimePickerPopover
                     value={value}
                     onSelect={onChange}
                     onClose={() => setIsOpen(false)}
@@ -911,11 +985,11 @@ const ProviderSchedule = () => {
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                                 <button onClick={handlePrevMonth} style={{ width: 36, height: 36, borderRadius: '50%', border: `1px solid ${T.line}`, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                    <CalendarBlank size={18} color={T.ink} weight="light" style={{ transform: 'rotate(180deg)' }} />
+                                    <CaretLeft size={18} color={T.ink} weight="bold" />
                                 </button>
                                 <span style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink }}>{MONTH_NAMES[displayMonth]} {displayYear}</span>
                                 <button onClick={handleNextMonth} style={{ width: 36, height: 36, borderRadius: '50%', border: `1px solid ${T.line}`, background: T.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                    <CalendarBlank size={18} color={T.ink} weight="light" />
+                                    <CaretRight size={18} color={T.ink} weight="bold" />
                                 </button>
                             </div>
 
@@ -987,7 +1061,7 @@ const ProviderSchedule = () => {
                             className="flex items-center justify-center focus:outline-none active:opacity-60"
                             style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${T.line}`, background: T.avatarBg }}
                         >
-                            <CalendarBlank size={16} color={T.ink} weight="light" style={{ transform: 'rotate(180deg)' }} />
+                            <CaretLeft size={16} color={T.ink} weight="bold" />
                         </button>
                         <span className="text-[16px] font-semibold text-ink">{MONTH_NAMES[displayMonth]} {displayYear}</span>
                         <button
@@ -995,7 +1069,7 @@ const ProviderSchedule = () => {
                             className="flex items-center justify-center focus:outline-none active:opacity-60"
                             style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${T.line}`, background: T.avatarBg }}
                         >
-                            <CalendarBlank size={16} color={T.ink} weight="light" />
+                            <CaretRight size={16} color={T.ink} weight="bold" />
                         </button>
                     </div>
 
