@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchProviderProfile } from '../../data/provider';
-import { request } from '../../data/apiClient';
+import { fetchProviderProfile, updateProviderProfile } from '../../data/provider';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
+import Toggle from '../../components/ui/Toggle';
 
 const T = {
   ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -14,24 +14,31 @@ const F = "'Sora',system-ui,sans-serif";
 const Divider = () => <div style={{ height: 1, background: T.line }} />;
 
 const DEFAULT_SETTINGS = {
-  cancellation_policy: 'Free up to 24 hrs',
-  minimum_notice: '2 hours',
+  cancellation_policy: 'Clients can cancel up to 24 hours before',
+  minimum_notice: 'Clients must book at least 2 hours ahead',
   auto_accept: false,
-  require_deposit: '30% default',
-  booking_confirmation: 'Manual review',
 };
-
-const ROWS = [
-  { key: 'cancellation_policy', label: 'Cancellation policy' },
-  { key: 'minimum_notice', label: 'Minimum notice' },
-  { key: 'auto_accept', label: 'Auto-accept bookings' },
-  { key: 'require_deposit', label: 'Require deposit' },
-  { key: 'booking_confirmation', label: 'Booking confirmation' },
+const CANCELLATION_OPTIONS = [
+  'Clients can cancel up to 1 hour before',
+  'Clients can cancel up to 2 hours before',
+  'Clients can cancel up to 6 hours before',
+  'Clients can cancel up to 12 hours before',
+  'Clients can cancel up to 24 hours before',
+  'Clients can cancel up to 48 hours before',
+];
+const NOTICE_OPTIONS = [
+  'Clients must book at least 1 hour ahead',
+  'Clients must book at least 2 hours ahead',
+  'Clients must book at least 4 hours ahead',
+  'Clients must book at least 12 hours ahead',
+  'Clients must book at least 24 hours ahead',
+  'Clients must book at least 48 hours ahead',
 ];
 
 export default function ProviderBookingSettings() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const isDesktop = useIsDesktop();
 
   useEffect(() => {
@@ -43,58 +50,90 @@ export default function ProviderBookingSettings() {
       .finally(() => setLoading(false));
   }, []);
 
-  const displayValue = (val) => {
-    if (val === true) return 'On';
-    if (val === false) return 'Off';
-    return val;
+  const saveSettings = async (nextSettings) => {
+    setSettings(nextSettings);
+    setSaving(true);
+    try {
+      await updateProviderProfile({ booking_settings: nextSettings });
+    } catch (err) {
+      console.error('[ProviderBookingSettings] save error', err);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const SelectRow = ({ label, value, options, onChange }) => (
+    <div style={{ padding: '18px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+        <p style={{ fontSize: 15, color: T.ink, margin: 0 }}>{label}</p>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            minWidth: 260,
+            padding: '10px 14px',
+            borderRadius: 12,
+            border: `1px solid ${T.line}`,
+            background: T.avatarBg,
+            color: T.ink,
+            fontFamily: F,
+            fontSize: 14,
+            outline: 'none',
+          }}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
+  const ToggleRow = ({ label, value, onChange, helper }) => (
+    <div style={{ padding: '18px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+        <div>
+          <p style={{ fontSize: 15, color: T.ink, margin: 0 }}>{label}</p>
+          {helper && <p style={{ fontSize: 12, color: T.muted, margin: '6px 0 0' }}>{helper}</p>}
+        </div>
+        <Toggle on={Boolean(value)} onChange={(next) => onChange(next)} />
+      </div>
+    </div>
+  );
+
+  const content = (
+    <>
+      <SelectRow
+        label="Cancellation window"
+        value={settings.cancellation_policy}
+        options={CANCELLATION_OPTIONS}
+        onChange={(next) => saveSettings({ ...settings, cancellation_policy: next })}
+      />
+      <Divider />
+      <SelectRow
+        label="Booking lead time"
+        value={settings.minimum_notice}
+        options={NOTICE_OPTIONS}
+        onChange={(next) => saveSettings({ ...settings, minimum_notice: next })}
+      />
+      <Divider />
+      <ToggleRow
+        label="Auto-accept bookings"
+        value={settings.auto_accept}
+        helper="When this is on, new bookings that meet your rules are confirmed automatically."
+        onChange={(next) => saveSettings({ ...settings, auto_accept: next })}
+      />
+      {saving && (
+        <p style={{ color: T.muted, fontSize: 12, margin: '12px 0 0' }}>Saving…</p>
+      )}
+    </>
+  );
 
   return (
     <SettingsPageLayout title="Booking Settings">
       {loading ? (
         <p style={{ color: T.muted, fontSize: 14, marginTop: 24 }}>Loading…</p>
-      ) : isDesktop ? (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: F }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'left', fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0 0 12px', borderBottom: `1px solid ${T.line}` }}>Setting</th>
-              <th style={{ textAlign: 'right', fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0 0 12px', borderBottom: `1px solid ${T.line}` }}>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((row) => (
-              <tr key={row.key} style={{ cursor: 'pointer' }}>
-                <td style={{ fontSize: 15, color: T.ink, padding: '18px 0', borderBottom: `1px solid ${T.line}` }}>{row.label}</td>
-                <td style={{ textAlign: 'right', padding: '18px 0', borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                    <span style={{ fontSize: 14, color: T.muted }}>{displayValue(settings[row.key])}</span>
-                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.faded} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M7 17L17 7M17 7H7M17 7v10" />
-                    </svg>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <>
-          {ROWS.map((row, i) => (
-            <div key={row.key}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', cursor: 'pointer' }}>
-                <p style={{ fontSize: 15, color: T.ink, margin: 0 }}>{row.label}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, color: T.muted }}>{displayValue(settings[row.key])}</span>
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.faded} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 17L17 7M17 7H7M17 7v10" />
-                  </svg>
-                </div>
-              </div>
-              {i < ROWS.length - 1 && <Divider />}
-            </div>
-          ))}
-        </>
-      )}
+      ) : isDesktop ? content : content}
     </SettingsPageLayout>
   );
 }

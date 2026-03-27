@@ -152,6 +152,46 @@ async function getProviderNotifPrefs(providerId) {
   };
 }
 
+async function getProviderBookingSettings(providerId) {
+  if (!supabase || !providerId) return {};
+
+  const { data } = await supabase
+    .from("provider_profiles")
+    .select("booking_settings")
+    .eq("provider_id", providerId)
+    .maybeSingle();
+
+  return data?.booking_settings || {};
+}
+
+function extractLeadingHours(value, fallbackHours) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return fallbackHours;
+  const match = value.match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : fallbackHours;
+}
+
+function normalizeProviderBookingRules(settings = {}) {
+  const minimumNoticeHours = extractLeadingHours(settings.minimum_notice, 2);
+  const cancellationWindowHours = extractLeadingHours(settings.cancellation_policy, 24);
+
+  return {
+    autoAccept: Boolean(settings.auto_accept),
+    minimumNoticeHours,
+    cancellationWindowHours,
+  };
+}
+
+function assertBookingLeadTime({ scheduledAt, minimumNoticeHours }) {
+  if (!scheduledAt || !minimumNoticeHours) return;
+  const scheduledTime = new Date(scheduledAt).getTime();
+  if (Number.isNaN(scheduledTime)) return;
+  const minAllowed = Date.now() + minimumNoticeHours * 60 * 60 * 1000;
+  if (scheduledTime < minAllowed) {
+    throw new Error(`Bookings must be made at least ${minimumNoticeHours} hours ahead.`);
+  }
+}
+
 function getProviderPushPrefKey(type) {
   const normalized = String(type || "").toLowerCase();
 
@@ -1584,6 +1624,23 @@ app.post("/api/bookings", async (req, res) => {
   }
 
   const now = new Date().toISOString();
+  let providerBookingRules = normalizeProviderBookingRules();
+
+  if (supabase) {
+    providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(providerId));
+  }
+
+  try {
+    assertBookingLeadTime({
+      scheduledAt,
+      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
+    });
+  } catch (leadTimeErr) {
+    return res.status(400).json({ error: leadTimeErr.message });
+  }
+
+  const requestedStatus = status === "draft" ? "pending" : status;
+  const initialStatus = providerBookingRules.autoAccept ? "confirmed" : requestedStatus;
 
   // Build metadata for promo/discount info
   const metadata = {};
@@ -1606,7 +1663,7 @@ app.post("/api/bookings", async (req, res) => {
     scheduledAt,
     location: location || "",
     notes: notes || "",
-    status,
+    status: initialStatus,
     createdAt: now,
     updatedAt: now,
     price: price ?? null,
@@ -1626,9 +1683,9 @@ app.post("/api/bookings", async (req, res) => {
         price: booking.price,
       };
 
-      if (Object.keys(metadata).length > 0) {
-        insertData.metadata = metadata;
-      }
+        if (Object.keys(metadata).length > 0) {
+          insertData.metadata = metadata;
+        }
 
       const { data, error } = await supabase
         .from("bookings")
@@ -1673,9 +1730,11 @@ app.post("/api/bookings", async (req, res) => {
           });
 
           await createProviderNotification(data.provider_id, {
-            type: 'booking_request',
-            title: 'New Booking Request',
-            body: `You have a new booking request for ${scheduledDate}`,
+            type: data.status === "confirmed" ? 'new_booking' : 'booking_request',
+            title: data.status === "confirmed" ? 'New Booking' : 'New Booking Request',
+            body: data.status === "confirmed"
+              ? `A booking was automatically accepted for ${scheduledDate}`
+              : `You have a new booking request for ${scheduledDate}`,
             booking_id: data.id,
             data: {
               service_id: data.service_id,
@@ -1683,6 +1742,21 @@ app.post("/api/bookings", async (req, res) => {
               price: data.price
             }
           });
+        }
+
+        if (data.status === "confirmed" && data.client_id) {
+          await createClientNotification(data.client_id, {
+            type: "accepted",
+            title: "Booking confirmed",
+            body: "Your booking was automatically confirmed.",
+            booking_id: data.id,
+            data: {
+              provider_id: data.provider_id,
+              booking_id: data.id,
+              scheduled_at: data.scheduled_at,
+              status: "confirmed",
+            },
+          }).catch(() => {});
         }
         return res.status(201).json({ booking: data });
       }
@@ -1703,10 +1777,9 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
     try {
       const { data, error } = await supabase
         .from("bookings")
-        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .select("*")
         .eq("id", bookingId)
         .eq("client_id", userId)
-        .select()
         .single();
 
       if (error) {
@@ -1714,28 +1787,48 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
       } else if (!data) {
         return res.status(404).json({ error: "Booking not found." });
       } else {
+        const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(data.provider_id));
+        const scheduledTime = new Date(data.scheduled_at).getTime();
+        const cutoffTime = scheduledTime - providerBookingRules.cancellationWindowHours * 60 * 60 * 1000;
+
+        if (Number.isFinite(cutoffTime) && Date.now() > cutoffTime) {
+          return res.status(400).json({
+            error: `This booking can only be cancelled at least ${providerBookingRules.cancellationWindowHours} hours before the appointment.`,
+          });
+        }
+
+        const { data: cancelledBooking, error: cancelErr } = await supabase
+          .from("bookings")
+          .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+          .eq("id", bookingId)
+          .eq("client_id", userId)
+          .select()
+          .single();
+
+        if (cancelErr) throw cancelErr;
+
         // Notify provider about the cancelled booking
-        if (data.provider_id) {
-          const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
+        if (cancelledBooking.provider_id) {
+          const scheduledDate = new Date(cancelledBooking.scheduled_at).toLocaleDateString('en-US', {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit'
           });
-          await createProviderNotification(data.provider_id, {
+          await createProviderNotification(cancelledBooking.provider_id, {
             type: 'booking_cancelled',
             title: 'Booking Cancelled',
             body: `A booking for ${scheduledDate} has been cancelled by the client`,
-            booking_id: data.id,
+            booking_id: cancelledBooking.id,
             data: {
-              client_id: data.client_id,
-              scheduled_at: data.scheduled_at,
+              client_id: cancelledBooking.client_id,
+              scheduled_at: cancelledBooking.scheduled_at,
               status: 'cancelled'
             }
           });
         }
-        return res.status(200).json({ booking: data });
+        return res.status(200).json({ booking: cancelledBooking });
       }
     } catch (error) {
       console.warn("[supabase] Unexpected error cancelling booking", error);
@@ -8506,6 +8599,19 @@ app.post("/api/bookings/create", async (req, res) => {
     return res.status(400).json({ error: "serviceId, providerId, and scheduledAt are required." });
   }
 
+  const providerBookingRules = normalizeProviderBookingRules(
+    supabase ? await getProviderBookingSettings(providerId) : {}
+  );
+
+  try {
+    assertBookingLeadTime({
+      scheduledAt,
+      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
+    });
+  } catch (leadTimeErr) {
+    return res.status(400).json({ error: leadTimeErr.message });
+  }
+
   const chargeAmount = depositAmount != null ? depositAmount : price;
   const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
 
@@ -8522,7 +8628,7 @@ app.post("/api/bookings/create", async (req, res) => {
           provider_id: providerId,
           scheduled_at: scheduledAt,
           notes: notes || "",
-          status: "pending",
+          status: providerBookingRules.autoAccept ? "confirmed" : "pending",
           price: price ?? null,
         })
         .select()
@@ -8569,11 +8675,28 @@ app.post("/api/bookings/create", async (req, res) => {
     // Notify provider
     await createProviderNotification(providerId, {
       type: "new_booking",
-      title: "New booking request",
-      body: "A client just booked through your public link.",
+      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New booking request",
+      body: providerBookingRules.autoAccept
+        ? "A booking through your public link was automatically accepted."
+        : "A client just booked through your public link.",
       data: { booking_id: bookingId },
       booking_id: bookingId,
     }).catch(() => {});
+
+    if (providerBookingRules.autoAccept && userId) {
+      await createClientNotification(userId, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your booking was automatically confirmed.",
+        booking_id: bookingId,
+        data: {
+          provider_id: providerId,
+          booking_id: bookingId,
+          scheduled_at: scheduledAt,
+          status: "confirmed",
+        },
+      }).catch(() => {});
+    }
 
     res.json({ ok: true, bookingId, paymentIntentId });
   } catch (err) {
@@ -8629,6 +8752,12 @@ app.post("/api/bookings/request-time", async (req, res) => {
   try {
     // Build scheduled_at from date + time
     const scheduledAt = `${requested_date}T${requested_time}:00`;
+    const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(provider_id));
+
+    assertBookingLeadTime({
+      scheduledAt,
+      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
+    });
 
     // Fetch service info for the notification body
     let serviceName = null;
@@ -8667,7 +8796,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
         provider_id,
         service_id: service_id || null,
         scheduled_at: scheduledAt,
-        status: "pending",
+        status: providerBookingRules.autoAccept ? "confirmed" : "pending",
         payment_status: "unpaid",
         price: servicePrice,
         metadata: {
@@ -8697,8 +8826,8 @@ app.post("/api/bookings/request-time", async (req, res) => {
       : `${clientName} requested a session on ${displayDate} at ${displayTime}`;
 
     await createProviderNotification(provider_id, {
-      type: "booking_request",
-      title: "New time request",
+      type: providerBookingRules.autoAccept ? "new_booking" : "booking_request",
+      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New time request",
       body: notifBody,
       booking_id: booking.id,
       data: {
@@ -8709,6 +8838,21 @@ app.post("/api/bookings/request-time", async (req, res) => {
         client_message: message || null,
       },
     }).catch(() => {});
+
+    if (providerBookingRules.autoAccept) {
+      await createClientNotification(clientId, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your booking was automatically confirmed.",
+        booking_id: booking.id,
+        data: {
+          provider_id,
+          booking_id: booking.id,
+          scheduled_at: scheduledAt,
+          status: "confirmed",
+        },
+      }).catch(() => {});
+    }
 
     return res.status(201).json({ booking });
   } catch (err) {
