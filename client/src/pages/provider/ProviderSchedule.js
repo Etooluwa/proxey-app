@@ -544,7 +544,10 @@ const ProviderSchedule = () => {
     }, [displayYear, displayMonth, selectedDay]);
 
     const daySchedule = byDate[selectedDateKey] || [];
-    const dayBlocks = getDayBlocks(blockedDates, selectedDateKey);
+    const dayBlocks = useMemo(
+        () => getDayBlocks(blockedDates, selectedDateKey),
+        [blockedDates, selectedDateKey]
+    );
 
     useEffect(() => {
         const override = getAvailabilityOverride(dayBlocks);
