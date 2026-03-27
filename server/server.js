@@ -721,17 +721,22 @@ app.get("/api/provider/services", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  let providerId;
+  let providerIdentity;
   try {
-    providerId = await resolveProviderId(req);
+    providerIdentity = await getProviderIdentity(getProviderId(req));
   } catch {
     return res.status(200).json({ services: [], groups: [] });
   }
 
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerRecordId = providerIdentity.recordId;
+
   try {
     const [{ data: services, error: svcError }, { data: groups, error: grpError }] = await Promise.all([
-      supabase.from("services").select("*").eq("provider_id", providerId).order("created_at", { ascending: false }),
-      supabase.from("service_groups").select("*").eq("provider_id", providerId).order("sort_order", { ascending: true }),
+      supabase.from("services").select("*").eq("provider_id", providerAuthId).order("created_at", { ascending: false }),
+      providerRecordId
+        ? supabase.from("service_groups").select("*").eq("provider_id", providerRecordId).order("sort_order", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (svcError) throw svcError;
@@ -750,7 +755,7 @@ app.get("/api/provider/services", async (req, res) => {
       const { data: bookings } = await supabase
         .from("bookings")
         .select("service_id")
-        .eq("provider_id", providerId)
+        .eq("provider_id", providerAuthId)
         .in("service_id", serviceIds)
         .neq("status", "cancelled")
         .gte("scheduled_at", monthStart)
@@ -851,12 +856,30 @@ app.patch("/api/provider/services/:id/group", async (req, res) => {
   const { id } = req.params;
   const { group_id } = req.body || {};
   try {
-    const providerId = await resolveProviderId(req);
+    const providerIdentity = await getProviderIdentity(getProviderId(req));
+    const providerAuthId = providerIdentity.authId || getProviderId(req);
+    const providerRecordId = providerIdentity.recordId;
+
+    if (group_id) {
+      if (!providerRecordId) {
+        return res.status(400).json({ error: "Provider record not found." });
+      }
+      const { data: group, error: groupError } = await supabase
+        .from("service_groups")
+        .select("id")
+        .eq("id", group_id)
+        .eq("provider_id", providerRecordId)
+        .maybeSingle();
+
+      if (groupError) throw groupError;
+      if (!group) return res.status(404).json({ error: "Group not found." });
+    }
+
     const { data, error } = await supabase
       .from("services")
       .update({ group_id: group_id || null })
       .eq("id", id)
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerAuthId)
       .select()
       .single();
     if (error) throw error;
@@ -886,7 +909,8 @@ app.post("/api/services", async (req, res) => {
 
   let providerId;
   try {
-    providerId = await resolveProviderId(req);
+    const providerIdentity = await getProviderIdentity(getProviderId(req));
+    providerId = providerIdentity.authId || getProviderId(req);
   } catch (err) {
     return res.status(400).json({ error: "Provider record not found for this user." });
   }
@@ -934,11 +958,13 @@ app.delete("/api/services/:id", async (req, res) => {
 
   try {
     const providerId = await resolveProviderId(req);
+    const providerIdentity = await getProviderIdentity(getProviderId(req));
+    const providerAuthId = providerIdentity.authId || getProviderId(req);
     const { data, error } = await supabase
       .from("services")
       .delete()
       .eq("id", serviceId)
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerAuthId)
       .select()
       .single();
 
@@ -960,12 +986,13 @@ app.get("/api/provider/services/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const providerId = await resolveProviderId(req);
+    const providerIdentity = await getProviderIdentity(getProviderId(req));
+    const providerAuthId = providerIdentity.authId || getProviderId(req);
     const { data: service, error: svcErr } = await supabase
       .from("services")
       .select("*")
       .eq("id", id)
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerAuthId)
       .single();
 
     if (svcErr || !service) return res.status(404).json({ error: "Service not found." });
@@ -1030,7 +1057,8 @@ app.put("/api/provider/services/:id", async (req, res) => {
   } = req.body || {};
 
   try {
-    const providerId = await resolveProviderId(req);
+    const providerIdentity = await getProviderIdentity(getProviderId(req));
+    const providerAuthId = providerIdentity.authId || getProviderId(req);
     const updates = {
       updated_at: new Date().toISOString(),
     };
@@ -1050,7 +1078,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
       .from("services")
       .update(updates)
       .eq("id", id)
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerAuthId)
       .select()
       .single();
 
