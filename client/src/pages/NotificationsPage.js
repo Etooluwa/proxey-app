@@ -27,20 +27,22 @@ const F = "'Sora',system-ui,sans-serif";
 // ─── Type normalisation ───────────────────────────────────────────────────────
 
 const ACCEPTED_TYPES = new Set([
-    'booking_accepted', 'appointment_accepted', 'time_request_accepted',
+    'accepted', 'booking_accepted', 'appointment_accepted', 'time_request_accepted',
 ]);
 const REJECTED_TYPES = new Set([
-    'booking_declined', 'appointment_declined', 'time_request_declined',
+    'rejected', 'booking_declined', 'appointment_declined', 'time_request_declined',
     'booking_cancelled',
 ]);
 const CONNECTED_TYPES = new Set(['connected', 'new_connection']);
 const REMINDER_TYPES = new Set(['reminder', 'upcoming_session']);
+const SESSION_COMPLETE_TYPES = new Set(['session_complete', 'booking_completed']);
 
 function normaliseType(rawType) {
     if (!rawType) return 'reminder';
     if (ACCEPTED_TYPES.has(rawType)) return 'accepted';
     if (REJECTED_TYPES.has(rawType)) return 'rejected';
     if (CONNECTED_TYPES.has(rawType)) return 'connected';
+    if (SESSION_COMPLETE_TYPES.has(rawType)) return 'session_complete';
     return 'reminder';
 }
 
@@ -48,36 +50,74 @@ function normaliseType(rawType) {
 
 const BADGE = {
     accepted: {
-        bg: '#5A8A5E',
+        bg: '#EBF2EC',
         icon: (
+            <svg width="20" height="20" fill="none" stroke="#5A8A5E" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
             <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         ),
+        badgeBg: '#5A8A5E',
+    },
+    session_complete: {
+        bg: '#EBF2EC',
+        icon: (
+            <svg width="20" height="20" fill="none" stroke="#5A8A5E" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
+            <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        badgeBg: '#5A8A5E',
     },
     rejected: {
-        bg: '#B04040',
+        bg: '#F2EBE5',
         icon: (
+            <svg width="20" height="20" fill="none" stroke="#B04040" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
             <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
         ),
+        badgeBg: '#B04040',
     },
     connected: {
-        bg: '#C25E4A',
+        bg: '#F2EBE5',
         icon: (
+            <svg width="20" height="20" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
             <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="1.75" viewBox="0 0 24 24">
                 <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         ),
+        badgeBg: '#C25E4A',
     },
     reminder: {
-        bg: '#8C6A64',
+        bg: '#F2EBE5',
         icon: (
+            <svg width="20" height="20" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
             <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         ),
+        badgeBg: '#8C6A64',
     },
 };
 
@@ -116,9 +156,16 @@ function declineReason(n) {
     return n.data?.reason || n.data?.decline_reason || null;
 }
 
-// Extract a booking_id to link Pay Now
+// Extract a booking_id to link Pay Now / Leave a review
 function bookingId(n) {
     return n.data?.booking_id || n.booking_id || null;
+}
+
+// Check if this notification should show a "Leave a review" prompt
+function showReviewPrompt(n) {
+    const type = normaliseType(n.type);
+    if (type !== 'session_complete') return false;
+    return n.data?.show_review_prompt !== false;
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -139,36 +186,60 @@ const Empty = () => (
 
 // ─── Single notification item ─────────────────────────────────────────────────
 
-const NotifItem = ({ n, onMarkRead, onPayNow }) => {
+const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview }) => {
     const type = normaliseType(n.type);
     const badge = BADGE[type];
     const unread = !n.is_read && !n.read;
     const reason = declineReason(n);
     const bid = bookingId(n);
     const ts = n.timestamp || n.created_at;
+    const showReview = showReviewPrompt(n);
+
+    const handleClick = () => {
+        if (showReview && bid) {
+            onMarkRead(n.id);
+            onLeaveReview(bid);
+        }
+    };
 
     return (
         <div>
-            <div
-                className="flex gap-3.5 py-5"
-                style={{ opacity: unread ? 1 : 0.55 }}
+            <button
+                onClick={handleClick}
+                className="flex gap-3.5 py-5 w-full text-left"
+                style={{ opacity: unread ? 1 : 0.55, background: 'transparent', border: 'none', cursor: showReview ? 'pointer' : 'default' }}
             >
-                {/* Avatar + badge */}
+                {/* Icon circle (session_complete uses large icon, others use avatar+badge) */}
                 <div className="relative flex-shrink-0">
-                    <Avatar initials={initialsFromNotif(n)} size={44} />
-                    <div
-                        className="absolute flex items-center justify-center rounded-full"
-                        style={{
-                            bottom: -2,
-                            right: -2,
-                            width: 22,
-                            height: 22,
-                            background: badge.bg,
-                            border: '2px solid #FBF7F2',
-                        }}
-                    >
-                        {badge.icon}
-                    </div>
+                    {type === 'session_complete' ? (
+                        <div
+                            className="flex items-center justify-center rounded-full"
+                            style={{ width: 44, height: 44, background: badge.bg }}
+                        >
+                            {badge.icon}
+                        </div>
+                    ) : (
+                        <>
+                            <Avatar initials={initialsFromNotif(n)} size={44} />
+                            <div
+                                className="absolute flex items-center justify-center rounded-full"
+                                style={{
+                                    bottom: -2, right: -2,
+                                    width: 22, height: 22,
+                                    background: badge.badgeBg,
+                                    border: '2px solid #FBF7F2',
+                                }}
+                            >
+                                {badge.iconBadge}
+                            </div>
+                        </>
+                    )}
+                    {/* Unread dot */}
+                    {unread && (
+                        <div
+                            style={{ position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: '50%', background: '#C25E4A', border: '2px solid #FBF7F2' }}
+                        />
+                    )}
                 </div>
 
                 {/* Content */}
@@ -176,17 +247,17 @@ const NotifItem = ({ n, onMarkRead, onPayNow }) => {
                     {/* Title row */}
                     <div className="flex items-start justify-between gap-2 mb-1">
                         <p
-                            className="text-[15px] text-ink m-0"
-                            style={{ fontWeight: unread ? 600 : 400 }}
+                            className="text-[14px] text-ink m-0"
+                            style={{ fontWeight: unread ? 600 : 500 }}
                         >
                             {n.title}
                         </p>
-                        {unread && (
-                            <div
-                                className="w-2 h-2 rounded-full flex-shrink-0 mt-[6px]"
-                                style={{ background: '#C25E4A' }}
-                            />
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <Lbl style={{ fontSize: '10px', margin: 0 }}>{formatRelTime(ts)}</Lbl>
+                            {unread && (
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#C25E4A' }} />
+                            )}
+                        </div>
                     </div>
 
                     {/* Body */}
@@ -207,12 +278,28 @@ const NotifItem = ({ n, onMarkRead, onPayNow }) => {
                         </div>
                     )}
 
-                    {/* Footer row: timestamp + Pay Now */}
-                    <div className="flex items-center justify-between gap-3">
-                        <Lbl style={{ fontSize: '10px' }}>{formatRelTime(ts)}</Lbl>
+                    {/* Action pills row */}
+                    <div className="flex items-center gap-3">
+                        {/* Leave a review pill (session_complete) */}
+                        {showReview && bid && (
+                            <div
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 14px', borderRadius: 9999,
+                                    background: '#FDDCC6', cursor: 'pointer',
+                                }}
+                            >
+                                <svg width="12" height="12" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                                <span style={{ fontSize: 12, fontWeight: 500, color: '#C25E4A', fontFamily: "'Sora',system-ui,sans-serif" }}>Leave a review</span>
+                            </div>
+                        )}
+
+                        {/* Pay Now pill (accepted bookings) */}
                         {type === 'accepted' && bid && unread && (
                             <button
-                                onClick={() => onPayNow(bid)}
+                                onClick={(e) => { e.stopPropagation(); onPayNow(bid); }}
                                 className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold text-white focus:outline-none"
                                 style={{ background: '#3D231E' }}
                             >
@@ -221,7 +308,7 @@ const NotifItem = ({ n, onMarkRead, onPayNow }) => {
                         )}
                     </div>
                 </div>
-            </div>
+            </button>
             <Divider />
         </div>
     );
@@ -246,6 +333,10 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
 
     const handlePayNow = (bid) => {
         navigate('/app/booking-flow', { state: { bookingId: bid } });
+    };
+
+    const handleLeaveReview = (bid) => {
+        navigate(`/app/review/${bid}`);
     };
 
     const handleViewAll = () => {
@@ -397,6 +488,7 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                                 n={n}
                                 onMarkRead={markAsRead}
                                 onPayNow={handlePayNow}
+                                onLeaveReview={handleLeaveReview}
                             />
                         ))}
 

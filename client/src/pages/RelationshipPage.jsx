@@ -208,6 +208,10 @@ const RelationshipPage = () => {
     const role = provider?.categories?.[0] || null;
     const connectedSince = stats?.together_since ? formatShortDate(stats.together_since) : null;
     const lastVisit = bookings.find(b => b.status === 'completed')?.scheduled_at;
+    // Find most recent completed booking that hasn't been reviewed
+    const unreviewedBooking = bookings.find(
+        (b) => b.status === 'completed' && !b.reviewed_at && !b.has_review
+    );
 
     if (isDesktop) {
         return (
@@ -283,6 +287,24 @@ const RelationshipPage = () => {
                         {/* Right: Timeline */}
                         <div>
                             <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 16 }}>Connected Timeline</span>
+
+                            {/* Review banner */}
+                            {!loading && unreviewedBooking && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', background: '#FFF5E6', borderRadius: 14, marginBottom: 20, border: '1px solid rgba(194,94,74,0.15)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <p style={{ fontFamily: F, fontSize: 13, color: '#92400E', margin: 0, fontWeight: 500 }}>Rate your last session</p>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate(`/app/review/${unreviewedBooking.id}`)}
+                                        style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: F, fontSize: 12, fontWeight: 600, color: '#C25E4A', cursor: 'pointer' }}
+                                    >
+                                        Leave a review →
+                                    </button>
+                                </div>
+                            )}
 
                             {error && <p style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{error}</p>}
 
@@ -417,7 +439,26 @@ const RelationshipPage = () => {
                     <>
                         <Lbl className="block mb-3">Connected Timeline</Lbl>
 
-                        {/* Loading skeleton */}
+                        {/* Review banner (mobile) */}
+                        {!loading && unreviewedBooking && (
+                            <div
+                                className="flex items-center justify-between gap-3 p-4 rounded-[14px] mb-5"
+                                style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.15)' }}
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <svg width="16" height="16" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0">
+                                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                    <p className="text-[13px] font-medium m-0" style={{ color: '#92400E', fontFamily: "'Sora',system-ui,sans-serif" }}>Rate your last session</p>
+                                </div>
+                                <button
+                                    onClick={() => navigate(`/app/review/${unreviewedBooking.id}`)}
+                                    style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 12, fontWeight: 600, color: '#C25E4A', cursor: 'pointer' }}
+                                >
+                                    Leave a review →
+                                </button>
+                            </div>
+                        )}
                         {loading && (
                             <div>
                                 {[1, 2, 3].map((i) => (

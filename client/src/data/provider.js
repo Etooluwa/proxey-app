@@ -23,6 +23,46 @@ export async function updateProviderJobStatus(jobId, nextStatus, declineReason) 
   return data.job;
 }
 
+export async function fetchProviderBookings(providerId, { tab } = {}) {
+  if (!providerId) {
+    throw new Error("providerId is required.");
+  }
+
+  const params = new URLSearchParams();
+  if (tab) params.set("tab", tab);
+  const query = params.toString();
+  const data = await request(
+    query ? `/providers/${providerId}/bookings?${query}` : `/providers/${providerId}/bookings`
+  );
+  return data.bookings || [];
+}
+
+export async function acceptProviderBooking(bookingId) {
+  if (!bookingId) {
+    throw new Error("bookingId is required.");
+  }
+
+  const data = await request(`/bookings/${bookingId}/accept`, {
+    method: "POST",
+  });
+  return data.booking;
+}
+
+export async function declineProviderBooking(bookingId, reason) {
+  if (!bookingId) {
+    throw new Error("bookingId is required.");
+  }
+
+  const body = {};
+  if (reason) body.reason = reason;
+
+  const data = await request(`/bookings/${bookingId}/decline`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return data.booking;
+}
+
 export async function fetchProviderEarnings() {
   const data = await request("/provider/earnings");
   return data.earnings || {

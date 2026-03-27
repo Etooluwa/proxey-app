@@ -9,6 +9,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { supabase } from '../../utils/supabase';
 import Header from '../../components/ui/Header';
 import Avatar from '../../components/ui/Avatar';
 import Lbl from '../../components/ui/Lbl';
@@ -90,6 +91,7 @@ const EmptyKliques = ({ handle }) => (
 const ClientRow = ({ client, onClick }) => {
     const statusCfg = STATUS[client.status] || STATUS.active;
     const lastVisit = fmtLastVisit(client.last_visit);
+    const sourceLabel = client.source === 'invite' ? 'via invite' : 'via booking';
 
     return (
         <>
@@ -111,7 +113,7 @@ const ClientRow = ({ client, onClick }) => {
                         </div>
                         <p className="text-[13px] text-muted m-0">
                             {client.visits} {client.visits === 1 ? 'visit' : 'visits'}
-                            {lastVisit ? ` · Last: ${lastVisit}` : ''}
+                            {lastVisit ? ` · Last: ${lastVisit}` : ` · ${sourceLabel}`}
                         </p>
                     </div>
                 </div>
@@ -127,12 +129,13 @@ const ClientRow = ({ client, onClick }) => {
 const ProviderClients = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
-    const { profile } = useSession();
+    const { session, profile } = useSession();
     const { unreadCount } = useNotifications();
 
     const [clients, setClients] = useState([]);
     const [handle, setHandle] = useState('');
     const [loading, setLoading] = useState(true);
+    const providerId = session?.user?.id;
 
     const initials = (profile?.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
@@ -158,6 +161,39 @@ const ProviderClients = () => {
         load();
         return () => { cancelled = true; };
     }, []);
+
+    useEffect(() => {
+        if (!supabase || !providerId) return undefined;
+
+        const refreshClients = async () => {
+            try {
+                const clientsData = await request('/provider/clients');
+                setClients(clientsData.clients || []);
+            } catch (err) {
+                console.error('[ProviderClients] realtime refresh error:', err);
+            }
+        };
+
+        const channel = supabase
+            .channel(`provider-clients:${providerId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'provider_clients',
+                filter: `provider_id=eq.${providerId}`,
+            }, refreshClients)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `provider_id=eq.${providerId}`,
+            }, refreshClients)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [providerId]);
 
   
     // ── Desktop layout ─────────────────────────────────────────────────────────

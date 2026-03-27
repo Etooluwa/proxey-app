@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { request } from '../data/apiClient';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
@@ -143,9 +144,20 @@ const AppDashboard = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session } = useSession();
 
+    const { notifications } = useNotifications();
+
+    // Find unread session_complete notifications that need a review
+    const sessionCompleteNotifs = (notifications || []).filter(
+        (n) => (n.type === 'session_complete' || n.type === 'booking_completed')
+            && !n.is_read
+            && (n.data?.show_review_prompt !== false)
+            && (n.booking_id || n.data?.booking_id)
+    );
+    const firstReviewNotif = sessionCompleteNotifs[0];
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
 
     useEffect(() => {
         if (!session?.accessToken) {
@@ -226,6 +238,27 @@ const AppDashboard = () => {
                     {/* Provider list */}
                     {!loading && !error && kliques.length > 0 && (
                         <>
+                            {/* Review banner (desktop) */}
+                            {firstReviewNotif && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 18px', background: '#FFF5E6', borderRadius: 14, border: '1px solid rgba(194,94,74,0.15)', marginBottom: 20 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <div>
+                                            <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: '#92400E', margin: '0 0 2px' }}>How was your last session?</p>
+                                            <p style={{ fontFamily: F, fontSize: 12, color: '#B45309', margin: 0 }}>{firstReviewNotif.body || firstReviewNotif.message}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate(`/app/review/${firstReviewNotif.booking_id || firstReviewNotif.data?.booking_id}`)}
+                                        style={{ flexShrink: 0, padding: '8px 18px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#C25E4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    >
+                                        Leave a review →
+                                    </button>
+                                </div>
+                            )}
+
                             <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 14 }}>
                                 {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
                             </span>
@@ -293,7 +326,26 @@ const AppDashboard = () => {
                             </h1>
                         </div>
 
-                        {/* Hairline-separated rows */}
+                        {/* Review banner (mobile) */}
+                        {firstReviewNotif && (
+                            <div
+                                className="flex items-center justify-between gap-3 p-4 rounded-[14px] mb-5"
+                                style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.15)' }}
+                            >
+                                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                    <svg width="16" height="16" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0">
+                                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                    <p className="text-[13px] font-medium truncate m-0" style={{ color: '#92400E', fontFamily: "'Sora',system-ui,sans-serif" }}>How was your last session?</p>
+                                </div>
+                                <button
+                                    onClick={() => navigate(`/app/review/${firstReviewNotif.booking_id || firstReviewNotif.data?.booking_id}`)}
+                                    style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 12, fontWeight: 600, color: '#C25E4A', cursor: 'pointer' }}
+                                >
+                                    Review →
+                                </button>
+                            </div>
+                        )}
                         <div>
                             {kliques.map((provider, i) => (
                                 <ProviderRow

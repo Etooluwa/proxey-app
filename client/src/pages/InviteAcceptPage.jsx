@@ -9,7 +9,7 @@
  * Edge cases: invalid code, expired, own invite, provider role user, already connected
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
@@ -526,6 +526,7 @@ function Spinner() {
 // ─── Main page ──────────────────────────────────────────────────────────────────
 export default function InviteAcceptPage() {
     const { code } = useParams();
+    const [searchParams] = useSearchParams();
     const { session, loading: authLoading } = useSession();
     const { loginWithGoogle } = useSession();
 
@@ -542,7 +543,7 @@ export default function InviteAcceptPage() {
         if (authLoading) return;
         if (!code) { setErrorReason('not_found'); setScreen('error'); return; }
         loadInvite();
-    }, [code, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [code, authLoading, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadInvite = async () => {
         try {
@@ -553,6 +554,11 @@ export default function InviteAcceptPage() {
                 return;
             }
             setProvider(data.provider);
+
+            if (searchParams.get('accepted') === 'true') {
+                setScreen('connected');
+                return;
+            }
 
             if (session) {
                 // Scenario A: logged in — connect immediately

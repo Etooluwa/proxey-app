@@ -5,14 +5,15 @@
  * 3-tab bookings page:
  *   Pending  — cards with Accept / Decline flow
  *   Upcoming — confirmed sessions not yet passed
- *   Past     — completed / cancelled / declined sessions
+ *   Past     — completed / cancelled sessions
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { fetchProviderJobs, updateProviderJobStatus } from '../../data/provider';
-import request from '../../data/apiClient';
+import { acceptProviderBooking, declineProviderBooking, fetchProviderBookings } from '../../data/provider';
+import { supabase } from '../../utils/supabase';
+import { getProviderBookingTab, splitProviderBookings } from '../../utils/providerBookings';
 import Header from '../../components/ui/Header';
 import Avatar from '../../components/ui/Avatar';
 import Lbl from '../../components/ui/Lbl';
@@ -295,7 +296,10 @@ const BookingRow = ({ job, onClick, isLast }) => {
     const price = fmtPrice(job.price);
     const duration = fmtDuration(job.duration);
     const isCompleted = job.status === 'completed';
-    const isCancelled = ['cancelled', 'declined'].includes(job.status);
+    const isCancelled = job.status === 'cancelled';
+    const isAwaitingCompletion =
+        (job.status || '').toLowerCase() === 'confirmed' &&
+        getProviderBookingTab(job) === 'past';
 
     return (
         <div
@@ -358,7 +362,25 @@ const BookingRow = ({ job, onClick, isLast }) => {
                         Cancelled
                     </span>
                 )}
-                {!isCompleted && !isCancelled && job.status === 'confirmed' && (
+                {isAwaitingCompletion && (
+                    <>
+                        <span style={{
+                            fontFamily: F,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#92400E',
+                            background: '#FFF5E6',
+                            padding: '3px 10px',
+                            borderRadius: 999,
+                        }}>
+                            Awaiting Completion
+                        </span>
+                        <span style={{ fontFamily: F, fontSize: 11, color: '#92400E' }}>
+                            Open to mark complete
+                        </span>
+                    </>
+                )}
+                {!isCompleted && !isCancelled && !isAwaitingCompletion && job.status === 'confirmed' && (
                     <span style={{
                         fontFamily: F,
                         fontSize: 11,
@@ -380,7 +402,7 @@ const BookingRow = ({ job, onClick, isLast }) => {
 
 const ProviderAppointments = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
-    const { profile } = useSession();
+    const { session, profile } = useSession();
     const { unreadCount } = useNotifications();
     const navigate = useNavigate();
 
@@ -390,13 +412,19 @@ const ProviderAppointments = () => {
     const [declining, setDeclining] = useState(null);
     const [declineReason, setDeclineReason] = useState('');
     const [activeTab, setActiveTab] = useState('pending');
+    const providerId = session?.user?.id;
 
     const initials = (profile?.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
     const load = useCallback(async () => {
+        if (!providerId) {
+            setJobs([]);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
-            const data = await fetchProviderJobs();
+            const data = await fetchProviderBookings(providerId);
             setJobs(data || []);
         } catch (err) {
             console.error('[ProviderAppointments] load error:', err);
@@ -404,30 +432,32 @@ const ProviderAppointments = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [providerId]);
 
     useEffect(() => { load(); }, [load]);
 
+    useEffect(() => {
+        if (!supabase || !providerId) return undefined;
+
+        const channel = supabase
+            .channel(`provider-bookings:${providerId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `provider_id=eq.${providerId}`,
+            }, () => {
+                load();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [load, providerId]);
+
     // ── Derive tab lists ──────────────────────────────────────────────────────
-    const nowIso = new Date().toISOString();
-
-    const pending = jobs
-        .filter((j) => (j.status || '').toLowerCase() === 'pending');
-
-    const upcoming = jobs
-        .filter((j) => {
-            const s = (j.status || '').toLowerCase();
-            return s === 'confirmed' && j.scheduled_at >= nowIso;
-        })
-        .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''));
-
-    const past = jobs
-        .filter((j) => {
-            const s = (j.status || '').toLowerCase();
-            return ['completed', 'cancelled', 'declined'].includes(s) ||
-                (s === 'confirmed' && j.scheduled_at < nowIso);
-        })
-        .sort((a, b) => (b.scheduled_at || '').localeCompare(a.scheduled_at || ''));
+    const { pending, upcoming, past } = splitProviderBookings(jobs);
 
     const pendingCount = pending.length;
     const upcomingCount = upcoming.length;
@@ -437,8 +467,12 @@ const ProviderAppointments = () => {
     const handleAccept = async (job) => {
         setActioning(job.id);
         try {
-            await updateProviderJobStatus(job.id, 'confirmed');
-            await load();
+            const updatedBooking = await acceptProviderBooking(job.id);
+            if (updatedBooking) {
+                setJobs((prev) => prev.map((item) => (item.id === job.id ? updatedBooking : item)));
+            } else {
+                await load();
+            }
         } catch (err) {
             console.error('[accept]', err);
         } finally {
@@ -459,10 +493,14 @@ const ProviderAppointments = () => {
     const handleConfirmDecline = async (job) => {
         setActioning(job.id);
         try {
-            await updateProviderJobStatus(job.id, 'declined', declineReason.trim() || undefined);
+            const updatedBooking = await declineProviderBooking(job.id, declineReason.trim() || undefined);
             setDeclining(null);
             setDeclineReason('');
-            await load();
+            if (updatedBooking) {
+                setJobs((prev) => prev.map((item) => (item.id === job.id ? updatedBooking : item)));
+            } else {
+                await load();
+            }
         } catch (err) {
             console.error('[decline]', err);
         } finally {

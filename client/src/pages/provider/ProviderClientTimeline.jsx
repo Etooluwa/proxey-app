@@ -3,13 +3,14 @@
  * Route: /provider/client/:clientId
  *
  * API: GET /api/provider/clients/:clientId
- *   → { client: { name, avatar }, stats: { visits, ltv, first_visit }, bookings }
+ *   → { client, connection, stats, timeline, bookings }
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useMessages } from '../../contexts/MessageContext';
 import { request } from '../../data/apiClient';
+import { supabase } from '../../utils/supabase';
 import BackBtn from '../../components/ui/BackBtn';
 import HeroCard from '../../components/ui/HeroCard';
 import HeroPill from '../../components/ui/HeroPill';
@@ -57,35 +58,11 @@ function fmtDuration(mins) {
     return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-// ─── Timeline item type ───────────────────────────────────────────────────────
-// confirmed/pending → accent dot
-// completed         → success dot
-// first (oldest)    → gold milestone dot
-
-function dotColor(booking, isMilestone) {
-    if (isMilestone) return '#D4A853';
-    if (booking.status === 'completed') return '#5A8A5E';
-    if (booking.status === 'cancelled') return '#B0948F';
-    return '#C25E4A'; // pending / confirmed / upcoming
-}
-
-const MILESTONE_INTERVALS = [5, 10, 25, 50]; // every N completed sessions gets a milestone
-
-function buildTimeline(bookings) {
-    // bookings are newest-first from API; we keep that order
-    const nonCancelled = bookings.filter((b) => b.status !== 'cancelled');
-    const completedCount = nonCancelled.filter((b) => b.status === 'completed').length;
-
-    return bookings.map((b, idx) => {
-        const isOldest = idx === bookings.length - 1;
-        // Milestones: check if this booking is the Nth completed (count from oldest)
-        const fromOldest = bookings.length - 1 - idx;
-        const completedUpToHere = bookings
-            .slice(idx) // older bookings (inclusive)
-            .filter((x) => x.status === 'completed').length;
-        const isMilestone = isOldest || MILESTONE_INTERVALS.includes(completedUpToHere);
-        return { booking: b, isMilestone, isOldest };
-    });
+function timelineDotColor(entry) {
+    if (entry.type === 'connected') return '#C25E4A';
+    if (entry.status === 'completed') return '#5A8A5E';
+    if (entry.status === 'cancelled') return '#B04040';
+    return '#C25E4A';
 }
 
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
@@ -96,14 +73,26 @@ const Shimmer = ({ className }) => (
 
 // ─── Timeline entry ───────────────────────────────────────────────────────────
 
-const TimelineEntry = ({ entry, isLast }) => {
-    const { booking: b, isMilestone } = entry;
-    const isUpcoming = b.status === 'pending' || b.status === 'confirmed';
-    const dot = dotColor(b, isMilestone);
-    const price = fmtPrice(b.price);
-    const duration = fmtDuration(b.duration);
-    const dateLabel = fmtDate(b.scheduled_at);
-    const timeLabel = fmtTime(b.scheduled_at);
+const TimelineEntry = ({ entry, isLast, clientName }) => {
+    const isConnected = entry.type === 'connected';
+    const isUpcoming = entry.status === 'pending' || entry.status === 'confirmed';
+    const isCompleted = entry.status === 'completed';
+    const isCancelled = entry.status === 'cancelled';
+    const dot = timelineDotColor(entry);
+    const price = fmtPrice(entry.price);
+    const duration = fmtDuration(entry.duration);
+    const dateLabel = fmtDate(entry.scheduled_at);
+    const timeLabel = fmtTime(entry.scheduled_at);
+    const serviceLabel = isConnected
+        ? `${clientName || 'Client'} joined your klique`
+        : (entry.service_name || 'Session');
+    const metaLabel = isConnected
+        ? `Connected ${entry.source === 'invite' ? 'via invite' : 'via booking'}`
+        : isCompleted
+            ? 'Session complete'
+            : isCancelled
+                ? 'Cancelled'
+                : 'Upcoming';
 
     return (
         <div>
@@ -126,23 +115,23 @@ const TimelineEntry = ({ entry, isLast }) => {
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1 gap-2">
                         <p className="text-[15px] text-ink m-0 leading-snug flex-1">
-                            {isMilestone && !isUpcoming
-                                ? `${b.status === 'completed' ? '🏅 ' : ''}${b.service_name || 'Session'}`
-                                : (b.service_name || 'Session')}
+                            {serviceLabel}
                         </p>
-                        {price && (
+                        {!isConnected && price && (
                             <span className="text-[15px] text-ink flex-shrink-0">{price}</span>
                         )}
                     </div>
 
                     <Lbl className="block mb-1">
                         {dateLabel}{timeLabel ? ` · ${timeLabel}` : ''}
-                        {duration ? ` · ${duration}` : ''}
+                        {!isConnected && duration ? ` · ${duration}` : ''}
                     </Lbl>
 
-                    {b.notes && (
+                    <p className="text-[13px] text-muted m-0 mt-1">{metaLabel}</p>
+
+                    {!isConnected && entry.notes && (
                         <p className="text-[13px] text-muted leading-relaxed italic m-0 mt-1.5">
-                            {b.notes}
+                            {entry.notes}
                         </p>
                     )}
 
@@ -156,12 +145,28 @@ const TimelineEntry = ({ entry, isLast }) => {
                                 Confirmed
                             </span>
                         )}
-                        {isMilestone && (
+                        {isCompleted && (
                             <span
                                 className="inline-flex px-2.5 py-1 rounded-pill text-[10px] font-semibold uppercase tracking-[0.05em]"
-                                style={{ background: '#FFF5E6', color: '#92400E' }}
+                                style={{ background: '#EBF2EC', color: '#5A8A5E' }}
                             >
-                                Milestone
+                                Session complete
+                            </span>
+                        )}
+                        {isCancelled && (
+                            <span
+                                className="inline-flex px-2.5 py-1 rounded-pill text-[10px] font-semibold uppercase tracking-[0.05em]"
+                                style={{ background: '#FDEDEA', color: '#B04040' }}
+                            >
+                                Cancelled
+                            </span>
+                        )}
+                        {isConnected && (
+                            <span
+                                className="inline-flex px-2.5 py-1 rounded-pill text-[10px] font-semibold uppercase tracking-[0.05em]"
+                                style={{ background: '#FDDCC6', color: '#C25E4A' }}
+                            >
+                                Connected
                             </span>
                         )}
                     </div>
@@ -181,10 +186,12 @@ const ProviderClientTimeline = () => {
     const { getOrCreateConversation, setCurrentConversation, loadMessages } = useMessages();
 
     const [client, setClient] = useState(null);
+    const [connection, setConnection] = useState(null);
     const [stats, setStats] = useState(null);
-    const [bookings, setBookings] = useState([]);
+    const [timeline, setTimeline] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const providerId = session?.user?.id;
 
     useEffect(() => {
         if (!clientId) return;
@@ -196,8 +203,9 @@ const ProviderClientTimeline = () => {
                 const data = await request(`/provider/clients/${clientId}`);
                 if (!cancelled) {
                     setClient(data.client);
+                    setConnection(data.connection || null);
                     setStats(data.stats);
-                    setBookings(data.bookings || []);
+                    setTimeline(data.timeline || []);
                 }
             } catch (err) {
                 console.error('[ProviderClientTimeline] load error:', err);
@@ -209,6 +217,42 @@ const ProviderClientTimeline = () => {
         load();
         return () => { cancelled = true; };
     }, [clientId]);
+
+    useEffect(() => {
+        if (!supabase || !providerId || !clientId) return undefined;
+
+        const refreshTimeline = async () => {
+            try {
+                const data = await request(`/provider/clients/${clientId}`);
+                setClient(data.client);
+                setConnection(data.connection || null);
+                setStats(data.stats);
+                setTimeline(data.timeline || []);
+            } catch (err) {
+                console.error('[ProviderClientTimeline] realtime refresh error:', err);
+            }
+        };
+
+        const channel = supabase
+            .channel(`provider-client:${providerId}:${clientId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'provider_clients',
+                filter: `provider_id=eq.${providerId}`,
+            }, refreshTimeline)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `provider_id=eq.${providerId}`,
+            }, refreshTimeline)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [providerId, clientId]);
 
     const handleMessage = async () => {
         try {
@@ -226,9 +270,9 @@ const ProviderClientTimeline = () => {
     };
 
     const initials = getInitials(client?.name);
-    const clientSince = fmtShortDate(stats?.first_visit);
-    const lastVisit = bookings.find((b) => b.status === 'completed')?.scheduled_at;
-    const timeline = buildTimeline(bookings);
+    const connectedSince = fmtShortDate(connection?.connected_at || stats?.connected_at);
+    const lastVisit = stats?.last_visit;
+    const hasBookingEvents = timeline.some((entry) => entry.type === 'booking');
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
@@ -240,8 +284,8 @@ const ProviderClientTimeline = () => {
             {/* ── Hero card ── */}
             <div className="px-5 mb-6">
                 <HeroCard>
-                    {clientSince && (
-                        <HeroPill className="mb-4">Client since {clientSince}</HeroPill>
+                    {connectedSince && (
+                        <HeroPill className="mb-4">Connected · {connectedSince}</HeroPill>
                     )}
 
                     <div className="flex items-center gap-4">
@@ -272,7 +316,7 @@ const ProviderClientTimeline = () => {
                                         {client?.name || 'Client'}
                                     </h1>
                                     <p className="text-[14px] text-muted m-0">
-                                        {stats?.visits ?? 0} session{(stats?.visits ?? 0) !== 1 ? 's' : ''}
+                                        {stats?.session_count ?? stats?.visits ?? 0} session{((stats?.session_count ?? stats?.visits ?? 0) !== 1) ? 's' : ''}
                                         {lastVisit ? ` · Last: ${fmtDateShort(lastVisit)}` : ''}
                                     </p>
                                 </>
@@ -330,25 +374,26 @@ const ProviderClientTimeline = () => {
                         )}
 
                         {/* Empty */}
-                        {!loading && bookings.length === 0 && (
-                            <div className="py-10 flex flex-col items-center">
-                                <p className="text-[15px] text-muted text-center">No sessions yet.</p>
-                                <p className="text-[13px] text-faded text-center mt-1">
-                                    Book a session to start building this client's history.
-                                </p>
-                            </div>
-                        )}
-
                         {/* Timeline entries */}
                         {!loading && timeline.length > 0 && (
                             <div>
                                 {timeline.map((entry, i) => (
                                     <TimelineEntry
-                                        key={entry.booking.id}
+                                        key={entry.id}
                                         entry={entry}
+                                        clientName={client?.name}
                                         isLast={i === timeline.length - 1}
                                     />
                                 ))}
+                            </div>
+                        )}
+
+                        {!loading && !hasBookingEvents && (
+                            <div className="py-8 flex flex-col items-center">
+                                <p className="text-[15px] text-muted text-center">No sessions yet.</p>
+                                <p className="text-[13px] text-faded text-center mt-1">
+                                    Once {client?.name || 'this client'} books, their history will appear here.
+                                </p>
                             </div>
                         )}
                     </>

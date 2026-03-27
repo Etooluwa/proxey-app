@@ -64,6 +64,16 @@ function ordinal(n) {
     return `${n}th`;
 }
 
+function normaliseBookingJob(booking) {
+    return {
+        ...booking,
+        source: 'booking',
+        visit_count: booking.visit_count || 0,
+        client_since: booking.client_since || null,
+        previous_notes: booking.previous_notes || null,
+    };
+}
+
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 
 const Shimmer = ({ className }) => (
@@ -213,10 +223,10 @@ const ProviderAppointmentDetail = () => {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await request(`/provider/jobs/${id}`);
-            const j = data.job || null;
+            const data = await request(`/bookings/${id}`);
+            const j = data.booking ? normaliseBookingJob(data.booking) : null;
             setJob(j);
-            setNotes(j?.notes || '');
+            setNotes('');
             if (j?.status === 'completed') {
                 setCompleted(true);
             }
@@ -230,6 +240,7 @@ const ProviderAppointmentDetail = () => {
     useEffect(() => { load(); }, [load]);
 
     const handleSaveNotes = async () => {
+        if (job?.source === 'booking') return;
         if (!notes.trim() || savingNotes) return;
         setSavingNotes(true);
         try {
@@ -260,12 +271,21 @@ const ProviderAppointmentDetail = () => {
         if (!job || completing) return;
         setCompleting(true);
         try {
-            const data = await request(`/provider/jobs/${id}/complete`, {
+            const data = await request(`/bookings/${id}/complete`, {
                 method: 'POST',
-                body: JSON.stringify({ sessionNotes: notes.trim() || undefined }),
             });
-            setPayoutData(data.payout || null);
-            setJob((prev) => ({ ...prev, status: 'completed' }));
+            const payout = data.payout
+                ? {
+                    totalPrice: data.payout.grossAmount,
+                    depositCollected: data.payout.depositCollected,
+                    remainingCharged: data.payout.remainingCharged,
+                    platformFee: data.payout.platformFee,
+                    providerPayout: data.payout.netAmount,
+                    paymentType: job.payment_type || 'full',
+                }
+                : null;
+            setPayoutData(payout);
+            setJob((prev) => ({ ...prev, status: 'completed', completed_at: new Date().toISOString() }));
             setCompleted(true);
         } catch (err) {
             console.error('[markComplete]', err);
@@ -468,7 +488,7 @@ const ProviderAppointmentDetail = () => {
                     </div>
 
                     {/* Current notes textarea */}
-                    {!isAlreadyCompleted && (
+                    {!isAlreadyCompleted && job.source !== 'booking' && (
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
@@ -487,6 +507,11 @@ const ProviderAppointmentDetail = () => {
                                 boxSizing: 'border-box',
                             }}
                         />
+                    )}
+                    {!isAlreadyCompleted && job.source === 'booking' && (
+                        <p className="text-[14px] text-muted m-0 leading-relaxed">
+                            This booking will move to Completed after you tap Mark Complete.
+                        </p>
                     )}
                     {isAlreadyCompleted && notes && (
                         <p className="text-[14px] text-ink m-0 leading-relaxed">{notes}</p>

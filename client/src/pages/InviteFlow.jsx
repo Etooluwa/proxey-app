@@ -406,7 +406,7 @@ function ScreenMagicLink({ inviteCode, provider, onSuccess }) {
   // If already authenticated, accept immediately
   useEffect(() => {
     if (!session || !inviteCode) return;
-    request(`/provider/invites/join/${inviteCode}/accept`, { method: "POST" })
+    request(`/invites/${inviteCode}/accept`, { method: "POST" })
       .then(() => {
         sessionStorage.removeItem(INVITE_KEY);
         onSuccess();
@@ -672,7 +672,7 @@ function InviteFlow() {
 
   const acceptAndAdvance = async (inviteCode) => {
     try {
-      await request(`/provider/invites/join/${inviteCode}/accept`, { method: "POST" });
+      await request(`/invites/${inviteCode}/accept`, { method: "POST" });
       sessionStorage.removeItem(INVITE_KEY);
     } catch {
       sessionStorage.removeItem(INVITE_KEY);

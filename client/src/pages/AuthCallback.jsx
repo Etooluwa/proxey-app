@@ -34,7 +34,7 @@ export default function AuthCallback() {
       const pendingInviteCode = sessionStorage.getItem(INVITE_KEY);
       if (pendingInviteCode) {
         try {
-          await request(`/provider/invites/join/${pendingInviteCode}/accept`, {
+          await request(`/invites/${pendingInviteCode}/accept`, {
             method: "POST",
           });
         } catch (err) {

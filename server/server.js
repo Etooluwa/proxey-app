@@ -456,6 +456,80 @@ async function resolveProviderId(req) {
   return data.id;
 }
 
+async function getProviderIdentity(providerIdentifier) {
+  if (!providerIdentifier || !supabase) {
+    return {
+      authId: providerIdentifier || null,
+      recordId: null,
+      ids: providerIdentifier ? [providerIdentifier] : [],
+    };
+  }
+
+  try {
+    const { data } = await supabase
+      .from("providers")
+      .select("id, user_id")
+      .or(`user_id.eq.${providerIdentifier},id.eq.${providerIdentifier}`)
+      .maybeSingle();
+
+    const authId = data?.user_id || providerIdentifier;
+    const recordId = data?.id || null;
+    const ids = Array.from(new Set([authId, recordId].filter(Boolean)));
+
+    return { authId, recordId, ids };
+  } catch (error) {
+    console.warn("[provider identity] Failed to resolve provider identity", error);
+    return {
+      authId: providerIdentifier,
+      recordId: null,
+      ids: providerIdentifier ? [providerIdentifier] : [],
+    };
+  }
+}
+
+async function ensureProviderClientConnection({ providerId, clientId, inviteId = null, source = "booking", connectedAt = new Date().toISOString() }) {
+  if (!supabase || !providerId || !clientId) return { created: false, connection: null };
+
+  const { data: existing, error: existingError } = await supabase
+    .from("provider_clients")
+    .select("id, provider_id, client_id, invite_id, connected_at, source")
+    .eq("provider_id", providerId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return { created: false, connection: existing };
+
+  const payload = {
+    provider_id: providerId,
+    client_id: clientId,
+    connected_at: connectedAt,
+    source,
+  };
+  if (inviteId) payload.invite_id = inviteId;
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("provider_clients")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: duplicate } = await supabase
+        .from("provider_clients")
+        .select("id, provider_id, client_id, invite_id, connected_at, source")
+        .eq("provider_id", providerId)
+        .eq("client_id", clientId)
+        .maybeSingle();
+      return { created: false, connection: duplicate || null };
+    }
+    throw insertError;
+  }
+
+  return { created: true, connection: inserted };
+}
+
 // Admin user IDs from environment variable (comma-separated UUIDs)
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
@@ -1455,6 +1529,15 @@ app.post("/api/bookings", async (req, res) => {
       if (error) {
         console.warn("[supabase] Failed to create booking, using stub.", error);
       } else {
+        await ensureProviderClientConnection({
+          providerId: data.provider_id,
+          clientId: data.client_id,
+          source: "booking",
+          connectedAt: data.created_at || now,
+        }).catch((err) => {
+          console.warn("[bookings] provider_clients upsert:", err.message);
+        });
+
         // Save intake responses if provided
         if (Array.isArray(intakeResponses) && intakeResponses.length > 0) {
           const rows = intakeResponses
@@ -3732,6 +3815,47 @@ app.get("/api/provider/bookings/pending-count", async (req, res) => {
   }
 });
 
+function getLocalDateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getProviderBookingTab(booking, todayKey = getLocalDateKey()) {
+  const status = String(booking?.status || "").toLowerCase();
+  const bookingDateKey = getLocalDateKey(booking?.scheduled_at);
+
+  if (status === "pending") return "pending";
+  if (status === "completed" || status === "cancelled") return "past";
+  if (status === "confirmed") {
+    if (!bookingDateKey || !todayKey) return "upcoming";
+    return bookingDateKey < todayKey ? "past" : "upcoming";
+  }
+
+  return null;
+}
+
+function sortProviderBookings(bookings, tab) {
+  const items = [...(bookings || [])];
+
+  if (tab === "pending") {
+    return items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  }
+
+  if (tab === "upcoming") {
+    return items.sort((a, b) => (a.scheduled_at || "").localeCompare(b.scheduled_at || ""));
+  }
+
+  if (tab === "past") {
+    return items.sort((a, b) => (b.scheduled_at || "").localeCompare(a.scheduled_at || ""));
+  }
+
+  return items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+}
+
 // GET /api/provider/calendar?year=YYYY&month=M(0-based) — bookings for this provider
 // grouped by YYYY-MM-DD for the given month, used by the calendar view.
 app.get("/api/provider/calendar", async (req, res) => {
@@ -3780,7 +3904,8 @@ app.get("/api/provider/calendar", async (req, res) => {
 
     const blockedDates = {};
     for (const row of blockedRows || []) {
-      blockedDates[row.date] = row;
+      if (!blockedDates[row.date]) blockedDates[row.date] = [];
+      blockedDates[row.date].push(row);
     }
 
     res.status(200).json({ byDate, blockedDates });
@@ -3790,201 +3915,272 @@ app.get("/api/provider/calendar", async (req, res) => {
   }
 });
 
-// GET /api/provider/clients — all clients connected to this provider
-// Source of truth: provider_clients table (includes invite-only connections)
-// Booking data merged in for visits, LTV, and last visit.
-app.get("/api/provider/clients", async (req, res) => {
-  if (!supabase) {
-    return res.status(500).json({ error: "Supabase client is not configured." });
+async function buildProviderClientsResponse(providerIdentifier) {
+  const identity = await getProviderIdentity(providerIdentifier);
+  const providerIds = identity.ids;
+  if (providerIds.length === 0) return { clients: [] };
+
+  const { data: connections, error: connErr } = await supabase
+    .from("provider_clients")
+    .select("id, provider_id, client_id, invite_id, connected_at, source")
+    .in("provider_id", providerIds)
+    .order("connected_at", { ascending: false });
+
+  if (connErr) throw connErr;
+
+  const connectionMap = {};
+  for (const row of connections || []) {
+    if (!row?.client_id) continue;
+    if (!connectionMap[row.client_id] || new Date(row.connected_at) > new Date(connectionMap[row.client_id].connected_at)) {
+      connectionMap[row.client_id] = row;
+    }
   }
 
-  const userId = getUserId(req);
+  const clientIds = Object.keys(connectionMap);
+  if (clientIds.length === 0) return { clients: [] };
 
-  try {
-    // Resolve providers.id from user_id (provider_clients uses the providers PK in some envs)
-    let providerId = userId;
-    const { data: providerRow } = await supabase
-      .from("providers")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (providerRow?.id) providerId = providerRow.id;
-
-    // 1. Existing connections for this provider (auth UUID as provider_id)
-    const { data: connections, error: connErr } = await supabase
-      .from("provider_clients")
-      .select("client_id, connected_at, source")
-      .eq("provider_id", userId);
-
-    if (connErr) throw connErr;
-
-    // 2. Include any clients who have booked but aren't yet in provider_clients
-    const { data: bookingRows } = await supabase
-      .from("bookings")
-      .select("client_id, client_name, scheduled_at, price, status")
-      .eq("provider_id", userId)
-      .neq("status", "cancelled");
-
-    const connMap = {};
-    for (const c of connections || []) connMap[c.client_id] = c;
-
-    const bookingClientIds = new Set();
-    for (const b of bookingRows || []) {
-      if (b.client_id) bookingClientIds.add(b.client_id);
-    }
-
-    const missingClientIds = [...bookingClientIds].filter((cid) => !connMap[cid]);
-
-    if (missingClientIds.length > 0) {
-      const nowIso = new Date().toISOString();
-      await supabase
-        .from("provider_clients")
-        .upsert(
-          missingClientIds.map((cid) => ({
-            provider_id: userId,
-            client_id: cid,
-            source: "booking",
-            connected_at: nowIso,
-          })),
-          { onConflict: "provider_id,client_id" }
-        )
-        .catch((err) => console.warn("[provider/clients] upsert from bookings:", err.message));
-
-      // Add to local map so response includes them immediately
-      for (const cid of missingClientIds) {
-        connMap[cid] = { client_id: cid, connected_at: nowIso, source: "booking" };
-      }
-    }
-
-    const clientIds = Array.from(new Set([...(connections || []).map((c) => c.client_id), ...bookingClientIds]));
-    if (clientIds.length === 0) return res.status(200).json({ clients: [] });
-
-    // 3. Booking aggregates — optional enrichment
-    const { data: bookings } = await supabase
-      .from("bookings")
-      .select("client_id, client_name, scheduled_at, price, status")
-      .eq("provider_id", userId)
-      .in("client_id", clientIds)
-      .neq("status", "cancelled");
-
-    const bookingMap = {};
-    for (const b of bookings || []) {
-      if (!bookingMap[b.client_id]) {
-        bookingMap[b.client_id] = { client_name: b.client_name, visits: 0, ltv: 0, last_visit: null };
-      }
-      bookingMap[b.client_id].visits += 1;
-      bookingMap[b.client_id].ltv += b.price || 0;
-      const bDate = b.scheduled_at ? new Date(b.scheduled_at) : null;
-      if (bDate && (!bookingMap[b.client_id].last_visit || bDate > new Date(bookingMap[b.client_id].last_visit))) {
-        bookingMap[b.client_id].last_visit = b.scheduled_at;
-      }
-    }
-
-    // 4. Client profiles for name + avatar
-    const { data: profiles } = await supabase
+  const [{ data: profiles, error: profileErr }, { data: bookings, error: bookingsErr }] = await Promise.all([
+    supabase
       .from("client_profiles")
-      .select("user_id, name, avatar")
-      .in("user_id", clientIds);
+      .select("user_id, name, email, phone, city, avatar")
+      .in("user_id", clientIds),
+    supabase
+      .from("bookings")
+      .select("client_id, client_name, scheduled_at, price, status")
+      .eq("provider_id", identity.authId)
+      .in("client_id", clientIds),
+  ]);
 
-    const profileMap = {};
-    for (const p of profiles || []) profileMap[p.user_id] = p;
+  if (profileErr) throw profileErr;
+  if (bookingsErr) throw bookingsErr;
 
-    // 5. Build response
-    
-    const threeWeeksAgo = new Date();
-    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+  const profileMap = {};
+  for (const profile of profiles || []) profileMap[profile.user_id] = profile;
 
-    const clients = clientIds.map((cid) => {
-      const conn = connMap[cid];
-      const profile = profileMap[cid] || {};
-      const bk = bookingMap[cid] || { visits: 0, ltv: 0, last_visit: null };
-      const lastVisitDate = bk.last_visit ? new Date(bk.last_visit) : null;
+  const bookingMap = {};
+  for (const booking of bookings || []) {
+    if (!booking?.client_id) continue;
+    if (!bookingMap[booking.client_id]) {
+      bookingMap[booking.client_id] = {
+        visit_count: 0,
+        last_visit: null,
+        last_booking_at: null,
+        client_name: booking.client_name || null,
+      };
+    }
 
-      let status;
-      if (bk.visits === 0) {
-        status = "new"; // connected via invite, no bookings yet
-      } else if (bk.visits < 3) {
+    const entry = bookingMap[booking.client_id];
+    const scheduledAt = booking.scheduled_at || null;
+
+    if (scheduledAt && (!entry.last_booking_at || new Date(scheduledAt) > new Date(entry.last_booking_at))) {
+      entry.last_booking_at = scheduledAt;
+    }
+
+    if (booking.status === "completed") {
+      entry.visit_count += 1;
+      if (scheduledAt && (!entry.last_visit || new Date(scheduledAt) > new Date(entry.last_visit))) {
+        entry.last_visit = scheduledAt;
+      }
+    }
+  }
+
+  const now = new Date();
+  const newCutoff = new Date(now);
+  newCutoff.setDate(newCutoff.getDate() - 14);
+  const activeCutoff = new Date(now);
+  activeCutoff.setDate(activeCutoff.getDate() - 30);
+
+  const clients = clientIds
+    .map((clientId) => {
+      const connection = connectionMap[clientId];
+      const profile = profileMap[clientId] || {};
+      const aggregate = bookingMap[clientId] || { visit_count: 0, last_visit: null, last_booking_at: null, client_name: null };
+      const connectedAt = connection?.connected_at || null;
+      const lastVisit = aggregate.last_visit;
+      const lastBookingAt = aggregate.last_booking_at;
+
+      let status = "active";
+      if (aggregate.visit_count === 0 && connectedAt && new Date(connectedAt) >= newCutoff) {
         status = "new";
-      } else if (lastVisitDate && lastVisitDate < threeWeeksAgo) {
+      } else if (aggregate.visit_count > 0 && lastVisit && new Date(lastVisit) < activeCutoff) {
+        status = "at-risk";
+      } else if ((lastBookingAt && new Date(lastBookingAt) >= activeCutoff) || (lastVisit && new Date(lastVisit) >= activeCutoff)) {
+        status = "active";
+      } else if (aggregate.visit_count > 0) {
         status = "at-risk";
       } else {
         status = "active";
       }
 
       return {
-        client_id: cid,
-        name: profile.name || bk.client_name || "Client",
+        id: connection?.id || `${identity.authId}:${clientId}`,
+        provider_id: connection?.provider_id || identity.authId,
+        client_id: clientId,
+        invite_id: connection?.invite_id || null,
+        connected_at: connectedAt,
+        source: connection?.source || "booking",
+        full_name: profile.name || aggregate.client_name || "Client",
+        name: profile.name || aggregate.client_name || "Client",
+        email: profile.email || null,
+        phone: profile.phone || null,
+        city: profile.city || null,
         avatar: profile.avatar || null,
-        visits: bk.visits,
-        ltv: bk.ltv,
-        last_visit: bk.last_visit,
-        connected_at: conn.connected_at,
-        source: conn.source,
+        visit_count: aggregate.visit_count,
+        visits: aggregate.visit_count,
+        last_visit: lastVisit,
+        last_booking_at: lastBookingAt,
         status,
       };
-    });
+    })
+    .sort((a, b) => new Date(b.connected_at || 0) - new Date(a.connected_at || 0));
 
-    // Sort: active → at-risk → new; within group by most recent connection
-    const statusOrder = { active: 0, "at-risk": 1, new: 2 };
-    clients.sort((a, b) =>
-      (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3) ||
-      new Date(b.connected_at) - new Date(a.connected_at)
-    );
+  return { clients };
+}
 
-    res.status(200).json({ clients });
-  } catch (err) {
-    console.error("[provider/clients]", err);
-    res.status(500).json({ error: "Failed to load provider clients." });
+async function buildProviderClientTimeline(providerIdentifier, clientId) {
+  const identity = await getProviderIdentity(providerIdentifier);
+  const providerIds = identity.ids;
+  if (providerIds.length === 0) throw new Error("Provider not found.");
+
+  const [{ data: connection, error: connectionErr }, { data: profile, error: profileErr }, { data: bookings, error: bookingsErr }] = await Promise.all([
+    supabase
+      .from("provider_clients")
+      .select("id, provider_id, client_id, invite_id, connected_at, source")
+      .in("provider_id", providerIds)
+      .eq("client_id", clientId)
+      .order("connected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("client_profiles")
+      .select("user_id, name, email, phone, city, avatar")
+      .eq("user_id", clientId)
+      .maybeSingle(),
+    supabase
+      .from("bookings")
+      .select("id, service_id, service_name, scheduled_at, duration, price, status, notes, completed_at, created_at, client_name")
+      .eq("provider_id", identity.authId)
+      .eq("client_id", clientId)
+      .order("scheduled_at", { ascending: false }),
+  ]);
+
+  if (connectionErr) throw connectionErr;
+  if (profileErr) throw profileErr;
+  if (bookingsErr) throw bookingsErr;
+  if (!connection) {
+    const error = new Error("Client connection not found.");
+    error.status = 404;
+    throw error;
   }
-});
 
-// GET /api/provider/clients/:clientId — full timeline for one client
-app.get("/api/provider/clients/:clientId", async (req, res) => {
+  const allBookings = bookings || [];
+  const completedBookings = allBookings.filter((booking) => booking.status === "completed");
+  const lastVisit = completedBookings.length > 0
+    ? completedBookings.reduce((latest, booking) => {
+        if (!latest) return booking.scheduled_at;
+        return new Date(booking.scheduled_at) > new Date(latest) ? booking.scheduled_at : latest;
+      }, null)
+    : null;
+
+  const events = [
+    {
+      id: `connected-${connection.id || clientId}`,
+      type: "connected",
+      status: "connected",
+      service_name: connection.source,
+      scheduled_at: connection.connected_at,
+      completed_at: null,
+      source: connection.source,
+      connected_at: connection.connected_at,
+    },
+    ...allBookings.map((booking) => ({
+      ...booking,
+      type: "booking",
+      source: booking.status === "cancelled" ? "booking_cancelled" : "booking",
+    })),
+  ].sort((a, b) => new Date(b.scheduled_at || b.connected_at || 0) - new Date(a.scheduled_at || a.connected_at || 0));
+
+  return {
+    client: {
+      user_id: clientId,
+      name: profile?.name || allBookings[0]?.client_name || "Client",
+      full_name: profile?.name || allBookings[0]?.client_name || "Client",
+      email: profile?.email || null,
+      phone: profile?.phone || null,
+      city: profile?.city || null,
+      avatar: profile?.avatar || null,
+    },
+    connection,
+    stats: {
+      visits: completedBookings.length,
+      session_count: completedBookings.length,
+      last_visit: lastVisit,
+      connected_at: connection.connected_at,
+    },
+    timeline: events,
+    bookings: allBookings,
+  };
+}
+
+async function handleProviderClients(req, res, providerIdentifier) {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const userId = getUserId(req);
-  const { clientId } = req.params;
+  try {
+    const callerIdentity = await getProviderIdentity(getUserId(req));
+    const requestedIdentity = await getProviderIdentity(providerIdentifier);
+
+    if (callerIdentity.authId !== requestedIdentity.authId) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
+
+    const payload = await buildProviderClientsResponse(requestedIdentity.authId);
+    return res.status(200).json(payload);
+  } catch (err) {
+    console.error("[provider/clients]", err);
+    return res.status(500).json({ error: "Failed to load provider clients." });
+  }
+}
+
+async function handleProviderClientTimeline(req, res, providerIdentifier, clientId) {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
 
   try {
-    // Client profile
-    const { data: profile } = await supabase
-      .from("client_profiles")
-      .select("user_id, name, avatar, city")
-      .eq("user_id", clientId)
-      .single();
+    const callerIdentity = await getProviderIdentity(getUserId(req));
+    const requestedIdentity = await getProviderIdentity(providerIdentifier);
 
-    // All bookings between this provider and client, newest first
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("id, service_name, scheduled_at, duration, price, status, notes, client_name, created_at")
-      .eq("provider_id", userId)
-      .eq("client_id", clientId)
-      .order("scheduled_at", { ascending: false });
+    if (callerIdentity.authId !== requestedIdentity.authId) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
 
-    if (bookingsError) throw bookingsError;
-
-    const allBookings = bookings || [];
-    const nonCancelled = allBookings.filter((b) => b.status !== "cancelled");
-    const totalVisits = nonCancelled.length;
-    const totalLtv = nonCancelled.reduce((sum, b) => sum + (b.price || 0), 0);
-    const firstVisit = nonCancelled.length > 0
-      ? nonCancelled.reduce((earliest, b) => {
-          const d = new Date(b.scheduled_at || b.created_at);
-          return d < new Date(earliest) ? b.scheduled_at || b.created_at : earliest;
-        }, nonCancelled[0].scheduled_at || nonCancelled[0].created_at)
-      : null;
-
-    res.status(200).json({
-      client: profile || { user_id: clientId, name: allBookings[0]?.client_name || "Client", avatar: null },
-      stats: { visits: totalVisits, ltv: totalLtv, first_visit: firstVisit },
-      bookings: allBookings,
-    });
+    const payload = await buildProviderClientTimeline(requestedIdentity.authId, clientId);
+    return res.status(200).json(payload);
   } catch (err) {
-    console.error("[supabase] Failed to load provider client timeline", err);
-    res.status(500).json({ error: "Failed to load client timeline." });
+    if (err?.status === 404) {
+      return res.status(404).json({ error: "Client connection not found." });
+    }
+    console.error("[provider/client timeline]", err);
+    return res.status(500).json({ error: "Failed to load client timeline." });
   }
+}
+
+app.get("/api/provider/clients", async (req, res) => {
+  return handleProviderClients(req, res, getUserId(req));
+});
+
+app.get("/api/providers/:id/clients", async (req, res) => {
+  return handleProviderClients(req, res, req.params.id);
+});
+
+app.get("/api/provider/clients/:clientId", async (req, res) => {
+  return handleProviderClientTimeline(req, res, getUserId(req), req.params.clientId);
+});
+
+app.get("/api/providers/:id/clients/:clientId/timeline", async (req, res) => {
+  return handleProviderClientTimeline(req, res, req.params.id, req.params.clientId);
 });
 
 app.get("/api/client/notifications", async (req, res) => {
@@ -4376,19 +4572,66 @@ app.get("/api/provider/blocked-dates", async (req, res) => {
 app.post("/api/provider/blocked-dates", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
   const providerId = getProviderId(req);
-  const { date, blockType = "full_day", startTime, endTime, reason } = req.body || {};
+  const body = req.body || {};
+  const date = body.date;
+  const blockType = body.blockType || body.block_type || "full_day";
+  const startTime = body.startTime || body.start_time || null;
+  const endTime = body.endTime || body.end_time || null;
+  const reason = body.reason || null;
   if (!date) return res.status(400).json({ error: "date is required." });
 
   // Validation for custom hours
-  if ((blockType === "hours" || blockType === "custom_hours") && (!startTime || !endTime)) {
+  if ((blockType === "hours" || blockType === "custom_hours" || blockType === "partial" || blockType === "availability_override") && (!startTime || !endTime)) {
     return res.status(400).json({ error: "startTime and endTime are required for hour-level blocks." });
   }
+  if ((blockType === "hours" || blockType === "custom_hours" || blockType === "partial" || blockType === "availability_override") && startTime >= endTime) {
+    return res.status(400).json({ error: "endTime must be later than startTime." });
+  }
   try {
-    const { data, error } = await supabase
-      .from("provider_blocked_dates")
-      .insert({ provider_id: providerId, date, block_type: blockType, start_time: startTime || null, end_time: endTime || null, reason: reason || null })
-      .select()
-      .single();
+    let data;
+    let error;
+
+    if (blockType === "availability_override") {
+      const { data: existingOverride, error: existingError } = await supabase
+        .from("provider_blocked_dates")
+        .select("id")
+        .eq("provider_id", providerId)
+        .eq("date", date)
+        .eq("block_type", "availability_override")
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (existingOverride?.id) {
+        ({ data, error } = await supabase
+          .from("provider_blocked_dates")
+          .update({ start_time: startTime, end_time: endTime, reason })
+          .eq("id", existingOverride.id)
+          .eq("provider_id", providerId)
+          .select()
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from("provider_blocked_dates")
+          .insert({
+            provider_id: providerId,
+            date,
+            block_type: "availability_override",
+            start_time: startTime,
+            end_time: endTime,
+            reason,
+          })
+          .select()
+          .single());
+      }
+    } else {
+      ({ data, error } = await supabase
+        .from("provider_blocked_dates")
+        .insert({ provider_id: providerId, date, block_type: blockType, start_time: startTime, end_time: endTime, reason })
+        .select()
+        .single());
+    }
+
     if (error) throw error;
     res.status(201).json({ block: data });
   } catch (err) {
@@ -5844,8 +6087,8 @@ app.get("/api/provider/:providerId/availability/closest", async (req, res) => {
 // GET /api/public/provider/:providerId/slots?date=YYYY-MM-DD&duration=60
 // Returns available time slots for a specific date by cross-referencing:
 //   1. provider_availability (weekly schedule, day_index 0=Sun…6=Sat)
-//   2. Existing confirmed/pending bookings on that date
-//   3. provider_time_blocks on that date
+//   2. provider_blocked_dates overrides / blocked ranges on that date
+//   3. Existing confirmed/pending bookings on that date
 app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
   const { providerId } = req.params;
@@ -5868,7 +6111,28 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       return res.json({ slots: [] });
     }
 
-    // 2. Existing bookings on this date (pending + confirmed)
+    // 2. Per-day overrides / blocked ranges
+    const { data: blockedDateRows } = await supabase
+      .from("provider_blocked_dates")
+      .select("block_type, start_time, end_time")
+      .eq("provider_id", providerId)
+      .eq("date", date);
+
+    const fullDayBlock = (blockedDateRows || []).find((row) => row.block_type === "full_day");
+    if (fullDayBlock) {
+      return res.json({ slots: [] });
+    }
+
+    const availabilityOverride = (blockedDateRows || []).find((row) => row.block_type === "availability_override");
+    const availableWindows = availabilityOverride
+      ? [{ start_time: availabilityOverride.start_time, end_time: availabilityOverride.end_time }]
+      : schedules;
+
+    if (!availableWindows || availableWindows.length === 0) {
+      return res.json({ slots: [] });
+    }
+
+    // 3. Existing bookings on this date (pending + confirmed)
     const dayStart = date + "T00:00:00";
     const dayEnd = date + "T23:59:59";
     const { data: bookings } = await supabase
@@ -5879,13 +6143,6 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       .gte("scheduled_at", dayStart)
       .lte("scheduled_at", dayEnd);
 
-    // 3. Time blocks on this date
-    const { data: blocks } = await supabase
-      .from("provider_time_blocks")
-      .select("start_time, end_time")
-      .eq("provider_id", providerId)
-      .eq("date", date);
-
     // Build set of blocked minute-ranges
     const blockedRanges = [];
     for (const b of bookings || []) {
@@ -5895,7 +6152,9 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       const buf = parseInt(buffer);
       blockedRanges.push({ start: startMins, end: startMins + dur + buf });
     }
-    for (const bl of blocks || []) {
+    for (const bl of blockedDateRows || []) {
+      if (bl.block_type === "full_day" || bl.block_type === "availability_override") continue;
+      if (!bl.start_time || !bl.end_time) continue;
       const [sh, sm] = bl.start_time.split(":").map(Number);
       const [eh, em] = bl.end_time.split(":").map(Number);
       blockedRanges.push({ start: sh * 60 + sm, end: eh * 60 + em });
@@ -5906,7 +6165,7 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const slotIncrement = 30;
     const slots = [];
 
-    for (const schedule of schedules) {
+    for (const schedule of availableWindows) {
       const [startH, startM] = schedule.start_time.split(":").map(Number);
       const [endH, endM] = schedule.end_time.split(":").map(Number);
       const windowStart = startH * 60 + startM;
@@ -7208,6 +7467,48 @@ app.get("/api/admin/disputes/stats", requireAdmin, async (req, res) => {
 // PROVIDER INVITES
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function resolveInviteIdentifier(identifier) {
+  const providerFields = "id, user_id, handle, name, business_name, category, city, photo, bio, avatar";
+
+  const { data: invite, error: inviteError } = await supabase
+    .from("provider_invites")
+    .select("id, code, status, provider_id, expires_at, uses_count")
+    .eq("code", identifier)
+    .maybeSingle();
+
+  if (inviteError) throw inviteError;
+
+  if (invite) {
+    if (invite.status === "expired") return { reason: "expired" };
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
+      return { reason: "expired" };
+    }
+
+    const { data: provider, error: providerError } = await supabase
+      .from("providers")
+      .select(providerFields)
+      .eq("user_id", invite.provider_id)
+      .maybeSingle();
+
+    if (providerError) throw providerError;
+    if (!provider) return { reason: "provider_not_found" };
+
+    return { provider, invite, identifierType: "code" };
+  }
+
+  const { data: provider, error: providerError } = await supabase
+    .from("providers")
+    .select(providerFields)
+    .eq("handle", identifier)
+    .maybeSingle();
+
+  if (providerError) throw providerError;
+  if (!provider) return { reason: "not_found" };
+
+  return { provider, invite: null, identifierType: "handle" };
+}
+
 // ─── POST /api/provider/invites — generate a new invite code ─────────────────
 app.post("/api/provider/invites", async (req, res) => {
   const providerId = getProviderId(req);
@@ -7227,6 +7528,32 @@ app.post("/api/provider/invites", async (req, res) => {
   } catch (err) {
     console.error("[provider/invites POST]", err);
     res.status(500).json({ error: "Failed to create invite." });
+  }
+});
+
+// ─── GET /api/provider/invites/current — fetch an active invite code ──────────
+app.get("/api/provider/invites/current", async (req, res) => {
+  const providerId = getProviderId(req);
+  if (!supabase) {
+    return res.json({ handle: "demo-provider", url: "/join/demo-provider" });
+  }
+
+  try {
+    const { data: provider, error } = await supabase
+      .from("providers")
+      .select("handle")
+      .eq("user_id", providerId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!provider?.handle) {
+      return res.status(404).json({ error: "Provider handle not found." });
+    }
+
+    return res.json({ handle: provider.handle, url: `/join/${provider.handle}` });
+  } catch (err) {
+    console.error("[provider/invites/current GET]", err);
+    return res.status(500).json({ error: "Failed to fetch invite." });
   }
 });
 
@@ -7250,30 +7577,14 @@ app.get("/api/provider/invites/join/:code", async (req, res) => {
     });
   }
   try {
-    const { data: invite, error: invErr } = await supabase
-      .from("provider_invites")
-      .select("id, code, status, provider_id, expires_at")
-      .eq("code", code)
-      .maybeSingle();
+    const resolved = await resolveInviteIdentifier(code);
+    if (resolved.reason) return res.json({ valid: false, reason: resolved.reason });
 
-    if (invErr) throw invErr;
-    if (!invite) return res.json({ valid: false, reason: "not_found" });
-    if (invite.status === "expired") return res.json({ valid: false, reason: "expired" });
-    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-      await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
-      return res.json({ valid: false, reason: "expired" });
-    }
+    const invitePayload = resolved.invite
+      ? { id: resolved.invite.id, code: resolved.invite.code, status: resolved.invite.status }
+      : { id: null, code, status: "active" };
 
-    // Fetch provider info (join via user_id since provider_invites.provider_id stores the auth UUID)
-    const { data: provider } = await supabase
-      .from("providers")
-      .select("id, user_id, name, business_name, category, city, photo, bio, avatar")
-      .eq("user_id", invite.provider_id)
-      .maybeSingle();
-
-    if (!provider) return res.json({ valid: false, reason: "provider_not_found" });
-
-    res.json({ valid: true, invite: { id: invite.id, code, status: invite.status }, provider });
+    res.json({ valid: true, invite: invitePayload, provider: resolved.provider });
   } catch (err) {
     console.error("[provider/invites/join GET]", err);
     res.status(500).json({ error: "Failed to look up invite." });
@@ -7287,65 +7598,48 @@ app.post("/api/invites/:code/accept", async (req, res) => {
 
   if (!supabase) return res.json({ connected: true, already_connected: false });
   try {
-    // 1. Validate invite
-    const { data: invite, error: invErr } = await supabase
-      .from("provider_invites")
-      .select("id, provider_id, status, expires_at")
-      .eq("code", code)
-      .maybeSingle();
-
-    if (invErr) throw invErr;
-    if (!invite) return res.status(404).json({ error: "invalid" });
-    if (invite.status === "expired") return res.status(410).json({ error: "expired" });
-    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-      await supabase.from("provider_invites").update({ status: "expired" }).eq("id", invite.id);
+    const resolved = await resolveInviteIdentifier(code);
+    if (resolved.reason === "not_found" || resolved.reason === "provider_not_found") {
+      return res.status(404).json({ error: "invalid" });
+    }
+    if (resolved.reason === "expired") {
       return res.status(410).json({ error: "expired" });
     }
 
+    const provider = resolved.provider;
+    const invite = resolved.invite;
+    const providerId = provider.user_id;
+
     // 2. Edge case: client trying to accept their own invite
-    if (invite.provider_id === clientId) {
+    if (providerId === clientId) {
       return res.status(400).json({ error: "own_invite" });
     }
 
-    // 3. Check if already connected
-    const { data: existing } = await supabase
-      .from("provider_clients")
-      .select("id")
-      .eq("provider_id", invite.provider_id)
-      .eq("client_id", clientId)
-      .maybeSingle();
-
-    if (existing) {
-      // Fetch provider info for response
-      const { data: provider } = await supabase
-        .from("providers")
-        .select("id, name, business_name, category, city, photo, avatar")
-        .eq("user_id", invite.provider_id)
-        .maybeSingle();
-      return res.json({ already_connected: true, connected: false, provider: provider || null });
-    }
-
-    // 4. Insert provider_clients connection
-    await supabase.from("provider_clients").insert({
-      provider_id: invite.provider_id,
-      client_id: clientId,
-      invite_id: invite.id,
-      connected_at: new Date().toISOString(),
+    const connectionResult = await ensureProviderClientConnection({
+      providerId,
+      clientId,
+      inviteId: invite?.id || null,
       source: "invite",
     });
 
-    // 5. Ensure client_profiles row exists (new users won't have one yet)
+    if (!connectionResult.created) {
+      return res.json({ already_connected: true, connected: false, provider: provider || null });
+    }
+
+    // 4. Ensure client_profiles row exists (new users won't have one yet)
     await supabase
       .from("client_profiles")
       .upsert({ user_id: clientId }, { onConflict: "user_id", ignoreDuplicates: true });
 
-    // 6. Increment uses_count (multi-use — never mark as accepted/closed)
-    await supabase
-      .from("provider_invites")
-      .update({ uses_count: (invite.uses_count || 0) + 1 })
-      .eq("id", invite.id);
+    // 5. Increment uses_count for legacy code-based invites only.
+    if (invite?.id) {
+      await supabase
+        .from("provider_invites")
+        .update({ uses_count: (invite.uses_count || 0) + 1 })
+        .eq("id", invite.id);
+    }
 
-    // 7. Get client name for notification
+    // 6. Get client name for notification
     const { data: clientProfile } = await supabase
       .from("client_profiles")
       .select("name")
@@ -7353,20 +7647,13 @@ app.post("/api/invites/:code/accept", async (req, res) => {
       .maybeSingle();
     const clientName = clientProfile?.name || "Someone";
 
-    // 8. Notify provider
-    await createProviderNotification(invite.provider_id, {
+    // 7. Notify provider
+    await createProviderNotification(providerId, {
       type: "new_client",
       title: "New client connected",
       body: `${clientName} accepted your invite and joined your klique.`,
       data: { client_id: clientId },
     }).catch(() => {});
-
-    // 9. Fetch provider info for response
-    const { data: provider } = await supabase
-      .from("providers")
-      .select("id, name, business_name, category, city, photo, avatar")
-      .eq("user_id", invite.provider_id)
-      .maybeSingle();
 
     res.json({ connected: true, already_connected: false, provider: provider || null });
   } catch (err) {
@@ -7383,18 +7670,22 @@ app.post("/api/provider/invites/join/:code/accept", async (req, res) => {
   const clientId = getUserId(req);
   if (!supabase) return res.json({ ok: true });
   try {
-    const { data: invite } = await supabase
-      .from("provider_invites")
-      .select("id, provider_id, status, expires_at")
-      .eq("code", code)
-      .maybeSingle();
-    if (!invite) return res.status(404).json({ error: "Invite not found." });
-    if (invite.status === "expired") return res.status(410).json({ error: "expired" });
+    const resolved = await resolveInviteIdentifier(code);
+    if (resolved.reason === "not_found" || resolved.reason === "provider_not_found") {
+      return res.status(404).json({ error: "Invite not found." });
+    }
+    if (resolved.reason === "expired") return res.status(410).json({ error: "expired" });
+
+    const providerId = resolved.provider.user_id;
+    const invite = resolved.invite;
+
     await supabase.from("provider_clients").upsert(
-      { provider_id: invite.provider_id, client_id: clientId, invite_id: invite.id, connected_at: new Date().toISOString(), source: "invite" },
+      { provider_id: providerId, client_id: clientId, invite_id: invite?.id || null, connected_at: new Date().toISOString(), source: "invite" },
       { onConflict: "provider_id,client_id" }
     );
-    await supabase.from("provider_invites").update({ uses_count: (invite.uses_count || 0) + 1 }).eq("id", invite.id);
+    if (invite?.id) {
+      await supabase.from("provider_invites").update({ uses_count: (invite.uses_count || 0) + 1 }).eq("id", invite.id);
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error("[provider/invites/join/accept legacy]", err);
@@ -7954,20 +8245,12 @@ app.post("/api/bookings/create", async (req, res) => {
       paymentIntentId = intent.id;
     }
 
-    // Upsert provider_clients relationship (source = booking)
     if (supabase && userId) {
-      await supabase
-        .from("provider_clients")
-        .upsert(
-          {
-            provider_id: providerId,
-            client_id: userId,
-            source: "booking",
-            connected_at: new Date().toISOString(),
-          },
-          { onConflict: "provider_id,client_id" }
-        )
-        .catch((err) => console.warn("[bookings/create] provider_clients upsert:", err.message));
+      await ensureProviderClientConnection({
+        providerId,
+        clientId: userId,
+        source: "booking",
+      }).catch((err) => console.warn("[bookings/create] provider_clients upsert:", err.message));
     }
 
     // Notify provider
@@ -8086,6 +8369,15 @@ app.post("/api/bookings/request-time", async (req, res) => {
 
     if (insertErr) throw insertErr;
 
+    await ensureProviderClientConnection({
+      providerId: provider_id,
+      clientId,
+      source: "booking",
+      connectedAt: booking.created_at || new Date().toISOString(),
+    }).catch((err) => {
+      console.warn("[bookings/request-time] provider_clients upsert:", err.message);
+    });
+
     // Notify provider
     const notifBody = serviceName
       ? `${clientName} requested ${serviceName} on ${displayDate} at ${displayTime}`
@@ -8123,7 +8415,7 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
   try {
     const { data: booking, error: fetchErr } = await supabase
       .from("bookings")
-      .select("provider_id, client_id, scheduled_at, price, service_id, metadata")
+      .select("id, status, provider_id, provider_name, client_id, service_id, service_name, scheduled_at, price, metadata")
       .eq("id", bookingId)
       .single();
 
@@ -8133,80 +8425,37 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
     }
     if (booking.status === "confirmed") return res.status(409).json({ error: "Already accepted." });
 
-    const { error: updateErr } = await supabase
+    const { data: updatedBooking, error: updateErr } = await supabase
       .from("bookings")
       .update({ status: "confirmed", updated_at: new Date().toISOString() })
-      .eq("id", bookingId);
+      .eq("id", bookingId)
+      .select("*")
+      .single();
 
     if (updateErr) throw updateErr;
-
-    // Fetch service name for notification
-    let serviceName = null;
-    if (booking.service_id) {
-      const { data: svc } = await supabase
-        .from("services")
-        .select("name")
-        .eq("id", booking.service_id)
-        .maybeSingle();
-      serviceName = svc?.name || null;
-    }
 
     const displayDate = new Date(booking.scheduled_at).toLocaleDateString("en-US", {
       weekday: "short", month: "short", day: "numeric",
     });
-    const displayTime = new Date(booking.scheduled_at).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
-    const sessionLabel = serviceName || "your session";
+    const sessionLabel = booking.service_name || "your service";
+    const providerLabel = booking.provider_name || "Your provider";
 
-    // Notify client to proceed to payment (respects push_booking_confirmations pref)
     if (booking.client_id) {
-      const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
-
-      // Push notification
-      if (prefs.push_booking_confirmations !== false) {
-        await createClientNotification(booking.client_id, {
-          type: "booking_accepted",
-          title: "Request accepted!",
-          body: `Your request for ${sessionLabel} on ${displayDate} at ${displayTime} was accepted. Complete payment to confirm.`,
+      await createClientNotification(booking.client_id, {
+        type: "accepted",
+        title: "Booking accepted",
+        body: `${providerLabel} confirmed your booking for ${sessionLabel} on ${displayDate}`,
+        booking_id: bookingId,
+        data: {
+          provider_id: requestingUserId,
           booking_id: bookingId,
-          data: {
-            provider_id: requestingUserId,
-            booking_id: bookingId,
-            scheduled_at: booking.scheduled_at,
-            price: booking.price,
-            action: "pay",
-          },
-        }).catch(() => {});
-      }
-
-      // Email: booking confirmation
-      if (prefs.email_booking_confirmations !== false && clientEmail) {
-        const priceStr = booking.price ? `$${(booking.price / 100).toFixed(2)}` : 'TBD';
-        await sendEmail({
-          to: clientEmail,
-          subject: `Booking confirmed — ${sessionLabel}`,
-          html: `
-            <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
-              <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
-                <h1 style="margin:0;font-size:22px;font-weight:700">Booking Confirmed</h1>
-              </div>
-              <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
-                <p style="margin:0 0 8px">Hi ${clientName || 'there'},</p>
-                <p style="margin:0 0 20px;color:#8C6A64">Your booking has been confirmed by your provider.</p>
-                <table style="width:100%;border-collapse:collapse">
-                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${sessionLabel}</td></tr>
-                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Date</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${displayDate} at ${displayTime}</td></tr>
-                  <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px">Amount</td><td style="padding:10px 0;text-align:right;font-weight:600">${priceStr}</td></tr>
-                </table>
-                <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
-              </div>
-            </div>`,
-        });
-      }
+          scheduled_at: booking.scheduled_at,
+          status: "confirmed",
+        },
+      }).catch(() => {});
     }
 
-    return res.status(200).json({ ok: true, booking_id: bookingId });
+    return res.status(200).json({ booking: updatedBooking });
   } catch (err) {
     console.error("[bookings/:id/accept]", err);
     return res.status(500).json({ error: "Failed to accept booking." });
@@ -8416,7 +8665,7 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
   try {
     const { data: booking, error: fetchErr } = await supabase
       .from("bookings")
-      .select("provider_id, client_id, service_name, scheduled_at, metadata")
+      .select("id, status, provider_id, provider_name, client_id, service_name, scheduled_at, metadata")
       .eq("id", bookingId)
       .single();
 
@@ -8424,42 +8673,46 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
     if (booking.provider_id !== requestingUserId) {
       return res.status(403).json({ error: "Not authorized to decline this booking." });
     }
+    if (booking.status === "cancelled") return res.status(409).json({ error: "Already declined." });
 
     const existingMeta = booking.metadata || {};
-    const { error: updateErr } = await supabase
+    const { data: updatedBooking, error: updateErr } = await supabase
       .from("bookings")
       .update({
         status: "cancelled",
         updated_at: new Date().toISOString(),
         metadata: { ...existingMeta, decline_reason: reason || null },
       })
-      .eq("id", bookingId);
+      .eq("id", bookingId)
+      .select("*")
+      .single();
 
     if (updateErr) throw updateErr;
 
-    // Notify client — include reason in body and action in data
     if (booking.client_id) {
+      const providerLabel = booking.provider_name || "Your provider";
       const sessionLabel = booking.service_name || "your session";
       const body = reason
-        ? `Your request for ${sessionLabel} was declined: ${reason}`
-        : `Your request for ${sessionLabel} was not accepted. Please try another time.`;
+        ? `${providerLabel} declined your booking request. Reason: ${reason}`
+        : `${providerLabel} declined your booking request`;
       await createClientNotification(booking.client_id, {
-        type: "booking_declined",
-        title: "Request Declined",
+        type: "rejected",
+        title: "Booking declined",
         body,
         booking_id: bookingId,
         data: {
           provider_id: requestingUserId,
           booking_id: bookingId,
           scheduled_at: booking.scheduled_at,
-          status: "declined",
+          service_name: sessionLabel,
+          status: "cancelled",
           reason: reason || null,
-          action: "declined",
+          decline_reason: reason || null,
         },
       }).catch(() => {});
     }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ booking: updatedBooking });
   } catch (err) {
     console.error("[bookings/:id/decline]", err);
     return res.status(500).json({ error: "Failed to decline booking." });
@@ -9020,10 +9273,9 @@ app.put("/api/services/:id/group", async (req, res) => {
 /**
  * GET /api/providers/:id/bookings
  * Query params:
- *   status   — comma-separated list e.g. "confirmed" or "completed,cancelled"
- *   timeframe — "upcoming" | "past" | omitted (all)
+ *   tab — "pending" | "upcoming" | "past" | omitted (all)
  *
- * Returns bookings enriched with service name + client name.
+ * Returns bookings for the provider using the bookings table as the source of truth.
  */
 app.get("/api/providers/:id/bookings", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Database unavailable." });
@@ -9031,38 +9283,20 @@ app.get("/api/providers/:id/bookings", async (req, res) => {
   const callerId = getProviderId(req);
   if (callerId !== providerId) return res.status(403).json({ error: "Forbidden." });
 
-  const { status, timeframe } = req.query;
-  const now = new Date().toISOString();
+  const tab = String(req.query.tab || "").toLowerCase();
+  const todayKey = getLocalDateKey();
 
   try {
-    // bookings table has denormalized service_name and client_name columns
-    let query = supabase
+    const { data, error } = await supabase
       .from("bookings")
       .select("*")
       .eq("provider_id", providerId);
-
-    // Filter by one or more statuses
-    if (status) {
-      const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
-      if (statuses.length === 1) {
-        query = query.eq("status", statuses[0]);
-      } else {
-        query = query.in("status", statuses);
-      }
-    }
-
-    // Timeframe filter
-    if (timeframe === "upcoming") {
-      query = query.gte("scheduled_at", now).order("scheduled_at", { ascending: true });
-    } else if (timeframe === "past") {
-      query = query.lt("scheduled_at", now).order("scheduled_at", { ascending: false });
-    } else {
-      query = query.order("scheduled_at", { ascending: false });
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
-    const bookings = data || [];
+    const allBookings = data || [];
+    const filtered = tab
+      ? allBookings.filter((booking) => getProviderBookingTab(booking, todayKey) === tab)
+      : allBookings;
+    const bookings = sortProviderBookings(filtered, tab);
 
     res.status(200).json({ bookings });
   } catch (err) {
@@ -9101,7 +9335,7 @@ app.get("/api/clients/:id/bookings", async (req, res) => {
         .order("scheduled_at", { ascending: true });
     } else if (timeframe === "past") {
       query = query
-        .in("status", ["completed", "cancelled", "declined"])
+        .in("status", ["completed", "cancelled"])
         .order("scheduled_at", { ascending: false });
     } else {
       query = query.order("scheduled_at", { ascending: false });

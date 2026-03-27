@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
@@ -7,6 +7,7 @@ import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useMessages } from '../../contexts/MessageContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { supabase } from '../../utils/supabase';
 
 // ─── Provider nav items ───────────────────────────────────────────────────────
 const PROVIDER_MENU = [
@@ -120,13 +121,43 @@ const ProviderLayout = () => {
     const { unreadCount: notifUnread } = useNotifications();
 
     const msgUnread = getUnreadCount();
+    const providerId = session?.user?.id;
+
+    const refreshPendingCount = useCallback(() => {
+        if (!providerId) {
+            setPendingCount(0);
+            return Promise.resolve();
+        }
+
+        return request('/provider/bookings/pending-count')
+            .then((d) => setPendingCount(d?.count ?? 0))
+            .catch(() => setPendingCount(0));
+    }, [providerId]);
 
     // Fetch pending booking count for the Bookings badge
     useEffect(() => {
-        request('/provider/bookings/pending-count')
-            .then((d) => setPendingCount(d?.count ?? 0))
-            .catch(() => setPendingCount(0));
-    }, []);
+        refreshPendingCount();
+    }, [refreshPendingCount]);
+
+    useEffect(() => {
+        if (!supabase || !providerId) return undefined;
+
+        const channel = supabase
+            .channel(`provider-layout-bookings:${providerId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `provider_id=eq.${providerId}`,
+            }, () => {
+                refreshPendingCount();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [providerId, refreshPendingCount]);
 
     const activeId = useActiveId(PROVIDER_MENU, '/provider');
     const { title, subtitle } = usePageMeta('/provider');
