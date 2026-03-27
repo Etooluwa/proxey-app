@@ -3864,7 +3864,8 @@ app.get("/api/provider/calendar", async (req, res) => {
   }
 
   const providerIdentity = await getProviderIdentity(getProviderId(req));
-  const providerIds = providerIdentity.ids;
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
   const year  = parseInt(req.query.year,  10) || new Date().getFullYear();
   const month = parseInt(req.query.month, 10);        // 0-based
   const m = isNaN(month) ? new Date().getMonth() : month;
@@ -3876,7 +3877,7 @@ app.get("/api/provider/calendar", async (req, res) => {
     const { data: bookings, error } = await supabase
       .from("bookings")
       .select("id, client_name, service_name, scheduled_at, duration, status")
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerAuthId)
       .neq("status", "cancelled")
       .gte("scheduled_at", start)
       .lt("scheduled_at", end)

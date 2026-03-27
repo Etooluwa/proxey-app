@@ -83,14 +83,6 @@ function getTimeOptionLabel(value) {
     return TIME_OPTIONS.find((option) => option.value === value)?.label || value;
 }
 
-function getTimeOptionPeriod(value) {
-    const hour = Number(String(value || '').slice(0, 2));
-    if (Number.isNaN(hour)) return '';
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    return 'Evening';
-}
-
 function getInitials(name) {
     return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -145,73 +137,46 @@ function TimePickerSheet({ label, value, onSelect, onClose }) {
     return (
         <div
             className="fixed inset-0 z-50 flex items-end"
-            style={{ background: 'rgba(61,35,30,0.32)' }}
+            style={{ background: 'rgba(61,35,30,0.35)' }}
             onClick={onClose}
         >
             <div
-                className="w-full rounded-t-[28px] pb-8"
-                style={{
-                    background: T.base,
-                    maxHeight: '68vh',
-                    overflowY: 'auto',
-                    boxShadow: '0 -16px 40px rgba(61,35,30,0.12)',
-                }}
+                className="w-full rounded-t-[24px] pb-8"
+                style={{ background: T.base, maxHeight: '60vh', overflowY: 'auto' }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div
-                    className="px-5 pt-3 pb-4"
-                    style={{ borderBottom: `1px solid ${T.line}` }}
-                >
-                    <div
-                        className="mx-auto mb-4 rounded-full"
-                        style={{ width: 48, height: 5, background: 'rgba(140,106,100,0.24)' }}
-                    />
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] m-0" style={{ color: T.muted }}>
-                                {label}
-                            </p>
-                            <p className="text-[22px] font-semibold m-0 mt-1" style={{ color: T.ink, letterSpacing: '-0.03em' }}>
-                                {value ? getTimeOptionLabel(value) : 'Choose a time'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="px-3 py-2 rounded-[12px] text-[12px] font-semibold focus:outline-none"
-                            style={{ border: `1px solid ${T.line}`, background: 'transparent', color: T.muted }}
-                        >
-                            Done
-                        </button>
+                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${T.line}` }}>
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] m-0 mb-1" style={{ color: T.muted }}>
+                            {label}
+                        </p>
+                        <p className="text-[16px] font-semibold m-0" style={{ color: T.ink }}>
+                            Select time
+                        </p>
                     </div>
+                    <button onClick={onClose} className="focus:outline-none text-[14px] font-medium" style={{ color: T.muted }}>
+                        Done
+                    </button>
                 </div>
-
-                <div className="px-3 py-3">
-                    {TIME_OPTIONS.map((option) => {
-                        const active = option.value === value;
-                        return (
-                            <button
-                                key={option.value}
-                                onClick={() => {
-                                    onSelect(option.value);
-                                    onClose();
-                                }}
-                                className="w-full flex items-center justify-between px-4 py-3 rounded-[16px] text-left focus:outline-none"
-                                style={{
-                                    background: active ? '#F7D9CB' : 'transparent',
-                                    color: active ? T.accent : T.ink,
-                                    border: active ? '1px solid rgba(194,94,74,0.3)' : '1px solid transparent',
-                                }}
-                            >
-                                <span className="text-[15px] font-semibold">{option.label}</span>
-                                <span
-                                    className="text-[11px] font-semibold uppercase tracking-[0.05em]"
-                                    style={{ color: active ? T.accent : T.muted }}
-                                >
-                                    {getTimeOptionPeriod(option.value)}
-                                </span>
-                            </button>
-                        );
-                    })}
+                <div>
+                    {TIME_OPTIONS.map((option) => (
+                        <button
+                            key={option.value}
+                            onClick={() => {
+                                onSelect(option.value);
+                                onClose();
+                            }}
+                            className="w-full flex items-center justify-between px-5 py-3.5 focus:outline-none"
+                            style={{ borderBottom: '1px solid rgba(140,106,100,0.08)' }}
+                        >
+                            <span className="text-[15px]" style={{ color: T.ink }}>{option.label}</span>
+                            {value === option.value && (
+                                <svg width="16" height="16" fill="none" stroke={T.accent} strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            )}
+                        </button>
+                    ))}
                 </div>
             </div>
         </div>
@@ -229,29 +194,25 @@ function TimeInput({ value, onChange, label }) {
             <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="w-full px-3.5 py-3 rounded-[14px] text-[15px] focus:outline-none flex items-center justify-between gap-3"
+                className="w-full px-3.5 py-3 rounded-[12px] text-[14px] focus:outline-none flex items-center justify-between gap-3"
                 style={{
                     background: T.avatarBg,
                     border: `1px solid ${T.line}`,
                     boxShadow: 'none',
                     fontFamily: F,
-                    minHeight: 54,
+                    minHeight: 50,
                 }}
             >
                 <span
                     className="truncate"
                     style={{
                         color: value ? T.ink : T.faded,
-                        fontWeight: value ? 600 : 500,
-                        letterSpacing: value ? '-0.01em' : '0.02em',
+                        fontWeight: 500,
                     }}
                 >
                     {value ? getTimeOptionLabel(value) : '--:-- --'}
                 </span>
-                <span
-                    className="flex items-center justify-center rounded-full flex-shrink-0"
-                    style={{ width: 28, height: 28, background: 'rgba(61,35,30,0.06)' }}
-                >
+                <span className="flex items-center justify-center flex-shrink-0">
                     <Clock size={16} color={T.ink} />
                 </span>
             </button>
