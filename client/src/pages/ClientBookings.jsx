@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
+import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
 import Footer from '../components/ui/Footer';
@@ -48,6 +50,29 @@ function fmtDuration(mins) {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return m ? `${h} hr ${m} min` : `${h} hr`;
+}
+
+function getLocalDateKey(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getClientBookingTab(booking, todayKey = getLocalDateKey()) {
+    const status = String(booking?.status || '').toLowerCase();
+    const bookingDateKey = getLocalDateKey(booking?.scheduled_at);
+
+    if (status === 'pending') return 'pending';
+    if (status === 'completed' || status === 'cancelled') return 'past';
+    if (status === 'confirmed') {
+        if (!bookingDateKey || !todayKey) return 'upcoming';
+        return bookingDateKey < todayKey ? 'past' : 'upcoming';
+    }
+
+    return null;
 }
 
 // ─── Status pill config ───────────────────────────────────────────────────────
@@ -256,30 +281,57 @@ function EmptyState({ message }) {
 export default function ClientBookings() {
     const { onMenu, isDesktop } = useOutletContext();
     const navigate = useNavigate();
+    const { session } = useSession();
 
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('pending');
 
     useEffect(() => {
-        request('/bookings/me')
+        const loadBookings = () => request('/bookings/me')
             .then((data) => setBookings(data?.bookings || []))
             .catch(() => setBookings([]))
             .finally(() => setLoading(false));
+
+        loadBookings();
     }, []);
 
-    const now = new Date();
+    useEffect(() => {
+        if (!supabase || !session?.user?.id) return undefined;
+
+        const refresh = () => {
+            request('/bookings/me')
+                .then((data) => setBookings(data?.bookings || []))
+                .catch(() => {});
+        };
+
+        const channel = supabase
+            .channel(`client-bookings:${session.user.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `client_id=eq.${session.user.id}`,
+            }, refresh)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [session?.user?.id]);
+
+    const todayKey = getLocalDateKey();
 
     const pending = bookings
-        .filter((b) => b.status === 'pending')
-        .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+        .filter((b) => getClientBookingTab(b, todayKey) === 'pending')
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     const upcoming = bookings
-        .filter((b) => b.status === 'confirmed' && new Date(b.scheduled_at) >= now)
+        .filter((b) => getClientBookingTab(b, todayKey) === 'upcoming')
         .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
 
     const past = bookings
-        .filter((b) => b.status === 'completed' || b.status === 'cancelled')
+        .filter((b) => getClientBookingTab(b, todayKey) === 'past')
         .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
 
     const tabs = [

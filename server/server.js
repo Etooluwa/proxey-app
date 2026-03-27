@@ -4277,6 +4277,38 @@ function sortProviderBookings(bookings, tab) {
   return items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 }
 
+function getClientBookingTab(booking, todayKey = getLocalDateKey()) {
+  const status = String(booking?.status || "").toLowerCase();
+  const bookingDateKey = getLocalDateKey(booking?.scheduled_at);
+
+  if (status === "pending") return "pending";
+  if (status === "completed" || status === "cancelled") return "past";
+  if (status === "confirmed") {
+    if (!bookingDateKey || !todayKey) return "upcoming";
+    return bookingDateKey < todayKey ? "past" : "upcoming";
+  }
+
+  return null;
+}
+
+function sortClientBookings(bookings, tab) {
+  const items = [...(bookings || [])];
+
+  if (tab === "pending") {
+    return items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  }
+
+  if (tab === "upcoming") {
+    return items.sort((a, b) => (a.scheduled_at || "").localeCompare(b.scheduled_at || ""));
+  }
+
+  if (tab === "past") {
+    return items.sort((a, b) => (b.scheduled_at || "").localeCompare(a.scheduled_at || ""));
+  }
+
+  return items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+}
+
 // GET /api/provider/calendar?year=YYYY&month=M(0-based) — bookings for this provider
 // grouped by YYYY-MM-DD for the given month, used by the calendar view.
 app.get("/api/provider/calendar", async (req, res) => {
@@ -9809,32 +9841,20 @@ app.get("/api/clients/:id/bookings", async (req, res) => {
   const callerId = getUserId(req);
   if (callerId !== clientId) return res.status(403).json({ error: "Forbidden." });
 
-  const { timeframe } = req.query;
-  const now = new Date().toISOString();
+  const tab = String(req.query.tab || "").toLowerCase();
+  const todayKey = getLocalDateKey();
 
   try {
-    // bookings table has denormalized service_name and provider_name columns
-    let query = supabase
+    const { data, error } = await supabase
       .from("bookings")
       .select("*")
       .eq("client_id", clientId);
-
-    if (timeframe === "upcoming") {
-      query = query
-        .in("status", ["pending", "confirmed"])
-        .gte("scheduled_at", now)
-        .order("scheduled_at", { ascending: true });
-    } else if (timeframe === "past") {
-      query = query
-        .in("status", ["completed", "cancelled"])
-        .order("scheduled_at", { ascending: false });
-    } else {
-      query = query.order("scheduled_at", { ascending: false });
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
-    const bookings = data || [];
+    const allBookings = data || [];
+    const filtered = tab
+      ? allBookings.filter((booking) => getClientBookingTab(booking, todayKey) === tab)
+      : allBookings;
+    const bookings = sortClientBookings(filtered, tab);
 
     res.status(200).json({ bookings });
   } catch (err) {
