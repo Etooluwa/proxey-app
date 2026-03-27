@@ -28,7 +28,7 @@ const inputStyle = {
 
 export default function ClientPersonalDetails() {
   const navigate = useNavigate();
-  const { session } = useSession();
+  const { session, profile, updateProfile } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
@@ -51,7 +51,7 @@ export default function ClientPersonalDetails() {
   useEffect(() => {
     request('/client/profile')
       .then((data) => {
-        const p = data?.profile || data || {};
+        const p = data?.profile || data || profile || {};
         setName(p.name || '');
         const em = p.email || session?.user?.email || '';
         setEmail(em);
@@ -61,7 +61,7 @@ export default function ClientPersonalDetails() {
       })
       .catch((err) => setError(err.message || 'Failed to load profile'))
       .finally(() => setLoading(false));
-  }, [session?.user?.email]);
+  }, [profile, session?.user?.email]);
 
   const citySuggestions = city.trim().length > 0 ? filterCities(city) : [];
   const emailChanged = email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
@@ -72,17 +72,27 @@ export default function ClientPersonalDetails() {
     setSuccess(null);
     try {
       // 1. Save name, phone, city to profile table
-      await request('/client/profile', {
+      const response = await request('/client/profile', {
         method: 'PUT',
         body: JSON.stringify({ name, phone, city, email }),
+      });
+      const savedProfile = response?.profile || {};
+
+      await updateProfile({
+        name: savedProfile.name ?? name,
+        email: savedProfile.email ?? email,
+        phone: savedProfile.phone ?? phone,
+        city: savedProfile.city ?? city,
       });
 
       // 2. If email changed, trigger Supabase confirmation email
       if (emailChanged && supabase) {
         const { error: authErr } = await supabase.auth.updateUser({ email: email.trim() });
         if (authErr) throw new Error(authErr.message);
+        setOriginalEmail(email.trim());
         setSuccess('Profile saved. Check your new email address to confirm the change.');
       } else {
+        setOriginalEmail(savedProfile.email ?? email.trim());
         setSuccess('Changes saved.');
         setTimeout(() => navigate(-1), 800);
       }
