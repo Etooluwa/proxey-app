@@ -85,6 +85,36 @@ function getPartialBlocks(blocks) {
     return (blocks || []).filter((row) => row.block_type !== 'full_day' && row.block_type !== 'availability_override');
 }
 
+function upsertBlockedDate(blockedDates, block) {
+    if (!block?.date) return blockedDates;
+    const dayRows = Array.isArray(blockedDates?.[block.date]) ? blockedDates[block.date] : [];
+    const replaceByType = block.block_type === 'availability_override' || block.block_type === 'full_day';
+    const nextDayRows = dayRows.filter((row) => {
+        if (row.id && block.id && row.id === block.id) return false;
+        if (replaceByType && row.block_type === block.block_type) return false;
+        return true;
+    });
+
+    return {
+        ...blockedDates,
+        [block.date]: [...nextDayRows, block],
+    };
+}
+
+function removeBlockedDate(blockedDates, dateKey, blockId) {
+    const dayRows = Array.isArray(blockedDates?.[dateKey]) ? blockedDates[dateKey] : [];
+    const nextDayRows = dayRows.filter((row) => row.id !== blockId);
+    if (nextDayRows.length === 0) {
+        const nextState = { ...blockedDates };
+        delete nextState[dateKey];
+        return nextState;
+    }
+    return {
+        ...blockedDates,
+        [dateKey]: nextDayRows,
+    };
+}
+
 function TimeInput({ value, onChange, label }) {
     return (
         <label className="flex-1 min-w-0">
@@ -196,6 +226,35 @@ function DayStatusBlock({ fullDayBlock, availabilityOverride, partialBlocks, del
                     </button>
                 </div>
             ))}
+        </div>
+    );
+}
+
+function DayAvailabilitySummary({ fullDayBlock, availabilityOverride, partialBlocks }) {
+    const availabilityText = fullDayBlock
+        ? 'Blocked all day'
+        : availabilityOverride
+            ? `${fmtBlockTime(availabilityOverride.start_time)} to ${fmtBlockTime(availabilityOverride.end_time)}`
+            : 'Using your regular weekly hours';
+
+    const availabilityTone = fullDayBlock ? T.faded : T.accent;
+
+    return (
+        <div className="py-4">
+            <Lbl className="block mb-2">Day Availability</Lbl>
+            <p className="text-[15px] font-semibold m-0" style={{ color: fullDayBlock ? T.ink : T.ink }}>
+                {availabilityText}
+            </p>
+            {partialBlocks.length > 0 && (
+                <p className="text-[13px] text-muted m-0 mt-1">
+                    {partialBlocks.length} blocked {partialBlocks.length === 1 ? 'range' : 'ranges'} within the day.
+                </p>
+            )}
+            {!fullDayBlock && availabilityOverride && (
+                <p className="text-[12px] m-0 mt-1" style={{ color: availabilityTone }}>
+                    This custom window overrides your recurring schedule for this date.
+                </p>
+            )}
         </div>
     );
 }
@@ -367,7 +426,15 @@ function DayPanel({
                 {loading && <span className="text-[12px] text-muted">Loading…</span>}
             </div>
 
-            {(dayBlocks.length > 0 || daySchedule.length > 0) && <Divider />}
+            <Divider />
+
+            <DayAvailabilitySummary
+                fullDayBlock={fullDayBlock}
+                availabilityOverride={availabilityOverride}
+                partialBlocks={partialBlocks}
+            />
+
+            <Divider />
 
             {dayBlocks.length > 0 && (
                 <DayStatusBlock
@@ -379,9 +446,13 @@ function DayPanel({
                 />
             )}
 
+            <div className="pt-4">
+                <Lbl className="block mb-2">Schedule</Lbl>
+            </div>
+
             {!loading && daySchedule.length === 0 && (
                 <div className="py-6">
-                    <p className="text-[15px] text-muted m-0">Nothing scheduled.</p>
+                    <p className="text-[15px] text-muted m-0">No appointments scheduled for this day.</p>
                 </div>
             )}
 
@@ -562,19 +633,17 @@ const ProviderSchedule = () => {
     const selectedDow = new Date(displayYear, displayMonth, selectedDay).getDay();
     const selectedLabel = `${DAY_NAMES_LONG[selectedDow]}, ${MONTH_NAMES[displayMonth].slice(0, 3)} ${selectedDay}`;
 
-    const refreshMonth = async () => {
-        await loadMonth();
-    };
-
     const saveBlock = async (payload, successTitle) => {
         setSavingAction(true);
         try {
-            await request('/provider/blocked-dates', {
+            const data = await request('/provider/blocked-dates', {
                 method: 'POST',
                 body: JSON.stringify(payload),
             });
+            if (data?.block) {
+                setBlockedDates((prev) => upsertBlockedDate(prev, data.block));
+            }
             toast.push({ title: successTitle, variant: 'success' });
-            await refreshMonth();
             setActionMode(null);
         } catch (err) {
             console.error('[ProviderSchedule] save error:', err);
@@ -621,8 +690,8 @@ const ProviderSchedule = () => {
         setDeletingId(id);
         try {
             await request(`/provider/blocked-dates/${id}`, { method: 'DELETE' });
+            setBlockedDates((prev) => removeBlockedDate(prev, selectedDateKey, id));
             toast.push({ title: 'Removed day adjustment', variant: 'success' });
-            await refreshMonth();
         } catch (err) {
             console.error('[ProviderSchedule] delete error:', err);
             toast.push({ title: err.message || 'Failed to delete adjustment', variant: 'error' });

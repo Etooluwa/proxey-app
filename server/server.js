@@ -3898,7 +3898,7 @@ app.get("/api/provider/calendar", async (req, res) => {
     const endDate = new Date(year, m + 1, 1).toISOString().slice(0, 10);
     const { data: blockedRows } = await supabase
       .from("provider_blocked_dates")
-      .select("date, block_type, start_time, end_time, reason")
+      .select("id, date, block_type, start_time, end_time, reason")
       .in("provider_id", providerIds)
       .gte("date", startDate)
       .lt("date", endDate);
