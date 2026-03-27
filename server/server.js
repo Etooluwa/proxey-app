@@ -2217,7 +2217,6 @@ app.get("/api/provider/earnings", async (req, res) => {
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    const yearStart = new Date(now.getFullYear(), 0, 1);
 
     // Fetch all completed bookings for this provider
     const { data: bookings, error } = await supabase
@@ -2233,31 +2232,44 @@ app.get("/api/provider/earnings", async (req, res) => {
 
     const allBookings = bookings || [];
 
-    // Calculate available balance (completed + paid)
+    const getEarningDate = (booking) => new Date(booking.completed_at || booking.scheduled_at || booking.created_at);
+    const getNetBookingAmountCents = (booking) => {
+      const grossCents = booking.price || 0;
+      if (!grossCents) return 0;
+
+      if (typeof booking.net_amount === "number" && !Number.isNaN(booking.net_amount)) {
+        return booking.net_amount;
+      }
+
+      const feeCents = Math.round(grossCents * BOOKING_PLATFORM_FEE_RATE);
+      return Math.max(grossCents - feeCents, 0);
+    };
+
+    // Calculate available balance (completed + paid) as provider net earnings
     const completedPaid = allBookings.filter(b =>
       b.status === 'completed' && b.payment_status === 'paid'
     );
-    const availableBalance = completedPaid.reduce((sum, b) => sum + (b.price || 0), 0);
+    const availableBalance = completedPaid.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
 
-    // Calculate pending clearance (completed but payment pending)
+    // Calculate pending clearance (completed but payout/payment not cleared) as provider net earnings
     const completedPendingPayment = allBookings.filter(b =>
-      b.status === 'completed' && b.payment_status === 'pending'
+      b.status === 'completed' && b.payment_status !== 'paid'
     );
-    const pendingClearance = completedPendingPayment.reduce((sum, b) => sum + (b.price || 0), 0);
+    const pendingClearance = completedPendingPayment.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
 
-    // Calculate this month's earnings
+    // Calculate this month's earnings by completion date
     const thisMonthBookings = allBookings.filter(b => {
-      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      const bookingDate = getEarningDate(b);
       return b.status === 'completed' && bookingDate >= currentMonthStart;
     });
-    const totalEarningsThisMonth = thisMonthBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    const totalEarningsThisMonth = thisMonthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
 
-    // Calculate last month's earnings for trend
+    // Calculate last month's earnings for trend by completion date
     const lastMonthBookings = allBookings.filter(b => {
-      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      const bookingDate = getEarningDate(b);
       return b.status === 'completed' && bookingDate >= lastMonthStart && bookingDate <= lastMonthEnd;
     });
-    const totalEarningsLastMonth = lastMonthBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    const totalEarningsLastMonth = lastMonthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
 
     // Calculate monthly trend percentage
     const monthlyTrend = totalEarningsLastMonth > 0
@@ -2273,13 +2285,13 @@ app.get("/api/provider/earnings", async (req, res) => {
       const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
       const dayBookings = allBookings.filter(b => {
-        const bookingDate = new Date(b.scheduled_at || b.created_at);
+        const bookingDate = getEarningDate(b);
         return b.status === 'completed' && bookingDate >= dayStart && bookingDate < dayEnd;
       });
 
       weeklyData.push({
         name: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        value: dayBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100 // Convert cents to dollars
+        value: dayBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0) / 100
       });
     }
 
@@ -2291,14 +2303,14 @@ app.get("/api/provider/earnings", async (req, res) => {
       const monthEnd = new Date(now.getFullYear(), m + 1, 0);
 
       const monthBookings = allBookings.filter(b => {
-        const bookingDate = new Date(b.scheduled_at || b.created_at);
+        const bookingDate = getEarningDate(b);
         return b.status === 'completed' && bookingDate >= monthStart && bookingDate <= monthEnd;
       });
 
-      const income = monthBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100;
+      const income = monthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0) / 100;
       const jobCount = monthBookings.length;
-      // Estimate expenses as 10% of income (platform fee)
-      const expense = Math.round(income * 0.1);
+      const grossIncome = monthBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100;
+      const expense = Math.max(Math.round(grossIncome - income), 0);
 
       monthlyData.push({
         name: months[m],
@@ -2314,7 +2326,7 @@ app.get("/api/provider/earnings", async (req, res) => {
       const key = b.service_name || "Other";
       if (!breakdownMap[key]) breakdownMap[key] = { name: key, sessions: 0, revenue: 0 };
       breakdownMap[key].sessions += 1;
-      breakdownMap[key].revenue += (b.price || 0);
+      breakdownMap[key].revenue += getNetBookingAmountCents(b);
     });
     const breakdown = Object.values(breakdownMap)
       .map(item => ({ ...item, revenue: item.revenue / 100 }))
@@ -2322,7 +2334,7 @@ app.get("/api/provider/earnings", async (req, res) => {
 
     // Generate transactions list from bookings
     const transactions = allBookings.slice(0, 20).map(b => {
-      const bookingDate = new Date(b.scheduled_at || b.created_at);
+      const bookingDate = getEarningDate(b);
       const isCompleted = b.status === 'completed';
       const isPaid = b.payment_status === 'paid';
 
@@ -2330,7 +2342,7 @@ app.get("/api/provider/earnings", async (req, res) => {
         id: b.id,
         date: bookingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         description: `Payment from ${b.client_name || 'Client'} - ${b.service_name || 'Service'}`,
-        amount: (b.price || 0) / 100, // Convert cents to dollars
+        amount: getNetBookingAmountCents(b) / 100,
         type: 'INCOME',
         status: isPaid ? 'COMPLETED' : (isCompleted ? 'PENDING' : b.status.toUpperCase())
       };
