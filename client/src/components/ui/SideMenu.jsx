@@ -13,6 +13,7 @@ import Avatar from './Avatar';
  * @param {function} onNav        - called with item.id on tap
  * @param {string}   userName     - display name in the header
  * @param {string}   userInitials - 1–2 char initials for Avatar
+ * @param {string}   userAvatar   - optional avatar image URL
  * @param {function} onSignOut    - sign out handler
  */
 const SideMenu = ({
@@ -23,6 +24,7 @@ const SideMenu = ({
     onNav,
     userName = '',
     userInitials = '?',
+    userAvatar = '',
     onSignOut,
 }) => {
     useEffect(() => {
@@ -54,7 +56,7 @@ const SideMenu = ({
                 {/* User header */}
                 <div className="px-5 pt-6 pb-5 border-b border-line">
                     <div className="flex items-center gap-3">
-                        <Avatar initials={userInitials} size={44} />
+                        <Avatar initials={userInitials} size={44} src={userAvatar} />
                         <div>
                             <p className="text-[16px] font-semibold text-ink m-0 leading-tight">
                                 {userName}

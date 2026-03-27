@@ -164,6 +164,7 @@ const ProviderLayout = () => {
 
     const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    const avatarSrc = profile?.photo || profile?.avatar || '';
 
     // Inject live counts into nav items
     const navItems = PROVIDER_MENU.map((item) => {
@@ -192,6 +193,7 @@ const ProviderLayout = () => {
                     onNav={handleNav}
                     userName={displayName}
                     userInitials={initials}
+                    userAvatar={avatarSrc}
                     isProvider={true}
                     onSignOut={handleSignOut}
                 />
@@ -219,6 +221,7 @@ const ProviderLayout = () => {
                 onNav={handleNav}
                 userName={displayName}
                 userInitials={initials}
+                userAvatar={avatarSrc}
                 onSignOut={handleSignOut}
             />
         </div>

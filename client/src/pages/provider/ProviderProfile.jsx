@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { fetchProviderProfile } from '../../data/provider';
-import { request } from '../../data/apiClient';
 import Header from '../../components/ui/Header';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
@@ -87,28 +86,21 @@ const ProviderProfile = () => {
     const { logout } = useSession();
 
     const [profile, setProfile] = useState(null);
-    const [stats, setStats] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
-    const [loadingStats, setLoadingStats] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
         async function load() {
             try {
-                const [profileData, statsData] = await Promise.all([
-                    fetchProviderProfile(),
-                    request('/provider/stats').catch(() => null),
-                ]);
+                const profileData = await fetchProviderProfile();
                 if (!cancelled) {
                     setProfile(profileData);
-                    setStats(statsData?.stats || null);
                 }
             } catch (err) {
                 console.error('[ProviderProfile] load error:', err);
             } finally {
                 if (!cancelled) {
                     setLoadingProfile(false);
-                    setLoadingStats(false);
                 }
             }
         }
@@ -119,10 +111,7 @@ const ProviderProfile = () => {
     const initials = getInitials(profile);
     const name = buildName(profile);
     const subtitle = buildSubtitle(profile);
-
-    const rating  = stats?.rating  ? `${stats.rating} ★` : '—';
-    const reviews = stats?.reviews ?? '—';
-    const clients = stats?.clients ?? '—';
+    const avatarSrc = profile?.photo || profile?.avatar || '';
 
     const handleRowTap = (row) => {
         if (row.route) navigate(row.route);
@@ -144,7 +133,13 @@ const ProviderProfile = () => {
                         {loadingProfile ? (
                             <div style={{ width: 80, height: 80, borderRadius: '50%', background: DT.avatarBg, marginBottom: 16 }} />
                         ) : (
-                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: DT.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 600, color: DT.muted, fontFamily: F, marginBottom: 16, flexShrink: 0 }}>{initials}</div>
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: DT.avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 600, color: DT.muted, fontFamily: F, marginBottom: 16, flexShrink: 0, overflow: 'hidden' }}>
+                                {avatarSrc ? (
+                                    <img src={avatarSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    initials
+                                )}
+                            </div>
                         )}
                         {/* Name */}
                         {loadingProfile ? (
@@ -154,22 +149,6 @@ const ProviderProfile = () => {
                         )}
                         <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: '0 0 20px' }}>{subtitle}</p>
 
-                        {/* Divider */}
-                        <div style={{ width: '100%', height: 1, background: DT.line, marginBottom: 20 }} />
-
-                        {/* Stats row */}
-                        <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                            {[{ label: 'Rating', value: rating }, { label: 'Reviews', value: reviews }, { label: 'Clients', value: clients }].map(({ label, value }) => (
-                                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    {loadingStats ? (
-                                        <div style={{ height: 20, width: 36, background: DT.avatarBg, borderRadius: 4, marginBottom: 4 }} />
-                                    ) : (
-                                        <span style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: DT.accent, letterSpacing: '-0.02em', marginBottom: 2 }}>{value}</span>
-                                    )}
-                                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 500, color: DT.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-                                </div>
-                            ))}
-                        </div>
                     </div>
 
                     {/* Right: Settings list */}
@@ -203,7 +182,7 @@ const ProviderProfile = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar initials={initials} />
+            <Header onMenu={onMenu} showAvatar initials={initials} avatarSrc={avatarSrc} />
 
             {/* ── Hero card ── */}
             <div className="px-4 pt-2 pb-1">
@@ -227,7 +206,7 @@ const ProviderProfile = () => {
                             />
                         ) : (
                             <div
-                                className="rounded-full flex items-center justify-center"
+                                className="rounded-full flex items-center justify-center overflow-hidden"
                                 style={{
                                     width: 80,
                                     height: 80,
@@ -238,7 +217,11 @@ const ProviderProfile = () => {
                                     fontFamily: "'Sora', system-ui, sans-serif",
                                 }}
                             >
-                                {initials}
+                                {avatarSrc ? (
+                                    <img src={avatarSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    initials
+                                )}
                             </div>
                         )}
                     </div>
@@ -267,38 +250,6 @@ const ProviderProfile = () => {
                         )}
                     </div>
 
-                    {/* Stats row */}
-                    <div className="relative z-10 flex gap-2.5 w-full mt-5">
-                        {[
-                            { label: 'Rating',  value: rating  },
-                            { label: 'Reviews', value: reviews },
-                            { label: 'Clients', value: clients },
-                        ].map(({ label, value }) => (
-                            <div
-                                key={label}
-                                className="flex-1 flex flex-col items-center py-3 px-2 rounded-[12px]"
-                                style={{ background: 'rgba(61,35,30,0.08)' }}
-                            >
-                                {loadingStats ? (
-                                    <div className="h-5 w-10 rounded animate-pulse mb-1"
-                                        style={{ background: 'rgba(61,35,30,0.12)' }} />
-                                ) : (
-                                    <span
-                                        className="text-[18px] font-semibold tracking-[-0.02em] mb-0.5"
-                                        style={{ color: '#3D231E' }}
-                                    >
-                                        {value}
-                                    </span>
-                                )}
-                                <span
-                                    className="text-[11px] uppercase tracking-[0.05em] font-medium"
-                                    style={{ color: '#8C6A64' }}
-                                >
-                                    {label}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
 

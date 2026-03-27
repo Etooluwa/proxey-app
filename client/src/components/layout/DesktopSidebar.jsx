@@ -51,7 +51,7 @@ export function DesktopHeader({ title, subtitle }) {
 }
 
 // ─── Desktop Sidebar ──────────────────────────────────────────────────────────
-export function DesktopSidebar({ items, active, onNav, userName, userInitials, isProvider, onSignOut }) {
+export function DesktopSidebar({ items, active, onNav, userName, userInitials, userAvatar, isProvider, onSignOut }) {
     return (
         <div style={{
             width: '260px', position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 10,
@@ -80,8 +80,13 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, i
                     width: 38, height: 38, borderRadius: '50%', background: T.avatarBg,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontFamily: F, fontSize: '13px', fontWeight: 500, color: T.muted, flexShrink: 0,
+                    overflow: 'hidden',
                 }}>
-                    {userInitials}
+                    {userAvatar ? (
+                        <img src={userAvatar} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                        userInitials
+                    )}
                 </div>
                 <div>
                     <p style={{ fontFamily: F, fontSize: '14px', fontWeight: 500, color: T.ink, margin: 0 }}>

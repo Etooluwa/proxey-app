@@ -16,6 +16,7 @@ import Avatar from './Avatar';
  * @param {function} onNotif      - notification bell tap handler
  * @param {boolean}  showAvatar   - show avatar in right slot (default true)
  * @param {string}   initials     - 2-char initials for avatar
+ * @param {string}   avatarSrc    - optional avatar image URL
  */
 const Header = ({
     onMenu,
@@ -23,6 +24,7 @@ const Header = ({
     onNotif,
     showAvatar = true,
     initials = '?',
+    avatarSrc = '',
 }) => (
     <div className="relative flex items-center justify-between px-5 py-3 bg-base">
         {/* Left: hamburger */}
@@ -36,7 +38,7 @@ const Header = ({
         {/* Right: bell + optional avatar */}
         <div className="flex items-center gap-1">
             <NotifBell count={notifCount} onClick={onNotif} />
-            {showAvatar && <Avatar initials={initials} size={32} />}
+            {showAvatar && <Avatar initials={initials} size={32} src={avatarSrc} />}
         </div>
     </div>
 );
