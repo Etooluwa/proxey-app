@@ -1,5 +1,29 @@
 import { request } from "./apiClient";
 
+let providerProfileCache = {
+  value: null,
+  expiresAt: 0,
+  promise: null,
+};
+
+const PROVIDER_PROFILE_TTL_MS = 60 * 1000;
+
+function setProviderProfileCache(profile) {
+  providerProfileCache = {
+    value: profile || null,
+    expiresAt: Date.now() + PROVIDER_PROFILE_TTL_MS,
+    promise: null,
+  };
+}
+
+function clearProviderProfileCache() {
+  providerProfileCache = {
+    value: null,
+    expiresAt: 0,
+    promise: null,
+  };
+}
+
 export async function fetchProviderJobs({ status } = {}) {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
@@ -73,8 +97,28 @@ export async function fetchProviderEarnings() {
 }
 
 export async function fetchProviderProfile() {
-  const data = await request("/provider/me");
-  return data.profile || null;
+  const now = Date.now();
+
+  if (providerProfileCache.value && providerProfileCache.expiresAt > now) {
+    return providerProfileCache.value;
+  }
+
+  if (providerProfileCache.promise) {
+    return providerProfileCache.promise;
+  }
+
+  providerProfileCache.promise = request("/provider/me")
+    .then((data) => {
+      const profile = data.profile || null;
+      setProviderProfileCache(profile);
+      return profile;
+    })
+    .catch((error) => {
+      providerProfileCache.promise = null;
+      throw error;
+    });
+
+  return providerProfileCache.promise;
 }
 
 export async function updateProviderProfile(payload) {
@@ -82,7 +126,12 @@ export async function updateProviderProfile(payload) {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+  setProviderProfileCache(data.profile || null);
   return data.profile;
+}
+
+export function invalidateProviderProfileCache() {
+  clearProviderProfileCache();
 }
 
 export async function updateProviderSchedule(schedule) {

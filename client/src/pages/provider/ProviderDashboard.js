@@ -187,15 +187,28 @@ const ProviderDashboard = () => {
         async function load() {
             setLoading(true);
             try {
-                const [dash, prof] = await Promise.all([
+                const [dashResult, profileResult] = await Promise.allSettled([
                     request('/provider/dashboard'),
                     fetchProviderProfile(),
                 ]);
+
+                const dash = dashResult.status === 'fulfilled' ? dashResult.value : null;
+                const prof = profileResult.status === 'fulfilled' ? profileResult.value : null;
+
                 if (!cancelled) {
-                    setSchedule(dash.schedule || []);
-                    setWeeklyEarnings(dash.weeklyEarnings || 0);
-                    setNewClients(dash.newClientsThisWeek || 0);
-                    setHandle(prof?.handle || '');
+                    if (dash) {
+                        setSchedule(dash.schedule || []);
+                        setWeeklyEarnings(dash.weeklyEarnings || 0);
+                        setNewClients(dash.newClientsThisWeek || 0);
+                    } else {
+                        setSchedule([]);
+                        setWeeklyEarnings(0);
+                        setNewClients(0);
+                    }
+
+                    if (prof?.handle) {
+                        setHandle(prof.handle);
+                    }
                 }
             } catch (err) {
                 console.error('[ProviderDashboard] load error:', err);
