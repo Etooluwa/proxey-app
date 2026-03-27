@@ -269,16 +269,50 @@ setInterval(async () => {
 
 // Service categories endpoint
 const SERVICE_CATEGORIES = [
-  { id: "home-cleaning", label: "Home & Cleaning" },
-  { id: "beauty-personal-care", label: "Beauty & Personal Care" },
-  { id: "health-wellness", label: "Health & Wellness" },
-  { id: "events-entertainment", label: "Events & Entertainment" },
-  { id: "trades-repair", label: "Trades & Repair" },
-  { id: "auto-services", label: "Auto Services" },
-  { id: "business-services", label: "Business Services" },
-  { id: "child-pet-care", label: "Child & Pet Care" },
+  { id: "vocal-coaching", label: "Vocal Coaching" },
+  { id: "music-lessons", label: "Music Lessons" },
+  { id: "dance-instruction", label: "Dance Instruction" },
+  { id: "fitness-training", label: "Fitness Training" },
+  { id: "yoga-pilates", label: "Yoga & Pilates" },
+  { id: "massage-therapy", label: "Massage Therapy" },
+  { id: "mental-wellness", label: "Mental Wellness" },
+  { id: "nutrition-coaching", label: "Nutrition Coaching" },
+  { id: "hair-styling", label: "Hair Styling" },
+  { id: "barbering", label: "Barbering" },
+  { id: "braiding-locs", label: "Braiding & Locs" },
+  { id: "makeup", label: "Makeup" },
+  { id: "nails", label: "Nails" },
+  { id: "lashes-brows", label: "Lashes & Brows" },
+  { id: "skincare-esthetics", label: "Skincare & Esthetics" },
+  { id: "spa-body-treatments", label: "Spa & Body Treatments" },
+  { id: "tattoo-piercing", label: "Tattoo & Piercing" },
+  { id: "photography", label: "Photography" },
+  { id: "videography", label: "Videography" },
+  { id: "event-planning", label: "Event Planning" },
+  { id: "dj-entertainment", label: "DJ & Music Entertainment" },
+  { id: "catering-private-chef", label: "Catering & Private Chef" },
+  { id: "decor-event-design", label: "Decor & Event Design" },
+  { id: "home-cleaning", label: "Home Cleaning" },
+  { id: "deep-cleaning", label: "Deep Cleaning" },
+  { id: "home-organization", label: "Home Organization" },
+  { id: "moving-hauling", label: "Moving & Hauling" },
+  { id: "handyman", label: "Handyman" },
+  { id: "electrical", label: "Electrical" },
+  { id: "plumbing", label: "Plumbing" },
+  { id: "painting", label: "Painting" },
+  { id: "landscaping", label: "Landscaping" },
+  { id: "auto-detailing", label: "Auto Detailing" },
+  { id: "auto-repair", label: "Auto Repair" },
+  { id: "pet-grooming", label: "Pet Grooming" },
+  { id: "pet-care", label: "Pet Care" },
+  { id: "childcare", label: "Childcare" },
+  { id: "tutoring", label: "Tutoring" },
+  { id: "language-coaching", label: "Language Coaching" },
+  { id: "business-consulting", label: "Business Consulting" },
+  { id: "marketing-branding", label: "Marketing & Branding" },
+  { id: "design-creative", label: "Design & Creative" },
+  { id: "tech-support", label: "Tech Support" },
   { id: "delivery-errands", label: "Delivery & Errands" },
-  { id: "creative-specialty", label: "Creative & Specialty" },
 ];
 
 app.get("/api/categories", (req, res) => {
@@ -2390,15 +2424,43 @@ app.get("/api/provider/me", async (req, res) => {
 
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from("provider_profiles")
-        .select("*")
-        .eq("provider_id", providerId)
-        .maybeSingle();
-      if (error) {
-        console.warn("[supabase] Failed to load provider profile, using stub.", error);
+      const [
+        { data: providerProfile, error: profileError },
+        { data: providerRecord, error: providerError },
+      ] = await Promise.all([
+        supabase
+          .from("provider_profiles")
+          .select("*")
+          .eq("provider_id", providerId)
+          .maybeSingle(),
+        supabase
+          .from("providers")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .eq("user_id", providerId)
+          .maybeSingle(),
+      ]);
+      if (profileError || providerError) {
+        console.warn("[supabase] Failed to load provider profile, using stub.", profileError || providerError);
       } else {
-        return res.status(200).json({ profile: data });
+        const mergedCategories = Array.isArray(providerProfile?.categories) && providerProfile.categories.length
+          ? providerProfile.categories
+          : Array.isArray(providerRecord?.categories) && providerRecord.categories.length
+            ? providerRecord.categories
+            : providerRecord?.category
+              ? [providerRecord.category]
+              : [];
+
+        return res.status(200).json({
+          profile: {
+            ...(providerRecord || {}),
+            ...(providerProfile || {}),
+            business_name: providerProfile?.business_name || providerRecord?.business_name || "",
+            bio: providerProfile?.bio || providerRecord?.bio || "",
+            city: providerProfile?.city || providerRecord?.city || "",
+            category: providerRecord?.category || providerProfile?.category || mergedCategories[0] || "",
+            categories: mergedCategories,
+          },
+        });
       }
     } catch (error) {
       console.warn("[supabase] Unexpected error fetching provider profile", error);
@@ -2544,22 +2606,82 @@ app.patch("/api/provider/me", async (req, res) => {
 
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      const now = new Date().toISOString();
+      const normalizedCategory = updates.category ?? (Array.isArray(updates.categories) ? updates.categories[0] : undefined);
+      const normalizedCategories = Array.isArray(updates.categories)
+        ? updates.categories
+        : normalizedCategory
+          ? [normalizedCategory]
+          : updates.categories;
+
+      const profilePayload = {
+        provider_id: providerId,
+        ...updates,
+        updated_at: now,
+      };
+
+      if (normalizedCategory !== undefined) profilePayload.category = normalizedCategory;
+      if (normalizedCategories !== undefined) profilePayload.categories = normalizedCategories;
+
+      const { data: profileData, error: profileError } = await supabase
         .from("provider_profiles")
-        .upsert(
-          {
-            provider_id: providerId,
-            ...updates,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "provider_id" }
-        )
+        .upsert(profilePayload, { onConflict: "provider_id" })
         .select()
         .single();
-      if (error) {
-        console.warn("[supabase] Failed to update provider profile, using stub.", error);
+      if (profileError) {
+        console.warn("[supabase] Failed to update provider profile, using stub.", profileError);
       } else {
-        return res.status(200).json({ profile: data });
+        let providerData = null;
+        const providerPayload = {
+          user_id: providerId,
+          updated_at: now,
+        };
+
+        if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
+        if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
+        if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
+        if (normalizedCategory !== undefined) providerPayload.category = normalizedCategory || null;
+        if (normalizedCategories !== undefined) providerPayload.categories = normalizedCategories || [];
+
+        if (Object.keys(providerPayload).length > 2) {
+          const { data, error } = await supabase
+            .from("providers")
+            .upsert(providerPayload, { onConflict: "user_id" })
+            .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+            .single();
+          if (error) {
+            console.warn("[supabase] Failed to update providers row for profile changes", error);
+          } else {
+            providerData = data;
+          }
+        } else {
+          const { data } = await supabase
+            .from("providers")
+            .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+            .eq("user_id", providerId)
+            .maybeSingle();
+          providerData = data || null;
+        }
+
+        const mergedCategories = Array.isArray(profileData?.categories) && profileData.categories.length
+          ? profileData.categories
+          : Array.isArray(providerData?.categories) && providerData.categories.length
+            ? providerData.categories
+            : providerData?.category
+              ? [providerData.category]
+              : [];
+
+        return res.status(200).json({
+          profile: {
+            ...(providerData || {}),
+            ...(profileData || {}),
+            business_name: profileData?.business_name || providerData?.business_name || "",
+            bio: profileData?.bio || providerData?.bio || "",
+            city: profileData?.city || providerData?.city || "",
+            category: providerData?.category || profileData?.category || mergedCategories[0] || "",
+            categories: mergedCategories,
+          },
+        });
       }
     } catch (error) {
       console.warn("[supabase] Unexpected error updating provider profile", error);
