@@ -120,30 +120,45 @@ const AvailabilityPage = () => {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [hoursData, prof] = await Promise.all([
+            const [hoursResult, profileResult] = await Promise.allSettled([
                 request('/provider/weekly-hours'),
                 fetchProviderProfile(),
             ]);
-            const hours = hoursData.hours || [];
-            const newSchedule = DAYS.map((_, i) => ({ ...DEFAULT_DAY }));
-            for (const h of hours) {
-                const idx = h.day_index; // 0=Mon
-                if (idx >= 0 && idx < 7) {
-                    newSchedule[idx] = {
-                        enabled: h.is_available !== false,
-                        start: h.start_time || '09:00',
-                        end: h.end_time || '17:00',
-                    };
+
+            if (hoursResult.status === 'fulfilled') {
+                const hours = hoursResult.value?.hours || [];
+                const newSchedule = DAYS.map((_, i) => ({ ...DEFAULT_DAY }));
+                for (const h of hours) {
+                    const idx = h.day_index; // 0=Mon
+                    if (idx >= 0 && idx < 7) {
+                        newSchedule[idx] = {
+                            enabled: h.is_available !== false,
+                            start: h.start_time || '09:00',
+                            end: h.end_time || '17:00',
+                        };
+                    }
                 }
+                setSchedule(newSchedule);
+            } else {
+                console.error('[AvailabilityPage] weekly hours load error:', hoursResult.reason);
             }
-            setSchedule(newSchedule);
-            const meta = prof?.metadata || {};
-            if (meta.bufferMinutes !== undefined) setBuffer(meta.bufferMinutes);
-            const wd = meta.bookingWindowDays;
-            if (wd) {
-                const known = WINDOW_OPTIONS.find((o) => o.id === wd);
-                if (known) { setWindowDays(wd); }
-                else { setWindowDays(-1); setCustomDays(String(wd)); }
+
+            if (profileResult.status === 'fulfilled') {
+                const meta = profileResult.value?.metadata || {};
+                if (meta.bufferMinutes !== undefined) setBuffer(meta.bufferMinutes);
+                const wd = meta.bookingWindowDays;
+                if (wd) {
+                    const known = WINDOW_OPTIONS.find((o) => o.id === wd);
+                    if (known) {
+                        setWindowDays(wd);
+                        setCustomDays('');
+                    } else {
+                        setWindowDays(-1);
+                        setCustomDays(String(wd));
+                    }
+                }
+            } else {
+                console.warn('[AvailabilityPage] provider profile load warning:', profileResult.reason);
             }
         } catch (err) {
             console.error('[AvailabilityPage] load error:', err);

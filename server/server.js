@@ -2354,7 +2354,7 @@ app.get("/api/provider/me", async (req, res) => {
         .from("provider_profiles")
         .select("*")
         .eq("provider_id", providerId)
-        .single();
+        .maybeSingle();
       if (error) {
         console.warn("[supabase] Failed to load provider profile, using stub.", error);
       } else {
@@ -4438,12 +4438,13 @@ app.get("/api/provider/time-blocks", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerIds = providerIdentity.ids;
   try {
     const { data, error } = await supabase
       .from("provider_time_blocks")
       .select("*")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .order("day_index", { ascending: true })
       .order("start_time", { ascending: true });
 
@@ -4461,7 +4462,9 @@ app.post("/api/provider/time-blocks", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
   const { blocks = [] } = req.body || {};
 
   if (!Array.isArray(blocks)) {
@@ -4469,7 +4472,7 @@ app.post("/api/provider/time-blocks", async (req, res) => {
   }
 
   const payload = blocks.map((block) => ({
-    provider_id: providerId,
+    provider_id: providerAuthId,
     day_index: block.dayIndex ?? block.day_index ?? 0,
     start_time: block.startTime ?? block.start_time,
     end_time: block.endTime ?? block.end_time,
@@ -4477,7 +4480,7 @@ app.post("/api/provider/time-blocks", async (req, res) => {
   }));
 
   try {
-    await supabase.from("provider_time_blocks").delete().eq("provider_id", providerId);
+    await supabase.from("provider_time_blocks").delete().in("provider_id", providerIds);
 
     const { data, error } = await supabase
       .from("provider_time_blocks")
@@ -4499,12 +4502,13 @@ app.post("/api/provider/time-blocks", async (req, res) => {
 // GET /api/provider/weekly-hours — returns day_index 0-6 (0=Mon) with start/end
 app.get("/api/provider/weekly-hours", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerIds = providerIdentity.ids;
   try {
     const { data, error } = await supabase
       .from("provider_time_blocks")
       .select("*")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .order("day_index", { ascending: true });
     if (error) throw error;
     res.status(200).json({ hours: data || [] });
@@ -4518,13 +4522,15 @@ app.get("/api/provider/weekly-hours", async (req, res) => {
 // body: { hours: [{ dayIndex, startTime, endTime, isAvailable }], bufferMinutes, bookingWindowDays }
 app.post("/api/provider/weekly-hours", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
   const { hours = [], bufferMinutes, bookingWindowDays } = req.body || {};
   if (!Array.isArray(hours)) return res.status(400).json({ error: "hours must be an array." });
   try {
-    await supabase.from("provider_time_blocks").delete().eq("provider_id", providerId);
+    await supabase.from("provider_time_blocks").delete().in("provider_id", providerIds);
     const payload = hours.map((h) => ({
-      provider_id: providerId,
+      provider_id: providerAuthId,
       day_index: h.dayIndex ?? h.day_index ?? 0,
       start_time: h.startTime ?? h.start_time ?? "09:00",
       end_time: h.endTime ?? h.end_time ?? "17:00",
@@ -4534,11 +4540,15 @@ app.post("/api/provider/weekly-hours", async (req, res) => {
     if (error) throw error;
     // Persist booking settings in provider_profiles.metadata
     if (bufferMinutes !== undefined || bookingWindowDays !== undefined) {
-      const { data: prof } = await supabase.from("provider_profiles").select("metadata").eq("provider_id", providerId).single();
+      const { data: prof } = await supabase
+        .from("provider_profiles")
+        .select("metadata")
+        .eq("provider_id", providerAuthId)
+        .maybeSingle();
       const meta = prof?.metadata || {};
       if (bufferMinutes !== undefined) meta.bufferMinutes = bufferMinutes;
       if (bookingWindowDays !== undefined) meta.bookingWindowDays = bookingWindowDays;
-      await supabase.from("provider_profiles").update({ metadata: meta }).eq("provider_id", providerId);
+      await supabase.from("provider_profiles").update({ metadata: meta }).eq("provider_id", providerAuthId);
     }
     res.status(201).json({ hours: data });
   } catch (err) {
