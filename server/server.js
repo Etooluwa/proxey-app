@@ -3863,7 +3863,8 @@ app.get("/api/provider/calendar", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerIds = providerIdentity.ids;
   const year  = parseInt(req.query.year,  10) || new Date().getFullYear();
   const month = parseInt(req.query.month, 10);        // 0-based
   const m = isNaN(month) ? new Date().getMonth() : month;
@@ -3898,7 +3899,7 @@ app.get("/api/provider/calendar", async (req, res) => {
     const { data: blockedRows } = await supabase
       .from("provider_blocked_dates")
       .select("date, block_type, start_time, end_time, reason")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .gte("date", startDate)
       .lt("date", endDate);
 
@@ -4551,12 +4552,13 @@ app.post("/api/provider/weekly-hours", async (req, res) => {
 // GET /api/provider/blocked-dates — returns upcoming blocked dates
 app.get("/api/provider/blocked-dates", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerIds = providerIdentity.ids;
   try {
     const { data, error } = await supabase
       .from("provider_blocked_dates")
       .select("*")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .gte("date", new Date().toISOString().slice(0, 10))
       .order("date", { ascending: true });
     if (error) throw error;
@@ -4571,7 +4573,10 @@ app.get("/api/provider/blocked-dates", async (req, res) => {
 // body: { date, blockType, startTime, endTime, reason }
 app.post("/api/provider/blocked-dates", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerId = providerIdentity.recordId || providerIdentity.authId;
+  const providerIds = providerIdentity.ids;
+  if (!providerId) return res.status(400).json({ error: "Provider record not found." });
   const body = req.body || {};
   const date = body.date;
   const blockType = body.blockType || body.block_type || "full_day";
@@ -4595,7 +4600,7 @@ app.post("/api/provider/blocked-dates", async (req, res) => {
       const { data: existingOverride, error: existingError } = await supabase
         .from("provider_blocked_dates")
         .select("id")
-        .eq("provider_id", providerId)
+        .in("provider_id", providerIds)
         .eq("date", date)
         .eq("block_type", "availability_override")
         .maybeSingle();
@@ -4643,14 +4648,15 @@ app.post("/api/provider/blocked-dates", async (req, res) => {
 // DELETE /api/provider/blocked-dates/:id
 app.delete("/api/provider/blocked-dates/:id", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerIds = providerIdentity.ids;
   const { id } = req.params;
   try {
     const { error } = await supabase
       .from("provider_blocked_dates")
       .delete()
       .eq("id", id)
-      .eq("provider_id", providerId);
+      .in("provider_id", providerIds);
     if (error) throw error;
     res.status(200).json({ ok: true });
   } catch (err) {
@@ -6096,6 +6102,8 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   if (!date) return res.status(400).json({ error: "date is required (YYYY-MM-DD)." });
 
   try {
+    const providerIdentity = await getProviderIdentity(providerId);
+    const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerId];
     const dateObj = new Date(date + "T00:00:00");
     const dayIndex = dateObj.getDay(); // 0=Sun, 6=Sat
 
@@ -6115,7 +6123,7 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const { data: blockedDateRows } = await supabase
       .from("provider_blocked_dates")
       .select("block_type, start_time, end_time")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .eq("date", date);
 
     const fullDayBlock = (blockedDateRows || []).find((row) => row.block_type === "full_day");
