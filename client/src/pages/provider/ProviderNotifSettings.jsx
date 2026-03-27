@@ -16,9 +16,9 @@ const DEFAULT_PREFS = {
     push_messages:      true,
     push_reminders:     true,
     push_payouts:       false,
-    email_earnings:     true,
+    email_new_bookings: true,
     email_reviews:      true,
-    email_marketing:    false,
+    email_payout_updates: false,
 };
 
 const PUSH_ITEMS = [
@@ -30,9 +30,9 @@ const PUSH_ITEMS = [
 ];
 
 const EMAIL_ITEMS = [
-    { key: 'email_earnings',  label: 'Weekly earnings summary' },
+    { key: 'email_new_bookings', label: 'New booking requests' },
     { key: 'email_reviews',   label: 'New reviews' },
-    { key: 'email_marketing', label: 'Marketing & tips' },
+    { key: 'email_payout_updates', label: 'Payout updates' },
 ];
 
 export default function ProviderNotifSettings() {

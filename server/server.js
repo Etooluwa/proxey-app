@@ -102,6 +102,14 @@ async function createProviderNotification(providerId, notification) {
   if (!supabase || !providerId) return null;
 
   try {
+    const prefKey = getProviderPushPrefKey(notification?.type);
+    if (prefKey) {
+      const { prefs } = await getProviderNotifPrefs(providerId);
+      if (prefs?.[prefKey] === false) {
+        return null;
+      }
+    }
+
     const { data, error } = await supabase
       .from("notifications")
       .insert({
@@ -128,6 +136,46 @@ async function createProviderNotification(providerId, notification) {
     console.error("[notifications] Error creating provider notification:", error);
     return null;
   }
+}
+
+async function getProviderNotifPrefs(providerId) {
+  if (!supabase || !providerId) return { prefs: {} };
+
+  const { data } = await supabase
+    .from("provider_profiles")
+    .select("notification_preferences")
+    .eq("provider_id", providerId)
+    .maybeSingle();
+
+  return {
+    prefs: data?.notification_preferences || {},
+  };
+}
+
+function getProviderPushPrefKey(type) {
+  const normalized = String(type || "").toLowerCase();
+
+  if (["booking_request", "new_booking", "time_request", "booking_cancelled"].includes(normalized)) {
+    return "push_new_bookings";
+  }
+
+  if (["booking_accepted", "booking_declined", "time_request_accepted", "time_request_declined"].includes(normalized)) {
+    return "push_confirmations";
+  }
+
+  if (["new_message"].includes(normalized)) {
+    return "push_messages";
+  }
+
+  if (["session_reminder"].includes(normalized)) {
+    return "push_reminders";
+  }
+
+  if (["bank", "payout", "payout_update"].includes(normalized)) {
+    return "push_payouts";
+  }
+
+  return null;
 }
 
 /**
@@ -2640,6 +2688,8 @@ app.patch("/api/provider/me", async (req, res) => {
         if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
         if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
         if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
+        if (typeof updates.photo !== "undefined") providerPayload.photo = updates.photo;
+        if (typeof updates.avatar !== "undefined") providerPayload.avatar = updates.avatar;
         if (normalizedCategory !== undefined) providerPayload.category = normalizedCategory || null;
         if (normalizedCategories !== undefined) providerPayload.categories = normalizedCategories || [];
 
@@ -3669,7 +3719,12 @@ app.get("/api/provider/portfolio", async (req, res) => {
       throw error;
     }
 
-    res.status(200).json({ media: data });
+    res.status(200).json({
+      media: (data || []).map((item) => ({
+        ...item,
+        url: item.media_url || null,
+      })),
+    });
   } catch (err) {
     console.error("[supabase] Failed to load portfolio media", err);
     res.status(500).json({ error: "Failed to load portfolio media." });
@@ -3695,7 +3750,12 @@ app.get("/api/provider/:providerId/portfolio", async (req, res) => {
       throw error;
     }
 
-    res.status(200).json({ media: data });
+    res.status(200).json({
+      media: (data || []).map((item) => ({
+        ...item,
+        url: item.media_url || null,
+      })),
+    });
   } catch (err) {
     console.error("[supabase] Failed to load provider portfolio", err);
     res.status(500).json({ error: "Failed to load portfolio." });
@@ -3733,7 +3793,7 @@ app.post("/api/provider/portfolio", async (req, res) => {
       throw error;
     }
 
-    res.status(201).json({ media: data });
+    res.status(201).json({ media: { ...data, url: data.media_url || null } });
   } catch (err) {
     console.error("[supabase] Failed to add portfolio media", err);
     res.status(500).json({ error: "Failed to add portfolio media." });
@@ -3765,7 +3825,7 @@ app.delete("/api/provider/portfolio/:id", async (req, res) => {
       return res.status(404).json({ error: "Portfolio media not found." });
     }
 
-    res.status(200).json({ media: data });
+    res.status(200).json({ media: { ...data, url: data.media_url || null } });
   } catch (err) {
     console.error("[supabase] Failed to delete portfolio media", err);
     res.status(500).json({ error: "Failed to delete portfolio media." });
