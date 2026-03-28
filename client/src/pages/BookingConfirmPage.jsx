@@ -1,12 +1,28 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import Card from "../components/ui/Card";
+import SavedPaymentMethodList from "../components/payment/SavedPaymentMethodList";
 import { useToast } from "../components/ui/ToastProvider";
 import useBookings from "../data/useBookings";
 import useProviders from "../data/useProviders";
 import useServices from "../data/useServices";
 import { requestCheckout } from "../data/bookings";
 import { request } from "../data/apiClient";
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || "");
+const T = {
+  ink: "#3D231E",
+  muted: "#8C6A64",
+  faded: "#B0948F",
+  accent: "#C25E4A",
+  line: "rgba(140,106,100,0.18)",
+  card: "#FFFFFF",
+  avatarBg: "#F2EBE5",
+  danger: "#B04040",
+};
+const F = "'Sora', system-ui, sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +50,141 @@ function fmtDateTime(iso) {
   });
 }
 
+function normalizePaymentErrorMessage(error) {
+  const rawMessage = String(error?.message || "");
+  const normalized = rawMessage.toLowerCase();
+
+  if (
+    normalized.includes("provider payout account is not ready yet") ||
+    normalized.includes("provider has not connected stripe yet")
+  ) {
+    return "This provider has not finished Stripe payout setup yet. Try again later or message them directly.";
+  }
+
+  return rawMessage || "Unable to start payment.";
+}
+
+function AddCardForm({ onSuccess, onCancel }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    setError(null);
+    setSaving(true);
+
+    try {
+      const { clientSecret } = await request("/payments/setup-intent", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+
+      const cardElement = elements.getElement(CardElement);
+      const { error: stripeErr, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: { card: cardElement },
+      });
+
+      if (stripeErr) {
+        setError(stripeErr.message);
+        return;
+      }
+
+      if (setupIntent.status === "succeeded") {
+        onSuccess?.(setupIntent.payment_method);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to save card.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: 16, background: T.card, borderRadius: 16, border: `1px solid ${T.line}` }}>
+      <p style={{
+        fontFamily: F,
+        fontSize: 11,
+        fontWeight: 600,
+        color: T.muted,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        margin: "0 0 12px",
+      }}>
+        Add a new card
+      </p>
+
+      <div style={{
+        padding: "14px 16px",
+        borderRadius: 12,
+        border: `1px solid ${T.line}`,
+        background: T.avatarBg,
+        marginBottom: 14,
+      }}>
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontFamily: F,
+                fontSize: "14px",
+                color: T.ink,
+                "::placeholder": { color: T.faded },
+              },
+              invalid: { color: T.danger },
+            },
+            hidePostalCode: false,
+          }}
+        />
+      </div>
+
+      {error && (
+        <p style={{ fontFamily: F, fontSize: 13, color: T.danger, margin: "0 0 12px" }}>{error}</p>
+      )}
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={saving || !stripe}
+          style={{
+            flex: 1,
+            padding: "13px 0",
+            borderRadius: 12,
+            border: "none",
+            background: saving ? T.faded : T.ink,
+            color: "#fff",
+            fontFamily: F,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: saving ? "default" : "pointer",
+          }}
+        >
+          {saving ? "Saving…" : "Save and use this card"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          style={{
+            padding: "13px 18px",
+            borderRadius: 12,
+            border: `1px solid ${T.line}`,
+            background: "transparent",
+            color: T.muted,
+            fontFamily: F,
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function BookingConfirmPage() {
@@ -49,6 +200,7 @@ function BookingConfirmPage() {
   const [savedPaymentMethods, setSavedPaymentMethods] = useState([]);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState(null);
   const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
 
   useEffect(() => {
     const match = bookings.find((item) => item.id === bookingId);
@@ -59,21 +211,25 @@ function BookingConfirmPage() {
     if (!bookingId && !bookingsLoading) refresh();
   }, [bookingId, bookingsLoading, refresh]);
 
-  // Fetch saved payment methods
-  useEffect(() => {
+  const loadPaymentMethods = useCallback(() => {
     setLoadingPaymentMethods(true);
     request('/payments/methods')
       .then((data) => {
         const methods = data?.paymentMethods || [];
         setSavedPaymentMethods(methods);
-        if (methods.length > 0) {
+        setSelectedPaymentMethodId((currentSelection) => {
+          if (methods.some((method) => method.id === currentSelection)) return currentSelection;
           const defaultMethod = methods.find((m) => m.isDefault) || methods[0];
-          setSelectedPaymentMethodId(defaultMethod.id);
-        }
+          return defaultMethod?.id || null;
+        });
       })
       .catch(() => {})
       .finally(() => setLoadingPaymentMethods(false));
   }, []);
+
+  useEffect(() => {
+    loadPaymentMethods();
+  }, [loadPaymentMethods]);
 
   const provider = providers.find((p) => p.id === booking?.providerId);
   const service = services.find((s) => s.id === booking?.serviceId);
@@ -83,7 +239,6 @@ function BookingConfirmPage() {
     setLoadingCheckout(true);
     try {
       const chargeAmount = booking.depositAmount || booking.price;
-      const paymentType = booking.depositAmount ? "deposit" : "full payment";
 
       if (selectedPaymentMethodId) {
         await request('/charge', {
@@ -115,12 +270,18 @@ function BookingConfirmPage() {
     } catch (error) {
       toast.push({
         title: "Unable to start payment",
-        description: error.message,
+        description: normalizePaymentErrorMessage(error),
         variant: "error",
       });
     } finally {
       setLoadingCheckout(false);
     }
+  };
+
+  const handleCardAdded = async (paymentMethodId) => {
+    setShowAddCard(false);
+    setSelectedPaymentMethodId(paymentMethodId);
+    await loadPaymentMethods();
   };
 
   // ── Derived display values ─────────────────────────────────────────────────
@@ -240,47 +401,39 @@ function BookingConfirmPage() {
         )}
       </Card>
 
-      {/* Payment method selector (if saved cards) */}
       {!loadingPaymentMethods && savedPaymentMethods.length > 0 && (
+        <SavedPaymentMethodList
+          paymentMethods={savedPaymentMethods}
+          selectedPaymentMethodId={selectedPaymentMethodId}
+          onSelect={setSelectedPaymentMethodId}
+          title="Pay with"
+        />
+      )}
+
+      {!showAddCard ? (
+        <button
+          type="button"
+          onClick={() => setShowAddCard(true)}
+          className="w-full mb-3"
+          style={{
+            padding: "15px 16px",
+            borderRadius: 16,
+            border: `1px dashed ${T.line}`,
+            background: "transparent",
+            color: T.accent,
+            fontFamily: F,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Add a new card
+        </button>
+      ) : (
         <div className="w-full mb-3">
-          <p className="font-sora text-[13px] font-semibold text-foreground text-left mb-2">
-            Pay with
-          </p>
-          <div className="flex flex-col gap-2">
-            {savedPaymentMethods.map((method) => {
-              const isSelected = selectedPaymentMethodId === method.id;
-              return (
-                <button
-                  key={method.id}
-                  onClick={() => setSelectedPaymentMethodId(method.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-card text-left focus:outline-none transition-colors"
-                  style={{
-                    background: isSelected ? "#FFF0E6" : "#FFFFFF",
-                    border: isSelected ? "1.5px solid #C25E4A" : "1px solid rgba(140,106,100,0.2)",
-                  }}
-                >
-                  <div
-                    className="flex items-center justify-center flex-shrink-0"
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      background: isSelected ? "#C25E4A" : "transparent",
-                      border: isSelected ? "none" : "2px solid #D1D5DB",
-                    }}
-                  >
-                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
-                  <span className="font-sora text-[14px] font-semibold text-foreground">
-                    {method.brand?.toUpperCase()} ···· {method.last4}
-                  </span>
-                  <span className="font-sora text-[12px] text-muted ml-auto">
-                    {method.expMonth}/{method.expYear}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <Elements stripe={stripePromise}>
+            <AddCardForm onSuccess={handleCardAdded} onCancel={() => setShowAddCard(false)} />
+          </Elements>
         </div>
       )}
 

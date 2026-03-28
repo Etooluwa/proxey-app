@@ -22,6 +22,7 @@ import ShareLinks from '../../components/ui/ShareLinks';
 import DesktopShareLinks from '../../components/DesktopShareLinks';
 import Footer from '../../components/ui/Footer';
 import AppointmentDrawer from '../../components/AppointmentDrawer';
+import ProviderStripeReadinessBanner from '../../components/provider/ProviderStripeReadinessBanner';
 
 // ─── Design tokens (desktop inline styles) ────────────────────────────────────
 const T = {
@@ -327,6 +328,10 @@ const ProviderDashboard = () => {
                     </div>
                 </div>
 
+                <div style={{ marginBottom: '24px' }}>
+                    <ProviderStripeReadinessBanner />
+                </div>
+
                 {/* ── Schedule card ── */}
                 <div style={{ background: T.card, borderRadius: '20px', border: `1px solid ${T.line}`, padding: '28px', marginBottom: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -421,6 +426,9 @@ const ProviderDashboard = () => {
 
             {/* ── Stats row ── */}
             <div className="px-5 flex-1 flex flex-col">
+                <div className="mb-5">
+                    <ProviderStripeReadinessBanner compact />
+                </div>
                 <Divider />
                 <div className="flex gap-6 pt-5 pb-5 relative">
                     <div className="absolute inset-y-5 left-1/2 w-px" style={{ background: 'rgba(140,106,100,0.2)' }} />

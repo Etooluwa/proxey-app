@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
-  currency: "USD",
+  currency: "CAD",
 });
 
 function SuccessPage() {

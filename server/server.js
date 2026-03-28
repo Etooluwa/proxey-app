@@ -19,6 +19,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-09-30.acacia",
 });
 
+const PLATFORM_CURRENCY = "cad";
+const PLATFORM_FEE_RATE = 0.10;
+
 const supabase =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(
@@ -218,6 +221,31 @@ function getProviderPushPrefKey(type) {
   return null;
 }
 
+function getClientPushPrefKey(type) {
+  const normalized = String(type || "").toLowerCase();
+
+  if ([
+    "accepted",
+    "rejected",
+    "booking_accepted",
+    "booking_declined",
+    "time_request_accepted",
+    "time_request_declined",
+  ].includes(normalized)) {
+    return "push_booking_confirmations";
+  }
+
+  if (["session_reminder"].includes(normalized)) {
+    return "push_reminders";
+  }
+
+  if (["session_complete", "booking_completed"].includes(normalized)) {
+    return "push_review_requests";
+  }
+
+  return null;
+}
+
 /**
  * Create a notification for a client
  * @param {string} userId - Client's user ID
@@ -227,6 +255,14 @@ async function createClientNotification(userId, notification) {
   if (!supabase || !userId) return null;
 
   try {
+    const prefKey = getClientPushPrefKey(notification?.type);
+    if (prefKey) {
+      const { prefs } = await getClientNotifPrefs(userId);
+      if (prefs?.[prefKey] === false) {
+        return null;
+      }
+    }
+
     const { data, error } = await supabase
       .from("client_notifications")
       .insert({
@@ -565,6 +601,66 @@ function getProviderId(req) {
   return req.headers["x-provider-id"] || getUserId(req);
 }
 
+async function getProviderStripeConnectStatus(providerId, { requireReady = false } = {}) {
+  if (!providerId) {
+    const error = new Error("providerId is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!supabase) {
+    return {
+      accountId: null,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      detailsSubmitted: false,
+    };
+  }
+
+  const { data: provider, error: providerError } = await supabase
+    .from("providers")
+    .select("stripe_account_id, business_name, name")
+    .eq("id", providerId)
+    .maybeSingle();
+
+  if (providerError) {
+    throw providerError;
+  }
+
+  const accountId = provider?.stripe_account_id || null;
+  if (!accountId) {
+    const error = new Error("Provider has not connected Stripe yet.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const account = await stripe.accounts.retrieve(accountId);
+  const status = {
+    accountId,
+    chargesEnabled: Boolean(account?.charges_enabled),
+    payoutsEnabled: Boolean(account?.payouts_enabled),
+    detailsSubmitted: Boolean(account?.details_submitted),
+  };
+
+  if (requireReady && (!status.chargesEnabled || !status.payoutsEnabled)) {
+    const error = new Error("Provider payout account is not ready yet.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return status;
+}
+
+function buildConnectTransferParams(amountCents, providerStripeAccountId) {
+  const applicationFeeAmount = Math.round(amountCents * PLATFORM_FEE_RATE);
+  return {
+    application_fee_amount: applicationFeeAmount,
+    transfer_data: {
+      destination: providerStripeAccountId,
+    },
+  };
+}
+
 // Resolves the providers.id (PK) from the caller's user_id.
 // Needed when inserting rows with a FK to providers.id (e.g. service_groups).
 async function resolveProviderId(req) {
@@ -704,7 +800,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
   const {
     serviceName,
     amount,
-    currency = "usd",
+    currency = PLATFORM_CURRENCY,
     bookingId,
     providerId,
     successUrl,
@@ -730,6 +826,12 @@ app.post("/api/create-checkout-session", async (req, res) => {
     if (bookingId) metadata.bookingId = String(bookingId);
     if (providerId) metadata.providerId = String(providerId);
 
+    let connectParams = {};
+    if (providerId) {
+      const providerStripe = await getProviderStripeConnectStatus(providerId, { requireReady: true });
+      connectParams = buildConnectTransferParams(amount, providerStripe.accountId);
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -748,11 +850,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
       ],
       metadata,
       client_reference_id: bookingId ? String(bookingId) : undefined,
-      // Optional Stripe Connect example (uncomment when providers use Express accounts):
-      // transfer_data: {
-      //   destination: providerStripeAccountId,
-      // },
-      // application_fee_amount: Math.round(amount * 0.2), // e.g. 20% platform fee
+      payment_intent_data: Object.keys(connectParams).length ? connectParams : undefined,
       success_url:
         successUrl ||
         `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -1866,13 +1964,19 @@ app.post("/api/payments/create-checkout", async (req, res) => {
     memoryStore.services.find((item) => item.id === booking.serviceId) || {};
 
   try {
+    let connectParams = {};
+    if (booking.providerId) {
+      const providerStripe = await getProviderStripeConnectStatus(booking.providerId, { requireReady: true });
+      connectParams = buildConnectTransferParams(booking.price || 1000, providerStripe.accountId);
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: PLATFORM_CURRENCY,
             product_data: {
               name: service?.name || "Booking Payment",
               description: service?.description,
@@ -1887,6 +1991,7 @@ app.post("/api/payments/create-checkout", async (req, res) => {
         providerId: booking.providerId,
       },
       client_reference_id: bookingId,
+      payment_intent_data: Object.keys(connectParams).length ? connectParams : undefined,
       success_url:
         successUrl ||
         `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -2148,8 +2253,6 @@ app.patch("/api/provider/jobs/:id/notes", async (req, res) => {
 
 // POST /api/provider/jobs/:id/complete — mark complete + return payout breakdown
 // Sets completed_at, updates linked booking, upserts provider_earnings record
-const PLATFORM_FEE_RATE = 0.10; // 10%
-
 app.post("/api/provider/jobs/:id/complete", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
   const providerId = getProviderId(req);
@@ -3389,7 +3492,7 @@ app.post("/api/reviews", async (req, res) => {
         if (stripe && booking.metadata?.payment_method_id && booking.metadata?.customer_id) {
           const tipIntent = await stripe.paymentIntents.create({
             amount: tipAmountCents,
-            currency: "usd",
+            currency: PLATFORM_CURRENCY,
             customer: booking.metadata.customer_id,
             payment_method: booking.metadata.payment_method_id,
             confirm: true,
@@ -3485,7 +3588,7 @@ app.post("/api/tips", async (req, res) => {
     if (stripe && paymentMethodId && customerId) {
       const tipIntent = await stripe.paymentIntents.create({
         amount: Math.round(amountCents),
-        currency: "usd",
+        currency: PLATFORM_CURRENCY,
         customer: customerId,
         payment_method: paymentMethodId,
         confirm: true,
@@ -4822,7 +4925,7 @@ app.post("/api/client/transactions", async (req, res) => {
   const {
     bookingId,
     amount,
-    currency = "usd",
+    currency = PLATFORM_CURRENCY,
     status = "pending",
     description = "",
   } = req.body || {};
@@ -5736,6 +5839,52 @@ async function attachProfilesToMessages(messages = []) {
 // PAYMENT ENDPOINTS - CLIENT PAYMENT METHODS
 // ============================================================================
 
+async function getClientStripeCustomerId(userId) {
+  if (!userId || !supabase) return null;
+
+  const { data: clientProfile } = await supabase
+    .from("client_profiles")
+    .select("stripe_customer_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return clientProfile?.stripe_customer_id || null;
+}
+
+async function requireClientStripeCustomerId(userId) {
+  const customerId = await getClientStripeCustomerId(userId);
+  if (!customerId) {
+    const error = new Error("No saved payment methods found for this client.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return customerId;
+}
+
+async function listCustomerCardPaymentMethods(customerId) {
+  const customer = await stripe.customers.retrieve(customerId);
+  const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method || null;
+  const paymentMethods = await stripe.paymentMethods.list({
+    customer: customerId,
+    type: "card",
+  });
+
+  return {
+    defaultPaymentMethodId,
+    paymentMethods: paymentMethods.data,
+  };
+}
+
+async function assertPaymentMethodBelongsToCustomer(paymentMethodId, customerId) {
+  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (paymentMethod.customer !== customerId) {
+    const error = new Error("Payment method does not belong to the authenticated client.");
+    error.statusCode = 403;
+    throw error;
+  }
+  return paymentMethod;
+}
+
 // POST /api/client/setup-intent
 // Creates a SetupIntent for client to save their card
 app.post("/api/client/setup-intent", async (req, res) => {
@@ -5936,9 +6085,13 @@ app.post("/api/charge", async (req, res) => {
       return res.status(400).json({ error: "No saved payment method on file." });
     }
 
+    await assertPaymentMethodBelongsToCustomer(paymentMethodId, customerId);
+    const providerStripe = await getProviderStripeConnectStatus(providerId, { requireReady: true });
+    const connectParams = buildConnectTransferParams(Math.round(amount), providerStripe.accountId);
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
-      currency: "cad",
+      currency: PLATFORM_CURRENCY,
       customer: customerId,
       payment_method: paymentMethodId,
       off_session: true,
@@ -5947,6 +6100,7 @@ app.post("/api/charge", async (req, res) => {
         bookingId: bookingId || "unknown",
         providerId: providerId || "unknown",
       },
+      ...connectParams,
     });
 
     // Update booking payment status
@@ -8563,23 +8717,15 @@ app.get("/api/payments/methods", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
   if (!supabase) return res.json({ paymentMethods: [] });
   try {
-    // Look up the client's Stripe customer id
-    const { data: client } = await supabase
-      .from("client_profiles")
-      .select("stripe_customer_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    const customerId = client?.stripe_customer_id;
+    const customerId = await getClientStripeCustomerId(userId);
     if (!customerId) return res.json({ paymentMethods: [] });
 
-    const customer = await stripe.customers.retrieve(customerId);
-    const defaultPmId = customer.invoice_settings?.default_payment_method;
-    const pmList = await stripe.paymentMethods.list({ customer: customerId, type: "card" });
+    const { defaultPaymentMethodId, paymentMethods } = await listCustomerCardPaymentMethods(customerId);
 
     res.json({
-      paymentMethods: pmList.data.map((pm) => ({
+      paymentMethods: paymentMethods.map((pm) => ({
         id: pm.id,
-        isDefault: pm.id === defaultPmId,
+        isDefault: pm.id === defaultPaymentMethodId,
         brand: pm.card.brand,
         last4: pm.card.last4,
         expMonth: pm.card.exp_month,
@@ -8647,6 +8793,70 @@ app.post("/api/payments/setup-intent", async (req, res) => {
   }
 });
 
+// POST /api/payments/methods/:paymentMethodId/default — set default card
+app.post("/api/payments/methods/:paymentMethodId/default", async (req, res) => {
+  const userId = getUserId(req);
+  const { paymentMethodId } = req.params;
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  if (!paymentMethodId) return res.status(400).json({ error: "paymentMethodId is required." });
+
+  try {
+    const customerId = await requireClientStripeCustomerId(userId);
+    await assertPaymentMethodBelongsToCustomer(paymentMethodId, customerId);
+
+    await stripe.customers.update(customerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    res.json({ success: true, defaultPaymentMethodId: paymentMethodId });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    console.error("[payments/default]", err);
+    res.status(statusCode).json({ error: err.message || "Failed to update default payment method." });
+  }
+});
+
+// DELETE /api/payments/methods/:paymentMethodId — remove saved card for logged-in client
+app.delete("/api/payments/methods/:paymentMethodId", async (req, res) => {
+  const userId = getUserId(req);
+  const { paymentMethodId } = req.params;
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  if (!paymentMethodId) return res.status(400).json({ error: "paymentMethodId is required." });
+
+  try {
+    const customerId = await requireClientStripeCustomerId(userId);
+    await assertPaymentMethodBelongsToCustomer(paymentMethodId, customerId);
+
+    const { defaultPaymentMethodId, paymentMethods } = await listCustomerCardPaymentMethods(customerId);
+    const remainingMethods = paymentMethods.filter((method) => method.id !== paymentMethodId);
+
+    await stripe.paymentMethods.detach(paymentMethodId);
+
+    if (defaultPaymentMethodId === paymentMethodId) {
+      await stripe.customers.update(customerId, {
+        invoice_settings: {
+          default_payment_method: remainingMethods[0]?.id || null,
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      deletedPaymentMethodId: paymentMethodId,
+      defaultPaymentMethodId:
+        defaultPaymentMethodId === paymentMethodId ? (remainingMethods[0]?.id || null) : defaultPaymentMethodId,
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    console.error("[payments/delete]", err);
+    res.status(statusCode).json({ error: err.message || "Failed to remove payment method." });
+  }
+});
+
 // POST /api/bookings/create — create booking and charge via PaymentIntent
 app.post("/api/bookings/create", async (req, res) => {
   const userId = getUserId(req);
@@ -8680,6 +8890,17 @@ app.post("/api/bookings/create", async (req, res) => {
 
   const chargeAmount = depositAmount != null ? depositAmount : price;
   const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
+  let providerStripe = null;
+
+  if (amountCents > 0) {
+    try {
+      providerStripe = await getProviderStripeConnectStatus(providerId, { requireReady: true });
+    } catch (providerStripeError) {
+      return res.status(providerStripeError.statusCode || 500).json({
+        error: providerStripeError.message || "Provider payout account is not ready yet.",
+      });
+    }
+  }
 
   try {
     let bookingId = crypto.randomUUID();
@@ -8696,6 +8917,7 @@ app.post("/api/bookings/create", async (req, res) => {
           notes: notes || "",
           status: providerBookingRules.autoAccept ? "confirmed" : "pending",
           price: price ?? null,
+          currency: PLATFORM_CURRENCY.toUpperCase(),
         })
         .select()
         .single();
@@ -8719,13 +8941,14 @@ app.post("/api/bookings/create", async (req, res) => {
 
       const intent = await stripe.paymentIntents.create({
         amount: amountCents,
-        currency: "usd",
+        currency: PLATFORM_CURRENCY,
         customer: customerId,
         payment_method: paymentMethodId,
         confirm: true,
         off_session: false,
         metadata: { bookingId, providerId, userId },
         ...(saveCard ? { setup_future_usage: "off_session" } : {}),
+        ...(providerStripe ? buildConnectTransferParams(amountCents, providerStripe.accountId) : {}),
       });
       paymentIntentId = intent.id;
     }

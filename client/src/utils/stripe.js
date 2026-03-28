@@ -5,7 +5,7 @@ const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 export async function initiateCheckout({
   serviceName,
   amount,
-  currency = "usd",
+  currency = "cad",
   bookingId,
   providerId,
   customerEmail,

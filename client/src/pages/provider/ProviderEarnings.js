@@ -18,6 +18,7 @@ import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
 import HeroCard from '../../components/ui/HeroCard';
 import Footer from '../../components/ui/Footer';
+import ProviderStripeReadinessBanner from '../../components/provider/ProviderStripeReadinessBanner';
 
 // ─── Desktop tokens ────────────────────────────────────────────────────────────
 const T = { ink: '#3D231E', muted: '#8C6A64', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', hero: '#FDDCC6', success: '#5A8A5E', successBg: '#EBF2EC' };
@@ -138,6 +139,10 @@ const ProviderEarnings = () => {
         return (
             <div style={{ padding: '40px', fontFamily: F }}>
                 <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    <div style={{ marginBottom: 24 }}>
+                        <ProviderStripeReadinessBanner />
+                    </div>
+
                     {/* Top 2-col: hero total + next payout */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
                         {/* Hero: monthly total */}
@@ -239,6 +244,9 @@ const ProviderEarnings = () => {
             <Header onMenu={onMenu} showAvatar initials={initials} />
 
             <div className="px-5 pb-10 flex-1 flex flex-col">
+                <div className="mb-5">
+                    <ProviderStripeReadinessBanner compact />
+                </div>
 
                 {/* ── Hero card: month pill + total + trend ── */}
                 <div className="mb-6">

@@ -39,20 +39,6 @@ const DAY_NAMES_LONG = [
     'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 ];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const TIME_OPTIONS = (() => {
-    const opts = [];
-    for (let h = 6; h <= 23; h += 1) {
-        for (const m of [0, 30]) {
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const hr = h % 12 || 12;
-            opts.push({
-                value: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-                label: `${hr}:${String(m).padStart(2, '0')} ${ampm}`,
-            });
-        }
-    }
-    return opts;
-})();
 
 function monFirstDow(date) {
     return (date.getDay() + 6) % 7;
@@ -80,7 +66,7 @@ function fmtBlockTime(t) {
 }
 
 function getTimeOptionLabel(value) {
-    return TIME_OPTIONS.find((option) => option.value === value)?.label || value;
+    return fmtBlockTime(value) || value;
 }
 
 function parseTimeValue(value) {
@@ -89,7 +75,10 @@ function parseTimeValue(value) {
 
     const [rawHour = '09', rawMinute = '00'] = String(value).split(':');
     const hour24 = Number(rawHour);
-    const minute = rawMinute === '30' ? '30' : '00';
+    const parsedMinute = Number(rawMinute);
+    const minute = Number.isNaN(parsedMinute)
+        ? '00'
+        : String(Math.min(59, Math.max(0, parsedMinute))).padStart(2, '0');
 
     if (Number.isNaN(hour24)) return fallback;
 
@@ -158,7 +147,7 @@ function removeBlockedDate(blockedDates, dateKey, blockId) {
 
 function TimePickerPopover({ value, onSelect, onClose }) {
     const hours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    const minutes = ['00', '30'];
+    const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
     const periods = ['AM', 'PM'];
     const parts = parseTimeValue(value);
 

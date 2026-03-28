@@ -61,7 +61,7 @@ function AddCardForm({ onSuccess, onCancel }) {
       }
 
       if (setupIntent.status === 'succeeded') {
-        onSuccess();
+        onSuccess(setupIntent.payment_method);
       }
     } catch (err) {
       setError(err.message || 'Failed to save card.');
@@ -138,6 +138,7 @@ export default function ClientPaymentMethods() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(null);
+  const [settingDefault, setSettingDefault] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const isDesktop = useIsDesktop();
 
@@ -152,10 +153,17 @@ export default function ClientPaymentMethods() {
   useEffect(() => { loadCards(); }, [loadCards]);
 
   const handleRemove = async (pmId) => {
+    const confirmed = window.confirm('Remove this saved card?');
+    if (!confirmed) return;
+
     setRemoving(pmId);
     try {
-      await request(`/client/payment-methods/${pmId}`, { method: 'DELETE' });
-      setCards((prev) => prev.filter((c) => c.id !== pmId));
+      const data = await request(`/payments/methods/${pmId}`, { method: 'DELETE' });
+      const fallbackDefaultId = data?.defaultPaymentMethodId || null;
+
+      setCards((prev) => prev
+        .filter((c) => c.id !== pmId)
+        .map((c) => ({ ...c, isDefault: c.id === fallbackDefaultId })));
     } catch (err) {
       console.error('[ClientPaymentMethods] remove error:', err);
     } finally {
@@ -163,9 +171,30 @@ export default function ClientPaymentMethods() {
     }
   };
 
-  const handleCardAdded = () => {
+  const handleSetDefault = async (pmId) => {
+    setSettingDefault(pmId);
+    try {
+      await request(`/payments/methods/${pmId}/default`, { method: 'POST' });
+      setCards((prev) => prev.map((card) => ({ ...card, isDefault: card.id === pmId })));
+    } catch (err) {
+      console.error('[ClientPaymentMethods] set default error:', err);
+    } finally {
+      setSettingDefault(null);
+    }
+  };
+
+  const handleCardAdded = async (paymentMethodId) => {
     setShowAdd(false);
-    loadCards();
+    try {
+      const hasDefault = cards.some((card) => card.isDefault);
+      if (paymentMethodId && !hasDefault) {
+        await request(`/payments/methods/${paymentMethodId}/default`, { method: 'POST' });
+      }
+    } catch (err) {
+      console.error('[ClientPaymentMethods] initial default error:', err);
+    } finally {
+      loadCards();
+    }
   };
 
   return (
@@ -205,19 +234,29 @@ export default function ClientPaymentMethods() {
                 </div>
               </div>
 
-              {card.isDefault ? (
-                <div style={{ padding: '4px 10px', borderRadius: 9999, background: T.hero }}>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: T.accent, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Default</span>
-                </div>
-              ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {card.isDefault && (
+                  <div style={{ padding: '4px 10px', borderRadius: 9999, background: T.hero }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: T.accent, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Default</span>
+                  </div>
+                )}
+                {!card.isDefault && (
+                  <button
+                    onClick={() => handleSetDefault(card.id)}
+                    disabled={settingDefault === card.id || removing === card.id}
+                    style={{ fontFamily: F, fontSize: 12, color: T.accent, background: 'none', border: 'none', cursor: settingDefault === card.id || removing === card.id ? 'default' : 'pointer' }}
+                  >
+                    {settingDefault === card.id ? 'Saving…' : 'Make default'}
+                  </button>
+                )}
                 <button
                   onClick={() => handleRemove(card.id)}
-                  disabled={removing === card.id}
-                  style={{ fontFamily: F, fontSize: 12, color: T.faded, background: 'none', border: 'none', cursor: removing === card.id ? 'default' : 'pointer' }}
+                  disabled={removing === card.id || settingDefault === card.id}
+                  style={{ fontFamily: F, fontSize: 12, color: T.faded, background: 'none', border: 'none', cursor: removing === card.id || settingDefault === card.id ? 'default' : 'pointer' }}
                 >
                   {removing === card.id ? 'Removing…' : 'Remove'}
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>

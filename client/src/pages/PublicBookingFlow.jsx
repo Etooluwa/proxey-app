@@ -10,11 +10,11 @@ import { loadStripe } from "@stripe/stripe-js";
 import { useSession } from "../auth/authContext";
 import { request } from "../data/apiClient";
 import Avatar from "../components/ui/Avatar";
-import Badge from "../components/ui/Badge";
 import Card from "../components/ui/Card";
 import Footer from "../components/ui/Footer";
 import Logo from "../components/ui/Logo";
 import Nav from "../components/ui/Nav";
+import SavedPaymentMethodList from "../components/payment/SavedPaymentMethodList";
 
 // ─── Stripe ───────────────────────────────────────────────────────────────────
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || "");
@@ -66,6 +66,20 @@ function fmtPrice(cents) {
   return "$" + (cents / 100).toFixed(2);
 }
 
+function normalizePaymentErrorMessage(error) {
+  const rawMessage = String(error?.message || "");
+  const normalized = rawMessage.toLowerCase();
+
+  if (
+    normalized.includes("provider payout account is not ready yet") ||
+    normalized.includes("provider has not connected stripe yet")
+  ) {
+    return "This provider has not finished Stripe payout setup yet. Try again later or message them directly.";
+  }
+
+  return rawMessage || "Payment failed. Please try again.";
+}
+
 function calcDeposit(service, priceOverride) {
   const total = priceOverride ?? (service?.base_price ?? 0); // cents
   if (service?.payment_type !== "deposit") return { isDeposit: false, total, deposit: total, remaining: 0 };
@@ -88,11 +102,6 @@ function formatTime(isoDate) {
   if (!isoDate) return "";
   const d = new Date(isoDate);
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-function brandIcon(brand) {
-  const icons = { visa: "💳", mastercard: "💳", amex: "💳", discover: "💳" };
-  return icons[brand?.toLowerCase()] || "💳";
 }
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
@@ -874,7 +883,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
       ssClear();
       onNext(result);
     } catch (err) {
-      setError(err.message || "Payment failed. Please try again.");
+      setError(normalizePaymentErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -929,33 +938,53 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
         Payment method
       </h2>
       <Card>
-        {!useNewCard && selectedPm ? (
+        {!useNewCard && paymentMethods.length > 0 ? (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 24 }}>{brandIcon(selectedPm.brand)}</span>
-                <div>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: FG, margin: 0 }}>
-                    {selectedPm.brand?.charAt(0).toUpperCase() + selectedPm.brand?.slice(1)} ···· {selectedPm.last4}
-                  </p>
-                  <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
-                    Expires {selectedPm.expMonth}/{selectedPm.expYear}
-                  </p>
-                </div>
-              </div>
-              {selectedPm.isDefault && (
-                <Badge variant="success" label="Default" />
-              )}
-            </div>
+            <SavedPaymentMethodList
+              paymentMethods={paymentMethods}
+              selectedPaymentMethodId={selectedPm?.id}
+              onSelect={(paymentMethodId) => {
+                const nextSelection = paymentMethods.find((method) => method.id === paymentMethodId) || null;
+                setSelectedPm(nextSelection);
+              }}
+              title="Saved cards"
+              marginBottom={14}
+            />
+
             <button
               onClick={() => setUseNewCard(true)}
-              style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0, fontFamily: "'Sora', system-ui, sans-serif" }}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                borderRadius: 14,
+                border: `1px dashed ${DIVIDER}`,
+                background: "transparent",
+                color: ACCENT,
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: "'Sora', system-ui, sans-serif",
+                cursor: "pointer",
+              }}
             >
-              Use a different card
+              Add a new card
             </button>
           </>
         ) : (
           <>
+            {paymentMethods.length > 0 && (
+              <SavedPaymentMethodList
+                paymentMethods={paymentMethods}
+                selectedPaymentMethodId={selectedPm?.id}
+                onSelect={(paymentMethodId) => {
+                  const nextSelection = paymentMethods.find((method) => method.id === paymentMethodId) || null;
+                  setSelectedPm(nextSelection);
+                  setUseNewCard(false);
+                }}
+                title="Saved cards"
+                marginBottom={14}
+              />
+            )}
+
             <Elements stripe={stripePromise}>
               <PaymentCardForm onToken={(ref) => { newCardRef.current = ref; }} />
             </Elements>
@@ -973,9 +1002,9 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
             {paymentMethods.length > 0 && (
               <button
                 onClick={() => { setUseNewCard(false); setSelectedPm(paymentMethods.find((p) => p.isDefault) || paymentMethods[0]); }}
-                style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "'Sora', system-ui, sans-serif" }}
+                style={{ color: ACCENT, background: "none", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 10, padding: 0, fontFamily: "'Sora', system-ui, sans-serif" }}
               >
-                Use saved card
+                Back to saved cards
               </button>
             )}
           </>
