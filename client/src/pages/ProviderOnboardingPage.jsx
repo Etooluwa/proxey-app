@@ -711,7 +711,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
         Go live
       </h2>
       <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
-        Claim your booking link and connect your payout account.
+        Claim your booking link now. You can connect Stripe later before you start taking paid bookings.
       </p>
 
       {/* Handle */}
@@ -787,7 +787,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
               Connect with Stripe
             </p>
             <p className="font-sora text-[13px] m-0" style={{ color: MUTED }}>
-              Receive payouts directly to your bank account.
+              Receive payouts directly to your bank account when you're ready to accept paid bookings.
             </p>
           </div>
         </div>
@@ -805,17 +805,22 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
             </span>
           </div>
         ) : (
-          <button
-            onClick={onStripeConnect}
-            disabled={stripeLoading}
-            className="w-full py-3.5 rounded-xl font-sora text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
-            style={{ background: stripeLoading ? "#B0B0B0" : "#635BFF", cursor: stripeLoading ? "not-allowed" : "pointer" }}
-          >
-            {stripeLoading && (
-              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            )}
-            {stripeLoading ? "Connecting…" : "Connect Stripe"}
-          </button>
+          <>
+            <button
+              onClick={onStripeConnect}
+              disabled={stripeLoading}
+              className="w-full py-3.5 rounded-xl font-sora text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+              style={{ background: stripeLoading ? "#B0B0B0" : "#635BFF", cursor: stripeLoading ? "not-allowed" : "pointer" }}
+            >
+              {stripeLoading && (
+                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              )}
+              {stripeLoading ? "Connecting…" : "Connect Stripe"}
+            </button>
+            <p className="font-sora text-[12px] m-0 mt-3" style={{ color: MUTED }}>
+              Optional for now. You can finish payout setup later in Profile → Payouts &amp; Billing.
+            </p>
+          </>
         )}
       </Card>
     </div>
@@ -826,7 +831,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
 function ProviderOnboardingPage() {
   const navigate    = useNavigate();
   const location    = useLocation();
-  const { session } = useSession();
+  const { session, updateProfile } = useSession();
   const toast       = useToast();
 
   // ── Form state (starts at defaults; overwritten once draft loads) ────────
@@ -966,7 +971,7 @@ function ProviderOnboardingPage() {
     if (step === 2) return profile.businessName.trim() && profile.city.trim() && profile.bio.trim();
     if (step === 3) return services.length > 0;
     if (step === 4) return true; // always enabled
-    if (step === 5) return handleStatus === "available" && stripeConnected;
+    if (step === 5) return handleStatus === "available";
     return false;
   };
 
@@ -992,10 +997,11 @@ function ProviderOnboardingPage() {
           bookingWindowWeeks: bookingWindow,
         }),
       });
+      await updateProfile({ isProfileComplete: true });
       // Clear the draft from Supabase
       request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
       toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
-      navigate("/provider");
+      navigate("/provider", { replace: true });
     } catch (err) {
       toast.push({ title: "Setup failed", description: err.message, variant: "error" });
     } finally {
