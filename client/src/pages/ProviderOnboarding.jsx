@@ -620,7 +620,7 @@ const AvailabilityStep = ({ avail, onToggle, onTime, buffer, onBuffer, window: w
 
 const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe, stripeLoading, onLaunch, launching, onBack, error }) => (
     <StepShell step={5} onBack={onBack}>
-        <StepHeader step={5} total={5} title="Almost there." sub="Choose your public handle and connect your payout method." />
+        <StepHeader step={5} total={5} title="Almost there." sub="Choose your public handle now. Stripe can be connected later before you accept paid bookings." />
 
         {/* Handle */}
         <Lbl className="mb-2">Your Handle</Lbl>
@@ -664,7 +664,7 @@ const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe,
         <div className="py-5">
             <Lbl className="mb-2">Connect Payouts</Lbl>
             <p className="text-[14px] text-muted leading-relaxed mb-4">
-                Connect your Stripe account to receive payments from clients securely.
+                Connect your Stripe account to receive payments from clients securely when you're ready.
             </p>
             {stripeConnected ? (
                 <div className="flex items-center gap-2 px-4 py-3.5 rounded-[12px]" style={{ background: '#EBF2EC' }}>
@@ -690,6 +690,11 @@ const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe,
                     Connect Stripe
                 </button>
             )}
+            {!stripeConnected && (
+                <p className="text-[12px] text-faded mt-3 mb-0">
+                    Optional for now. You can finish payout setup later in Profile → Payouts &amp; Billing.
+                </p>
+            )}
         </div>
 
         <Err msg={error} />
@@ -712,7 +717,7 @@ const DEFAULT_AVAIL = DAYS.map((_, i) => ({
 
 export default function ProviderOnboarding() {
     const navigate = useNavigate();
-    const { session } = useSession();
+    const { session, updateProfile } = useSession();
 
     const [step, setStep] = useState(0);
     const [error, setError] = useState(null);
@@ -899,8 +904,9 @@ export default function ProviderOnboarding() {
         try {
             await request('/provider/me', {
                 method: 'PATCH',
-                body: JSON.stringify({ handle, is_profile_complete: true }),
+                body: JSON.stringify({ handle }),
             });
+            await updateProfile({ isProfileComplete: true });
             navigate('/provider', { replace: true });
         } catch (err) {
             setError(err.message || 'Failed to launch page.');
