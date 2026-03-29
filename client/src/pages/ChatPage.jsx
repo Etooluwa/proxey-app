@@ -261,7 +261,7 @@ const ChatPage = () => {
 
     const handleSend = useCallback(async () => {
         const text = input.trim();
-        if (!text || !conversationId) return;
+        if (!text || !conversationId || sending) return;
         setInput('');
         setSending(true);
         try {
@@ -272,7 +272,7 @@ const ChatPage = () => {
         } finally {
             setSending(false);
         }
-    }, [input, conversationId, sendMessage]);
+    }, [input, conversationId, sending, sendMessage]);
 
     const handleBack = () => {
         const basePath = isProvider ? '/provider/messages' : '/app/messages';

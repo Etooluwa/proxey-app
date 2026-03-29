@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { uploadMessageImage } from '../utils/messageImageUpload';
@@ -63,6 +63,19 @@ async function enrichConversations(conversations = []) {
     }));
 }
 
+function mergeUniqueMessages(messages = []) {
+    const byId = new Map();
+
+    for (const message of messages) {
+        if (!message?.id) continue;
+        byId.set(message.id, message);
+    }
+
+    return Array.from(byId.values()).sort((a, b) => (
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    ));
+}
+
 export const MessageProvider = ({ children }) => {
     const { session, profile } = useSession();
     const userId = session?.user?.id;
@@ -71,6 +84,7 @@ export const MessageProvider = ({ children }) => {
     const [conversations, setConversations] = useState([]);
     const [currentConversation, setCurrentConversation] = useState(null);
     const [messages, setMessages] = useState({});
+    const sendingConversationIdsRef = useRef(new Set());
 
     const updateConversationLocally = useCallback((conversationId, updater) => {
         setConversations((prev) =>
@@ -123,7 +137,7 @@ export const MessageProvider = ({ children }) => {
 
             setMessages(prev => ({
                 ...prev,
-                [conversationId]: data || []
+                [conversationId]: mergeUniqueMessages(data || [])
             }));
         } catch (error) {
             console.error('[messages] Failed to load messages:', error);
@@ -179,10 +193,10 @@ export const MessageProvider = ({ children }) => {
                     (payload) => {
                         setMessages(prev => ({
                             ...prev,
-                            [currentConversation]: [
-                                ...(prev[currentConversation] || []).filter((msg) => msg.id !== payload.new.id),
-                                payload.new
-                            ]
+                            [currentConversation]: mergeUniqueMessages([
+                                ...(prev[currentConversation] || []),
+                                payload.new,
+                            ])
                         }));
                         loadConversations(); // Refresh to update unread counts
                     }
@@ -287,7 +301,12 @@ export const MessageProvider = ({ children }) => {
             throw new Error('Message must have content or image');
         }
 
+        if (sendingConversationIdsRef.current.has(conversationId)) {
+            return null;
+        }
+
         try {
+            sendingConversationIdsRef.current.add(conversationId);
             let imageUrl = null;
 
             // Upload image if provided
@@ -329,7 +348,10 @@ export const MessageProvider = ({ children }) => {
 
             setMessages((prev) => ({
                 ...prev,
-                [conversationId]: [...(prev[conversationId] || []), data],
+                [conversationId]: mergeUniqueMessages([
+                    ...(prev[conversationId] || []),
+                    data,
+                ]),
             }));
 
             updateConversationLocally(conversationId, (current) => ({
@@ -353,6 +375,8 @@ export const MessageProvider = ({ children }) => {
         } catch (error) {
             console.error('[messages] Failed to send message:', error);
             throw error;
+        } finally {
+            sendingConversationIdsRef.current.delete(conversationId);
         }
     };
 
