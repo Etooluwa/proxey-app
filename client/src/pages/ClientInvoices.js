@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
+import Header from '../components/ui/Header';
+import Footer from '../components/ui/Footer';
 
 const T = {
     ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -39,8 +41,9 @@ const StatusPill = ({ status }) => {
 };
 
 const ClientInvoices = () => {
+    const navigate = useNavigate();
     const { session } = useSession();
-    const { isDesktop } = useOutletContext() || {};
+    const { isDesktop, onMenu } = useOutletContext() || {};
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -260,8 +263,11 @@ const ClientInvoices = () => {
 
     // ── Mobile layout ────────────────────────────────────────────────────────
     return (
-        <div style={{ minHeight: '100vh', background: T.base, paddingBottom: 96 }}>
-            <div style={{ padding: '32px 20px 0' }}>
+        <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+
+            <div style={{ padding: '0 20px 24px', flex: 1 }}>
+                <div style={{ paddingTop: 8 }}>
                 <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 600, color: T.ink, letterSpacing: '-0.02em', margin: '0 0 20px' }}>My Invoices</h1>
 
                 <FilterBar />
@@ -307,9 +313,11 @@ const ClientInvoices = () => {
                         </div>
                     </div>
                 ))}
+                </div>
             </div>
 
             {selectedInvoice && <DetailModal />}
+            <Footer />
         </div>
     );
 };
