@@ -143,7 +143,7 @@ const ProviderRow = ({ provider, onClick, showDivider }) => (
 const AppDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
-    const { session } = useSession();
+    const { session, profile: sessionProfile } = useSession();
 
     const { notifications } = useNotifications();
 
@@ -214,10 +214,27 @@ const AppDashboard = () => {
         };
     }, [session?.user?.id]);
 
+    const firstName = (sessionProfile?.name || session?.user?.user_metadata?.full_name || '').split(' ')[0];
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
     if (isDesktop) {
         return (
             <div style={{ padding: '40px', fontFamily: F }}>
                 <div style={{ maxWidth: 800, margin: '0 auto' }}>
+                    {/* Welcome */}
+                    <div style={{ marginBottom: 32 }}>
+                        <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>YOUR RELATIONSHIPS</p>
+                        <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
+                            {greeting}{firstName ? `, ${firstName}` : ''}.
+                        </h1>
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>
+                            {kliques.length > 0
+                                ? `You have ${kliques.length} provider relationship${kliques.length !== 1 ? 's' : ''} here.`
+                                : 'Your provider relationships will appear here.'}
+                        </p>
+                    </div>
+
                     {/* Loading */}
                     {loading && (
                         <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
@@ -350,12 +367,15 @@ const AppDashboard = () => {
                 {/* Provider list */}
                 {!loading && !error && kliques.length > 0 && (
                     <div className="flex-1 flex flex-col">
-                        {/* Title + count */}
+                        {/* Welcome + count */}
                         <div className="mb-4">
-                            <Lbl className="block mb-1">{kliques.length} provider{kliques.length !== 1 ? 's' : ''}</Lbl>
-                            <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
-                                My kliques
+                            <Lbl className="block mb-1">YOUR RELATIONSHIPS</Lbl>
+                            <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0 mb-1">
+                                {greeting}{firstName ? `, ${firstName}` : ''}.
                             </h1>
+                            <p className="text-[14px] text-muted m-0 mb-1" style={{ lineHeight: 1.6 }}>
+                                {kliques.length} provider relationship{kliques.length !== 1 ? 's' : ''} here.
+                            </p>
                         </div>
 
                         {/* Review banner (mobile) */}
