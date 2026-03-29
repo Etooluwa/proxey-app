@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { useMessages } from '../contexts/MessageContext';
 import { request } from '../data/apiClient';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
@@ -171,6 +172,7 @@ const RelationshipPage = () => {
     const { providerId } = useParams();
     const navigate = useNavigate();
     const { session } = useSession();
+    const { getOrCreateConversation, setCurrentConversation, loadMessages } = useMessages();
     const { isDesktop } = useOutletContext() || {};
 
     const [provider, setProvider] = useState(null);
@@ -210,6 +212,17 @@ const RelationshipPage = () => {
     const unreviewedBooking = bookings.find(
         (b) => b.status === 'completed' && !b.reviewed_at && !b.has_review
     );
+
+    const handleMessage = async () => {
+        try {
+            const conversation = await getOrCreateConversation(providerId, 'provider');
+            setCurrentConversation(conversation.id);
+            loadMessages(conversation.id);
+            navigate(`/app/messages/${conversation.id}`);
+        } catch (err) {
+            console.error('[RelationshipPage] message open error:', err);
+        }
+    };
 
     if (isDesktop) {
         return (
@@ -277,7 +290,7 @@ const RelationshipPage = () => {
                                     <button onClick={() => navigate('/app/booking-flow', { state: { providerId } })} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
                                         Book a Session →
                                     </button>
-                                    <button onClick={() => navigate('/app/messages', { state: { providerId } })} style={{ padding: '12px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(61,35,30,0.25)', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
+                                    <button onClick={handleMessage} style={{ padding: '12px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(61,35,30,0.25)', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
                                         Message →
                                     </button>
                                 </div>
@@ -421,7 +434,7 @@ const RelationshipPage = () => {
                     Book a Session →
                 </button>
                 <button
-                    onClick={() => navigate('/app/messages', { state: { providerId } })}
+                    onClick={handleMessage}
                     className="flex-1 py-3.5 rounded-pill text-ink text-[14px] font-semibold focus:outline-none active:opacity-80 transition-opacity"
                     style={{ border: '1.5px solid rgba(140,106,100,0.35)' }}
                 >
