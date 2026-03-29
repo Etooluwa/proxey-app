@@ -2914,7 +2914,6 @@ app.patch("/api/provider/me", async (req, res) => {
         }
       }
 
-      if (normalizedCategory !== undefined) profilePayload.category = normalizedCategory;
       if (normalizedCategories !== undefined) profilePayload.categories = normalizedCategories;
 
       const { data: profileData, error: profileError } = await supabase
@@ -2923,64 +2922,64 @@ app.patch("/api/provider/me", async (req, res) => {
         .select()
         .single();
       if (profileError) {
-        console.warn("[supabase] Failed to update provider profile, using stub.", profileError);
-      } else {
-        let providerData = null;
-        const providerPayload = {
-          user_id: providerId,
-          updated_at: now,
-        };
-
-        if (typeof updates.handle !== "undefined") providerPayload.handle = updates.handle || null;
-        if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
-        if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
-        if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
-        if (typeof updates.photo !== "undefined") providerPayload.photo = updates.photo;
-        if (typeof updates.avatar !== "undefined") providerPayload.avatar = updates.avatar;
-        if (typeof updates.is_profile_complete !== "undefined") providerPayload.is_profile_complete = Boolean(updates.is_profile_complete);
-        if (normalizedCategory !== undefined) providerPayload.category = normalizedCategory || null;
-        if (normalizedCategories !== undefined) providerPayload.categories = normalizedCategories || [];
-
-        if (Object.keys(providerPayload).length > 2) {
-          const { data, error } = await supabase
-            .from("providers")
-            .upsert(providerPayload, { onConflict: "user_id" })
-            .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
-            .single();
-          if (error) {
-            console.warn("[supabase] Failed to update providers row for profile changes", error);
-          } else {
-            providerData = data;
-          }
-        } else {
-          const { data } = await supabase
-            .from("providers")
-            .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
-            .eq("user_id", providerId)
-            .maybeSingle();
-          providerData = data || null;
-        }
-
-        const mergedCategories = Array.isArray(profileData?.categories) && profileData.categories.length
-          ? profileData.categories
-          : Array.isArray(providerData?.categories) && providerData.categories.length
-            ? providerData.categories
-            : providerData?.category
-              ? [providerData.category]
-              : [];
-
-        return res.status(200).json({
-          profile: {
-            ...(providerData || {}),
-            ...(profileData || {}),
-            business_name: profileData?.business_name || providerData?.business_name || "",
-            bio: profileData?.bio || providerData?.bio || "",
-            city: profileData?.city || providerData?.city || "",
-            category: providerData?.category || profileData?.category || mergedCategories[0] || "",
-            categories: mergedCategories,
-          },
-        });
+        console.warn("[supabase] Failed to update provider profile fields", profileError);
       }
+
+      let providerData = null;
+      const providerPayload = {
+        user_id: providerId,
+        updated_at: now,
+      };
+
+      if (typeof updates.handle !== "undefined") providerPayload.handle = updates.handle || null;
+      if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
+      if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
+      if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
+      if (typeof updates.photo !== "undefined") providerPayload.photo = updates.photo;
+      if (typeof updates.avatar !== "undefined") providerPayload.avatar = updates.avatar;
+      if (typeof updates.is_profile_complete !== "undefined") providerPayload.is_profile_complete = Boolean(updates.is_profile_complete);
+      if (normalizedCategory !== undefined) providerPayload.category = normalizedCategory || null;
+      if (normalizedCategories !== undefined) providerPayload.categories = normalizedCategories || [];
+
+      if (Object.keys(providerPayload).length > 2) {
+        const { data, error } = await supabase
+          .from("providers")
+          .upsert(providerPayload, { onConflict: "user_id" })
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .single();
+        if (error) {
+          console.warn("[supabase] Failed to update providers row for profile changes", error);
+        } else {
+          providerData = data;
+        }
+      } else {
+        const { data } = await supabase
+          .from("providers")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .eq("user_id", providerId)
+          .maybeSingle();
+        providerData = data || null;
+      }
+
+      const mergedCategories = Array.isArray(profileData?.categories) && profileData.categories.length
+        ? profileData.categories
+        : Array.isArray(providerData?.categories) && providerData.categories.length
+          ? providerData.categories
+          : providerData?.category
+            ? [providerData.category]
+            : [];
+
+      return res.status(200).json({
+        profile: {
+          ...(providerData || {}),
+          ...(profileData || {}),
+          business_name: profileData?.business_name || providerData?.business_name || "",
+          bio: profileData?.bio || providerData?.bio || "",
+          city: profileData?.city || providerData?.city || "",
+          category: providerData?.category || mergedCategories[0] || "",
+          categories: mergedCategories,
+        },
+      });
     } catch (error) {
       console.warn("[supabase] Unexpected error updating provider profile", error);
     }

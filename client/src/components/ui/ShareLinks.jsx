@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { request } from '../../data/apiClient';
 
 const TOPO_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='none' stroke='%23C25E4A' stroke-width='1'%3E%3Cellipse cx='200' cy='200' rx='180' ry='80'/%3E%3Cellipse cx='200' cy='200' rx='140' ry='60'/%3E%3Cellipse cx='200' cy='200' rx='100' ry='45'/%3E%3Cellipse cx='200' cy='200' rx='60' ry='30'/%3E%3Cellipse cx='200' cy='200' rx='160' ry='110'/%3E%3C/g%3E%3C/svg%3E")`;
 
@@ -134,32 +133,9 @@ const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, 
 const ShareLinks = ({ handle = '' }) => {
     const [copied, setCopied] = useState(null);
     const [showQR, setShowQR] = useState(null);
-    const [invitePath, setInvitePath] = useState('');
-
-    useEffect(() => {
-        let active = true;
-
-        async function loadInvitePath() {
-            try {
-                const data = await request('/provider/invites/current');
-                if (!active) return;
-                setInvitePath(data?.url || '');
-            } catch (_) {
-                if (!active) return;
-                setInvitePath(handle ? `/join/${handle}` : '');
-            }
-        }
-
-        loadInvitePath();
-
-        return () => {
-            active = false;
-        };
-    }, [handle]);
-
-    const inviteUrl = invitePath ? `mykliques.com${invitePath}` : 'mykliques.com/join/';
+    const inviteUrl = `mykliques.com/join/${handle}`;
     const bookingUrl = `mykliques.com/book/${handle}`;
-    const inviteFullUrl = invitePath ? `https://mykliques.com${invitePath}` : 'https://mykliques.com/join/';
+    const inviteFullUrl = `https://mykliques.com/join/${handle}`;
     const bookingFullUrl = `https://mykliques.com/book/${handle}`;
 
     const handleCopy = (type, fullUrl) => {
