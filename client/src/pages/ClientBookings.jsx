@@ -1,56 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
 import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
-import Avatar from '../components/ui/Avatar';
 import Footer from '../components/ui/Footer';
-
-const T = {
-    ink: '#3D231E',
-    muted: '#8C6A64',
-    faded: '#B0948F',
-    accent: '#C25E4A',
-    line: 'rgba(140,106,100,0.18)',
-    card: '#FFFFFF',
-    hero: '#FDDCC6',
-    avatarBg: '#F2EBE5',
-    success: '#5A8A5E',
-    successBg: '#EBF2EC',
-    dangerBg: '#FDEDEA',
-    base: '#FBF7F2',
-};
-const F = "'Sora',system-ui,sans-serif";
-
-function getInitials(name) {
-    return (name || 'P').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-}
-
-function fmtDateTime(iso) {
-    if (!iso) return 'TBD';
-    return new Date(iso).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
-
-function fmtPrice(val) {
-    if (!val && val !== 0) return null;
-    const dollars = val > 1000 ? val / 100 : val;
-    return `$${Math.round(dollars)}`;
-}
-
-function fmtDuration(mins) {
-    if (!mins) return null;
-    if (mins < 60) return `${mins} min`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m ? `${h} hr ${m} min` : `${h} hr`;
-}
+import {
+    BOOKING_TOKENS,
+    BODY_FONT,
+    BookingsEmptyState,
+    BookingsPageHeader,
+    BookingsTabBar,
+    BookingCard,
+    CalendarIcon,
+    ClockIcon,
+    EnvelopeIcon,
+} from '../components/bookings/BookingsShared';
 
 function getLocalDateKey(value = new Date()) {
     const date = value instanceof Date ? value : new Date(value);
@@ -75,223 +40,51 @@ function getClientBookingTab(booking, todayKey = getLocalDateKey()) {
     return null;
 }
 
-// ─── Status pill config ───────────────────────────────────────────────────────
-function getStatusStyle(status) {
-    switch (status) {
-        case 'pending':
-            return { background: '#FFF5E6', color: '#92400E', label: 'Pending' };
-        case 'confirmed':
-            return { background: T.successBg, color: T.success, label: 'Confirmed' };
-        case 'completed':
-            return { background: T.successBg, color: T.success, label: 'Completed' };
-        case 'cancelled':
-            return { background: T.dangerBg, color: '#B04040', label: 'Cancelled' };
-        default:
-            return { background: T.avatarBg, color: T.muted, label: status };
+function getEmptyCopy(tab) {
+    if (tab === 'pending') {
+        return {
+            icon: <EnvelopeIcon />,
+            title: 'No pending bookings',
+            description: "When you request a booking, it'll show here until your provider confirms.",
+        };
     }
+
+    if (tab === 'upcoming') {
+        return {
+            icon: <CalendarIcon />,
+            title: 'Nothing upcoming',
+            description: "Once a provider confirms your booking, it'll show up here.",
+        };
+    }
+
+    return {
+        icon: <ClockIcon />,
+        title: 'No past sessions',
+        description: 'Your completed and cancelled sessions will be listed here.',
+    };
 }
 
-// ─── TabBar ───────────────────────────────────────────────────────────────────
-function TabBar({ tabs, activeTab, onTabChange }) {
-    return (
-        <div style={{ display: 'flex', gap: 8 }}>
-            {tabs.map((tab) => {
-                const isActive = tab.id === activeTab;
-                return (
-                    <button
-                        key={tab.id}
-                        onClick={() => onTabChange(tab.id)}
-                        style={{
-                            flex: 1,
-                            borderRadius: 14,
-                            padding: '14px 0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: 4,
-                            background: isActive ? T.hero : T.card,
-                            border: isActive ? `2px solid ${T.accent}` : `1px solid rgba(140,106,100,0.18)`,
-                            cursor: 'pointer',
-                            fontFamily: F,
-                        }}
-                    >
-                        <span
-                            style={{
-                                fontSize: 20,
-                                fontWeight: 700,
-                                color: isActive ? T.accent : T.ink,
-                            }}
-                        >
-                            {tab.count}
-                        </span>
-                        <span
-                            style={{
-                                fontSize: 11,
-                                fontWeight: 500,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                color: T.muted,
-                            }}
-                        >
-                            {tab.label}
-                        </span>
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
-// ─── BookingRow ───────────────────────────────────────────────────────────────
-function BookingRow({ booking, onTap, showReview }) {
-    const statusStyle = getStatusStyle(booking.status);
-    const subtitle = [booking.service_name, fmtDuration(booking.duration)]
-        .filter(Boolean)
-        .join(' · ');
-    const price = fmtPrice(booking.price);
-
-    return (
-        <div
-            onClick={onTap || undefined}
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                padding: '14px 0',
-                borderBottom: `1px solid ${T.line}`,
-                cursor: onTap ? 'pointer' : 'default',
-            }}
-        >
-            {/* Avatar */}
-            <Avatar
-                initials={getInitials(booking.provider_name)}
-                size={40}
-                bg={T.avatarBg}
-                color={T.muted}
-            />
-
-            {/* Middle */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                    style={{
-                        fontFamily: F,
-                        fontSize: 15,
-                        fontWeight: 500,
-                        color: T.ink,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                    }}
-                >
-                    {booking.provider_name || 'Provider'}
-                </div>
-                {subtitle && (
-                    <div
-                        style={{
-                            fontFamily: F,
-                            fontSize: 13,
-                            color: T.muted,
-                            marginTop: 2,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                        }}
-                    >
-                        {subtitle}
-                    </div>
-                )}
-            </div>
-
-            {/* Right */}
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                {price && (
-                    <div
-                        style={{
-                            fontFamily: F,
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: T.ink,
-                        }}
-                    >
-                        {price}
-                    </div>
-                )}
-                <div
-                    style={{
-                        fontFamily: F,
-                        fontSize: 12,
-                        color: T.muted,
-                        marginTop: 2,
-                    }}
-                >
-                    {fmtDateTime(booking.scheduled_at)}
-                </div>
-                <div style={{ marginTop: 4 }}>
-                    <span
-                        style={{
-                            fontFamily: F,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            padding: '3px 10px',
-                            borderRadius: 9999,
-                            display: 'inline-block',
-                            background: statusStyle.background,
-                            color: statusStyle.color,
-                        }}
-                    >
-                        {statusStyle.label}
-                    </span>
-                </div>
-                {showReview && booking.status === 'completed' && !booking.reviewed && (
-                    <div
-                        style={{
-                            fontFamily: F,
-                            fontSize: 12,
-                            color: T.accent,
-                            fontWeight: 500,
-                            marginTop: 4,
-                        }}
-                    >
-                        Leave a review →
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ─── EmptyState ───────────────────────────────────────────────────────────────
-function EmptyState({ message }) {
-    return (
-        <div
-            style={{
-                textAlign: 'center',
-                padding: '48px 0',
-                fontFamily: F,
-                fontSize: 14,
-                color: T.muted,
-            }}
-        >
-            {message}
-        </div>
-    );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ClientBookings() {
-    const { onMenu, isDesktop } = useOutletContext();
+    const { onMenu, isDesktop } = useOutletContext() || {};
     const navigate = useNavigate();
     const { session } = useSession();
-
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('pending');
 
     useEffect(() => {
-        const loadBookings = () => request('/bookings/me')
-            .then((data) => setBookings(data?.bookings || []))
-            .catch(() => setBookings([]))
-            .finally(() => setLoading(false));
+        const loadBookings = async () => {
+            setLoading(true);
+            try {
+                const data = await request('/bookings/me');
+                setBookings(Array.isArray(data?.bookings) ? data.bookings : []);
+            } catch (error) {
+                console.error('[ClientBookings] load error:', error);
+                setBookings([]);
+            } finally {
+                setLoading(false);
+            }
+        };
 
         loadBookings();
     }, []);
@@ -299,20 +92,25 @@ export default function ClientBookings() {
     useEffect(() => {
         if (!supabase || !session?.user?.id) return undefined;
 
-        const refresh = () => {
-            request('/bookings/me')
-                .then((data) => setBookings(data?.bookings || []))
-                .catch(() => {});
+        const refresh = async () => {
+            try {
+                const data = await request('/bookings/me');
+                setBookings(Array.isArray(data?.bookings) ? data.bookings : []);
+            } catch (_) {}
         };
 
         const channel = supabase
             .channel(`client-bookings:${session.user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'bookings',
-                filter: `client_id=eq.${session.user.id}`,
-            }, refresh)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'bookings',
+                    filter: `client_id=eq.${session.user.id}`,
+                },
+                refresh,
+            )
             .subscribe();
 
         return () => {
@@ -322,17 +120,26 @@ export default function ClientBookings() {
 
     const todayKey = getLocalDateKey();
 
-    const pending = bookings
-        .filter((b) => getClientBookingTab(b, todayKey) === 'pending')
-        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    const pending = useMemo(
+        () => bookings
+            .filter((booking) => getClientBookingTab(booking, todayKey) === 'pending')
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)),
+        [bookings, todayKey],
+    );
 
-    const upcoming = bookings
-        .filter((b) => getClientBookingTab(b, todayKey) === 'upcoming')
-        .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+    const upcoming = useMemo(
+        () => bookings
+            .filter((booking) => getClientBookingTab(booking, todayKey) === 'upcoming')
+            .sort((a, b) => new Date(a.scheduled_at || 0) - new Date(b.scheduled_at || 0)),
+        [bookings, todayKey],
+    );
 
-    const past = bookings
-        .filter((b) => getClientBookingTab(b, todayKey) === 'past')
-        .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
+    const past = useMemo(
+        () => bookings
+            .filter((booking) => getClientBookingTab(booking, todayKey) === 'past')
+            .sort((a, b) => new Date(b.scheduled_at || 0) - new Date(a.scheduled_at || 0)),
+        [bookings, todayKey],
+    );
 
     const tabs = [
         { id: 'pending', label: 'Pending', count: pending.length },
@@ -340,103 +147,76 @@ export default function ClientBookings() {
         { id: 'past', label: 'Past', count: past.length },
     ];
 
-    function getRows() {
-        if (activeTab === 'pending') return pending;
-        if (activeTab === 'upcoming') return upcoming;
-        return past;
-    }
+    const rows = activeTab === 'pending' ? pending : activeTab === 'upcoming' ? upcoming : past;
+    const emptyCopy = getEmptyCopy(activeTab);
 
-    function getEmptyMessage() {
-        if (activeTab === 'pending') return 'No pending bookings.';
-        if (activeTab === 'upcoming') return 'No upcoming sessions.';
-        return 'No past sessions yet.';
-    }
+    const content = (
+        <>
+            <style>{`
+                @keyframes fadeUp {
+                    from { opacity: 0; transform: translateY(12px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
 
-    function handleRowTap(booking) {
-        if (activeTab === 'pending') return undefined;
-        return () => navigate(`/app/relationship/${booking.provider_id}`);
-    }
+            <BookingsPageHeader label="Your Sessions" />
+            <BookingsTabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-    const rows = getRows();
+            <div style={{ animation: 'fadeUp 0.4s ease 0.19s both' }}>
+                {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                        <div
+                            style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                border: `2px solid ${BOOKING_TOKENS.accent}`,
+                                borderTopColor: 'transparent',
+                                animation: 'spin 0.7s linear infinite',
+                            }}
+                        />
+                    </div>
+                ) : rows.length === 0 ? (
+                    <BookingsEmptyState
+                        icon={emptyCopy.icon}
+                        title={emptyCopy.title}
+                        description={emptyCopy.description}
+                    />
+                ) : (
+                    rows.map((booking) => (
+                        <BookingCard
+                            key={booking.id}
+                            booking={booking}
+                            personName={booking.provider_name || 'Provider'}
+                            isDesktop={isDesktop}
+                            onClick={() => navigate(`/app/relationship/${booking.provider_id}`)}
+                        />
+                    ))
+                )}
+            </div>
+        </>
+    );
 
-    // ── Desktop layout ────────────────────────────────────────────────────────
     if (isDesktop) {
         return (
-            <div style={{ padding: '40px', fontFamily: F }}>
-                <div style={{ maxWidth: 800, margin: '0 auto' }}>
-                    <div style={{ marginBottom: 24 }}>
-                        <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
-                    </div>
-                    <div
-                        style={{
-                            background: T.card,
-                            borderRadius: 16,
-                            border: `1px solid ${T.line}`,
-                            padding: '0 24px',
-                        }}
-                    >
-                        {loading ? (
-                            <EmptyState message="Loading…" />
-                        ) : rows.length === 0 ? (
-                            <EmptyState message={getEmptyMessage()} />
-                        ) : (
-                            rows.map((b) => (
-                                <BookingRow
-                                    key={b.id}
-                                    booking={b}
-                                    onTap={activeTab !== 'pending' ? () => navigate(`/app/relationship/${b.provider_id}`) : undefined}
-                                    showReview={activeTab === 'past'}
-                                />
-                            ))
-                        )}
-                    </div>
+            <div style={{ padding: '0 40px 60px', fontFamily: BODY_FONT }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {content}
                 </div>
             </div>
         );
     }
 
-    // ── Mobile layout ─────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
-            <Header onMenu={onMenu} />
-            <div style={{ padding: '16px 20px 8px' }}>
-                <h1
-                    style={{
-                        fontFamily: F,
-                        fontSize: 32,
-                        fontWeight: 600,
-                        color: T.ink,
-                        letterSpacing: '-0.03em',
-                        margin: 0,
-                    }}
-                >
-                    Bookings
-                </h1>
+        <div className="flex flex-col min-h-screen" style={{ background: BOOKING_TOKENS.base }}>
+            <Header onMenu={onMenu} showAvatar={false} />
+            <div style={{ padding: '0 20px 24px', flex: 1 }}>
+                {content}
             </div>
-
-            {/* TabBar */}
-            <div style={{ padding: '0 20px 20px' }}>
-                <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
-            </div>
-
-            {/* Content */}
-            <div style={{ flex: 1, padding: '0 20px' }}>
-                {loading ? (
-                    <EmptyState message="Loading…" />
-                ) : rows.length === 0 ? (
-                    <EmptyState message={getEmptyMessage()} />
-                ) : (
-                    rows.map((b) => (
-                        <BookingRow
-                            key={b.id}
-                            booking={b}
-                            onTap={activeTab !== 'pending' ? () => navigate(`/app/relationship/${b.provider_id}`) : undefined}
-                            showReview={activeTab === 'past'}
-                        />
-                    ))
-                )}
-            </div>
-
             <Footer />
         </div>
     );

@@ -53,7 +53,7 @@ const CLIENT_MENU = [
 const PAGE_TITLES = {
     '/app': { title: '', subtitle: '' },
     '/app/messages': { title: 'Messages', subtitle: '' },
-    '/app/bookings': { title: 'Bookings', subtitle: '' },
+    '/app/bookings': { title: '', subtitle: '' },
     '/app/invoices': { title: 'Invoices', subtitle: '' },
     '/app/notifications': { title: 'Notifications', subtitle: '' },
     '/app/profile': { title: 'Profile', subtitle: '' },

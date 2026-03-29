@@ -74,7 +74,7 @@ const PROVIDER_MENU = [
 // ─── Page titles for desktop header ──────────────────────────────────────────
 const PAGE_TITLES = {
     '/provider': { title: 'Dashboard', subtitle: 'Welcome back' },
-    '/provider/bookings': { title: 'Bookings', subtitle: '' },
+    '/provider/bookings': { title: '', subtitle: '' },
     '/provider/clients': { title: 'My Kliques', subtitle: '' },
     '/provider/services': { title: 'Services', subtitle: '' },
     '/provider/calendar': { title: 'Calendar', subtitle: '' },
