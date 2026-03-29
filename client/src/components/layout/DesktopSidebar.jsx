@@ -19,6 +19,7 @@ const T = {
 };
 
 const F = "'Sora',system-ui,sans-serif";
+const DISPLAY_F = "'Playfair Display', serif";
 
 function formatBadgeCount(value) {
     if (!Number.isFinite(value) || value <= 0) return null;
@@ -33,23 +34,29 @@ export function DesktopHeader({ title, subtitle }) {
             alignItems: 'center', borderBottom: `1px solid ${T.line}`,
             position: 'sticky', top: 0, background: T.base, zIndex: 30,
         }}>
-            <div>
-                {subtitle && (
-                    <span style={{
-                        fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.muted,
-                        letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block',
-                        marginBottom: '4px',
-                    }}>
-                        {subtitle}
-                    </span>
-                )}
-                <h1 style={{
-                    fontFamily: F, fontSize: '26px', fontWeight: 400,
-                    letterSpacing: '-0.03em', color: T.ink, margin: 0,
-                }}>
-                    {title}
-                </h1>
-            </div>
+            {(title || subtitle) ? (
+                <div>
+                    {subtitle && (
+                        <span style={{
+                            fontFamily: F, fontSize: '11px', fontWeight: 500, color: T.muted,
+                            letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block',
+                            marginBottom: '4px',
+                        }}>
+                            {subtitle}
+                        </span>
+                    )}
+                    {title && (
+                        <h1 style={{
+                            fontFamily: F, fontSize: '26px', fontWeight: 400,
+                            letterSpacing: '-0.03em', color: T.ink, margin: 0,
+                        }}>
+                            {title}
+                        </h1>
+                    )}
+                </div>
+            ) : (
+                <div />
+            )}
             <NotificationDropdown />
         </header>
     );
@@ -66,8 +73,8 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
             {/* Wordmark */}
             <div style={{ padding: '28px 28px 8px' }}>
                 <p style={{
-                    fontFamily: F, fontSize: '22px',
-                    fontWeight: 600, color: T.accent, letterSpacing: '-0.02em', margin: 0,
+                    fontFamily: DISPLAY_F, fontSize: '22px',
+                    fontWeight: 500, color: T.accent, letterSpacing: '-0.02em', margin: 0,
                 }}>
                     kliques
                 </p>
@@ -126,23 +133,40 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
                                 transition: 'background 0.15s, color 0.15s',
                             }}
                         >
-                            <span>{item.label}</span>
-                            {badgeCount && (
-                                <span style={{
-                                    minWidth: '22px',
-                                    fontSize: '11px', fontWeight: 600, color: '#fff',
-                                    background: T.accent, borderRadius: '9999px',
-                                    padding: '2px 8px', lineHeight: '16px', textAlign: 'center',
-                                }}>
-                                    {badgeCount}
-                                </span>
-                            )}
-                            {item.badge && !badgeCount && (
-                                <span style={{
-                                    width: '7px', height: '7px', borderRadius: '50%',
-                                    background: T.accent, flexShrink: 0,
-                                }} />
-                            )}
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                <svg
+                                    width="18"
+                                    height="18"
+                                    fill="none"
+                                    stroke={isActive ? T.accent : T.muted}
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    viewBox="0 0 24 24"
+                                    style={{ flexShrink: 0 }}
+                                >
+                                    <path d={item.d} />
+                                </svg>
+                                <span>{item.label}</span>
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {badgeCount && (
+                                    <span style={{
+                                        minWidth: '22px',
+                                        fontSize: '11px', fontWeight: 600, color: '#fff',
+                                        background: T.accent, borderRadius: '9999px',
+                                        padding: '2px 8px', lineHeight: '16px', textAlign: 'center',
+                                    }}>
+                                        {badgeCount}
+                                    </span>
+                                )}
+                                {item.badge && !badgeCount && (
+                                    <span style={{
+                                        width: '7px', height: '7px', borderRadius: '50%',
+                                        background: T.accent, flexShrink: 0,
+                                    }} />
+                                )}
+                            </span>
                         </button>
                     );
                 })}

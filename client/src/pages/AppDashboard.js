@@ -1,41 +1,34 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
-import { useNotifications } from '../contexts/NotificationContext';
 import { request } from '../data/apiClient';
 import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
-import Avatar from '../components/ui/Avatar';
-import Lbl from '../components/ui/Lbl';
-import ArrowIcon from '../components/ui/ArrowIcon';
 import Footer from '../components/ui/Footer';
 
 const T = {
+    base: '#FBF7F2',
     ink: '#3D231E',
     muted: '#8C6A64',
     faded: '#B0948F',
     accent: '#C25E4A',
-    line: 'rgba(140,106,100,0.18)',
-    card: '#FFFFFF',
     hero: '#FDDCC6',
     avatarBg: '#F2EBE5',
+    line: 'rgba(140,106,100,0.18)',
+    card: '#FFFFFF',
+    callout: '#FFF5E6',
     success: '#5A8A5E',
-    successBg: '#EEF3ED',
-    warmCard: '#F2E9E2',
+    successBg: '#EBF2EC',
 };
 
-const F = "'Sora',system-ui,sans-serif";
-const DISPLAY_F = "'Cormorant Garamond', Georgia, serif";
-
-function formatDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+const F = "'Sora', system-ui, sans-serif";
+const DISPLAY_F = "'Playfair Display', serif";
 
 function getInitials(name) {
     return (name || '?')
-        .split(' ')
-        .map((w) => w[0])
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part[0])
         .join('')
         .slice(0, 2)
         .toUpperCase();
@@ -43,300 +36,423 @@ function getInitials(name) {
 
 function getGreeting() {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
     return 'Good evening';
 }
 
-function getRelationshipStatus(provider) {
-    return (provider?.visits || 0) === 0 ? 'New' : 'Active';
+function formatVisitDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function statusPillStyles(provider) {
-    return getRelationshipStatus(provider) === 'New'
-        ? { background: '#FDE2D3', color: T.accent }
-        : { background: T.successBg, color: T.success };
+function getProviderStatus(provider) {
+    const visits = Number(provider?.visits || 0);
+    const connectedAt = provider?.connected_at ? new Date(provider.connected_at) : null;
+    const lastVisit = provider?.last_visit ? new Date(provider.last_visit) : null;
+    const now = new Date();
+
+    if (connectedAt && visits === 0) {
+        const connectedDays = (now - connectedAt) / (1000 * 60 * 60 * 24);
+        if (connectedDays <= 14) {
+            return { label: 'New', background: T.hero, color: T.accent };
+        }
+    }
+
+    if (lastVisit) {
+        const lastVisitDays = (now - lastVisit) / (1000 * 60 * 60 * 24);
+        if (lastVisitDays <= 30) {
+            return { label: 'Active', background: T.successBg, color: T.success };
+        }
+    }
+
+    return null;
 }
 
-function statusDotColor(provider) {
-    return getRelationshipStatus(provider) === 'New' ? T.success : T.accent;
+function providerCountLabel(count) {
+    return `${count} PROVIDER${count === 1 ? '' : 'S'}`;
 }
 
-function SummaryIntro({ firstName, kliquesCount }) {
-    const greeting = getGreeting();
-
+function GreetingBlock({ firstName, count }) {
     return (
-        <div style={{ marginBottom: 28 }}>
-            <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+        <section
+            style={{
+                marginBottom: count > 0 ? 34 : 28,
+                animation: 'fadeUp 0.4s ease 0.05s both',
+            }}
+        >
+            <p
+                style={{
+                    margin: '0 0 10px',
+                    fontFamily: F,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: T.accent,
+                }}
+            >
                 Your Relationships
             </p>
             <h1
                 style={{
+                    margin: '0 0 8px',
                     fontFamily: F,
-                    fontSize: 'clamp(2.35rem,4vw,3.4rem)',
-                    fontWeight: 600,
+                    fontSize: 34,
+                    fontWeight: 400,
+                    letterSpacing: '-0.03em',
+                    lineHeight: 1.15,
                     color: T.ink,
-                    margin: '0 0 10px',
-                    letterSpacing: '-0.055em',
-                    lineHeight: 0.98,
                 }}
             >
-                {greeting},{' '}
-                <span style={{ fontFamily: DISPLAY_F, fontStyle: 'italic', color: T.accent, fontWeight: 600 }}>
-                    {firstName || 'there'}
+                {getGreeting()},{' '}
+                <span
+                    style={{
+                        fontFamily: DISPLAY_F,
+                        fontStyle: 'italic',
+                        color: T.accent,
+                    }}
+                >
+                    {firstName || 'there'}.
                 </span>
-                .
             </h1>
-            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>
-                {kliquesCount > 0
-                    ? `You have ${kliquesCount} provider${kliquesCount !== 1 ? 's' : ''} in your klique.`
-                    : 'Your providers will appear here.'}
-            </p>
-        </div>
+            {count > 0 && (
+                <p
+                    style={{
+                        margin: 0,
+                        fontFamily: F,
+                        fontSize: 15,
+                        color: T.muted,
+                        lineHeight: 1.6,
+                    }}
+                >
+                    You have {count} provider{count === 1 ? '' : 's'} in your klique.
+                </p>
+            )}
+        </section>
     );
 }
 
-function InviteHintCard({ compact = false }) {
+function ProviderCard({ provider, onClick }) {
+    const status = getProviderStatus(provider);
+
     return (
-        <div
+        <button
+            type="button"
+            onClick={onClick}
+            className="group w-full text-left"
             style={{
                 display: 'flex',
-                alignItems: 'flex-start',
-                gap: 16,
-                padding: compact ? '16px 18px' : '18px 22px',
+                alignItems: 'center',
+                gap: 20,
+                padding: '20px 24px',
+                marginBottom: 10,
                 borderRadius: 18,
-                background: T.warmCard,
                 border: `1px solid ${T.line}`,
+                background: T.card,
+                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+            }}
+            onMouseEnter={(event) => {
+                event.currentTarget.style.borderColor = T.accent;
+                event.currentTarget.style.boxShadow = '0 4px 20px rgba(194,94,74,0.06)';
+                event.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(event) => {
+                event.currentTarget.style.borderColor = T.line;
+                event.currentTarget.style.boxShadow = 'none';
+                event.currentTarget.style.transform = 'translateY(0)';
             }}
         >
             <div
                 style={{
-                    width: compact ? 40 : 42,
-                    height: compact ? 40 : 42,
-                    borderRadius: 14,
-                    background: '#FFF8F1',
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: provider.avatar ? T.avatarBg : T.hero,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    position: 'relative',
                     flexShrink: 0,
+                    overflow: 'hidden',
+                    fontFamily: F,
+                    fontSize: 17,
+                    fontWeight: 500,
+                    color: T.muted,
                 }}
             >
-                <svg width="18" height="18" fill="none" stroke={T.accent} strokeWidth="1.6" viewBox="0 0 24 24">
-                    <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {provider.avatar ? (
+                    <img
+                        src={provider.avatar}
+                        alt={provider.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                ) : (
+                    getInitials(provider.name)
+                )}
+                <span
+                    style={{
+                        position: 'absolute',
+                        right: 1,
+                        bottom: 1,
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: T.success,
+                        border: '2.5px solid #FFFFFF',
+                    }}
+                />
             </div>
-            <p style={{ fontFamily: F, fontSize: compact ? 13 : 14, color: T.muted, margin: 0, lineHeight: 1.55 }}>
-                <span style={{ color: T.ink, fontWeight: 600 }}>Got an invite link?</span>{' '}
-                Tap the link your provider sent you and you&apos;ll be connected instantly.
-            </p>
-        </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                    style={{
+                        margin: '0 0 2px',
+                        fontFamily: F,
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: T.ink,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
+                    {provider.name}
+                </p>
+                <p
+                    style={{
+                        margin: 0,
+                        fontFamily: F,
+                        fontSize: 13,
+                        color: T.muted,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
+                    {provider.role || 'Provider'}
+                </p>
+            </div>
+
+            <div
+                style={{
+                    display: 'flex',
+                    gap: 20,
+                    flexShrink: 0,
+                    alignItems: 'center',
+                }}
+            >
+                <div style={{ textAlign: 'center' }}>
+                    <span
+                        style={{
+                            display: 'block',
+                            marginBottom: 1,
+                            fontFamily: F,
+                            fontSize: 18,
+                            fontWeight: 400,
+                            letterSpacing: '-0.03em',
+                            color: T.ink,
+                        }}
+                    >
+                        {provider.visits || 0}
+                    </span>
+                    <span
+                        style={{
+                            fontFamily: F,
+                            fontSize: 10,
+                            fontWeight: 500,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            color: T.faded,
+                        }}
+                    >
+                        Visits
+                    </span>
+                </div>
+                <div style={{ textAlign: 'center', minWidth: 62 }}>
+                    <span
+                        style={{
+                            display: 'block',
+                            marginBottom: 1,
+                            fontFamily: F,
+                            fontSize: 18,
+                            fontWeight: 400,
+                            letterSpacing: '-0.03em',
+                            color: T.ink,
+                        }}
+                    >
+                        {formatVisitDate(provider.last_visit)}
+                    </span>
+                    <span
+                        style={{
+                            fontFamily: F,
+                            fontSize: 10,
+                            fontWeight: 500,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            color: T.faded,
+                        }}
+                    >
+                        Last Visit
+                    </span>
+                </div>
+            </div>
+
+            {status && (
+                <span
+                    style={{
+                        padding: '5px 12px',
+                        borderRadius: 9999,
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: status.color,
+                        background: status.background,
+                        flexShrink: 0,
+                    }}
+                >
+                    {status.label}
+                </span>
+            )}
+
+            <svg
+                width="20"
+                height="20"
+                fill="none"
+                stroke={T.faded}
+                strokeWidth="1.5"
+                viewBox="0 0 24 24"
+                style={{
+                    flexShrink: 0,
+                    transition: 'transform 0.2s ease, color 0.2s ease',
+                }}
+                className="group-hover:translate-x-[3px]"
+            >
+                <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </button>
     );
 }
 
-function NextConnectionCard({ isDesktop = false }) {
+function GhostProviderCard() {
     return (
         <div
             style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 16,
-                padding: isDesktop ? '18px 22px' : '16px 18px',
-                borderRadius: 20,
-                border: '1px solid rgba(140,106,100,0.14)',
-                background: 'rgba(255,255,255,0.46)',
-                opacity: 0.72,
+                gap: 20,
+                padding: '20px 24px',
+                marginBottom: 10,
+                borderRadius: 18,
+                border: `1px solid ${T.line}`,
+                background: T.card,
+                opacity: 0.35,
+                pointerEvents: 'none',
             }}
         >
             <div
                 style={{
-                    width: isDesktop ? 48 : 44,
-                    height: isDesktop ? 48 : 44,
+                    width: 52,
+                    height: 52,
                     borderRadius: '50%',
-                    background: '#F6F0EA',
-                    color: '#D4C2BA',
+                    background: T.avatarBg,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontFamily: F,
-                    fontSize: 18,
-                    fontWeight: 500,
                     flexShrink: 0,
+                    fontFamily: F,
+                    fontSize: 20,
+                    fontWeight: 500,
+                    color: T.faded,
                 }}
             >
                 +
             </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-                <p style={{ fontFamily: F, fontSize: isDesktop ? 15 : 14, fontWeight: 600, color: '#D4C2BA', margin: '0 0 4px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: '0 0 2px', fontFamily: F, fontSize: 16, fontWeight: 500, color: T.faded }}>
                     Your next connection
                 </p>
-                <p style={{ fontFamily: F, fontSize: isDesktop ? 14 : 13, color: '#C9B5AD', margin: 0 }}>
+                <p style={{ margin: 0, fontFamily: F, fontSize: 13, color: T.muted }}>
                     Accept an invite or book a session
                 </p>
             </div>
-            <svg width="16" height="16" fill="none" stroke="#D4C2BA" strokeWidth="1.6" viewBox="0 0 24 24">
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            <svg width="20" height="20" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         </div>
     );
 }
 
-function ReviewBanner({ notification, onReview }) {
-    if (!notification) return null;
-
+function InviteHintCard() {
     return (
-        <div
+        <section
             style={{
+                marginTop: 28,
+                padding: 24,
+                borderRadius: 18,
+                background: T.avatarBg,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
                 gap: 16,
-                padding: '14px 18px',
-                background: '#FFF5E6',
-                borderRadius: 14,
-                border: '1px solid rgba(194,94,74,0.15)',
-                marginBottom: 18,
+                alignItems: 'flex-start',
+                animation: 'fadeUp 0.4s ease 0.19s both',
             }}
         >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <svg width="18" height="18" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <div style={{ minWidth: 0 }}>
-                    <p style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 2px' }}>
-                        How was your last session?
-                    </p>
-                    <p style={{ fontFamily: F, fontSize: 12, color: '#B45309', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {notification.body || notification.message}
-                    </p>
-                </div>
-            </div>
-            <button
-                onClick={onReview}
-                style={{
-                    flexShrink: 0,
-                    padding: '8px 16px',
-                    borderRadius: 999,
-                    background: '#FDDCC6',
-                    border: 'none',
-                    fontFamily: F,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: T.accent,
-                    cursor: 'pointer',
-                }}
-            >
-                Leave a review
-            </button>
-        </div>
-    );
-}
-
-function ProviderRow({ provider, onClick, isDesktop = false }) {
-    const statusStyles = statusPillStyles(provider);
-
-    return (
-        <button
-            onClick={onClick}
-            className="w-full text-left focus:outline-none transition-transform"
-            style={{
-                padding: isDesktop ? '18px 22px' : '16px 18px',
-                borderRadius: 20,
-                background: '#FFFFFF',
-                border: `1px solid ${T.line}`,
-                display: 'grid',
-                gridTemplateColumns: isDesktop ? 'minmax(0,1.3fr) auto 36px' : 'minmax(0,1fr) auto',
-                alignItems: 'center',
-                gap: isDesktop ? 18 : 14,
-                boxShadow: '0 1px 0 rgba(140,106,100,0.04)',
-            }}
-        >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <Avatar initials={getInitials(provider.name)} size={isDesktop ? 48 : 44} src={provider.avatar || ''} />
-                    <span
-                        style={{
-                            position: 'absolute',
-                            right: 1,
-                            bottom: 1,
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: statusDotColor(provider),
-                            border: '2px solid #FFFFFF',
-                        }}
-                    />
-                </div>
-
-                <div style={{ minWidth: 0 }}>
-                    <p className="text-[15px] font-semibold text-ink m-0 mb-0.5 truncate">
-                        {provider.name}
-                    </p>
-                    <p className="text-[13px] m-0 truncate" style={{ color: T.muted }}>
-                        {provider.role || 'Provider'}
-                    </p>
-                </div>
-            </div>
-
             <div
                 style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, auto)',
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: T.callout,
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: isDesktop ? 22 : 14,
+                    justifyContent: 'center',
+                    flexShrink: 0,
                 }}
             >
-                <div style={{ textAlign: 'center', minWidth: 40 }}>
-                    <p style={{ fontFamily: F, fontSize: isDesktop ? 17 : 16, fontWeight: 600, color: T.ink, margin: '0 0 3px' }}>
-                        {provider.visits || 0}
-                    </p>
-                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.faded }}>
-                        Visits
-                    </span>
-                </div>
-
-                <div style={{ textAlign: 'center', minWidth: isDesktop ? 72 : 60 }}>
-                    <p style={{ fontFamily: F, fontSize: isDesktop ? 17 : 16, fontWeight: 600, color: T.ink, margin: '0 0 3px' }}>
-                        {provider.last_visit ? formatDate(provider.last_visit) : '—'}
-                    </p>
-                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.faded }}>
-                        Last visit
-                    </span>
-                </div>
-
-                <div
-                    style={{
-                        padding: '6px 12px',
-                        borderRadius: 999,
-                        background: statusStyles.background,
-                        color: statusStyles.color,
-                        fontFamily: F,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        justifySelf: 'start',
-                    }}
-                >
-                    {getRelationshipStatus(provider)}
-                </div>
+                <svg width="20" height="20" fill="none" stroke="#92400E" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
             </div>
-
-            {isDesktop && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <ArrowIcon size={18} />
-                </div>
-            )}
-        </button>
+            <p style={{ margin: 0, fontFamily: F, fontSize: 14, color: T.muted, lineHeight: 1.6 }}>
+                <strong style={{ color: T.ink, fontWeight: 500 }}>Got an invite link?</strong>{' '}
+                Tap the link your provider sent you — you&apos;ll be connected instantly and they&apos;ll appear here.
+            </p>
+        </section>
     );
 }
 
-function EmptyState({ firstName }) {
+function ProvidersSection({ kliques, onSelect }) {
+    const showGhost = kliques.length < 3;
+
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
-            <SummaryIntro firstName={firstName} kliquesCount={0} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <NextConnectionCard />
-                <InviteHintCard compact />
-            </div>
-        </div>
+        <section style={{ animation: 'fadeUp 0.4s ease 0.12s both' }}>
+            {kliques.length > 0 && (
+                <p
+                    style={{
+                        margin: '0 0 14px',
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: T.muted,
+                    }}
+                >
+                    {providerCountLabel(kliques.length)}
+                </p>
+            )}
+
+            {kliques.map((provider) => (
+                <ProviderCard
+                    key={provider.provider_id}
+                    provider={provider}
+                    onClick={() => onSelect(provider.provider_id)}
+                />
+            ))}
+
+            {showGhost && <GhostProviderCard />}
+            {showGhost && <InviteHintCard />}
+        </section>
     );
 }
 
@@ -344,16 +460,6 @@ const AppDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile: sessionProfile } = useSession();
-    const { notifications } = useNotifications();
-
-    const sessionCompleteNotifs = (notifications || []).filter(
-        (n) => (n.type === 'session_complete' || n.type === 'booking_completed')
-            && !n.is_read
-            && (n.data?.show_review_prompt !== false)
-            && (n.booking_id || n.data?.booking_id)
-    );
-
-    const firstReviewNotif = sessionCompleteNotifs[0];
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -369,7 +475,7 @@ const AppDashboard = () => {
             setError(null);
             try {
                 const data = await request('/client/kliques');
-                setKliques(data.kliques || []);
+                setKliques(Array.isArray(data.kliques) ? data.kliques : []);
             } catch (err) {
                 console.error('Failed to load kliques:', err);
                 setError('Could not load your kliques.');
@@ -387,24 +493,32 @@ const AppDashboard = () => {
         const refresh = async () => {
             try {
                 const data = await request('/client/kliques');
-                setKliques(data.kliques || []);
+                setKliques(Array.isArray(data.kliques) ? data.kliques : []);
             } catch (_) {}
         };
 
         const channel = supabase
             .channel(`client-kliques:${session.user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'provider_clients',
-                filter: `client_id=eq.${session.user.id}`,
-            }, refresh)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'bookings',
-                filter: `client_id=eq.${session.user.id}`,
-            }, refresh)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'provider_clients',
+                    filter: `client_id=eq.${session.user.id}`,
+                },
+                refresh,
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'bookings',
+                    filter: `client_id=eq.${session.user.id}`,
+                },
+                refresh,
+            )
             .subscribe();
 
         return () => {
@@ -412,115 +526,73 @@ const AppDashboard = () => {
         };
     }, [session?.user?.id]);
 
-    const firstName = useMemo(() => (
-        (sessionProfile?.name || session?.user?.user_metadata?.full_name || '').split(' ')[0]
-    ), [sessionProfile?.name, session?.user?.user_metadata?.full_name]);
+    const firstName = useMemo(() => {
+        const fullName = sessionProfile?.name || session?.user?.user_metadata?.full_name || '';
+        return fullName.trim().split(/\s+/)[0] || 'there';
+    }, [sessionProfile?.name, session?.user?.user_metadata?.full_name]);
 
-    const reviewBookingId = firstReviewNotif?.booking_id || firstReviewNotif?.data?.booking_id;
+    const content = (
+        <>
+            <style>{`
+                @keyframes fadeUp {
+                    from { opacity: 0; transform: translateY(12px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+
+            <GreetingBlock firstName={firstName} count={kliques.length} />
+
+            {loading && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                    <div
+                        style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: `2px solid ${T.accent}`,
+                            borderTopColor: 'transparent',
+                            animation: 'spin 0.7s linear infinite',
+                        }}
+                    />
+                </div>
+            )}
+
+            {!loading && error && (
+                <p style={{ margin: 0, fontFamily: F, fontSize: 14, color: T.muted }}>
+                    {error}
+                </p>
+            )}
+
+            {!loading && !error && (
+                <ProvidersSection
+                    kliques={kliques}
+                    onSelect={(providerId) => navigate(`/app/relationship/${providerId}`)}
+                />
+            )}
+        </>
+    );
 
     if (isDesktop) {
         return (
-            <div style={{ padding: '40px', fontFamily: F }}>
-                <div style={{ maxWidth: 980, margin: '0 auto' }}>
-                    <SummaryIntro firstName={firstName} kliquesCount={kliques.length} />
-
-                    {loading && (
-                        <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${T.accent}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
-                        </div>
-                    )}
-
-                    {!loading && error && (
-                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, textAlign: 'center' }}>{error}</p>
-                    )}
-
-                    {!loading && !error && kliques.length === 0 && (
-                        <div style={{ maxWidth: 760 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <NextConnectionCard isDesktop />
-                                <InviteHintCard />
-                            </div>
-                        </div>
-                    )}
-
-                    {!loading && !error && kliques.length > 0 && (
-                        <>
-                            <ReviewBanner
-                                notification={firstReviewNotif}
-                                onReview={() => navigate(`/app/review/${reviewBookingId}`)}
-                            />
-
-                            <Lbl className="block mb-3">
-                                {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
-                            </Lbl>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {kliques.map((provider) => (
-                                    <ProviderRow
-                                        key={provider.provider_id}
-                                        provider={provider}
-                                        isDesktop
-                                        onClick={() => navigate(`/app/relationship/${provider.provider_id}`)}
-                                    />
-                                ))}
-                                <NextConnectionCard isDesktop />
-                                <InviteHintCard />
-                            </div>
-                        </>
-                    )}
+            <div style={{ padding: '0 40px 60px', fontFamily: F }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                    {content}
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-base">
+        <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
             <Header onMenu={onMenu} showAvatar={false} />
-
-            <div className="px-5 pt-4 flex-1 flex flex-col">
-                {loading && (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="w-7 h-7 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-                    </div>
-                )}
-
-                {!loading && error && (
-                    <div className="flex-1 flex items-center justify-center">
-                        <p className="text-[14px] text-muted text-center px-8">{error}</p>
-                    </div>
-                )}
-
-                {!loading && !error && kliques.length === 0 && <EmptyState firstName={firstName} />}
-
-                {!loading && !error && kliques.length > 0 && (
-                    <div className="flex-1 flex flex-col">
-                        <SummaryIntro firstName={firstName} kliquesCount={kliques.length} />
-
-                        <ReviewBanner
-                            notification={firstReviewNotif}
-                            onReview={() => navigate(`/app/review/${reviewBookingId}`)}
-                        />
-
-                        <Lbl className="block mb-3">
-                            {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
-                        </Lbl>
-
-                        <div className="flex flex-col gap-3">
-                            {kliques.map((provider) => (
-                                <ProviderRow
-                                    key={provider.provider_id}
-                                    provider={provider}
-                                    onClick={() => navigate(`/app/relationship/${provider.provider_id}`)}
-                                />
-                            ))}
-                            <NextConnectionCard />
-                            <InviteHintCard compact />
-                        </div>
-                    </div>
-                )}
-
-                <Footer />
+            <div style={{ padding: '0 20px 24px', flex: 1 }}>
+                {content}
             </div>
+            <Footer />
         </div>
     );
 };
