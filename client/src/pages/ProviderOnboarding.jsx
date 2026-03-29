@@ -25,6 +25,7 @@ import { request } from '../data/apiClient';
 import BackBtn from '../components/ui/BackBtn';
 import Divider from '../components/ui/Divider';
 import { filterCities } from '../utils/categories';
+import { uploadProfilePhoto } from '../utils/photoUpload';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -772,6 +773,10 @@ export default function ProviderOnboarding() {
         setSaving(true);
         try {
             const cat = category === 'Other' ? customCat.trim() : category;
+            const uploadedPhotoUrl = profile.photoFile
+                ? await uploadProfilePhoto(profile.photoFile, session?.user?.id)
+                : null;
+
             await request('/provider/me', {
                 method: 'PATCH',
                 body: JSON.stringify({
@@ -779,7 +784,16 @@ export default function ProviderOnboarding() {
                     city: profile.city.trim(),
                     bio: profile.bio.trim(),
                     category: cat,
+                    photo: uploadedPhotoUrl || undefined,
+                    avatar: uploadedPhotoUrl || undefined,
                 }),
+            });
+            await updateProfile({
+                name: profile.businessName.trim(),
+                city: profile.city.trim(),
+                bio: profile.bio.trim(),
+                photo: uploadedPhotoUrl || undefined,
+                avatar: uploadedPhotoUrl || undefined,
             });
             go(3);
         } catch (err) {

@@ -8,6 +8,7 @@ import { useMessages } from '../../contexts/MessageContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
 import { supabase } from '../../utils/supabase';
+import { fetchProviderProfile } from '../../data/provider';
 
 // ─── Provider nav items ───────────────────────────────────────────────────────
 const PROVIDER_MENU = [
@@ -115,7 +116,7 @@ const ProviderLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
     const navigate = useNavigate();
-    const { session, profile, logout } = useSession();
+    const { session, profile, logout, updateProfile } = useSession();
     const isDesktop = useIsDesktop();
     const { getUnreadCount } = useMessages();
     const { unreadCount: notifUnread } = useNotifications();
@@ -138,6 +139,34 @@ const ProviderLayout = () => {
     useEffect(() => {
         refreshPendingCount();
     }, [refreshPendingCount]);
+
+    useEffect(() => {
+        if (!providerId) return undefined;
+
+        let cancelled = false;
+
+        async function hydrateProviderProfile() {
+            try {
+                const providerProfile = await fetchProviderProfile();
+                if (cancelled || !providerProfile) return;
+
+                await updateProfile({
+                    name: providerProfile.name || providerProfile.business_name || profile?.name,
+                    city: providerProfile.city || profile?.city,
+                    photo: providerProfile.photo || providerProfile.avatar || profile?.photo,
+                    avatar: providerProfile.avatar || providerProfile.photo || profile?.avatar,
+                });
+            } catch (error) {
+                console.warn('[ProviderLayout] Failed to hydrate provider profile', error);
+            }
+        }
+
+        hydrateProviderProfile();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [providerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!supabase || !providerId) return undefined;
