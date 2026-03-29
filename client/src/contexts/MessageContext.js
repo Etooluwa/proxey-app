@@ -258,6 +258,20 @@ export const MessageProvider = ({ children }) => {
             const [enriched] = await enrichConversations([newConv]);
             return enriched;
         } catch (error) {
+            if (userRole === 'provider' && otherUserRole === 'client') {
+                try {
+                    const response = await request(`/provider/clients/${otherUserId}/conversation`, {
+                        method: 'POST',
+                    });
+                    const conversation = response?.conversation;
+                    if (!conversation) throw new Error('Conversation was not returned.');
+                    const [enriched] = await enrichConversations([conversation]);
+                    loadConversations();
+                    return enriched;
+                } catch (fallbackError) {
+                    console.error('[messages] Provider fallback conversation create failed:', fallbackError);
+                }
+            }
             console.error('[messages] Failed to create conversation:', error);
             throw error;
         }

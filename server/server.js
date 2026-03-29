@@ -748,6 +748,68 @@ async function ensureProviderClientConnection({ providerId, clientId, inviteId =
   return { created: true, connection: inserted };
 }
 
+async function getOrCreateProviderClientConversation({ providerAuthId, clientId }) {
+  if (!supabase || !providerAuthId || !clientId) {
+    throw new Error("Missing provider/client identifiers.");
+  }
+
+  const providerIdentity = await getProviderIdentity(providerAuthId);
+  const providerIds = providerIdentity.ids.length > 0
+    ? providerIdentity.ids
+    : [providerIdentity.authId].filter(Boolean);
+
+  const { data: connection, error: connectionError } = await supabase
+    .from("provider_clients")
+    .select("id")
+    .in("provider_id", providerIds)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (connectionError) throw connectionError;
+  if (!connection) {
+    const err = new Error("Client connection not found.");
+    err.status = 404;
+    throw err;
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("provider_id", providerIdentity.authId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return existing;
+
+  const [{ data: providerProfile }, { data: clientProfile }] = await Promise.all([
+    supabase
+      .from("providers")
+      .select("name, business_name")
+      .eq("user_id", providerIdentity.authId)
+      .maybeSingle(),
+    supabase
+      .from("client_profiles")
+      .select("name")
+      .eq("user_id", clientId)
+      .maybeSingle(),
+  ]);
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("conversations")
+    .insert({
+      client_id: clientId,
+      provider_id: providerIdentity.authId,
+      client_name: clientProfile?.name || "Client",
+      provider_name: providerProfile?.business_name || providerProfile?.name || "Provider",
+    })
+    .select()
+    .single();
+
+  if (insertError) throw insertError;
+  return inserted;
+}
+
 // Admin user IDs from environment variable (comma-separated UUIDs)
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
@@ -4799,6 +4861,34 @@ app.get("/api/provider/clients/:clientId", async (req, res) => {
 
 app.get("/api/providers/:id/clients/:clientId/timeline", async (req, res) => {
   return handleProviderClientTimeline(req, res, req.params.id, req.params.clientId);
+});
+
+app.post("/api/provider/clients/:clientId/conversation", async (req, res) => {
+  if (!supabase) {
+    return res.status(500).json({ error: "Supabase client is not configured." });
+  }
+
+  const providerId = getUserId(req);
+  const { clientId } = req.params;
+
+  if (!providerId) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+
+  try {
+    const conversation = await getOrCreateProviderClientConversation({
+      providerAuthId: providerId,
+      clientId,
+    });
+
+    return res.status(200).json({ conversation });
+  } catch (err) {
+    if (err?.status === 404) {
+      return res.status(404).json({ error: "Client connection not found." });
+    }
+    console.error("[provider/client conversation]", err);
+    return res.status(500).json({ error: "Failed to start conversation." });
+  }
 });
 
 app.get("/api/client/notifications", async (req, res) => {

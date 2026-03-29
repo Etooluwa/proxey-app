@@ -265,10 +265,6 @@ const ProviderClientTimeline = () => {
         }
     };
 
-    const handleBookForClient = () => {
-        navigate('/app/booking-flow', { state: { clientId, providerMode: true } });
-    };
-
     const initials = getInitials(client?.name);
     const connectedSince = fmtShortDate(connection?.connected_at || stats?.connected_at);
     const lastVisit = stats?.last_visit;
@@ -327,20 +323,13 @@ const ProviderClientTimeline = () => {
             </div>
 
             {/* ── CTA buttons ── */}
-            <div className="px-5 flex gap-3 mb-7">
+            <div className="px-5 mb-7">
                 <button
                     onClick={handleMessage}
-                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-80 transition-opacity"
+                    className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-80 transition-opacity"
                     style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
                 >
                     Message
-                </button>
-                <button
-                    onClick={handleBookForClient}
-                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none active:opacity-80 transition-opacity"
-                    style={{ background: '#3D231E', border: 'none' }}
-                >
-                    Book for Client
                 </button>
             </div>
 
