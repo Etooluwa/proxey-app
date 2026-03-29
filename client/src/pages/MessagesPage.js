@@ -242,22 +242,60 @@ const MessagesPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { session } = useSession();
-    const { conversations, markAsRead, setCurrentConversation, loadMessages, messages, sendMessage } = useMessages();
+    const { conversations, markAsRead, setCurrentConversation, loadMessages, messages, sendMessage, getOrCreateConversation } = useMessages();
     const [activeChat, setActiveChat] = useState(null);
+    const [creatingConversation, setCreatingConversation] = useState(false);
 
     // Pre-select from route state (e.g., navigate from RelationshipPage with { providerId })
     useEffect(() => {
         const targetProviderId = location.state?.providerId;
-        if (!targetProviderId || conversations.length === 0) return;
+        if (!targetProviderId || creatingConversation) return;
 
         const match = conversations.find((c) => c.provider_id === targetProviderId);
         if (match) {
             markAsRead(match.id);
             setCurrentConversation(match.id);
             loadMessages(match.id);
-            navigate(`/app/messages/${match.id}`, { replace: true });
+            if (isDesktop) {
+                setActiveChat(match);
+            } else {
+                navigate(`/app/messages/${match.id}`, { replace: true });
+            }
+            return;
         }
-    }, [location.state?.providerId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
+
+        let cancelled = false;
+
+        const ensureConversation = async () => {
+            try {
+                setCreatingConversation(true);
+                const conversation = await getOrCreateConversation(targetProviderId, 'provider');
+                if (cancelled || !conversation) return;
+
+                markAsRead(conversation.id);
+                setCurrentConversation(conversation.id);
+                loadMessages(conversation.id);
+
+                if (isDesktop) {
+                    setActiveChat(conversation);
+                } else {
+                    navigate(`/app/messages/${conversation.id}`, { replace: true });
+                }
+            } catch (error) {
+                console.error('[MessagesPage] Failed to start client conversation:', error);
+            } finally {
+                if (!cancelled) {
+                    setCreatingConversation(false);
+                }
+            }
+        };
+
+        ensureConversation();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [location.state?.providerId, conversations, creatingConversation, getOrCreateConversation, isDesktop, loadMessages, markAsRead, navigate, setCurrentConversation]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSelect = (chat) => {
         markAsRead(chat.id);
@@ -359,10 +397,16 @@ const MessagesPage = () => {
                 </div>
 
                 {/* Empty state */}
-                {conversations.length === 0 && <MessagesEmpty />}
+                {conversations.length === 0 && !creatingConversation && <MessagesEmpty />}
+
+                {creatingConversation && (
+                    <div className="flex-1 flex items-center justify-center py-12">
+                        <p className="text-[14px] text-muted text-center m-0">Starting conversation…</p>
+                    </div>
+                )}
 
                 {/* List */}
-                {conversations.length > 0 && (
+                {conversations.length > 0 && !creatingConversation && (
                     <div>
                         <Divider />
                         {conversations.map((chat) => {
