@@ -777,24 +777,32 @@ export default function ProviderOnboarding() {
                 ? await uploadProfilePhoto(profile.photoFile, session?.user?.id)
                 : null;
 
+            const patchBody = {
+                business_name: profile.businessName.trim(),
+                city: profile.city.trim(),
+                bio: profile.bio.trim(),
+                category: cat,
+            };
+            if (uploadedPhotoUrl) {
+                patchBody.photo = uploadedPhotoUrl;
+                patchBody.avatar = uploadedPhotoUrl;
+            }
+
             await request('/provider/me', {
                 method: 'PATCH',
-                body: JSON.stringify({
-                    business_name: profile.businessName.trim(),
-                    city: profile.city.trim(),
-                    bio: profile.bio.trim(),
-                    category: cat,
-                    photo: uploadedPhotoUrl || undefined,
-                    avatar: uploadedPhotoUrl || undefined,
-                }),
+                body: JSON.stringify(patchBody),
             });
-            await updateProfile({
+
+            const profileUpdate = {
                 name: profile.businessName.trim(),
                 city: profile.city.trim(),
                 bio: profile.bio.trim(),
-                photo: uploadedPhotoUrl || undefined,
-                avatar: uploadedPhotoUrl || undefined,
-            });
+            };
+            if (uploadedPhotoUrl) {
+                profileUpdate.photo = uploadedPhotoUrl;
+                profileUpdate.avatar = uploadedPhotoUrl;
+            }
+            await updateProfile(profileUpdate);
             go(3);
         } catch (err) {
             setError(err.message || 'Failed to save profile.');

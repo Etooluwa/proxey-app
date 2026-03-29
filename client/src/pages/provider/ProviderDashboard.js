@@ -170,7 +170,7 @@ const DesktopApptRow = ({ appt, onClick }) => (
 const ProviderDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
-    const { profile: sessionProfile } = useSession();
+    const { profile: sessionProfile, updateProfile } = useSession();
     const { unreadCount } = useNotifications();
 
     const [schedule, setSchedule] = useState([]);
@@ -210,6 +210,12 @@ const ProviderDashboard = () => {
                     if (prof?.handle) {
                         setHandle(prof.handle);
                     }
+
+                    // Sync photo/avatar from DB into authContext if missing from localStorage
+                    const dbPhoto = prof?.photo || prof?.avatar;
+                    if (dbPhoto && !sessionProfile?.photo && !sessionProfile?.avatar) {
+                        updateProfile({ photo: dbPhoto, avatar: dbPhoto }).catch(() => {});
+                    }
                 }
             } catch (err) {
                 console.error('[ProviderDashboard] load error:', err);
@@ -223,6 +229,7 @@ const ProviderDashboard = () => {
 
     const firstName = sessionProfile?.name?.split(' ')[0] || 'there';
     const initials = getInitials(sessionProfile?.name);
+    const avatarSrc = sessionProfile?.photo || sessionProfile?.avatar || '';
     const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
     const upNext = schedule[0] || null;
 
@@ -389,6 +396,7 @@ const ProviderDashboard = () => {
                 onMenu={onMenu}
                 showAvatar
                 initials={initials}
+                avatarSrc={avatarSrc}
                 notifCount={unreadCount}
                 onNotif={() => navigate('/provider/notifications')}
             />
