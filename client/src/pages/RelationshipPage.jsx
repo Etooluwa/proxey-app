@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { request } from '../data/apiClient';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
 import HeroCard from '../components/ui/HeroCard';
@@ -179,17 +180,13 @@ const RelationshipPage = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!session?.accessToken) { setLoading(false); return; }
+        if (!session?.user?.id) { setLoading(false); return; }
 
         const fetchRelationship = async () => {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch(`/api/client/relationship/${providerId}`, {
-                    headers: { Authorization: `Bearer ${session.accessToken}` },
-                });
-                if (!res.ok) throw new Error('Failed to load');
-                const data = await res.json();
+                const data = await request(`/client/relationship/${providerId}`);
                 setProvider(data.provider);
                 setStats(data.stats);
                 setBookings(data.bookings || []);
@@ -202,7 +199,7 @@ const RelationshipPage = () => {
         };
 
         fetchRelationship();
-    }, [providerId, session]);
+    }, [providerId, session?.user?.id]);
 
     const initials = getInitials(provider?.name);
     const avatarSrc = provider?.avatar || provider?.photo || '';
