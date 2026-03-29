@@ -34,8 +34,7 @@ export async function uploadProfilePhoto(file, userId) {
   try {
     // Generate a unique filename
     const fileExt = file.name.split(".").pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `profile-photos/${fileName}`;
+    const filePath = `${userId}-${Date.now()}.${fileExt}`;
 
     // Upload to Supabase Storage
     const { error } = await supabase.storage
@@ -47,16 +46,7 @@ export async function uploadProfilePhoto(file, userId) {
 
     if (error) {
       console.error("[photoUpload] Failed to upload to Supabase Storage", error);
-      // Fallback to base64 if upload fails
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result;
-          resolve(base64String);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      throw new Error(error.message || "Failed to upload profile photo.");
     }
 
     // Get public URL
@@ -67,16 +57,7 @@ export async function uploadProfilePhoto(file, userId) {
     return publicUrl;
   } catch (error) {
     console.error("[photoUpload] Unexpected error during upload", error);
-    // Fallback to base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result;
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    throw new Error(error.message || "Failed to upload profile photo.");
   }
 }
 
