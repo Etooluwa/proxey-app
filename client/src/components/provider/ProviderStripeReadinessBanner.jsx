@@ -16,7 +16,13 @@ const T = {
 const F = "'Sora',system-ui,sans-serif";
 
 function resolveBannerState(profile, accountStatus) {
-  if (!profile?.stripe_account_id) return null;
+  if (!profile?.stripe_account_id) {
+    return {
+      title: 'Connect Stripe before collecting payments',
+      description:
+        'You can finish your profile now, but paid bookings stay blocked until you connect Stripe in Payouts & Billing.',
+    };
+  }
 
   if (accountStatus?.chargesEnabled && accountStatus?.payoutsEnabled) {
     return null;

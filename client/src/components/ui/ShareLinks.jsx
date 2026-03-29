@@ -27,7 +27,7 @@ const ShareIcon = () => (
     </svg>
 );
 
-const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, onToggleQR, onShare }) => {
+const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, onToggleQR, onShare, disabled = false, note = '' }) => {
     const isCopied = copied === type;
     const isShowingQR = showQR === type;
 
@@ -66,10 +66,12 @@ const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, 
                     {/* Copy */}
                     <button
                         onClick={onCopy}
+                        disabled={disabled}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[10px] text-[13px] font-semibold transition-colors"
                         style={{
-                            background: isCopied ? '#EBF2EC' : '#3D231E',
-                            color: isCopied ? '#5A8A5E' : '#FFFFFF',
+                            background: disabled ? '#B0948F' : isCopied ? '#EBF2EC' : '#3D231E',
+                            color: disabled ? '#FFFFFF' : isCopied ? '#5A8A5E' : '#FFFFFF',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
                         }}
                     >
                         {isCopied ? <CheckIcon /> : <CopyIcon stroke="#fff" />}
@@ -79,10 +81,13 @@ const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, 
                     {/* QR */}
                     <button
                         onClick={onToggleQR}
+                        disabled={disabled}
                         className="flex items-center justify-center px-3 py-2 rounded-[10px] transition-colors"
                         style={{
                             background: isShowingQR ? 'rgba(194,94,74,0.1)' : 'rgba(255,255,255,0.6)',
                             border: '1px solid rgba(140,106,100,0.2)',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.55 : 1,
                         }}
                         aria-label="Toggle QR code"
                     >
@@ -92,16 +97,25 @@ const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, 
                     {/* Share */}
                     <button
                         onClick={onShare}
+                        disabled={disabled}
                         className="flex items-center justify-center px-3 py-2 rounded-[10px] transition-colors"
                         style={{
                             background: 'rgba(255,255,255,0.6)',
                             border: '1px solid rgba(140,106,100,0.2)',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.55 : 1,
                         }}
                         aria-label="Share link"
                     >
                         <ShareIcon />
                     </button>
                 </div>
+
+                {note && (
+                    <p className="text-[12px] text-muted leading-relaxed mt-3 mb-0">
+                        {note}
+                    </p>
+                )}
 
                 {/* QR code expansion */}
                 {isShowingQR && (
@@ -133,18 +147,21 @@ const LinkBlock = ({ type, label, url, fullUrl, isHero, copied, showQR, onCopy, 
 const ShareLinks = ({ handle = '' }) => {
     const [copied, setCopied] = useState(null);
     const [showQR, setShowQR] = useState(null);
-    const inviteUrl = `mykliques.com/join/${handle}`;
-    const bookingUrl = `mykliques.com/book/${handle}`;
-    const inviteFullUrl = `https://mykliques.com/join/${handle}`;
-    const bookingFullUrl = `https://mykliques.com/book/${handle}`;
+    const hasHandle = Boolean(handle);
+    const inviteUrl = hasHandle ? `mykliques.com/join/${handle}` : 'Choose your handle to unlock invite links';
+    const bookingUrl = hasHandle ? `mykliques.com/book/${handle}` : 'Choose your handle to unlock booking links';
+    const inviteFullUrl = hasHandle ? `https://mykliques.com/join/${handle}` : '';
+    const bookingFullUrl = hasHandle ? `https://mykliques.com/book/${handle}` : '';
 
     const handleCopy = (type, fullUrl) => {
+        if (!fullUrl) return;
         navigator.clipboard.writeText(fullUrl).catch(() => {});
         setCopied(type);
         setTimeout(() => setCopied(null), 2000);
     };
 
     const handleShare = (fullUrl) => {
+        if (!fullUrl) return;
         if (navigator.share) {
             navigator.share({ url: fullUrl }).catch(() => {});
         } else {
@@ -152,7 +169,10 @@ const ShareLinks = ({ handle = '' }) => {
         }
     };
 
-    const toggleQR = (type) => setShowQR(prev => prev === type ? null : type);
+    const toggleQR = (type) => {
+        if (!hasHandle) return;
+        setShowQR(prev => prev === type ? null : type);
+    };
 
     return (
         <div className="flex flex-col gap-3">
@@ -168,6 +188,8 @@ const ShareLinks = ({ handle = '' }) => {
                 isHero
                 copied={copied}
                 showQR={showQR}
+                disabled={!hasHandle}
+                note={!hasHandle ? 'Finish onboarding and save your public handle to activate this share link.' : ''}
                 onCopy={() => handleCopy('invite', inviteFullUrl)}
                 onToggleQR={() => toggleQR('invite')}
                 onShare={() => handleShare(inviteFullUrl)}
@@ -181,6 +203,8 @@ const ShareLinks = ({ handle = '' }) => {
                 isHero={false}
                 copied={copied}
                 showQR={showQR}
+                disabled={!hasHandle}
+                note={!hasHandle ? 'Your public booking page appears here once your handle has been saved successfully.' : ''}
                 onCopy={() => handleCopy('booking', bookingFullUrl)}
                 onToggleQR={() => toggleQR('booking')}
                 onShare={() => handleShare(bookingFullUrl)}

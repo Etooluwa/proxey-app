@@ -59,7 +59,7 @@ function CalendarIcon() {
 }
 
 // ─── Single link card ─────────────────────────────────────────────────────────
-function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied, showQR, onCopy, onToggleQR, onShare }) {
+function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied, showQR, onCopy, onToggleQR, onShare, disabled = false, note = '' }) {
     const isCopied = copied === type;
     const isShowingQR = showQR === type;
 
@@ -114,12 +114,13 @@ function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied
                     {/* Copy */}
                     <button
                         onClick={onCopy}
+                        disabled={disabled}
                         style={{
                             flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
-                            background: isCopied ? T.successBg : T.ink,
-                            color: isCopied ? T.success : '#fff',
+                            background: disabled ? '#B0948F' : isCopied ? T.successBg : T.ink,
+                            color: disabled ? '#fff' : isCopied ? T.success : '#fff',
                             fontFamily: F, fontSize: '12px', fontWeight: 500,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center',
+                            cursor: disabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', gap: '5px', transition: 'background 0.2s, color 0.2s',
                         }}
                     >
@@ -143,12 +144,14 @@ function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied
                     {/* QR */}
                     <button
                         onClick={onToggleQR}
+                        disabled={disabled}
                         aria-label="Toggle QR code"
                         style={{
                             padding: '10px 14px', borderRadius: '10px',
                             border: `1px solid ${T.line}`,
                             background: isShowingQR ? 'rgba(194,94,74,0.10)' : iconBtnBg,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: disabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: disabled ? 0.55 : 1,
                         }}
                     >
                         <QRIcon active={isShowingQR} />
@@ -157,16 +160,24 @@ function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied
                     {/* Share */}
                     <button
                         onClick={onShare}
+                        disabled={disabled}
                         aria-label="Share link"
                         style={{
                             padding: '10px 14px', borderRadius: '10px',
                             border: `1px solid ${T.line}`, background: iconBtnBg,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: disabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: disabled ? 0.55 : 1,
                         }}
                     >
                         <ShareIcon />
                     </button>
                 </div>
+
+                {note && (
+                    <p style={{ fontFamily: F, fontSize: '12px', color: T.muted, lineHeight: 1.55, margin: '10px 0 0' }}>
+                        {note}
+                    </p>
+                )}
 
                 {/* QR expansion */}
                 {isShowingQR && (
@@ -205,18 +216,21 @@ function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied
 export default function DesktopShareLinks({ handle = '' }) {
     const [copied, setCopied] = useState(null);
     const [showQR, setShowQR] = useState(null);
-    const inviteUrl = `mykliques.com/join/${handle}`;
-    const bookingUrl = `mykliques.com/book/${handle}`;
-    const inviteFullUrl = `https://mykliques.com/join/${handle}`;
-    const bookingFullUrl = `https://mykliques.com/book/${handle}`;
+    const hasHandle = Boolean(handle);
+    const inviteUrl = hasHandle ? `mykliques.com/join/${handle}` : 'Choose your handle to unlock invite links';
+    const bookingUrl = hasHandle ? `mykliques.com/book/${handle}` : 'Choose your handle to unlock booking links';
+    const inviteFullUrl = hasHandle ? `https://mykliques.com/join/${handle}` : '';
+    const bookingFullUrl = hasHandle ? `https://mykliques.com/book/${handle}` : '';
 
     const handleCopy = (type, fullUrl) => {
+        if (!fullUrl) return;
         navigator.clipboard.writeText(fullUrl).catch(() => {});
         setCopied(type);
         setTimeout(() => setCopied(null), 2000);
     };
 
     const handleShare = (fullUrl) => {
+        if (!fullUrl) return;
         if (navigator.share) {
             navigator.share({ url: fullUrl }).catch(() => {});
         } else {
@@ -224,7 +238,10 @@ export default function DesktopShareLinks({ handle = '' }) {
         }
     };
 
-    const toggleQR = (type) => setShowQR((prev) => (prev === type ? null : type));
+    const toggleQR = (type) => {
+        if (!hasHandle) return;
+        setShowQR((prev) => (prev === type ? null : type));
+    };
 
     return (
         <div style={{ marginTop: '28px' }}>
@@ -247,6 +264,8 @@ export default function DesktopShareLinks({ handle = '' }) {
                     isHero
                     copied={copied}
                     showQR={showQR}
+                    disabled={!hasHandle}
+                    note={!hasHandle ? 'Finish onboarding and save your public handle to activate this share link.' : ''}
                     onCopy={() => handleCopy('invite', inviteFullUrl)}
                     onToggleQR={() => toggleQR('invite')}
                     onShare={() => handleShare(inviteFullUrl)}
@@ -261,6 +280,8 @@ export default function DesktopShareLinks({ handle = '' }) {
                     isHero={false}
                     copied={copied}
                     showQR={showQR}
+                    disabled={!hasHandle}
+                    note={!hasHandle ? 'Your public booking page appears here once your handle has been saved successfully.' : ''}
                     onCopy={() => handleCopy('booking', bookingFullUrl)}
                     onToggleQR={() => toggleQR('booking')}
                     onShare={() => handleShare(bookingFullUrl)}

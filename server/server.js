@@ -2931,6 +2931,15 @@ app.patch("/api/provider/me", async (req, res) => {
         updated_at: now,
       };
 
+      const fallbackProviderName =
+        updates.name ||
+        updates.business_name ||
+        profileData?.business_name ||
+        profileData?.name ||
+        updates.handle ||
+        "Provider";
+
+      providerPayload.name = fallbackProviderName;
       if (typeof updates.handle !== "undefined") providerPayload.handle = updates.handle || null;
       if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
       if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
