@@ -2710,21 +2710,97 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
             sendEmail({
               to: clientEmail,
               subject: `Your booking request was not accepted`,
-              html: emailBase(`
-                <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">Booking request declined</h2>
-                <p style="margin:0 0 24px;font-size:14px;color:#8C6A64;line-height:1.6;">Unfortunately, your booking request with ${provInfo.name || 'your provider'} was not accepted.</p>
-                ${declineReason ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#FDEDEA;border-radius:12px;padding:20px;margin-bottom:24px;">
-                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Reason</td></tr>
-                  <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;">${declineReason}</td></tr>
-                </table>` : ''}
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F2;border-radius:12px;padding:20px;margin-bottom:24px;">
-                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
-                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${data.service_name || 'Service'}</td></tr>
-                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Requested time</td></tr>
-                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;">${fmtDate(data.scheduled_at)}</td></tr>
+              html: `<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Booking Declined - Kliques</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; }
+        .hero-card { background-color: #FBE4D5 !important; border-radius: 24px !important; }
+        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
+        .data-table { background-color: #F3ECE7 !important; border-radius: 16px !important; }
+        .reason-box { background-color: #FDEDEA !important; border-radius: 16px !important; }
+        @media screen and (max-width: 480px) {
+            .mobile-padding { padding: 20px !important; }
+            .logo-img { height: 80px !important; }
+            .h1-mobile { font-size: 24px !important; }
+        }
+    </style>
+</head>
+<body style="background-color: #FAF7F2; margin: 0 !important; padding: 0 !important;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAF7F2;">
+        <tr>
+            <td align="center" style="padding: 40px 10px 40px 10px;" class="mobile-padding">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px;">
+                    <tr>
+                        <td align="center" class="hero-card" style="padding: 48px 32px 48px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 24px;">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" height="110" style="height: 110px; width: auto; display: block;" class="logo-img">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <h1 class="h1-mobile" style="font-size: 28px; font-weight: 600; color: #331D19; margin: 0 0 12px 0; letter-spacing: -0.02em;">Booking request declined</h1>
+                                        <p style="color: #8E7A75; font-size: 15px; line-height: 1.6; margin: 0;">Unfortunately, your booking request with ${provInfo.name || 'your provider'} was not accepted.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                ${declineReason ? `
+                                <tr><td height="32"></td></tr>
+                                <tr>
+                                    <td align="left" class="reason-box" style="padding: 24px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Reason</td></tr>
+                                            <tr><td style="font-size: 14px; color: #331D19; line-height: 1.6;">${declineReason}</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                ` : ''}
+                                <tr><td height="32"></td></tr>
+                                <tr>
+                                    <td align="left" class="data-table" style="padding: 32px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Service</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${data.service_name || 'Service'}</td></tr>
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Requested time</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19;">${fmtDate(data.scheduled_at)}</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding: 40px 0 24px 0;">
+                            <a href="https://mykliques.com/app" class="cta-button">View my kliques →</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 40px;">
+                            <p style="color: #331D19; font-weight: 500; font-size: 15px; margin: 0;">- The Kliques Team</p>
+                        </td>
+                    </tr>
                 </table>
-                <a href="https://mykliques.com/app" style="display:inline-block;padding:12px 28px;background:#3D231E;color:#ffffff;text-decoration:none;border-radius:9999px;font-size:14px;font-weight:600;">View my kliques →</a>
-              `),
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
             }).catch(() => {});
           }
         } else if (clientId && status === 'completed') {
