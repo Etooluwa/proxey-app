@@ -3,7 +3,7 @@ import { request } from '../../data/apiClient';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 import { useSession } from '../../auth/authContext';
-import { fetchProviderProfile, updateProviderProfile } from '../../data/provider';
+import { fetchProviderProfile, invalidateProviderProfileCache, updateProviderProfile } from '../../data/provider';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../../utils/photoUpload';
 import { uploadPortfolioImage, deletePortfolioImage } from '../../utils/portfolioUpload';
 
@@ -85,12 +85,20 @@ export default function ProviderPhotosPortfolio() {
 
     try {
       const nextUrl = await uploadProfilePhoto(file, session?.user?.id);
-      await updateProviderProfile({ photo: nextUrl, avatar: nextUrl });
-      await updateAuthProfile({ ...(profile || {}), photo: nextUrl, avatar: nextUrl });
+      const savedProfile = await updateProviderProfile({ photo: nextUrl, avatar: nextUrl });
+      const resolvedPhoto = savedProfile?.photo || savedProfile?.avatar || nextUrl;
+      invalidateProviderProfileCache();
+      await updateAuthProfile({
+        name: savedProfile?.name || savedProfile?.business_name || profile?.name,
+        city: savedProfile?.city || profile?.city,
+        bio: savedProfile?.bio || profile?.bio,
+        photo: resolvedPhoto,
+        avatar: savedProfile?.avatar || resolvedPhoto,
+      });
       if (providerPhoto && providerPhoto !== nextUrl) {
         deleteProfilePhoto(providerPhoto).catch(() => {});
       }
-      setProviderPhoto(nextUrl);
+      setProviderPhoto(resolvedPhoto);
     } catch (err) {
       setError(err.message || 'Failed to update profile photo.');
     } finally {
