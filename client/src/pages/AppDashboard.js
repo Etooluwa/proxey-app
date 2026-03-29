@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -7,13 +7,25 @@ import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
 import Lbl from '../components/ui/Lbl';
-import Divider from '../components/ui/Divider';
 import ArrowIcon from '../components/ui/ArrowIcon';
-import HeroCard from '../components/ui/HeroCard';
 import Footer from '../components/ui/Footer';
 
-const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', hero: '#FDDCC6', avatarBg: '#F2EBE5', success: '#5A8A5E' };
+const T = {
+    ink: '#3D231E',
+    muted: '#8C6A64',
+    faded: '#B0948F',
+    accent: '#C25E4A',
+    line: 'rgba(140,106,100,0.18)',
+    card: '#FFFFFF',
+    hero: '#FDDCC6',
+    avatarBg: '#F2EBE5',
+    success: '#5A8A5E',
+    successBg: '#EEF3ED',
+    warmCard: '#F2E9E2',
+};
+
 const F = "'Sora',system-ui,sans-serif";
+const DISPLAY_F = "'Cormorant Garamond', Georgia, serif";
 
 function formatDate(iso) {
     if (!iso) return '—';
@@ -29,136 +41,322 @@ function getInitials(name) {
         .toUpperCase();
 }
 
-// ─── Empty state ────────────────────────────────────────────────────────────
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+}
 
-const ClientEmptyKliques = () => (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
-        {/* Hero card with topo texture + ghost avatars */}
-        <HeroCard>
-            <div style={{ display: 'flex', marginBottom: 28 }}>
-                {[0, 1, 2].map((i) => (
-                    <div
-                        key={i}
-                        style={{
-                            width: 48, height: 48, borderRadius: '50%',
-                            background: 'rgba(255,255,255,0.5)',
-                            border: '2px solid rgba(255,255,255,0.7)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginLeft: i > 0 ? -12 : 0, zIndex: 3 - i,
-                        }}
-                    >
-                        <svg width="20" height="20" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
-                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
-                ))}
-            </div>
-            <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, color: T.ink, margin: '0 0 10px' }}>
-                Your circle<br />starts here.
-            </h2>
-            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
-                Every great relationship begins with a first step. Book with a provider or accept an invite — your shared history will live here.
+function getRelationshipStatus(provider) {
+    return (provider?.visits || 0) === 0 ? 'New' : 'Active';
+}
+
+function statusPillStyles(provider) {
+    return getRelationshipStatus(provider) === 'New'
+        ? { background: '#FDE2D3', color: T.accent }
+        : { background: T.successBg, color: T.success };
+}
+
+function statusDotColor(provider) {
+    return getRelationshipStatus(provider) === 'New' ? T.success : T.accent;
+}
+
+function SummaryIntro({ firstName, kliquesCount }) {
+    const greeting = getGreeting();
+
+    return (
+        <div style={{ marginBottom: 28 }}>
+            <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+                Your Relationships
             </p>
-        </HeroCard>
+            <h1
+                style={{
+                    fontFamily: F,
+                    fontSize: 'clamp(2.35rem,4vw,3.4rem)',
+                    fontWeight: 600,
+                    color: T.ink,
+                    margin: '0 0 10px',
+                    letterSpacing: '-0.055em',
+                    lineHeight: 0.98,
+                }}
+            >
+                {greeting},{' '}
+                <span style={{ fontFamily: DISPLAY_F, fontStyle: 'italic', color: T.accent, fontWeight: 600 }}>
+                    {firstName || 'there'}
+                </span>
+                .
+            </h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>
+                {kliquesCount > 0
+                    ? `You have ${kliquesCount} provider${kliquesCount !== 1 ? 's' : ''} in your klique.`
+                    : 'Your providers will appear here.'}
+            </p>
+        </div>
+    );
+}
 
-        <Divider />
-
-        {/* Got an invite? */}
-        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#FFF5E6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="18" height="18" fill="none" stroke="#92400E" strokeWidth="1.5" viewBox="0 0 24 24">
+function InviteHintCard({ compact = false }) {
+    return (
+        <div
+            style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 16,
+                padding: compact ? '16px 18px' : '18px 22px',
+                borderRadius: 18,
+                background: T.warmCard,
+                border: `1px solid ${T.line}`,
+            }}
+        >
+            <div
+                style={{
+                    width: compact ? 40 : 42,
+                    height: compact ? 40 : 42,
+                    borderRadius: 14,
+                    background: '#FFF8F1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                }}
+            >
+                <svg width="18" height="18" fill="none" stroke={T.accent} strokeWidth="1.6" viewBox="0 0 24 24">
                     <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             </div>
-            <div>
-                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Got an invite?</p>
-                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Tap the link your provider sent you. One tap and you're connected.</p>
-            </div>
+            <p style={{ fontFamily: F, fontSize: compact ? 13 : 14, color: T.muted, margin: 0, lineHeight: 1.55 }}>
+                <span style={{ color: T.ink, fontWeight: 600 }}>Got an invite link?</span>{' '}
+                Tap the link your provider sent you and you&apos;ll be connected instantly.
+            </p>
         </div>
+    );
+}
 
-        <Divider />
+function NextConnectionCard({ isDesktop = false }) {
+    return (
+        <div
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: isDesktop ? '18px 22px' : '16px 18px',
+                borderRadius: 20,
+                border: '1px solid rgba(140,106,100,0.14)',
+                background: 'rgba(255,255,255,0.46)',
+                opacity: 0.72,
+            }}
+        >
+            <div
+                style={{
+                    width: isDesktop ? 48 : 44,
+                    height: isDesktop ? 48 : 44,
+                    borderRadius: '50%',
+                    background: '#F6F0EA',
+                    color: '#D4C2BA',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: F,
+                    fontSize: 18,
+                    fontWeight: 500,
+                    flexShrink: 0,
+                }}
+            >
+                +
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontFamily: F, fontSize: isDesktop ? 15 : 14, fontWeight: 600, color: '#D4C2BA', margin: '0 0 4px' }}>
+                    Your next connection
+                </p>
+                <p style={{ fontFamily: F, fontSize: isDesktop ? 14 : 13, color: '#C9B5AD', margin: 0 }}>
+                    Accept an invite or book a session
+                </p>
+            </div>
+            <svg width="16" height="16" fill="none" stroke="#D4C2BA" strokeWidth="1.6" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+        </div>
+    );
+}
 
-        {/* Everything in one place */}
-        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+function ReviewBanner({ notification, onReview }) {
+    if (!notification) return null;
+
+    return (
+        <div
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                padding: '14px 18px',
+                background: '#FFF5E6',
+                borderRadius: 14,
+                border: '1px solid rgba(194,94,74,0.15)',
+                marginBottom: 18,
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <svg width="18" height="18" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
+                <div style={{ minWidth: 0 }}>
+                    <p style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 2px' }}>
+                        How was your last session?
+                    </p>
+                    <p style={{ fontFamily: F, fontSize: 12, color: '#B45309', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {notification.body || notification.message}
+                    </p>
+                </div>
             </div>
-            <div>
-                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Everything in one place</p>
-                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Session history, provider notes, bookings, and messages — all tied to each relationship.</p>
-            </div>
+            <button
+                onClick={onReview}
+                style={{
+                    flexShrink: 0,
+                    padding: '8px 16px',
+                    borderRadius: 999,
+                    background: '#FDDCC6',
+                    border: 'none',
+                    fontFamily: F,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: T.accent,
+                    cursor: 'pointer',
+                }}
+            >
+                Leave a review
+            </button>
         </div>
+    );
+}
 
-        <Divider />
+function ProviderRow({ provider, onClick, isDesktop = false }) {
+    const statusStyles = statusPillStyles(provider);
 
-        {/* Built around people */}
-        <div style={{ padding: '20px 0', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            </div>
-            <div>
-                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Built around people, not transactions</p>
-                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>Kliques remembers your journey with each provider so the relationship only gets better.</p>
-            </div>
-        </div>
-    </div>
-);
-
-// ─── Provider row ────────────────────────────────────────────────────────────
-
-const ProviderRow = ({ provider, onClick, showDivider }) => (
-    <>
+    return (
         <button
             onClick={onClick}
-            className="w-full flex items-center gap-3.5 py-3.5 px-1 text-left focus:outline-none active:bg-avatarBg/40 transition-colors"
+            className="w-full text-left focus:outline-none transition-transform"
+            style={{
+                padding: isDesktop ? '18px 22px' : '16px 18px',
+                borderRadius: 20,
+                background: '#FFFFFF',
+                border: `1px solid ${T.line}`,
+                display: 'grid',
+                gridTemplateColumns: isDesktop ? 'minmax(0,1.3fr) auto 36px' : 'minmax(0,1fr) auto',
+                alignItems: 'center',
+                gap: isDesktop ? 18 : 14,
+                boxShadow: '0 1px 0 rgba(140,106,100,0.04)',
+            }}
         >
-            <Avatar initials={getInitials(provider.name)} size={44} src={provider.avatar || ''} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar initials={getInitials(provider.name)} size={isDesktop ? 48 : 44} src={provider.avatar || ''} />
+                    <span
+                        style={{
+                            position: 'absolute',
+                            right: 1,
+                            bottom: 1,
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: statusDotColor(provider),
+                            border: '2px solid #FFFFFF',
+                        }}
+                    />
+                </div>
 
-            <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-ink m-0 mb-0.5 truncate">
-                    {provider.name}
-                </p>
-                {provider.role && (
-                    <p className="text-[13px] text-muted m-0 mb-1 truncate">{provider.role}</p>
-                )}
-                <Lbl>
-                    {provider.visits} {provider.visits === 1 ? 'visit' : 'visits'}
-                    {' · '}
-                    Last: {formatDate(provider.last_visit)}
-                </Lbl>
+                <div style={{ minWidth: 0 }}>
+                    <p className="text-[15px] font-semibold text-ink m-0 mb-0.5 truncate">
+                        {provider.name}
+                    </p>
+                    <p className="text-[13px] m-0 truncate" style={{ color: T.muted }}>
+                        {provider.role || 'Provider'}
+                    </p>
+                </div>
             </div>
 
-            <ArrowIcon size={18} />
-        </button>
-        {showDivider && <Divider />}
-    </>
-);
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, auto)',
+                    alignItems: 'center',
+                    gap: isDesktop ? 22 : 14,
+                }}
+            >
+                <div style={{ textAlign: 'center', minWidth: 40 }}>
+                    <p style={{ fontFamily: F, fontSize: isDesktop ? 17 : 16, fontWeight: 600, color: T.ink, margin: '0 0 3px' }}>
+                        {provider.visits || 0}
+                    </p>
+                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.faded }}>
+                        Visits
+                    </span>
+                </div>
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+                <div style={{ textAlign: 'center', minWidth: isDesktop ? 72 : 60 }}>
+                    <p style={{ fontFamily: F, fontSize: isDesktop ? 17 : 16, fontWeight: 600, color: T.ink, margin: '0 0 3px' }}>
+                        {provider.last_visit ? formatDate(provider.last_visit) : '—'}
+                    </p>
+                    <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.faded }}>
+                        Last visit
+                    </span>
+                </div>
+
+                <div
+                    style={{
+                        padding: '6px 12px',
+                        borderRadius: 999,
+                        background: statusStyles.background,
+                        color: statusStyles.color,
+                        fontFamily: F,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        justifySelf: 'start',
+                    }}
+                >
+                    {getRelationshipStatus(provider)}
+                </div>
+            </div>
+
+            {isDesktop && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <ArrowIcon size={18} />
+                </div>
+            )}
+        </button>
+    );
+}
+
+function EmptyState({ firstName }) {
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
+            <SummaryIntro firstName={firstName} kliquesCount={0} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <NextConnectionCard />
+                <InviteHintCard compact />
+            </div>
+        </div>
+    );
+}
 
 const AppDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile: sessionProfile } = useSession();
-
     const { notifications } = useNotifications();
 
-    // Find unread session_complete notifications that need a review
     const sessionCompleteNotifs = (notifications || []).filter(
         (n) => (n.type === 'session_complete' || n.type === 'booking_completed')
             && !n.is_read
             && (n.data?.show_review_prompt !== false)
             && (n.booking_id || n.data?.booking_id)
     );
+
     const firstReviewNotif = sessionCompleteNotifs[0];
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
 
     useEffect(() => {
         if (!session?.accessToken) {
@@ -214,126 +412,59 @@ const AppDashboard = () => {
         };
     }, [session?.user?.id]);
 
-    const firstName = (sessionProfile?.name || session?.user?.user_metadata?.full_name || '').split(' ')[0];
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const firstName = useMemo(() => (
+        (sessionProfile?.name || session?.user?.user_metadata?.full_name || '').split(' ')[0]
+    ), [sessionProfile?.name, session?.user?.user_metadata?.full_name]);
+
+    const reviewBookingId = firstReviewNotif?.booking_id || firstReviewNotif?.data?.booking_id;
 
     if (isDesktop) {
         return (
             <div style={{ padding: '40px', fontFamily: F }}>
-                <div style={{ maxWidth: 800, margin: '0 auto' }}>
-                    {/* Welcome */}
-                    <div style={{ marginBottom: 32 }}>
-                        <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>YOUR RELATIONSHIPS</p>
-                        <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-                            {greeting}{firstName ? `, ${firstName}` : ''}.
-                        </h1>
-                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>
-                            {kliques.length > 0
-                                ? `You have ${kliques.length} provider relationship${kliques.length !== 1 ? 's' : ''} here.`
-                                : 'Your provider relationships will appear here.'}
-                        </p>
-                    </div>
+                <div style={{ maxWidth: 980, margin: '0 auto' }}>
+                    <SummaryIntro firstName={firstName} kliquesCount={kliques.length} />
 
-                    {/* Loading */}
                     {loading && (
                         <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${T.accent}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
                         </div>
                     )}
 
-                    {/* Error */}
                     {!loading && error && (
                         <p style={{ fontFamily: F, fontSize: 14, color: T.muted, textAlign: 'center' }}>{error}</p>
                     )}
 
-                    {/* Empty state */}
                     {!loading && !error && kliques.length === 0 && (
-                        <div style={{ maxWidth: 480, margin: '60px auto 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', marginBottom: 24, justifyContent: 'center' }}>
-                                {[0, 1, 2].map((i) => (
-                                    <div key={i} style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(194,94,74,0.1)', border: '2px solid rgba(194,94,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i > 0 ? -12 : 0 }}>
-                                        <svg width="20" height="20" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
-                                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    </div>
-                                ))}
-                            </div>
-                            <p style={{ fontFamily: F, fontSize: 20, fontWeight: 500, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>Your circle starts here.</p>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px', lineHeight: 1.7 }}>Book with a provider or accept an invite to start building your history together.</p>
-                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                {[
-                                    { bg: '#FFF5E6', iconColor: '#92400E', path: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', label: 'Got an invite?', desc: 'Tap the link your provider sent you.' },
-                                    { bg: '#F2EBE5', iconColor: '#8C6A64', path: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Everything in one place', desc: 'History, bookings, and messages — all per relationship.' },
-                                    { bg: '#F2EBE5', iconColor: '#8C6A64', path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', label: 'Built around people', desc: 'Your relationship only gets better over time.' },
-                                ].map((r, i, arr) => (
-                                    <React.Fragment key={r.label}>
-                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '16px 0', textAlign: 'left' }}>
-                                            <div style={{ width: 40, height: 40, borderRadius: 12, background: r.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <svg width="18" height="18" fill="none" stroke={r.iconColor} strokeWidth="1.5" viewBox="0 0 24 24"><path d={r.path} strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                            </div>
-                                            <div>
-                                                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 3px' }}>{r.label}</p>
-                                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.6 }}>{r.desc}</p>
-                                            </div>
-                                        </div>
-                                        {i < arr.length - 1 && <div style={{ height: 1, background: 'rgba(140,106,100,0.2)' }} />}
-                                    </React.Fragment>
-                                ))}
+                        <div style={{ maxWidth: 760 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <NextConnectionCard isDesktop />
+                                <InviteHintCard />
                             </div>
                         </div>
                     )}
 
-                    {/* Provider list */}
                     {!loading && !error && kliques.length > 0 && (
                         <>
-                            {/* Review banner (desktop) */}
-                            {firstReviewNotif && (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 18px', background: '#FFF5E6', borderRadius: 14, border: '1px solid rgba(194,94,74,0.15)', marginBottom: 20 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <svg width="18" height="18" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                        <div>
-                                            <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: '#92400E', margin: '0 0 2px' }}>How was your last session?</p>
-                                            <p style={{ fontFamily: F, fontSize: 12, color: '#B45309', margin: 0 }}>{firstReviewNotif.body || firstReviewNotif.message}</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => navigate(`/app/review/${firstReviewNotif.booking_id || firstReviewNotif.data?.booking_id}`)}
-                                        style={{ flexShrink: 0, padding: '8px 18px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#C25E4A', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                    >
-                                        Leave a review →
-                                    </button>
-                                </div>
-                            )}
+                            <ReviewBanner
+                                notification={firstReviewNotif}
+                                onReview={() => navigate(`/app/review/${reviewBookingId}`)}
+                            />
 
-                            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 14 }}>
+                            <Lbl className="block mb-3">
                                 {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
-                            </span>
-                            <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
-                                {/* Table header */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 80px 120px 40px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
-                                    {['Provider', 'Role', 'Visits', 'Last Visit', ''].map((h) => (
-                                        <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
-                                    ))}
-                                </div>
-                                {kliques.map((provider, i) => (
-                                    <button
+                            </Lbl>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {kliques.map((provider) => (
+                                    <ProviderRow
                                         key={provider.provider_id}
+                                        provider={provider}
+                                        isDesktop
                                         onClick={() => navigate(`/app/relationship/${provider.provider_id}`)}
-                                        style={{ display: 'grid', gridTemplateColumns: '1fr 160px 80px 120px 40px', alignItems: 'center', padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < kliques.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <Avatar initials={getInitials(provider.name)} size={36} src={provider.avatar || ''} />
-                                            <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{provider.name}</span>
-                                        </div>
-                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{provider.role || '—'}</span>
-                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{provider.visits}</span>
-                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{formatDate(provider.last_visit)}</span>
-                                        <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                    </button>
+                                    />
                                 ))}
+                                <NextConnectionCard isDesktop />
+                                <InviteHintCard />
                             </div>
                         </>
                     )}
@@ -347,66 +478,43 @@ const AppDashboard = () => {
             <Header onMenu={onMenu} showAvatar={false} />
 
             <div className="px-5 pt-4 flex-1 flex flex-col">
-                {/* Loading */}
                 {loading && (
                     <div className="flex-1 flex items-center justify-center">
                         <div className="w-7 h-7 rounded-full border-2 border-accent border-t-transparent animate-spin" />
                     </div>
                 )}
 
-                {/* Error */}
                 {!loading && error && (
                     <div className="flex-1 flex items-center justify-center">
                         <p className="text-[14px] text-muted text-center px-8">{error}</p>
                     </div>
                 )}
 
-                {/* Empty state */}
-                {!loading && !error && kliques.length === 0 && <ClientEmptyKliques />}
+                {!loading && !error && kliques.length === 0 && <EmptyState firstName={firstName} />}
 
-                {/* Provider list */}
                 {!loading && !error && kliques.length > 0 && (
                     <div className="flex-1 flex flex-col">
-                        {/* Welcome + count */}
-                        <div className="mb-4">
-                            <Lbl className="block mb-1">YOUR RELATIONSHIPS</Lbl>
-                            <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0 mb-1">
-                                {greeting}{firstName ? `, ${firstName}` : ''}.
-                            </h1>
-                            <p className="text-[14px] text-muted m-0 mb-1" style={{ lineHeight: 1.6 }}>
-                                {kliques.length} provider relationship{kliques.length !== 1 ? 's' : ''} here.
-                            </p>
-                        </div>
+                        <SummaryIntro firstName={firstName} kliquesCount={kliques.length} />
 
-                        {/* Review banner (mobile) */}
-                        {firstReviewNotif && (
-                            <div
-                                className="flex items-center justify-between gap-3 p-4 rounded-[14px] mb-5"
-                                style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.15)' }}
-                            >
-                                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                                    <svg width="16" height="16" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0">
-                                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                    <p className="text-[13px] font-medium truncate m-0" style={{ color: '#92400E', fontFamily: "'Sora',system-ui,sans-serif" }}>How was your last session?</p>
-                                </div>
-                                <button
-                                    onClick={() => navigate(`/app/review/${firstReviewNotif.booking_id || firstReviewNotif.data?.booking_id}`)}
-                                    style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 9999, background: '#FDDCC6', border: 'none', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 12, fontWeight: 600, color: '#C25E4A', cursor: 'pointer' }}
-                                >
-                                    Review →
-                                </button>
-                            </div>
-                        )}
-                        <div>
-                            {kliques.map((provider, i) => (
+                        <ReviewBanner
+                            notification={firstReviewNotif}
+                            onReview={() => navigate(`/app/review/${reviewBookingId}`)}
+                        />
+
+                        <Lbl className="block mb-3">
+                            {kliques.length} provider{kliques.length !== 1 ? 's' : ''}
+                        </Lbl>
+
+                        <div className="flex flex-col gap-3">
+                            {kliques.map((provider) => (
                                 <ProviderRow
                                     key={provider.provider_id}
                                     provider={provider}
                                     onClick={() => navigate(`/app/relationship/${provider.provider_id}`)}
-                                    showDivider={i < kliques.length - 1}
                                 />
                             ))}
+                            <NextConnectionCard />
+                            <InviteHintCard compact />
                         </div>
                     </div>
                 )}

@@ -113,19 +113,39 @@ const ConvoRow = ({ chat, unread, onClick }) => (
 function DesktopChatPanel({ chat, messages: msgs = [], session, onSend, onClose }) {
     const [text, setText] = useState('');
     const [sending, setSending] = useState(false);
+    const [attachment, setAttachment] = useState(null);
     const bottomRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const attachmentPreviewUrl = attachment ? URL.createObjectURL(attachment) : null;
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [msgs]);
+    useEffect(() => () => {
+        if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl);
+    }, [attachmentPreviewUrl]);
 
     const handleSend = async () => {
         const content = text.trim();
-        if (!content || sending) return;
+        const attachedFile = attachment;
+        if ((!content && !attachedFile) || sending) return;
         setSending(true);
         setText('');
-        try { await onSend({ conversationId: chat.id, content }); } catch (e) { console.error(e); }
+        setAttachment(null);
+        try { await onSend({ conversationId: chat.id, content, imageFile: attachedFile }); }
+        catch (e) {
+            console.error(e);
+            setText(content);
+            setAttachment(attachedFile);
+        }
         finally { setSending(false); }
+    };
+
+    const handleAttachmentPick = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setAttachment(file);
+        event.target.value = '';
     };
 
     const myId = session?.user?.id;
@@ -161,7 +181,28 @@ function DesktopChatPanel({ chat, messages: msgs = [], session, onSend, onClose 
             </div>
 
             {/* Input */}
-            <div style={{ padding: '12px 16px', borderTop: `1px solid ${T.line}`, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ position: 'relative', padding: '12px 16px', borderTop: `1px solid ${T.line}`, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                {attachmentPreviewUrl && (
+                    <div style={{ position: 'absolute', bottom: 68, left: 16, right: 16, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 16, border: `1px solid ${T.line}`, background: '#F6EFE8' }}>
+                        <img src={attachmentPreviewUrl} alt={attachment?.name || 'Attachment preview'} style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment?.name || 'Attached image'}</p>
+                            <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: '4px 0 0' }}>Ready to send</p>
+                        </div>
+                        <button type="button" onClick={() => setAttachment(null)} style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${T.line}`, background: '#fff', cursor: 'pointer', flexShrink: 0 }}>
+                            <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.75" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" /></svg>
+                        </button>
+                    </div>
+                )}
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending}
+                    style={{ width: 40, height: 40, borderRadius: '50%', background: 'transparent', border: `1px solid ${T.line}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    aria-label="Attach image"
+                >
+                    <svg width="16" height="16" fill="none" stroke={T.muted} strokeWidth="1.75" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                </button>
                 <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -172,11 +213,18 @@ function DesktopChatPanel({ chat, messages: msgs = [], session, onSend, onClose 
                 />
                 <button
                     onClick={handleSend}
-                    disabled={!text.trim() || sending}
-                    style={{ width: 40, height: 40, borderRadius: '50%', background: text.trim() ? T.ink : T.avatarBg, border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.2s' }}
+                    disabled={(!text.trim() && !attachment) || sending}
+                    style={{ width: 40, height: 40, borderRadius: '50%', background: (text.trim() || attachment) ? T.ink : T.avatarBg, border: 'none', cursor: (text.trim() || attachment) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.2s' }}
                 >
-                    <svg width="16" height="16" fill="none" stroke={text.trim() ? '#fff' : T.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <svg width="16" height="16" fill="none" stroke={(text.trim() || attachment) ? '#fff' : T.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handleAttachmentPick}
+                />
             </div>
         </div>
     );
