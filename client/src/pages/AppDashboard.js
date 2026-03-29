@@ -588,7 +588,7 @@ const AppDashboard = () => {
 
     return (
         <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
-            <Header onMenu={onMenu} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
             <div style={{ padding: '0 20px 24px', flex: 1 }}>
                 {content}
             </div>

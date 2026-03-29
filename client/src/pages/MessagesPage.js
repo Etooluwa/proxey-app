@@ -348,7 +348,7 @@ const MessagesPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
 
             <div className="px-5 pb-6 flex-1 flex flex-col">
                 {/* Page title */}

@@ -84,7 +84,7 @@ const AccountPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
 
             {/* ── Identity ── */}
             <div className="px-5 pb-5">
