@@ -58,7 +58,7 @@ function buildClusters(messages, myId) {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-const Bubble = ({ msg, isMe, isFirst, isLast, otherInitials, showAvatarSlot }) => (
+const Bubble = ({ msg, isMe, isFirst, isLast, otherInitials, otherAvatar, showAvatarSlot }) => (
     <div
         className="flex items-end gap-2"
         style={{ justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: isLast ? 0 : 2 }}
@@ -66,7 +66,7 @@ const Bubble = ({ msg, isMe, isFirst, isLast, otherInitials, showAvatarSlot }) =
         {/* Avatar slot — left side for received messages */}
         {!isMe && (
             <div className="w-7 flex-shrink-0 flex items-end">
-                {isFirst && <Avatar initials={otherInitials} size={28} />}
+                {isFirst && <Avatar initials={otherInitials} src={otherAvatar || ''} size={28} />}
             </div>
         )}
 
@@ -82,7 +82,15 @@ const Bubble = ({ msg, isMe, isFirst, isLast, otherInitials, showAvatarSlot }) =
                     fontFamily: 'inherit',
                 }}
             >
-                {msg.content}
+                {msg.image_url && (
+                    <img
+                        src={msg.image_url}
+                        alt="Message attachment"
+                        className="block w-full max-w-[260px] rounded-[14px]"
+                        style={{ marginBottom: msg.content ? 8 : 0 }}
+                    />
+                )}
+                {msg.content && <span>{msg.content}</span>}
             </div>
         </div>
 
@@ -119,8 +127,18 @@ const ThreeDot = ({ onClick }) => (
 
 // ─── Input bar ────────────────────────────────────────────────────────────────
 
-const InputBar = ({ value, onChange, onSend, sending }) => {
+const InputBar = ({
+    value,
+    onChange,
+    onSend,
+    sending,
+    onAttachClick,
+    attachmentPreviewUrl,
+    attachmentName,
+    onClearAttachment,
+}) => {
     const hasText = value.trim().length > 0;
+    const canSend = hasText || Boolean(attachmentPreviewUrl);
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -131,14 +149,50 @@ const InputBar = ({ value, onChange, onSend, sending }) => {
 
     return (
         <div
-            className="flex items-end gap-2 px-4 py-3 bg-base"
+            className="px-4 py-3 bg-base"
             style={{ borderTop: '1px solid rgba(140,106,100,0.2)' }}
         >
+            {attachmentPreviewUrl && (
+                <div
+                    className="mb-3 flex items-start gap-3 rounded-[18px] px-3 py-3"
+                    style={{ background: '#F6EFE8', border: '1px solid rgba(140,106,100,0.18)' }}
+                >
+                    <img
+                        src={attachmentPreviewUrl}
+                        alt={attachmentName || 'Attachment preview'}
+                        className="h-16 w-16 rounded-[14px] object-cover flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1 pt-1">
+                        <p className="m-0 text-[13px] font-medium text-ink truncate">
+                            {attachmentName || 'Attached image'}
+                        </p>
+                        <p className="m-0 mt-1 text-[12px] text-faded">
+                            Ready to send
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClearAttachment}
+                        className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ border: '1px solid rgba(140,106,100,0.18)', background: '#FFF' }}
+                        aria-label="Remove attachment"
+                    >
+                        <svg width="14" height="14" fill="none" stroke="#8C6A64" strokeWidth="1.75" viewBox="0 0 24 24">
+                            <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            <div className="flex items-end gap-2">
             {/* Plus / attach */}
             <button
+                type="button"
+                onClick={onAttachClick}
                 className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none"
                 style={{ border: '1px solid rgba(140,106,100,0.2)', background: 'transparent' }}
                 aria-label="Attach"
+                disabled={sending}
             >
                 <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path d="M12 5v14M5 12h14" strokeLinecap="round" />
@@ -167,27 +221,28 @@ const InputBar = ({ value, onChange, onSend, sending }) => {
             </div>
 
             {/* Send button */}
-            <button
-                onClick={onSend}
-                disabled={!hasText || sending}
-                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none transition-colors"
-                style={{
-                    background: hasText ? '#C25E4A' : '#F2EBE5',
-                    cursor: hasText ? 'pointer' : 'default',
-                }}
-                aria-label="Send"
-            >
-                <svg
-                    width="16"
-                    height="16"
-                    fill="none"
-                    stroke={hasText ? '#fff' : '#B0948F'}
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
+                <button
+                    onClick={onSend}
+                    disabled={!canSend || sending}
+                    className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none transition-colors"
+                    style={{
+                        background: canSend ? '#C25E4A' : '#F2EBE5',
+                        cursor: canSend ? 'pointer' : 'default',
+                    }}
+                    aria-label="Send"
                 >
-                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            </button>
+                    <svg
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke={canSend ? '#fff' : '#B0948F'}
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                    >
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </button>
+            </div>
         </div>
     );
 };
@@ -210,8 +265,17 @@ const ChatPage = () => {
 
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
+    const [attachment, setAttachment] = useState(null);
     const bottomRef = useRef(null);
+    const fileInputRef = useRef(null);
     const userId = session?.user?.id;
+    const attachmentPreviewUrl = attachment ? URL.createObjectURL(attachment) : null;
+
+    useEffect(() => {
+        return () => {
+            if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl);
+        };
+    }, [attachmentPreviewUrl]);
 
     // Activate this conversation in context (triggers realtime subscription in MessageContext)
     useEffect(() => {
@@ -236,6 +300,9 @@ const ChatPage = () => {
         ? (conversation?.client_name || 'Client')
         : (conversation?.provider_name || 'Provider');
     const otherInitials = getInitials(otherName);
+    const otherAvatar = isProvider
+        ? (conversation?.client_avatar || '')
+        : (conversation?.provider_avatar || '');
 
     // Profile link for the other person in the header
     const otherProfilePath = isProvider
@@ -261,18 +328,28 @@ const ChatPage = () => {
 
     const handleSend = useCallback(async () => {
         const text = input.trim();
-        if (!text || !conversationId || sending) return;
+        const attachedFile = attachment;
+        if ((!text && !attachedFile) || !conversationId || sending) return;
         setInput('');
+        setAttachment(null);
         setSending(true);
         try {
-            await sendMessage({ conversationId, content: text });
+            await sendMessage({ conversationId, content: text, imageFile: attachedFile });
         } catch (err) {
             console.error('[ChatPage] send error:', err);
             setInput(text); // restore on failure
+            setAttachment(attachedFile);
         } finally {
             setSending(false);
         }
-    }, [input, conversationId, sending, sendMessage]);
+    }, [input, attachment, conversationId, sending, sendMessage]);
+
+    const handleAttachmentPick = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setAttachment(file);
+        event.target.value = '';
+    };
 
     const handleBack = () => {
         const basePath = isProvider ? '/provider/messages' : '/app/messages';
@@ -304,7 +381,7 @@ const ChatPage = () => {
                     className="flex items-center gap-3 flex-1 min-w-0 focus:outline-none group"
                     style={{ background: 'none', border: 'none', padding: 0, cursor: otherProfilePath ? 'pointer' : 'default', textAlign: 'left' }}
                 >
-                    <Avatar initials={otherInitials} size={36} />
+                    <Avatar initials={otherInitials} src={otherAvatar} size={36} />
                     <p
                         className="text-[15px] font-semibold text-ink m-0 truncate"
                         style={{ textDecoration: otherProfilePath ? 'underline' : 'none', textDecorationColor: 'rgba(140,106,100,0.4)', textUnderlineOffset: '3px' }}
@@ -345,6 +422,7 @@ const ChatPage = () => {
                                         isFirst={isFirst}
                                         isLast={isLast}
                                         otherInitials={otherInitials}
+                                        otherAvatar={otherAvatar}
                                     />
                                 );
                             })}
@@ -372,6 +450,17 @@ const ChatPage = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onSend={handleSend}
                 sending={sending}
+                onAttachClick={() => fileInputRef.current?.click()}
+                attachmentPreviewUrl={attachmentPreviewUrl}
+                attachmentName={attachment?.name}
+                onClearAttachment={() => setAttachment(null)}
+            />
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={handleAttachmentPick}
             />
         </div>
     );
