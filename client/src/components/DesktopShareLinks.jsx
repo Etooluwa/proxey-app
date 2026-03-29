@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { request } from '../data/apiClient';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -205,10 +206,32 @@ function LinkCard({ type, icon, label, description, url, fullUrl, isHero, copied
 export default function DesktopShareLinks({ handle = '' }) {
     const [copied, setCopied] = useState(null);
     const [showQR, setShowQR] = useState(null);
+    const [invitePath, setInvitePath] = useState('');
 
-    const inviteUrl = `mykliques.com/join/${handle}`;
+    useEffect(() => {
+        let active = true;
+
+        async function loadInvitePath() {
+            try {
+                const data = await request('/provider/invites/current');
+                if (!active) return;
+                setInvitePath(data?.url || '');
+            } catch (_) {
+                if (!active) return;
+                setInvitePath(handle ? `/join/${handle}` : '');
+            }
+        }
+
+        loadInvitePath();
+
+        return () => {
+            active = false;
+        };
+    }, [handle]);
+
+    const inviteUrl = invitePath ? `mykliques.com${invitePath}` : 'mykliques.com/join/';
     const bookingUrl = `mykliques.com/book/${handle}`;
-    const inviteFullUrl = `https://mykliques.com/join/${handle}`;
+    const inviteFullUrl = invitePath ? `https://mykliques.com${invitePath}` : 'https://mykliques.com/join/';
     const bookingFullUrl = `https://mykliques.com/book/${handle}`;
 
     const handleCopy = (type, fullUrl) => {

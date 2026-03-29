@@ -2670,7 +2670,7 @@ app.get("/api/provider/me", async (req, res) => {
     try {
       const [
         { data: providerProfile, error: profileError },
-        { data: providerRecord, error: providerError },
+        { data: initialProviderRecord, error: providerError },
       ] = await Promise.all([
         supabase
           .from("provider_profiles")
@@ -2683,6 +2683,27 @@ app.get("/api/provider/me", async (req, res) => {
           .eq("user_id", providerId)
           .maybeSingle(),
       ]);
+      let providerRecord = initialProviderRecord;
+
+      if (providerProfile?.handle && !providerRecord?.handle) {
+        const { data: backfilledProvider } = await supabase
+          .from("providers")
+          .upsert(
+            {
+              user_id: providerId,
+              handle: providerProfile.handle,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" }
+          )
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .maybeSingle();
+
+        if (backfilledProvider) {
+          providerRecord = backfilledProvider;
+        }
+      }
+
       if (profileError || providerError) {
         console.warn("[supabase] Failed to load provider profile, using stub.", profileError || providerError);
       } else {
@@ -2860,9 +2881,38 @@ app.patch("/api/provider/me", async (req, res) => {
 
       const profilePayload = {
         provider_id: providerId,
-        ...updates,
         updated_at: now,
       };
+
+      const providerProfileFields = [
+        "name",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "bio",
+        "avatar",
+        "business_name",
+        "city",
+        "address_line1",
+        "address_line2",
+        "categories",
+        "languages",
+        "hourly_rate",
+        "schedule",
+        "notification_preferences",
+        "booking_settings",
+        "stripe_account_id",
+        "stripe_last4",
+        "account_status",
+        "photo",
+      ];
+
+      for (const field of providerProfileFields) {
+        if (typeof updates[field] !== "undefined") {
+          profilePayload[field] = updates[field];
+        }
+      }
 
       if (normalizedCategory !== undefined) profilePayload.category = normalizedCategory;
       if (normalizedCategories !== undefined) profilePayload.categories = normalizedCategories;
@@ -2881,11 +2931,13 @@ app.patch("/api/provider/me", async (req, res) => {
           updated_at: now,
         };
 
+        if (typeof updates.handle !== "undefined") providerPayload.handle = updates.handle || null;
         if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
         if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
         if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
         if (typeof updates.photo !== "undefined") providerPayload.photo = updates.photo;
         if (typeof updates.avatar !== "undefined") providerPayload.avatar = updates.avatar;
+        if (typeof updates.is_profile_complete !== "undefined") providerPayload.is_profile_complete = Boolean(updates.is_profile_complete);
         if (normalizedCategory !== undefined) providerPayload.category = normalizedCategory || null;
         if (normalizedCategories !== undefined) providerPayload.categories = normalizedCategories || [];
 
@@ -8161,22 +8213,47 @@ app.post("/api/provider/invites", async (req, res) => {
 app.get("/api/provider/invites/current", async (req, res) => {
   const providerId = getProviderId(req);
   if (!supabase) {
-    return res.json({ handle: "demo-provider", url: "/join/demo-provider" });
+    return res.json({ code: "demo-invite-code", url: "/join/demo-invite-code" });
   }
 
   try {
-    const { data: provider, error } = await supabase
-      .from("providers")
-      .select("handle")
-      .eq("user_id", providerId)
+    const now = new Date().toISOString();
+    const { data: existingInvite, error } = await supabase
+      .from("provider_invites")
+      .select("code, status, expires_at, created_at")
+      .eq("provider_id", providerId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) throw error;
-    if (!provider?.handle) {
-      return res.status(404).json({ error: "Provider handle not found." });
+
+    if (existingInvite?.expires_at && new Date(existingInvite.expires_at) < new Date()) {
+      await supabase
+        .from("provider_invites")
+        .update({ status: "expired" })
+        .eq("provider_id", providerId)
+        .eq("code", existingInvite.code);
+    } else if (existingInvite?.code) {
+      return res.json({ code: existingInvite.code, url: `/join/${existingInvite.code}` });
     }
 
-    return res.json({ handle: provider.handle, url: `/join/${provider.handle}` });
+    const code = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    const { data: createdInvite, error: createError } = await supabase
+      .from("provider_invites")
+      .insert({
+        provider_id: providerId,
+        code,
+        status: "active",
+        created_at: now,
+      })
+      .select("code")
+      .single();
+
+    if (createError) throw createError;
+
+    return res.json({ code: createdInvite.code, url: `/join/${createdInvite.code}` });
   } catch (err) {
     console.error("[provider/invites/current GET]", err);
     return res.status(500).json({ error: "Failed to fetch invite." });
