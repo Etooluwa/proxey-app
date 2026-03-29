@@ -336,6 +336,40 @@ async function getClientNotifPrefs(userId) {
   };
 }
 
+// ─── Helper: fetch provider email + name ─────────────────────────────────────
+async function getProviderEmailInfo(providerId) {
+  if (!supabase || !providerId) return {};
+  const { data } = await supabase
+    .from('providers')
+    .select('email, name, business_name')
+    .eq('user_id', providerId)
+    .maybeSingle();
+  return {
+    email: data?.email || null,
+    name: data?.business_name || data?.name || null,
+  };
+}
+
+// ─── Email templates ──────────────────────────────────────────────────────────
+function emailBase(bodyHtml) {
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#FBF7F2;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid rgba(140,106,100,0.15);">
+<tr><td style="background:#FDDCC6;padding:28px 32px;">
+  <span style="font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">kliques</span>
+</td></tr>
+<tr><td style="padding:32px;">${bodyHtml}</td></tr>
+<tr><td style="padding:16px 32px 28px;border-top:1px solid rgba(140,106,100,0.15);">
+  <p style="margin:0;font-size:12px;color:#B0948F;">You're receiving this because you have an account on <a href="https://mykliques.com" style="color:#C25E4A;text-decoration:none;">mykliques.com</a>.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 // ─── Session reminder scheduler (runs every 5 min) ───────────────────────────
 // Sends a push notification 3 hours before confirmed appointments
 setInterval(async () => {
@@ -1902,6 +1936,31 @@ app.post("/api/bookings", async (req, res) => {
               price: data.price
             }
           });
+
+          // Email provider about new booking request
+          if (data.status === 'pending') {
+            const provInfo = await getProviderEmailInfo(data.provider_id);
+            const { name: clientName } = await getClientNotifPrefs(data.client_id);
+            if (provInfo.email) {
+              sendEmail({
+                to: provInfo.email,
+                subject: `New booking request — ${fmtDate(data.scheduled_at)}`,
+                html: emailBase(`
+                  <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">New booking request</h2>
+                  <p style="margin:0 0 24px;font-size:14px;color:#8C6A64;line-height:1.6;">You have a new booking request waiting for your approval.</p>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F2;border-radius:12px;padding:20px;margin-bottom:24px;">
+                    <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Client</td></tr>
+                    <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${clientName || 'A client'}</td></tr>
+                    <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+                    <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${data.service_name || 'Service'}</td></tr>
+                    <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
+                    <tr><td style="font-size:15px;font-weight:600;color:#3D231E;">${fmtDate(data.scheduled_at)}</td></tr>
+                  </table>
+                  <a href="https://mykliques.com/provider/appointments" style="display:inline-block;padding:12px 28px;background:#3D231E;color:#ffffff;text-decoration:none;border-radius:9999px;font-size:14px;font-weight:600;">Review request →</a>
+                `),
+              }).catch(() => {});
+            }
+          }
         }
 
         if (data.status === "confirmed" && data.client_id) {
@@ -2482,6 +2541,29 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
               status: 'accepted'
             }
           });
+
+          // Email client: booking confirmed
+          const { email: clientEmail, name: clientName } = await getClientNotifPrefs(clientId);
+          const provInfo = await getProviderEmailInfo(data.provider_id);
+          if (clientEmail) {
+            sendEmail({
+              to: clientEmail,
+              subject: `Your booking is confirmed — ${fmtDate(data.scheduled_at)}`,
+              html: emailBase(`
+                <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">Booking confirmed</h2>
+                <p style="margin:0 0 24px;font-size:14px;color:#8C6A64;line-height:1.6;">Your booking has been confirmed. We'll see you there!</p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F2;border-radius:12px;padding:20px;margin-bottom:24px;">
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Provider</td></tr>
+                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${provInfo.name || 'Your provider'}</td></tr>
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${data.service_name || 'Service'}</td></tr>
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
+                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;">${fmtDate(data.scheduled_at)}</td></tr>
+                </table>
+                <a href="https://mykliques.com/app" style="display:inline-block;padding:12px 28px;background:#3D231E;color:#ffffff;text-decoration:none;border-radius:9999px;font-size:14px;font-weight:600;">View my kliques →</a>
+              `),
+            }).catch(() => {});
+          }
         } else if (clientId && (status === 'declined' || status === 'cancelled')) {
           await createClientNotification(clientId, {
             type: 'booking_declined',
@@ -2496,6 +2578,31 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
               reason: declineReason || null,
             }
           });
+
+          // Email client: booking declined/cancelled by provider
+          const { email: clientEmail } = await getClientNotifPrefs(clientId);
+          const provInfo = await getProviderEmailInfo(data.provider_id);
+          if (clientEmail) {
+            sendEmail({
+              to: clientEmail,
+              subject: `Your booking request was not accepted`,
+              html: emailBase(`
+                <h2 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">Booking request declined</h2>
+                <p style="margin:0 0 24px;font-size:14px;color:#8C6A64;line-height:1.6;">Unfortunately, your booking request with ${provInfo.name || 'your provider'} was not accepted.</p>
+                ${declineReason ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#FDEDEA;border-radius:12px;padding:20px;margin-bottom:24px;">
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Reason</td></tr>
+                  <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;">${declineReason}</td></tr>
+                </table>` : ''}
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F2;border-radius:12px;padding:20px;margin-bottom:24px;">
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;padding-bottom:16px;">${data.service_name || 'Service'}</td></tr>
+                  <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Requested time</td></tr>
+                  <tr><td style="font-size:15px;font-weight:600;color:#3D231E;">${fmtDate(data.scheduled_at)}</td></tr>
+                </table>
+                <a href="https://mykliques.com/app" style="display:inline-block;padding:12px 28px;background:#3D231E;color:#ffffff;text-decoration:none;border-radius:9999px;font-size:14px;font-weight:600;">View my kliques →</a>
+              `),
+            }).catch(() => {});
+          }
         } else if (clientId && status === 'completed') {
           await createClientNotification(clientId, {
             type: 'booking_completed',
