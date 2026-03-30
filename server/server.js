@@ -9604,6 +9604,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
         client_id: clientId,
         provider_id,
         service_id: service_id || null,
+        service_name: serviceName || "Session",
         scheduled_at: scheduledAt,
         status: providerBookingRules.autoAccept ? "confirmed" : "pending",
         payment_status: "unpaid",
