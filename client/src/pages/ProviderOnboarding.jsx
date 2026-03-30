@@ -907,18 +907,10 @@ export default function ProviderOnboarding() {
         setStripeLoading(true);
         sessionStorage.setItem('kliques.ob.step', 3);
         try {
-            const userId = session?.user?.id;
-            const email = session?.user?.email;
-            const businessName = profile.businessName || authProfile?.name || '';
-            const { accountId } = await request('/provider/connected-account', {
-                method: 'POST',
-                body: JSON.stringify({ userId, email, businessName }),
-            });
-            const { url } = await request('/provider/onboarding-link', {
+            const { url } = await request('/provider/stripe/connect', {
                 method: 'POST',
                 body: JSON.stringify({
-                    accountId,
-                    refreshUrl: `${window.location.origin}/provider/onboarding`,
+                    refreshUrl: `${window.location.origin}/provider/onboarding?step=3`,
                     returnUrl: `${window.location.origin}/provider/onboarding?stripe=done`,
                 }),
             });
