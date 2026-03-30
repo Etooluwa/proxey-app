@@ -218,6 +218,12 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
 
     return (
         <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
+            {/* Top nav */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: `1px solid ${T.line}` }}>
+                <span style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 20, fontWeight: 600, color: T.accent, letterSpacing: '-0.02em' }}>kliques</span>
+                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, background: T.abg, padding: '4px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>Public booking page</span>
+            </div>
+
             {/* Hero */}
             <div style={{ background: T.hero, position: 'relative', overflow: 'hidden', padding: '48px 24px 36px' }}>
                 <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.12, pointerEvents: 'none' }} />
@@ -468,10 +474,9 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
 
     useEffect(() => {
         if (!service?.id) { setLoaded(true); return; }
-        request(`/services/${service.id}`)
+        request(`/services/${service.id}/intake`)
             .then(data => {
-                const qs = data.intake_questions || data.service?.intake_questions || [];
-                setQuestions(qs);
+                setQuestions(data.questions || []);
                 setLoaded(true);
             })
             .catch(() => setLoaded(true));
