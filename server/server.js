@@ -5533,35 +5533,35 @@ app.get("/api/provider/weekly-hours", async (req, res) => {
 });
 
 // POST /api/provider/weekly-hours — replace all with new schedule
-// body: { hours: [{ dayIndex, startTime, endTime, isAvailable }], bufferMinutes, bookingWindowDays }
+// body: { hours: [{ dayIndex, isAvailable, timeSlots: ["09:00","13:30",...] }], bookingWindowDays }
 app.post("/api/provider/weekly-hours", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
   const providerIdentity = await getProviderIdentity(getProviderId(req));
   const providerAuthId = providerIdentity.authId || getProviderId(req);
   const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
-  const { hours = [], bufferMinutes, bookingWindowDays } = req.body || {};
+  const { hours = [], bookingWindowDays } = req.body || {};
   if (!Array.isArray(hours)) return res.status(400).json({ error: "hours must be an array." });
   try {
     await supabase.from("provider_time_blocks").delete().in("provider_id", providerIds);
     const payload = hours.map((h) => ({
       provider_id: providerAuthId,
       day_index: h.dayIndex ?? h.day_index ?? 0,
-      start_time: h.startTime ?? h.start_time ?? "09:00",
-      end_time: h.endTime ?? h.end_time ?? "17:00",
       is_available: h.isAvailable ?? h.is_available ?? true,
+      time_slots: Array.isArray(h.timeSlots) ? h.timeSlots : null,
+      start_time: null,
+      end_time: null,
     }));
     const { data, error } = await supabase.from("provider_time_blocks").insert(payload).select();
     if (error) throw error;
-    // Persist booking settings in provider_profiles.metadata
-    if (bufferMinutes !== undefined || bookingWindowDays !== undefined) {
+    // Persist booking window in provider_profiles.metadata
+    if (bookingWindowDays !== undefined) {
       const { data: prof } = await supabase
         .from("provider_profiles")
         .select("metadata")
         .eq("provider_id", providerAuthId)
         .maybeSingle();
       const meta = prof?.metadata || {};
-      if (bufferMinutes !== undefined) meta.bufferMinutes = bufferMinutes;
-      if (bookingWindowDays !== undefined) meta.bookingWindowDays = bookingWindowDays;
+      meta.bookingWindowDays = bookingWindowDays;
       await supabase.from("provider_profiles").update({ metadata: meta }).eq("provider_id", providerAuthId);
     }
     res.status(201).json({ hours: data });
@@ -7166,29 +7166,37 @@ app.get("/api/provider/:providerId/availability/closest", async (req, res) => {
 });
 
 // GET /api/public/provider/:providerId/slots?date=YYYY-MM-DD&duration=60
-// Returns available time slots for a specific date by cross-referencing:
-//   1. provider_availability (weekly schedule, day_index 0=Sun…6=Sat)
-//   2. provider_blocked_dates overrides / blocked ranges on that date
-//   3. Existing confirmed/pending bookings on that date
+// Returns available time slots for a specific date.
+// If the provider has explicit time_slots defined for the day, those are returned directly
+// (minus any already booked). Falls back to start/end range generation for legacy rows.
 app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
   const { providerId } = req.params;
-  const { date, duration = 60, buffer = 0 } = req.query;
+  const { date, duration = 60 } = req.query;
   if (!date) return res.status(400).json({ error: "date is required (YYYY-MM-DD)." });
 
   try {
     const providerIdentity = await getProviderIdentity(providerId);
     const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerId];
+    const providerBookingId = providerIdentity.recordId || providerId;
     const dateObj = new Date(date + "T00:00:00");
-    const dayIndex = dateObj.getDay(); // 0=Sun, 6=Sat
+    const jsDayIndex = dateObj.getDay(); // 0=Sun, 6=Sat
+    const mondayFirstDayIndex = (jsDayIndex + 6) % 7; // 0=Mon, 6=Sun
 
     // 1. Provider's weekly schedule for this day
-    const { data: schedules } = await supabase
-      .from("provider_availability")
-      .select("start_time, end_time, is_available")
-      .eq("provider_id", providerId)
-      .eq("day_index", dayIndex)
+    const candidateDayIndexes = Array.from(new Set([jsDayIndex, mondayFirstDayIndex]));
+    const { data: scheduleRows, error: scheduleError } = await supabase
+      .from("provider_time_blocks")
+      .select("start_time, end_time, is_available, day_index, time_slots")
+      .in("provider_id", providerIds)
+      .in("day_index", candidateDayIndexes)
       .eq("is_available", true);
+
+    if (scheduleError) throw scheduleError;
+
+    const mondaySchedules = (scheduleRows || []).filter((row) => Number(row.day_index) === mondayFirstDayIndex);
+    const sundaySchedules = (scheduleRows || []).filter((row) => Number(row.day_index) === jsDayIndex);
+    const schedules = mondaySchedules.length > 0 ? mondaySchedules : sundaySchedules;
 
     if (!schedules || schedules.length === 0) {
       return res.json({ slots: [] });
@@ -7202,18 +7210,7 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       .eq("date", date);
 
     const fullDayBlock = (blockedDateRows || []).find((row) => row.block_type === "full_day");
-    if (fullDayBlock) {
-      return res.json({ slots: [] });
-    }
-
-    const availabilityOverride = (blockedDateRows || []).find((row) => row.block_type === "availability_override");
-    const availableWindows = availabilityOverride
-      ? [{ start_time: availabilityOverride.start_time, end_time: availabilityOverride.end_time }]
-      : schedules;
-
-    if (!availableWindows || availableWindows.length === 0) {
-      return res.json({ slots: [] });
-    }
+    if (fullDayBlock) return res.json({ slots: [] });
 
     // 3. Existing bookings on this date (pending + confirmed)
     const dayStart = date + "T00:00:00";
@@ -7221,46 +7218,82 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const { data: bookings } = await supabase
       .from("bookings")
       .select("scheduled_at, duration")
-      .eq("provider_id", providerId)
+      .eq("provider_id", providerBookingId)
       .in("status", ["pending", "confirmed"])
       .gte("scheduled_at", dayStart)
       .lte("scheduled_at", dayEnd);
 
-    // Build set of blocked minute-ranges
-    const blockedRanges = [];
+    // Build set of booked start times (HH:MM) to exclude
+    const bookedTimes = new Set();
     for (const b of bookings || []) {
       const start = new Date(b.scheduled_at);
-      const startMins = start.getHours() * 60 + start.getMinutes();
-      const dur = b.duration || parseInt(duration);
-      const buf = parseInt(buffer);
-      blockedRanges.push({ start: startMins, end: startMins + dur + buf });
+      const h = start.getHours().toString().padStart(2, "0");
+      const m = start.getMinutes().toString().padStart(2, "0");
+      bookedTimes.add(`${h}:${m}`);
     }
+
+    // Also build blocked minute-ranges from partial blocks for filtering
+    const blockedRanges = [];
     for (const bl of blockedDateRows || []) {
-      if (bl.block_type === "full_day" || bl.block_type === "availability_override") continue;
+      if (bl.block_type !== "partial" && bl.block_type !== "hours") continue;
       if (!bl.start_time || !bl.end_time) continue;
       const [sh, sm] = bl.start_time.split(":").map(Number);
       const [eh, em] = bl.end_time.split(":").map(Number);
       blockedRanges.push({ start: sh * 60 + sm, end: eh * 60 + em });
     }
 
-    // Generate slots in 30-min increments within each available window
-    const slotDuration = parseInt(duration);
-    const slotIncrement = 30;
-    const slots = [];
+    let slots = [];
 
-    for (const schedule of availableWindows) {
-      const [startH, startM] = schedule.start_time.split(":").map(Number);
-      const [endH, endM] = schedule.end_time.split(":").map(Number);
-      const windowStart = startH * 60 + startM;
-      const windowEnd = endH * 60 + endM;
+    // Check if provider uses explicit time_slots
+    const hasExplicitSlots = schedules.some((s) => Array.isArray(s.time_slots) && s.time_slots.length > 0);
 
-      for (let t = windowStart; t + slotDuration <= windowEnd; t += slotIncrement) {
-        const slotEnd = t + slotDuration + parseInt(buffer);
-        const isBlocked = blockedRanges.some(r => t < r.end && slotEnd > r.start);
-        if (!isBlocked) {
+    if (hasExplicitSlots) {
+      // Merge all time_slots from matching day rows, sort, dedupe
+      const allSlots = [];
+      for (const s of schedules) {
+        if (Array.isArray(s.time_slots)) allSlots.push(...s.time_slots);
+      }
+      // Check availability_override — if set, only include slots within that window
+      const availabilityOverride = (blockedDateRows || []).find((row) => row.block_type === "availability_override");
+      const overrideStart = availabilityOverride ? availabilityOverride.start_time : null;
+      const overrideEnd = availabilityOverride ? availabilityOverride.end_time : null;
+
+      slots = [...new Set(allSlots)]
+        .sort()
+        .filter((slot) => {
+          if (bookedTimes.has(slot)) return false;
+          const [h, m] = slot.split(":").map(Number);
+          const mins = h * 60 + m;
+          // Check partial blocks
+          if (blockedRanges.some((r) => mins >= r.start && mins < r.end)) return false;
+          // Check override window
+          if (overrideStart && overrideEnd) {
+            const [oh, om] = overrideStart.split(":").map(Number);
+            const [eh, em] = overrideEnd.split(":").map(Number);
+            if (mins < oh * 60 + om || mins >= eh * 60 + em) return false;
+          }
+          return true;
+        });
+    } else {
+      // Legacy: generate from start/end range
+      const availabilityOverride = (blockedDateRows || []).find((row) => row.block_type === "availability_override");
+      const availableWindows = availabilityOverride
+        ? [{ start_time: availabilityOverride.start_time, end_time: availabilityOverride.end_time }]
+        : schedules;
+
+      const slotDuration = parseInt(duration);
+      for (const window of availableWindows) {
+        const [startH, startM] = window.start_time.split(":").map(Number);
+        const [endH, endM] = window.end_time.split(":").map(Number);
+        const windowStart = startH * 60 + startM;
+        const windowEnd = endH * 60 + endM;
+        for (let t = windowStart; t + slotDuration <= windowEnd; t += 30) {
+          const slotEnd = t + slotDuration;
+          const isBlocked = blockedRanges.some((r) => t < r.end && slotEnd > r.start);
           const h = Math.floor(t / 60).toString().padStart(2, "0");
-          const m = (t % 60).toString().padStart(2, "0");
-          slots.push(`${h}:${m}`);
+          const mm = (t % 60).toString().padStart(2, "0");
+          const slot = `${h}:${mm}`;
+          if (!isBlocked && !bookedTimes.has(slot)) slots.push(slot);
         }
       }
     }
@@ -7269,9 +7302,9 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
     const filtered = date === today
-      ? slots.filter(s => {
+      ? slots.filter((s) => {
           const [h, m] = s.split(":").map(Number);
-          return h * 60 + m > nowMins + 30; // 30 min buffer for same-day
+          return h * 60 + m > nowMins + 30;
         })
       : slots;
 
