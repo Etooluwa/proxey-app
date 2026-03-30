@@ -396,6 +396,34 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
     );
 }
 
+// Shared layout wrapper for steps 2–5
+const StepWrap = ({ children, padBottom = 120 }) => (
+    <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
+        <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}} .step-fade{animation:fadeUp .35s ease both}`}</style>
+        <div style={{ maxWidth: 560, margin: '0 auto', padding: `0 0 ${padBottom}px` }}>{children}</div>
+    </div>
+);
+
+const StepHeader = ({ onBack, current, total }) => (
+    <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <BackBtn onClick={onBack} />
+        <StepDots current={current} total={total} />
+    </div>
+);
+
+const StepTitle = ({ title, sub }) => (
+    <div style={{ padding: '12px 24px 24px' }}>
+        <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', margin: '0 0 6px', color: T.ink }}>{title}</h1>
+        {sub && <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>{sub}</p>}
+    </div>
+);
+
+const StickyFooter = ({ children }) => (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 28px', background: `linear-gradient(transparent, ${T.base} 20%)`, zIndex: 10 }}>
+        <div style={{ maxWidth: 512, margin: '0 auto' }}>{children}</div>
+    </div>
+);
+
 // ─── STEP 2: Date & Time ────────────────────────────────────────────────────────
 function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSelect, onTimeSelect, onBack, onContinue }) {
     const [weekOffset, setWeekOffset] = useState(0);
@@ -409,132 +437,96 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSe
     const today = new Date(); today.setHours(0, 0, 0, 0);
 
     const weekLabel = (() => {
-        const first = weekDates[0];
-        const last = weekDates[6];
-        if (first.getMonth() === last.getMonth()) {
+        const first = weekDates[0], last = weekDates[6];
+        if (first.getMonth() === last.getMonth())
             return `${MONTH_ABBR[first.getMonth()]} ${first.getDate()} – ${last.getDate()}, ${last.getFullYear()}`;
-        }
         return `${MONTH_ABBR[first.getMonth()]} ${first.getDate()} – ${MONTH_ABBR[last.getMonth()]} ${last.getDate()}, ${last.getFullYear()}`;
     })();
 
     useEffect(() => {
         if (!selectedDate || !provider?.id) return;
-        setLoadingSlots(true);
-        setNoSlots(false);
+        setLoadingSlots(true); setNoSlots(false);
         request(`/public/provider/${provider.user_id || provider.id}/slots?date=${selectedDate}&duration=${service?.duration || 60}&buffer=${provider.buffer_minutes || 0}`)
-            .then(data => {
-                setSlots(data.slots || []);
-                setNoSlots(!data.slots?.length);
-            })
+            .then(data => { setSlots(data.slots || []); setNoSlots(!data.slots?.length); })
             .catch(() => { setSlots([]); setNoSlots(true); })
             .finally(() => setLoadingSlots(false));
     }, [selectedDate, provider?.id, provider?.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleWeekChange = (dir) => {
-        setWeekOffset(o => o + dir);
-        onDateSelect(null);
-        onTimeSelect(null);
-        setSlots([]);
-    };
-
+    const handleWeekChange = (dir) => { setWeekOffset(o => o + dir); onDateSelect(null); onTimeSelect(null); setSlots([]); };
     const displayName = provider?.business_name || provider?.name || 'Provider';
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 0 100px' }}>
-                <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <BackBtn onClick={onBack} />
+        <StepWrap>
+            <StepHeader onBack={onBack} current={2} total={5} />
+            <StepTitle title="Pick a date & time" sub="Choose when you'd like your session" />
+            <div style={{ padding: '0 24px' }} className="step-fade">
+                {/* Booking window note */}
+                <div style={{ background: T.abg, borderRadius: 12, padding: '10px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" /></svg>
+                    <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>
+                        {displayName} accepts bookings up to <strong>{bookingWindow} weeks</strong> ahead
+                    </p>
                 </div>
-                <StepDots current={2} total={5} />
-                <div style={{ padding: '8px 24px 24px' }}>
-                    <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Pick a date & time</h1>
-                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 24px' }}>Choose when you'd like your session</p>
 
-                    {/* Booking window note */}
-                    <div style={{ background: T.abg, borderRadius: 10, padding: '10px 14px', marginBottom: 24 }}>
-                        <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>
-                            {displayName} accepts bookings up to <strong>{bookingWindow} weeks</strong> ahead
-                        </p>
-                    </div>
-
-                    {/* Week navigation */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <button onClick={() => handleWeekChange(-1)} disabled={weekOffset === 0} style={{ background: 'none', border: 'none', cursor: weekOffset === 0 ? 'default' : 'pointer', padding: 8, opacity: weekOffset === 0 ? 0.3 : 1 }}>
-                            <svg width="20" height="20" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </button>
-                        <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, margin: 0 }}>{weekLabel}</p>
-                        <button onClick={() => handleWeekChange(1)} disabled={weekOffset >= maxWeekOffset} style={{ background: 'none', border: 'none', cursor: weekOffset >= maxWeekOffset ? 'default' : 'pointer', padding: 8, opacity: weekOffset >= maxWeekOffset ? 0.3 : 1 }}>
-                            <svg width="20" height="20" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </button>
-                    </div>
-
-                    {/* Date pills */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 28 }}>
-                        {weekDates.map(d => {
-                            const isPast = d < today;
-                            const ds = dateToStr(d);
-                            const isSelected = selectedDate === ds;
-                            return (
-                                <button
-                                    key={ds}
-                                    onClick={() => { if (!isPast) { onDateSelect(ds); onTimeSelect(null); } }}
-                                    disabled={isPast}
-                                    style={{
-                                        padding: '10px 4px', borderRadius: 12, border: `1px solid ${isSelected ? T.accent : T.line}`,
-                                        background: isSelected ? T.hero : 'transparent',
-                                        cursor: isPast ? 'default' : 'pointer', opacity: isPast ? 0.3 : 1,
-                                        fontFamily: F, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                                    }}
-                                >
-                                    <span style={{ fontSize: 10, color: isSelected ? T.accent : T.muted, fontWeight: 500 }}>{DAY_ABBR[d.getDay()]}</span>
-                                    <span style={{ fontSize: 15, fontWeight: isSelected ? 600 : 400, color: isSelected ? T.accent : T.ink }}>{d.getDate()}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Time slots */}
-                    {selectedDate && (
-                        <>
-                            <Lbl style={{ marginBottom: 12 }}>Available times</Lbl>
-                            {loadingSlots ? (
-                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted }}>Loading…</p>
-                            ) : noSlots ? (
-                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted }}>No available times on this date. Try another day.</p>
-                            ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                                    {slots.map(slot => {
-                                        const isSelected = selectedTime === slot;
-                                        return (
-                                            <button
-                                                key={slot}
-                                                onClick={() => onTimeSelect(slot)}
-                                                style={{
-                                                    padding: '12px 8px', borderRadius: 12,
-                                                    border: `1px solid ${isSelected ? T.accent : T.line}`,
-                                                    background: isSelected ? T.hero : 'transparent',
-                                                    fontFamily: F, fontSize: 13, fontWeight: isSelected ? 600 : 400,
-                                                    color: isSelected ? T.accent : T.ink, cursor: 'pointer',
-                                                }}
-                                            >
-                                                {fmtTime(slot)}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </>
-                    )}
+                {/* Week navigation */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <button onClick={() => handleWeekChange(-1)} disabled={weekOffset === 0} style={{ background: 'none', border: 'none', cursor: weekOffset === 0 ? 'default' : 'pointer', padding: 8, opacity: weekOffset === 0 ? 0.25 : 1, display: 'flex' }}>
+                        <svg width="20" height="20" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                    <span style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink }}>{weekLabel}</span>
+                    <button onClick={() => handleWeekChange(1)} disabled={weekOffset >= maxWeekOffset} style={{ background: 'none', border: 'none', cursor: weekOffset >= maxWeekOffset ? 'default' : 'pointer', padding: 8, opacity: weekOffset >= maxWeekOffset ? 0.25 : 1, display: 'flex' }}>
+                        <svg width="20" height="20" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
                 </div>
+
+                {/* Date pills */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 28 }}>
+                    {weekDates.map(d => {
+                        const isPast = d < today, ds = dateToStr(d), isSel = selectedDate === ds;
+                        return (
+                            <button key={ds} onClick={() => { if (!isPast) { onDateSelect(ds); onTimeSelect(null); } }} disabled={isPast}
+                                style={{ padding: '10px 4px', borderRadius: 12, border: `1px solid ${isSel ? T.accent : T.line}`, background: isSel ? T.hero : T.card, cursor: isPast ? 'default' : 'pointer', opacity: isPast ? 0.3 : 1, fontFamily: F, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all .15s' }}>
+                                <span style={{ fontSize: 10, color: isSel ? T.accent : T.muted, fontWeight: 500 }}>{DAY_ABBR[d.getDay()]}</span>
+                                <span style={{ fontSize: 15, fontWeight: isSel ? 600 : 400, color: isSel ? T.accent : T.ink }}>{d.getDate()}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Time slots */}
+                {selectedDate && (
+                    <>
+                        <Lbl style={{ marginBottom: 12 }}>Available times</Lbl>
+                        {loadingSlots ? (
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                                <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${T.hero}`, borderTopColor: T.accent, animation: 'spin 0.8s linear infinite' }} />
+                            </div>
+                        ) : noSlots ? (
+                            <div style={{ padding: '20px', background: T.abg, borderRadius: 14, textAlign: 'center' }}>
+                                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>No available times on this date. Try another day.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                                {slots.map(slot => {
+                                    const isSel = selectedTime === slot;
+                                    return (
+                                        <button key={slot} onClick={() => onTimeSelect(slot)}
+                                            style={{ padding: '13px 8px', borderRadius: 12, border: `1px solid ${isSel ? T.accent : T.line}`, background: isSel ? T.hero : T.card, fontFamily: F, fontSize: 13, fontWeight: isSel ? 600 : 400, color: isSel ? T.accent : T.ink, cursor: 'pointer', transition: 'all .15s' }}>
+                                            {fmtTime(slot)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
-
-            {/* Sticky CTA */}
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: T.base, borderTop: `1px solid ${T.line}` }}>
-                <BtnPrimary onClick={onContinue} disabled={!selectedDate || !selectedTime}>
-                    Continue
+            <StickyFooter>
+                <BtnPrimary onClick={onContinue} disabled={!selectedDate || !selectedTime} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
+                    {selectedDate && selectedTime ? `Continue — ${fmtDate(selectedDate)} at ${fmtTime(selectedTime)}` : 'Select a date & time'}
                 </BtnPrimary>
-            </div>
-        </div>
+            </StickyFooter>
+        </StepWrap>
     );
 }
 
@@ -548,19 +540,13 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
     useEffect(() => {
         if (!service?.id) { setLoaded(true); return; }
         request(`/services/${service.id}/intake`)
-            .then(data => {
-                setQuestions(data.questions || []);
-                setLoaded(true);
-            })
+            .then(data => { setQuestions(data.questions || []); setLoaded(true); })
             .catch(() => setLoaded(true));
     }, [service?.id]);
 
     const toggleOption = (questionId, optionText) => {
         const current = answers[questionId] || [];
-        const updated = current.includes(optionText)
-            ? current.filter(o => o !== optionText)
-            : [...current, optionText];
-        onAnswersChange({ ...answers, [questionId]: updated });
+        onAnswersChange({ ...answers, [questionId]: current.includes(optionText) ? current.filter(o => o !== optionText) : [...current, optionText] });
     };
 
     if (!loaded) return (
@@ -570,87 +556,52 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
         </div>
     );
 
-    if (questions.length === 0) {
-        // No intake questions — auto-skip
-        onContinue({ freeform: '' });
-        return null;
-    }
+    if (questions.length === 0) { onContinue({ freeform: '' }); return null; }
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 0 120px' }}>
-                <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <BackBtn onClick={onBack} />
-                </div>
-                <StepDots current={3} total={5} />
-                <div style={{ padding: '8px 24px 24px' }}>
-                    <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', margin: '0 0 6px' }}>A few questions</h1>
-                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 28px' }}>Help {displayName} prepare for your session</p>
-
-                    {questions.map(q => (
-                        <div key={q.id} style={{ marginBottom: 24 }}>
-                            <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 12px' }}>{q.question_text}</p>
-                            {q.question_type === 'multiple_choice' && q.options?.length > 0 ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                    {q.options.map(opt => {
-                                        const selected = (answers[q.id] || []).includes(opt.option_text);
-                                        return (
-                                            <button
-                                                key={opt.id}
-                                                onClick={() => toggleOption(q.id, opt.option_text)}
-                                                style={{
-                                                    padding: '10px 16px', borderRadius: 20,
-                                                    border: `1px solid ${selected ? T.accent : T.line}`,
-                                                    background: selected ? T.hero : 'transparent',
-                                                    fontFamily: F, fontSize: 13, fontWeight: selected ? 600 : 400,
-                                                    color: selected ? T.accent : T.ink, cursor: 'pointer',
-                                                }}
-                                            >
-                                                {opt.option_text}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <textarea
-                                    value={answers[q.id]?.[0] || ''}
-                                    onChange={e => onAnswersChange({ ...answers, [q.id]: [e.target.value] })}
-                                    placeholder="Your answer…"
-                                    rows={3}
-                                    style={{ ...inputStyle, resize: 'vertical' }}
-                                />
-                            )}
-                        </div>
-                    ))}
-
-                    {/* Freeform */}
-                    <div style={{ marginTop: 8 }}>
-                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 12px' }}>Anything else you'd like to share?</p>
-                        <textarea
-                            value={freeform}
-                            onChange={e => e.target.value.length <= 500 && setFreeform(e.target.value)}
-                            placeholder="Optional notes for your provider…"
-                            rows={4}
-                            style={{ ...inputStyle, resize: 'vertical' }}
-                        />
-                        <p style={{ fontFamily: F, fontSize: 11, color: T.faded, textAlign: 'right', margin: '4px 0 0' }}>{freeform.length}/500</p>
+        <StepWrap>
+            <StepHeader onBack={onBack} current={3} total={5} />
+            <StepTitle title="A few questions" sub={`Help ${displayName} prepare for your session`} />
+            <div style={{ padding: '0 24px' }} className="step-fade">
+                {questions.map(q => (
+                    <div key={q.id} style={{ marginBottom: 28, padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16 }}>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 14px' }}>{q.question_text}</p>
+                        {q.question_type === 'multiple_choice' && q.options?.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {q.options.map(opt => {
+                                    const sel = (answers[q.id] || []).includes(opt.option_text);
+                                    return (
+                                        <button key={opt.id} onClick={() => toggleOption(q.id, opt.option_text)}
+                                            style={{ padding: '10px 16px', borderRadius: 20, border: `1px solid ${sel ? T.accent : T.line}`, background: sel ? T.hero : 'transparent', fontFamily: F, fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? T.accent : T.ink, cursor: 'pointer', transition: 'all .15s' }}>
+                                            {opt.option_text}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <textarea value={answers[q.id]?.[0] || ''} onChange={e => onAnswersChange({ ...answers, [q.id]: [e.target.value] })} placeholder="Your answer…" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                        )}
                     </div>
+                ))}
+
+                {/* Freeform */}
+                <div style={{ padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, marginBottom: 8 }}>
+                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 12px' }}>Anything else you'd like to share?</p>
+                    <textarea value={freeform} onChange={e => e.target.value.length <= 500 && setFreeform(e.target.value)} placeholder="Optional notes for your provider…" rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
+                    <p style={{ fontFamily: F, fontSize: 11, color: T.faded, textAlign: 'right', margin: '4px 0 0' }}>{freeform.length}/500</p>
                 </div>
             </div>
-
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: T.base, borderTop: `1px solid ${T.line}` }}>
-                <BtnPrimary onClick={() => onContinue({ freeform })}>Continue</BtnPrimary>
-                <button onClick={() => onSkip()} style={{ width: '100%', padding: '12px', fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer', marginTop: 8 }}>
-                    Skip
-                </button>
-            </div>
-        </div>
+            <StickyFooter>
+                <BtnPrimary onClick={() => onContinue({ freeform })} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>Continue</BtnPrimary>
+                <button onClick={() => onSkip()} style={{ width: '100%', padding: '12px', fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer', marginTop: 4 }}>Skip</button>
+            </StickyFooter>
+        </StepWrap>
     );
 }
 
 // ─── STEP 3.5: Auth Gate ────────────────────────────────────────────────────────
 function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onBack }) {
-    const [mode, setMode] = useState('signup'); // signup | login
+    const [mode, setMode] = useState('signup');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -667,10 +618,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
         setSubmitting(true);
         try {
             if (mode === 'signup') {
-                const { error: err } = await supabase.auth.signUp({
-                    email: email.trim(), password,
-                    options: { data: { role: 'client', full_name: name.trim() } },
-                });
+                const { error: err } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { role: 'client', full_name: name.trim() } } });
                 if (err) throw err;
                 window.localStorage.setItem('proxey.pending_role', 'client');
                 window.localStorage.setItem('proxey.pendingName', name.trim());
@@ -679,72 +627,68 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
                 if (err) throw err;
             }
             onAuth();
-        } catch (err) {
-            setError(err.message || 'Something went wrong.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleGoogle = async () => {
-        try { await loginWithGoogle('client'); } catch { }
+        } catch (err) { setError(err.message || 'Something went wrong.'); }
+        finally { setSubmitting(false); }
     };
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 0 100px' }}>
-                <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <BackBtn onClick={onBack} />
+        <StepWrap>
+            <StepHeader onBack={onBack} current={4} total={5} />
+            <StepTitle
+                title={mode === 'signup' ? 'Almost there' : 'Sign in to book'}
+                sub={mode === 'signup' ? 'Create an account to complete your booking' : `Sign in to complete your booking with ${displayName}`}
+            />
+            <div style={{ padding: '0 24px' }} className="step-fade">
+                {/* Booking summary */}
+                <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: '18px 22px', marginBottom: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: 0 }}>{service?.name}</p>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(service?.base_price)}</p>
+                    </div>
+                    <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{fmtDate(selectedDate)}{selectedDate && selectedTime ? ' · ' : ''}{fmtTime(selectedTime)}</p>
+                    {service?.duration && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '4px 0 0' }}>{fmtDuration(service.duration)}</p>}
                 </div>
-                <StepDots current={4} total={5} />
-                <div style={{ padding: '8px 24px 24px' }}>
-                    <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', margin: '0 0 6px' }}>
-                        {mode === 'signup' ? 'Almost there' : 'Sign in to book'}
-                    </h1>
-                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 24px' }}>
-                        {mode === 'signup' ? 'Create an account to complete your booking' : `Sign in to complete your booking with ${displayName}`}
-                    </p>
 
-                    <BookingSummaryCard service={service} date={selectedDate} time={selectedTime} />
-
-                    {mode === 'signup' && (
-                        <div style={{ marginBottom: 16 }}>
-                            <Lbl style={{ marginBottom: 8 }}>Full Name</Lbl>
-                            <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" style={inputStyle} />
-                        </div>
-                    )}
-                    <div style={{ marginBottom: 16 }}>
-                        <Lbl style={{ marginBottom: 8 }}>Email</Lbl>
-                        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoComplete="email" style={inputStyle} />
+                {mode === 'signup' && (
+                    <div style={{ marginBottom: 14 }}>
+                        <Lbl style={{ marginBottom: 8 }}>Full Name</Lbl>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" style={inputStyle} />
                     </div>
-                    <div style={{ marginBottom: mode === 'signup' ? 6 : 24 }}>
-                        <Lbl style={{ marginBottom: 8 }}>Password</Lbl>
-                        <PwField value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'signup' ? 'Create a password' : 'Enter your password'} />
-                    </div>
-                    {mode === 'signup' && <p style={{ fontFamily: F, fontSize: 11, color: T.faded, margin: '0 0 24px' }}>At least 8 characters</p>}
+                )}
+                <div style={{ marginBottom: 14 }}>
+                    <Lbl style={{ marginBottom: 8 }}>Email</Lbl>
+                    <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoComplete="email" style={inputStyle} />
+                </div>
+                <div style={{ marginBottom: mode === 'signup' ? 6 : 20 }}>
+                    <Lbl style={{ marginBottom: 8 }}>Password</Lbl>
+                    <PwField value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'signup' ? 'Create a password (8+ chars)' : 'Enter your password'} />
+                </div>
 
-                    {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 12px' }}>{error}</p>}
+                {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 12px' }}>{error}</p>}
 
-                    <BtnPrimary onClick={handleSubmit} disabled={submitting}>
-                        {submitting && <Spinner />}
-                        {submitting ? 'Please wait…' : mode === 'signup' ? 'Create Account & Continue' : 'Sign In & Continue'}
-                    </BtnPrimary>
+                <BtnPrimary onClick={handleSubmit} disabled={submitting} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
+                    {submitting && <Spinner />}
+                    {submitting ? 'Please wait…' : mode === 'signup' ? 'Create Account & Continue' : 'Sign In & Continue'}
+                </BtnPrimary>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
-                        <div style={{ flex: 1, height: 1, background: T.line }} />
-                        <span style={{ fontFamily: F, fontSize: 11, color: T.faded, letterSpacing: '0.05em', textTransform: 'uppercase' }}>or</span>
-                        <div style={{ flex: 1, height: 1, background: T.line }} />
-                    </div>
-                    <BtnOutlined onClick={handleGoogle}><GoogleIcon /> Continue with Google</BtnOutlined>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+                    <div style={{ flex: 1, height: 1, background: T.line }} />
+                    <span style={{ fontFamily: F, fontSize: 11, color: T.faded, letterSpacing: '0.05em', textTransform: 'uppercase' }}>or</span>
+                    <div style={{ flex: 1, height: 1, background: T.line }} />
+                </div>
+                <BtnOutlined onClick={() => loginWithGoogle('client').catch(() => {})} style={{ padding: 16, borderRadius: 14 }}>
+                    <GoogleIcon /> Continue with Google
+                </BtnOutlined>
 
-                    <div style={{ textAlign: 'center', marginTop: 20 }}>
-                        <button onClick={() => setMode(m => m === 'signup' ? 'login' : 'signup')} style={{ fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer' }}>
-                            {mode === 'signup' ? <>Already have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign in</span></> : <>Don't have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign up</span></>}
-                        </button>
-                    </div>
+                <div style={{ textAlign: 'center', marginTop: 20 }}>
+                    <button onClick={() => setMode(m => m === 'signup' ? 'login' : 'signup')} style={{ fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer' }}>
+                        {mode === 'signup'
+                            ? <>Already have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign in</span></>
+                            : <>Don't have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign up</span></>}
+                    </button>
                 </div>
             </div>
-        </div>
+        </StepWrap>
     );
 }
 
@@ -761,60 +705,55 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
     ].filter(r => r.value);
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 0 120px' }}>
-                <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <BackBtn onClick={onBack} />
-                </div>
-                <StepDots current={4} total={5} />
-                <div style={{ padding: '8px 24px 24px' }}>
-                    <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Review your booking</h1>
-                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 28px' }}>Confirm the details before requesting</p>
-
-                    {/* Provider row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-                        <ProviderAvatar provider={provider} size={48} />
-                        <div>
-                            <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{displayName}</p>
-                            {category && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{category}</p>}
-                        </div>
+        <StepWrap>
+            <StepHeader onBack={onBack} current={4} total={5} />
+            <StepTitle title="Review your booking" sub="Confirm the details before requesting" />
+            <div style={{ padding: '0 24px' }} className="step-fade">
+                {/* Provider row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, marginBottom: 12 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: T.abg, border: `1px solid ${T.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                        {(provider?.avatar || provider?.photo)
+                            ? <img src={provider.avatar || provider.photo} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.muted }}>{initials(displayName)}</span>
+                        }
                     </div>
-                    <HRule />
+                    <div>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 2px' }}>{displayName}</p>
+                        {category && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{category}</p>}
+                    </div>
+                </div>
 
-                    {/* Detail rows */}
+                {/* Detail card */}
+                <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: 'hidden', marginBottom: 12 }}>
                     {rows.map((r, i) => (
-                        <div key={r.label}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0' }}>
-                                <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{r.label}</span>
-                                <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{r.value}</span>
-                            </div>
-                            <HRule />
+                        <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 22px', borderBottom: i < rows.length - 1 ? `1px solid ${T.line}` : 'none' }}>
+                            <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{r.label}</span>
+                            <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{r.value}</span>
                         </div>
                     ))}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0 24px' }}>
-                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Price</span>
-                        <span style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.accent }}>{fmtPrice(service?.base_price)}</span>
-                    </div>
-
-                    {/* Callout */}
-                    <div style={{ background: T.callout, borderRadius: 12, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 8 }}>
-                        <svg width="18" height="18" fill="none" stroke={T.calloutText} strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
-                            <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-                        </svg>
-                        <p style={{ fontFamily: F, fontSize: 13, color: T.calloutText, margin: 0, lineHeight: 1.5 }}>
-                            This is a booking request. <strong>{displayName}</strong> will review and confirm it. You'll be notified once it's accepted.
-                        </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderTop: `1px solid ${T.line}`, background: T.abg }}>
+                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Total</span>
+                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.accent }}>{fmtPrice(service?.base_price)}</span>
                     </div>
                 </div>
-            </div>
 
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: T.base, borderTop: `1px solid ${T.line}` }}>
-                <BtnPrimary onClick={onSubmit} disabled={submitting}>
+                {/* Callout */}
+                <div style={{ background: T.callout, borderRadius: 14, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <svg width="18" height="18" fill="none" stroke={T.calloutText} strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+                        <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+                    </svg>
+                    <p style={{ fontFamily: F, fontSize: 13, color: T.calloutText, margin: 0, lineHeight: 1.6 }}>
+                        This is a booking request. <strong>{displayName}</strong> will review and confirm it. You'll be notified once it's accepted.
+                    </p>
+                </div>
+            </div>
+            <StickyFooter>
+                <BtnPrimary onClick={onSubmit} disabled={submitting} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
                     {submitting && <Spinner />}
                     {submitting ? 'Sending request…' : 'Request Booking'}
                 </BtnPrimary>
-            </div>
-        </div>
+            </StickyFooter>
+        </StepWrap>
     );
 }
 
