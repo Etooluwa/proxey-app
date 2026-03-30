@@ -329,8 +329,8 @@ const ProviderServices = () => {
                         </div>
                     </div>
 
-                    {/* Empty state */}
-                    {!loading && services.length === 0 && (
+                    {/* Empty state — only when no services AND no groups */}
+                    {!loading && services.length === 0 && groups.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '48px 0' }}>
                             <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Set up your menu.</p>
                             <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 20px' }}>Add the services you offer — name, duration, price.</p>
@@ -339,7 +339,9 @@ const ProviderServices = () => {
                     )}
 
                     {/* Grouped tables */}
-                    {!loading && services.length > 0 && grouped.map((section) => {
+                    {!loading && grouped.map((section) => {
+                        // Skip the ungrouped "General" section if it's empty and there are named groups
+                        if (!section.group && section.services.length === 0 && groups.length > 0) return null;
                         const groupName = section.group ? section.group.name : 'General';
                         return (
                             <div key={section.group?.id || 'ungrouped'} style={{ marginBottom: 28 }}>
