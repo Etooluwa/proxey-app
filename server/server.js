@@ -9019,10 +9019,19 @@ app.post("/api/provider/stripe/connect", async (req, res) => {
     });
     // Save account ID to providers row
     if (supabase) {
+      const fallbackName = businessName || email || "Provider";
       await supabase
         .from("providers")
-        .update({ stripe_account_id: account.id })
-        .eq("user_id", providerId);
+        .upsert(
+          {
+            user_id: providerId,
+            name: fallbackName,
+            business_name: businessName || null,
+            stripe_account_id: account.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
     }
     const link = await stripe.accountLinks.create({
       account: account.id,

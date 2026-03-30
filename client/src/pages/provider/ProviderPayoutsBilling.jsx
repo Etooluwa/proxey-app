@@ -25,7 +25,7 @@ function fmtMoney(value) {
 }
 
 export default function ProviderPayoutsBilling() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const stripeReturnComplete = searchParams.get('stripe') === 'done';
   const [hasStripeAccount, setHasStripeAccount] = useState(false);
@@ -99,8 +99,12 @@ export default function ProviderPayoutsBilling() {
         description: 'Your payout account status has been refreshed.',
         variant: 'success',
       });
+
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('stripe');
+      setSearchParams(nextParams, { replace: true });
     }
-  }, [stripeReturnComplete, toast]);
+  }, [searchParams, setSearchParams, stripeReturnComplete, toast]);
 
   const handleStripeConnect = async () => {
     setStripeLoading(true);
