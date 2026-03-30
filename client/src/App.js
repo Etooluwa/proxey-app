@@ -103,6 +103,8 @@ function App() {
                     {/* ── Public routes (no auth) ──────────────────────────── */}
                     <Route path="/book/:handle" element={<PublicBookingPage />} />
                     <Route path="/join/:code" element={<InviteAcceptPage />} />
+                    <Route path="/terms" element={<TermsOfService publicView />} />
+                    <Route path="/policy" element={<PrivacyPolicy publicView />} />
 
                     {/* ── Auth routes ──────────────────────────────────────── */}
                     <Route path="/login" element={<LoginPage />} />

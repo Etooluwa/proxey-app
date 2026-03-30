@@ -15,7 +15,7 @@
  * Mobile: form only, full width
  */
 import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -582,6 +582,16 @@ export default function LoginPage() {
     };
 
     const showBack = screen !== 'role';
+    const legalLinks = (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', marginTop: 24 }}>
+            <Link to="/terms" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none' }}>
+                Terms of Service
+            </Link>
+            <Link to="/policy" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none' }}>
+                Privacy Policy
+            </Link>
+        </div>
+    );
 
     const formPanel = (
         <div style={{ flex: 1, background: T.card, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? 640 : '100dvh' }}>
@@ -622,7 +632,10 @@ export default function LoginPage() {
                     overflow: 'hidden', boxShadow: '0 20px 60px rgba(61,35,30,0.06)',
                     display: 'flex', border: `1px solid ${T.line}`,
                 }}>
-                    {formPanel}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1, paddingBottom: 24 }}>
+                        {formPanel}
+                        {legalLinks}
+                    </div>
                     <ImagePanel screen={screen} />
                 </div>
             </div>
@@ -637,7 +650,10 @@ export default function LoginPage() {
                 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
                 * { box-sizing: border-box; }
             `}</style>
-            {formPanel}
+            <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>{formPanel}</div>
+                <div style={{ padding: '0 24px 28px' }}>{legalLinks}</div>
+            </div>
         </div>
     );
 }

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
@@ -60,9 +61,8 @@ const SECTIONS = [
 
 const Divider = () => <div style={{ height: 1, background: T.line }} />;
 
-export default function TermsOfService() {
+function TermsContent() {
   return (
-    <SettingsPageLayout title="Terms of Service">
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
         {SECTIONS.map((section, i) => (
           <div key={i}>
@@ -86,6 +86,51 @@ export default function TermsOfService() {
           </div>
         ))}
       </div>
+  );
+}
+
+function PublicLegalShell({ title, children }) {
+  return (
+    <div style={{ minHeight: '100vh', background: T.base, fontFamily: F, padding: '32px 20px 56px' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+          <Link to="/login" style={{ textDecoration: 'none', color: T.muted, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Kliques
+          </Link>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <Link to="/terms" style={{ color: T.accent, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Terms</Link>
+            <Link to="/policy" style={{ color: T.muted, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>Privacy Policy</Link>
+          </div>
+        </div>
+        <div style={{ background: T.card, borderRadius: 24, border: `1px solid ${T.line}`, padding: '28px 24px 32px' }}>
+          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: T.accent, margin: '0 0 8px' }}>
+            Legal
+          </p>
+          <h1 style={{ fontSize: 34, fontWeight: 400, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 24px' }}>
+            {title}
+          </h1>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TermsOfService({ publicView = false }) {
+  if (publicView) {
+    return (
+      <PublicLegalShell title="Terms of Service">
+        <TermsContent />
+      </PublicLegalShell>
+    );
+  }
+
+  return (
+    <SettingsPageLayout title="Terms of Service">
+      <TermsContent />
     </SettingsPageLayout>
   );
 }
