@@ -32,7 +32,7 @@ const Header = ({
         <MenuBtn onClick={onMenu} />
 
         {/* Center: logo (absolute so it's truly centered) */}
-        <img src={klogo} alt="kliques" className="absolute left-1/2 -translate-x-1/2 select-none pointer-events-none" style={{ height: 32, width: 'auto' }} />
+        <img src={klogo} alt="kliques" className="absolute left-1/2 -translate-x-1/2 select-none pointer-events-none" style={{ height: 44, width: 'auto' }} />
 
         {/* Right: bell + optional avatar */}
         <div className="flex items-center gap-1">
