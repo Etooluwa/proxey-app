@@ -340,11 +340,18 @@ function StepTime({ provider, service, onNext, onBack }) {
     setLoadingSlots(true);
     setSelectedSlot(null);
     const dateStr = selectedDate.toISOString().slice(0, 10);
-    request(`/provider/${provider.id}/availability?startDate=${dateStr}&endDate=${dateStr}&limit=20`)
-      .then((data) => setSlots(data?.availability || []))
+    request(`/public/provider/${provider.id}/slots?date=${dateStr}&duration=${service?.duration || 60}&buffer=${provider?.buffer_minutes || 0}`)
+      .then((data) => {
+        const mappedSlots = (data?.slots || []).map((time) => ({
+          id: `${dateStr}-${time}`,
+          datetime: `${dateStr}T${time}:00`,
+          time_slot: time,
+        }));
+        setSlots(mappedSlots);
+      })
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false));
-  }, [provider?.id, selectedDateIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [provider?.id, provider?.buffer_minutes, selectedDateIdx, service?.duration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleContinue() {
     ssSet(SS.selectedSlot, selectedSlot);

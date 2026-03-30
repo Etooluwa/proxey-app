@@ -446,11 +446,11 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSe
     useEffect(() => {
         if (!selectedDate || !provider?.id) return;
         setLoadingSlots(true); setNoSlots(false);
-        request(`/public/provider/${provider.user_id || provider.id}/slots?date=${selectedDate}&duration=${service?.duration || 60}&buffer=${provider.buffer_minutes || 0}`)
+        request(`/public/provider/${provider.id}/slots?date=${selectedDate}&duration=${service?.duration || 60}&buffer=${provider.buffer_minutes || 0}`)
             .then(data => { setSlots(data.slots || []); setNoSlots(!data.slots?.length); })
             .catch(() => { setSlots([]); setNoSlots(true); })
             .finally(() => setLoadingSlots(false));
-    }, [selectedDate, provider?.id, provider?.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selectedDate, provider?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleWeekChange = (dir) => { setWeekOffset(o => o + dir); onDateSelect(null); onTimeSelect(null); setSlots([]); };
     const displayName = provider?.business_name || provider?.name || 'Provider';
