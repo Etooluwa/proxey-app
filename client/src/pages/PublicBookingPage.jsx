@@ -243,7 +243,6 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
             {/* Top nav */}
             <div className="fade-1" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
                 <span style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: 20, fontWeight: 500, color: T.accent, letterSpacing: '-0.02em' }}>kliques</span>
-                <span style={{ padding: '5px 12px', borderRadius: 9999, background: T.abg, fontSize: 11, fontWeight: 500, color: T.muted, fontFamily: F }}>Public booking page</span>
             </div>
 
             {/* Hero */}
