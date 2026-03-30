@@ -6808,6 +6808,14 @@ app.post("/api/provider/connected-account", async (req, res) => {
       },
     });
 
+    // Persist the Stripe account ID to provider_profiles immediately
+    if (supabase) {
+      await supabase
+        .from("provider_profiles")
+        .update({ stripe_account_id: account.id })
+        .eq("user_id", userId);
+    }
+
     res.json({
       accountId: account.id,
     });
