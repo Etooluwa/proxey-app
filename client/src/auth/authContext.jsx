@@ -41,7 +41,21 @@ function sanitizeProfile(profile) {
 
     // Sanitize common fields expected to be strings
     // List sourced from usage in AccountPage.js, AppShell.js, etc.
-    const stringFields = ['name', 'firstName', 'lastName', 'email', 'phone', 'bio', 'photo', 'avatar', 'city', 'defaultLocation'];
+    const stringFields = [
+        'name',
+        'firstName',
+        'lastName',
+        'email',
+        'phone',
+        'bio',
+        'photo',
+        'avatar',
+        'city',
+        'defaultLocation',
+        'handle',
+        'businessName',
+        'business_name',
+    ];
 
     stringFields.forEach(field => {
         if (field in safeProfile) {
@@ -90,6 +104,26 @@ function isProfileCompleteShape(profile) {
     if (profile.isProfileComplete === true) return true;
     // Otherwise, check for required fields (for legacy profiles or incomplete onboarding)
     return Boolean(profile.name && profile.phone && profile.defaultLocation);
+}
+
+function getSessionRole(session) {
+    return (
+        session?.user?.role ||
+        session?.user?.metadata?.role ||
+        session?.user?.metadata?.profile?.role ||
+        "client"
+    );
+}
+
+function isProfileCompleteForRole(profile, role) {
+    if (!profile) return false;
+    if (profile.isProfileComplete === true) return true;
+
+    if (role === "provider") {
+        return Boolean(profile.handle);
+    }
+
+    return isProfileCompleteShape(profile);
 }
 
 function loadLocalRoles() {
@@ -204,7 +238,7 @@ export function AuthProvider({ children }) {
 
     const isProfileComplete = useMemo(() => {
         if (!session?.user) return false;
-        return isProfileCompleteShape(profile);
+        return isProfileCompleteForRole(profile, getSessionRole(session));
     }, [profile, session]);
 
     const login = async ({ email, password, role = "client" }) => {
@@ -466,6 +500,7 @@ export function AuthProvider({ children }) {
             updateProfile,
             isProfileComplete,
             isProfileCompleteShape,
+            isProfileCompleteForRole,
         }),
         [session, profile, loading, authError, isProfileComplete, updateProfile]
     );

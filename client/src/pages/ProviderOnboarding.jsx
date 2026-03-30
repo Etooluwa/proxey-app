@@ -929,7 +929,7 @@ export default function ProviderOnboarding() {
                 method: 'PATCH',
                 body: JSON.stringify({ handle }),
             });
-            await updateProfile({ isProfileComplete: true });
+            await updateProfile({ handle, isProfileComplete: true });
             sessionStorage.removeItem('kliques.ob.step');
             navigate('/provider', { replace: true });
         } catch (err) {
