@@ -3048,7 +3048,7 @@ app.get("/api/provider/me", async (req, res) => {
           .maybeSingle(),
         supabase
           .from("providers")
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .eq("user_id", providerId)
           .maybeSingle(),
       ]);
@@ -3065,7 +3065,7 @@ app.get("/api/provider/me", async (req, res) => {
             },
             { onConflict: "user_id" }
           )
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .maybeSingle();
 
         if (backfilledProvider) {
@@ -3323,7 +3323,7 @@ app.patch("/api/provider/me", async (req, res) => {
         const { data, error } = await supabase
           .from("providers")
           .upsert(providerPayload, { onConflict: "user_id" })
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .single();
         if (error) {
           console.warn("[supabase] Failed to update providers row for profile changes", error);
@@ -3333,7 +3333,7 @@ app.patch("/api/provider/me", async (req, res) => {
       } else {
         const { data } = await supabase
           .from("providers")
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar")
+          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .eq("user_id", providerId)
           .maybeSingle();
         providerData = data || null;
