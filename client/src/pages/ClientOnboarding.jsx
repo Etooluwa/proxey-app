@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
-import { filterCities } from '../utils/categories';
+import { useCitySearch } from '../hooks/useCitySearch';
 import BackBtn from '../components/ui/BackBtn';
 import Divider from '../components/ui/Divider';
 
@@ -151,8 +151,8 @@ const WelcomeStep = ({ onNext }) => (
 
 const AboutYouStep = ({ form, onChange, onNext, onBack, saving, error }) => {
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const suggestions = form.city.trim().length > 0 ? filterCities(form.city) : [];
-    const cityBorderActive = showSuggestions && suggestions.length > 0;
+    const { suggestions, loading: cityLoading } = useCitySearch(form.city);
+    const cityBorderActive = showSuggestions && (suggestions.length > 0 || cityLoading);
 
     return (
         <div className="flex flex-col" style={{ minHeight: '100dvh', background: '#FBF7F2' }}>
@@ -232,7 +232,7 @@ const AboutYouStep = ({ form, onChange, onNext, onBack, saving, error }) => {
                     </div>
 
                     {/* Suggestions dropdown */}
-                    {showSuggestions && suggestions.length > 0 && (
+                    {showSuggestions && form.city.trim().length >= 2 && (cityLoading || suggestions.length > 0) && (
                         <div
                             className="absolute left-0 right-0 mt-1 overflow-hidden z-10"
                             style={{
@@ -240,11 +240,17 @@ const AboutYouStep = ({ form, onChange, onNext, onBack, saving, error }) => {
                                 borderRadius: 12,
                                 border: '1px solid rgba(140,106,100,0.2)',
                                 boxShadow: '0 8px 24px rgba(61,35,30,0.08)',
-                                maxHeight: 200,
+                                maxHeight: 220,
                                 overflowY: 'auto',
                             }}
                         >
-                            {suggestions.map((c) => (
+                            {cityLoading ? (
+                                <div className="flex items-center gap-2 px-4 py-3.5 text-[13px]" style={{ color: '#8C6A64' }}>
+                                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(140,106,100,0.2)', borderTop: '2px solid #C25E4A', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                    Searching…
+                                </div>
+                            ) : suggestions.map((c) => (
                                 <button
                                     key={c}
                                     type="button"

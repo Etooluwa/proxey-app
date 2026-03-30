@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
 import { useSession } from '../auth/authContext';
 import supabase from '../utils/supabase';
-import { filterCities } from '../utils/categories';
+import { useCitySearch } from '../hooks/useCitySearch';
 import SettingsPageLayout from '../components/ui/SettingsPageLayout';
 
 const T = {
@@ -63,7 +63,7 @@ export default function ClientPersonalDetails() {
       .finally(() => setLoading(false));
   }, [profile, session?.user?.email]);
 
-  const citySuggestions = city.trim().length > 0 ? filterCities(city) : [];
+  const { suggestions: citySuggestions, loading: cityLoading } = useCitySearch(city);
   const emailChanged = email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
 
   const handleSave = async () => {
@@ -173,9 +173,14 @@ export default function ClientPersonalDetails() {
                 >×</button>
               )}
             </div>
-            {showSuggestions && citySuggestions.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: T.card, border: `1px solid ${T.accent}`, borderTop: 'none', borderRadius: '0 0 12px 12px', zIndex: 50, maxHeight: 200, overflowY: 'auto' }}>
-                {citySuggestions.map((c) => (
+            {showSuggestions && city.trim().length >= 2 && (cityLoading || citySuggestions.length > 0) && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: T.card, border: `1px solid ${T.accent}`, borderTop: 'none', borderRadius: '0 0 12px 12px', zIndex: 50, maxHeight: 220, overflowY: 'auto' }}>
+                {cityLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', fontFamily: F, fontSize: 13, color: T.muted }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(140,106,100,0.2)', borderTop: `2px solid ${T.accent}`, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                    Searching…
+                  </div>
+                ) : citySuggestions.map((c) => (
                   <button
                     key={c}
                     onMouseDown={() => { setCity(c); setShowSuggestions(false); }}

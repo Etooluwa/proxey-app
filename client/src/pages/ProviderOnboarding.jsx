@@ -24,7 +24,7 @@ import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
 import BackBtn from '../components/ui/BackBtn';
 import Divider from '../components/ui/Divider';
-import { filterCities } from '../utils/categories';
+import { useCitySearch } from '../hooks/useCitySearch';
 import { uploadProfilePhoto } from '../utils/photoUpload';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ const CategoryStep = ({ category, customCat, onCategory, onCustom, onNext, onBac
 const ProfileStep = ({ profile, onChange, onNext, onBack, saving, error }) => {
     const fileRef = useRef(null);
     const [showCitySuggestions, setShowCitySuggestions] = useState(false);
-    const citySuggestions = profile.city.trim().length > 0 ? filterCities(profile.city) : [];
+    const { suggestions: citySuggestions, loading: cityLoading } = useCitySearch(profile.city);
 
     return (
         <StepShell step={2} onBack={onBack}>
@@ -328,10 +328,15 @@ const ProfileStep = ({ profile, onChange, onNext, onBack, saving, error }) => {
                         style={{ ...inputStyle, border: `1px solid ${showCitySuggestions && citySuggestions.length > 0 ? '#C25E4A' : 'rgba(140,106,100,0.2)'}` }}
                     />
                 </div>
-                {showCitySuggestions && citySuggestions.length > 0 && (
+                {showCitySuggestions && profile.city.trim().length >= 2 && (cityLoading || citySuggestions.length > 0) && (
                     <div className="absolute left-0 right-0 mt-1 z-10 overflow-hidden"
-                        style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', boxShadow: '0 8px 24px rgba(61,35,30,0.08)', maxHeight: 200, overflowY: 'auto' }}>
-                        {citySuggestions.map((c) => (
+                        style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', boxShadow: '0 8px 24px rgba(61,35,30,0.08)', maxHeight: 220, overflowY: 'auto' }}>
+                        {cityLoading ? (
+                            <div className="flex items-center gap-2 px-4 py-3.5 text-[13px]" style={{ color: '#8C6A64' }}>
+                                <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(140,106,100,0.2)', borderTop: '2px solid #C25E4A', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                                Searching…
+                            </div>
+                        ) : citySuggestions.map((c) => (
                             <button key={c} type="button"
                                 onMouseDown={() => { onChange('city', c); setShowCitySuggestions(false); }}
                                 className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left focus:outline-none text-[14px] text-ink"

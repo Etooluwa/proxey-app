@@ -7,7 +7,8 @@ import { useNotifications } from "../contexts/NotificationContext";
 import { useToast } from "../components/ui/ToastProvider";
 import PaymentMethodFormWrapper from "../components/payment/PaymentMethodForm";
 import PaymentMethodScreen from "../components/payment/PaymentMethodScreen";
-import { SERVICE_CATEGORIES, filterCities } from "../utils/categories";
+import { SERVICE_CATEGORIES } from "../utils/categories";
+import { useCitySearch } from "../hooks/useCitySearch";
 import "../styles/onboarding.css";
 
 function OnboardingPage() {
@@ -33,7 +34,7 @@ function OnboardingPage() {
   const [paymentStep, setPaymentStep] = useState(0); // 0: not started, 1: form shown, 2: complete
   const [submitting, setSubmitting] = useState(false);
   const [cityInputFocused, setCityInputFocused] = useState(false);
-  const [citySuggestions, setCitySuggestions] = useState([]);
+  const { suggestions: citySuggestions } = useCitySearch(form.city);
 
   const handlePhotoClick = () => {
     fileInputRef.current?.click();
@@ -67,17 +68,10 @@ function OnboardingPage() {
   const handleCityChange = (event) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, city: value }));
-    if (value.trim().length > 0) {
-      const suggestions = filterCities(value);
-      setCitySuggestions(suggestions);
-    } else {
-      setCitySuggestions([]);
-    }
   };
 
   const handleCitySelect = (city) => {
     setForm((prev) => ({ ...prev, city }));
-    setCitySuggestions([]);
     setCityInputFocused(false);
   };
 
