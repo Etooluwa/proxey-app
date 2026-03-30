@@ -1,29 +1,13 @@
 import React from 'react';
+import klogo from '../../klogo.png';
 
 /**
- * "kliques" wordmark in Playfair Display.
- * Reference: docs/ui-reference/shared/logo.jsx
+ * kliques logo image.
  *
- * @param {number} size  - font size in px (default 18)
- * @param {'accent'|'white'|'muted'} color - named token, or pass any CSS hex/rgb string
+ * @param {number} height - image height in px (default 22)
  */
-const Logo = ({ size = 18, color = 'accent' }) => {
-    const colorMap = {
-        accent: 'text-accent',
-        white:  'text-white',
-        muted:  'text-muted',
-    };
-    const colorClass  = colorMap[color] ?? '';
-    const inlineColor = colorMap[color] ? undefined : color;
-
-    return (
-        <span
-            className={`font-playfair font-bold leading-none ${colorClass}`}
-            style={{ fontSize: size, letterSpacing: '-0.5px', color: inlineColor }}
-        >
-            kliques
-        </span>
-    );
-};
+const Logo = ({ height = 22 }) => (
+    <img src={klogo} alt="kliques" style={{ height, width: 'auto', display: 'block' }} />
+);
 
 export default Logo;

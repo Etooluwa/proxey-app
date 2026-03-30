@@ -13,6 +13,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
+import klogo from '../klogo.png';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -213,7 +214,7 @@ function ScreenLanding({ provider, hasAccount, onPrimary, onSecondary }) {
                     <div style={{ marginBottom: 16 }}>
                         <ProviderAvatar provider={provider} size={72} />
                     </div>
-                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 13, color: T.accent, margin: '0 0 8px', letterSpacing: '-0.02em' }}>kliques</p>
+                    <img src={klogo} alt="kliques" style={{ height: 16, width: 'auto', display: 'block', marginBottom: 8 }} />
                     <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1.2, margin: '0 0 8px' }}>
                         {firstName} invited you<br/>to join their klique.
                     </h1>

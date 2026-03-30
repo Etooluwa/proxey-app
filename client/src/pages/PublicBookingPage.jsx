@@ -14,6 +14,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
+import klogo from '../klogo.png';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -242,7 +243,7 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
 
             {/* Top nav */}
             <div className="fade-1" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
-                <span style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: 20, fontWeight: 500, color: T.accent, letterSpacing: '-0.02em' }}>kliques</span>
+                <img src={klogo} alt="kliques" style={{ height: 22, width: 'auto' }} />
             </div>
 
             {/* Hero */}
@@ -377,7 +378,7 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
                 {/* Powered by */}
                 <div className="fade-4" style={{ textAlign: 'center', padding: '32px 0 16px' }}>
                     <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>Powered by </span>
-                    <span style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: 12, color: T.accent, fontWeight: 500 }}>kliques</span>
+                    <img src={klogo} alt="kliques" style={{ height: 14, width: 'auto' }} />
                 </div>
             </div>
 

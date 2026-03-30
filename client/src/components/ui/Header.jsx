@@ -2,6 +2,7 @@ import React from 'react';
 import MenuBtn from './MenuBtn';
 import NotifBell from './NotifBell';
 import Avatar from './Avatar';
+import klogo from '../../klogo.png';
 
 /**
  * v6 top-of-screen header.
@@ -30,10 +31,8 @@ const Header = ({
         {/* Left: hamburger */}
         <MenuBtn onClick={onMenu} />
 
-        {/* Center: wordmark (absolute so it's truly centered) */}
-        <span className="absolute left-1/2 -translate-x-1/2 text-[13px] font-semibold text-accent tracking-wide select-none pointer-events-none">
-            kliques
-        </span>
+        {/* Center: logo (absolute so it's truly centered) */}
+        <img src={klogo} alt="kliques" className="absolute left-1/2 -translate-x-1/2 select-none pointer-events-none" style={{ height: 22, width: 'auto' }} />
 
         {/* Right: bell + optional avatar */}
         <div className="flex items-center gap-1">

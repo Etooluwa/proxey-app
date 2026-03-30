@@ -1,5 +1,6 @@
 import React from 'react';
 import NotificationDropdown from '../NotificationDropdown';
+import klogo from '../../klogo.png';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -70,14 +71,9 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
             background: T.sidebar, borderRight: `1px solid ${T.line}`,
             display: 'flex', flexDirection: 'column',
         }}>
-            {/* Wordmark */}
+            {/* Logo */}
             <div style={{ padding: '28px 28px 8px' }}>
-                <p style={{
-                    fontFamily: DISPLAY_F, fontSize: '22px',
-                    fontWeight: 500, color: T.accent, letterSpacing: '-0.02em', margin: 0,
-                }}>
-                    kliques
-                </p>
+                <img src={klogo} alt="kliques" style={{ height: 24, width: 'auto', display: 'block', marginBottom: 4 }} />
                 <p style={{ fontFamily: F, fontSize: '11px', color: T.faded, margin: '4px 0 0', letterSpacing: '0.03em' }}>
                     Relationship OS
                 </p>

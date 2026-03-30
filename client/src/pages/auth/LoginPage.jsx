@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
+import klogo from '../../klogo.png';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -473,8 +474,8 @@ function ImagePanel({ screen }) {
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity .4s' }}
             />
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 36px', background: 'linear-gradient(transparent,rgba(0,0,0,0.55))', zIndex: 2 }}>
-                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 500, color: '#fff', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    kliques
+                <div style={{ marginBottom: 8 }}>
+                    <img src={klogo} alt="kliques" style={{ height: 22, width: 'auto', filter: 'brightness(0) invert(1)' }} />
                 </div>
                 <p style={{ fontFamily: F, color: '#fff', fontSize: 13, lineHeight: 1.6, margin: 0, opacity: 0.9 }}>
                     {TX[currentKey]}
