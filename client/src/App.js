@@ -1,6 +1,6 @@
 // React import not needed with modern JSX transform
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { API_BASE } from './data/apiClient';
 import { AuthProvider } from './auth/authContext';
 import { ToastProvider } from './components/ui/ToastProvider';
@@ -85,6 +85,37 @@ import AdminReviews from './pages/admin/AdminReviews';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminPromotions from './pages/admin/AdminPromotions';
 
+function ScrollToTopOnRouteChange() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+
+      document.querySelectorAll('main').forEach((node) => {
+        if (node instanceof HTMLElement) node.scrollTop = 0;
+      });
+
+      document.querySelectorAll('.overflow-y-auto').forEach((node) => {
+        if (node instanceof HTMLElement) node.scrollTop = 0;
+      });
+    };
+
+    resetScroll();
+
+    const raf = window.requestAnimationFrame(resetScroll);
+    return () => window.cancelAnimationFrame(raf);
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
 function App() {
   useEffect(() => {
     fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
@@ -93,6 +124,7 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <ScrollToTopOnRouteChange />
         <AuthProvider>
           <ToastProvider>
             <NotificationProvider>
