@@ -154,6 +154,8 @@ const ProviderLayout = () => {
                     city: providerProfile.city || profile?.city,
                     photo: providerProfile.photo || providerProfile.avatar || profile?.photo,
                     avatar: providerProfile.avatar || providerProfile.photo || profile?.avatar,
+                    // If the provider has a handle, they completed onboarding — mark profile complete
+                    ...(providerProfile.handle ? { isProfileComplete: true } : {}),
                 });
             } catch (error) {
                 console.warn('[ProviderLayout] Failed to hydrate provider profile', error);
