@@ -353,32 +353,34 @@ const AvailabilityPage = () => {
             </div>
 
             {/* ── Sticky bottom bar ── */}
-            <div
-                className="fixed bottom-0 left-0 right-0 flex gap-3 px-5 py-3"
-                style={{
-                    background: '#FBF7F2',
-                    borderTop: '1px solid rgba(140,106,100,0.15)',
-                    paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
-                }}
-            >
-                <button
-                    onClick={() => navigate('/provider/schedule')}
-                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
-                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+            <div className="sticky bottom-0 px-5 py-3 mt-auto" style={{ background: '#FBF7F2' }}>
+                <div
+                    className="flex gap-3"
+                    style={{
+                        borderTop: '1px solid rgba(140,106,100,0.15)',
+                        paddingTop: 12,
+                        paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+                    }}
                 >
-                    Cancel
-                </button>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                    style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1 }}
-                >
-                    {saving && (
-                        <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    )}
-                    {saving ? 'Saving…' : 'Save Changes'}
-                </button>
+                    <button
+                        onClick={() => navigate('/provider/schedule')}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                        style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1 }}
+                    >
+                        {saving && (
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                        )}
+                        {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                </div>
             </div>
 
             {/* Add slot sheet */}
