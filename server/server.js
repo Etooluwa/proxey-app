@@ -9581,6 +9581,14 @@ app.post("/api/bookings/request-time", async (req, res) => {
       servicePrice = svc?.base_price || null;
     }
 
+    // Fetch provider name to store on booking
+    const { data: providerRow } = await supabase
+      .from("providers")
+      .select("name, business_name")
+      .eq("user_id", provider_id)
+      .maybeSingle();
+    const providerName = providerRow?.business_name || providerRow?.name || null;
+
     // Fetch client name for notification
     const { data: clientProfile } = await supabase
       .from("client_profiles")
@@ -9603,6 +9611,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
       .insert({
         client_id: clientId,
         provider_id,
+        provider_name: providerName,
         service_id: service_id || null,
         service_name: serviceName || "Session",
         scheduled_at: scheduledAt,
