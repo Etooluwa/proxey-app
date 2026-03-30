@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import supabase from "../utils/supabase";
 import { uploadProfilePhoto } from "../utils/photoUpload";
+import { request } from "../data/apiClient";
 
 const SAFE_STRING = (val) => {
     if (typeof val === 'string') return val;
@@ -55,6 +56,8 @@ function sanitizeProfile(profile) {
         'handle',
         'businessName',
         'business_name',
+        'stripe_account_id',
+        'stripe_last4',
     ];
 
     stringFields.forEach(field => {
@@ -124,6 +127,29 @@ function isProfileCompleteForRole(profile, role) {
     }
 
     return isProfileCompleteShape(profile);
+}
+
+function mapProviderApiProfile(profile) {
+    if (!profile || typeof profile !== "object") return null;
+
+    const resolvedName = profile.business_name || profile.businessName || profile.name || "";
+    const resolvedPhoto = profile.photo || profile.avatar || "";
+    const resolvedHandle = profile.handle || "";
+
+    return sanitizeProfile({
+        ...profile,
+        name: resolvedName,
+        businessName: profile.business_name || profile.businessName || "",
+        business_name: profile.business_name || profile.businessName || "",
+        photo: resolvedPhoto,
+        avatar: resolvedPhoto,
+        handle: resolvedHandle,
+        isProfileComplete: Boolean(
+            profile.isProfileComplete ||
+            profile.is_profile_complete ||
+            resolvedHandle
+        ),
+    });
 }
 
 function loadLocalRoles() {
@@ -235,6 +261,44 @@ export function AuthProvider({ children }) {
             persistProfile(session.user.id, profile);
         }
     }, [session?.user?.id, profile]);
+
+    useEffect(() => {
+        let active = true;
+
+        async function hydrateProviderProfile() {
+            if (loading || !session?.user) return;
+
+            const role = getSessionRole(session);
+            if (role !== "provider") return;
+
+            if (profile?.handle && profile?.isProfileComplete) return;
+
+            try {
+                const data = await request("/provider/me");
+                if (!active) return;
+
+                const nextProfile = mapProviderApiProfile(data?.profile);
+                if (!nextProfile) return;
+
+                setProfile((prev) => {
+                    const merged = sanitizeProfile({
+                        ...(prev || {}),
+                        ...nextProfile,
+                    });
+                    return merged;
+                });
+            } catch (error) {
+                if (!active) return;
+                console.warn("[auth] Failed to hydrate provider profile from API", error);
+            }
+        }
+
+        hydrateProviderProfile();
+
+        return () => {
+            active = false;
+        };
+    }, [loading, profile, session]);
 
     const isProfileComplete = useMemo(() => {
         if (!session?.user) return false;

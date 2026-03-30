@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchProviderProfile } from '../../data/provider';
+import { fetchProviderProfile, invalidateProviderProfileCache } from '../../data/provider';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { request } from '../../data/apiClient';
 import { useToast } from '../../components/ui/ToastProvider';
@@ -27,6 +27,7 @@ function fmtMoney(value) {
 export default function ProviderPayoutsBilling() {
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const stripeReturnComplete = searchParams.get('stripe') === 'done';
   const [hasStripeAccount, setHasStripeAccount] = useState(false);
   const [last4, setLast4] = useState('');
   const [nextPayout, setNextPayout] = useState('');
@@ -40,6 +41,9 @@ export default function ProviderPayoutsBilling() {
     async function loadPayoutState() {
       setLoading(true);
       try {
+        if (stripeReturnComplete) {
+          invalidateProviderProfileCache();
+        }
         const profile = await fetchProviderProfile();
         if (!active || !profile) return;
 
@@ -84,10 +88,9 @@ export default function ProviderPayoutsBilling() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, [searchParams, stripeReturnComplete]);
 
   const isDesktop = useIsDesktop();
-  const stripeReturnComplete = searchParams.get('stripe') === 'done';
 
   useEffect(() => {
     if (stripeReturnComplete) {
