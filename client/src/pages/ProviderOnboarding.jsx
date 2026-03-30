@@ -723,7 +723,7 @@ const DEFAULT_AVAIL = DAYS.map((_, i) => ({
 
 export default function ProviderOnboarding() {
     const navigate = useNavigate();
-    const { session, updateProfile } = useSession();
+    const { session, profile: authProfile, updateProfile } = useSession();
 
     const [step, setStep] = useState(0);
     const [error, setError] = useState(null);
@@ -756,11 +756,13 @@ export default function ProviderOnboarding() {
 
     const handleCheckTimer = useRef(null);
 
-    const go = (n) => { setError(null); setStep(n); };
+    const go = (n) => { setError(null); setStep(n); sessionStorage.setItem('kliques.ob.step', n); };
 
-    // If returning from Stripe, jump to handle step
+    // If returning from Stripe or resuming, restore step
     useEffect(() => {
-        if (stripeConnected) setStep(3);
+        if (stripeConnected) { setStep(3); return; }
+        const saved = sessionStorage.getItem('kliques.ob.step');
+        if (saved) setStep(parseInt(saved, 10));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Step 1: category ──────────────────────────────────────────────────────
@@ -903,12 +905,14 @@ export default function ProviderOnboarding() {
 
     const connectStripe = async () => {
         setStripeLoading(true);
+        sessionStorage.setItem('kliques.ob.step', 3);
         try {
             const userId = session?.user?.id;
             const email = session?.user?.email;
+            const businessName = profile.businessName || authProfile?.name || '';
             const { accountId } = await request('/provider/connected-account', {
                 method: 'POST',
-                body: JSON.stringify({ userId, email, businessName: profile.businessName }),
+                body: JSON.stringify({ userId, email, businessName }),
             });
             const { url } = await request('/provider/onboarding-link', {
                 method: 'POST',
@@ -934,6 +938,7 @@ export default function ProviderOnboarding() {
                 body: JSON.stringify({ handle }),
             });
             await updateProfile({ isProfileComplete: true });
+            sessionStorage.removeItem('kliques.ob.step');
             navigate('/provider', { replace: true });
         } catch (err) {
             setError(err.message || 'Failed to launch page.');
