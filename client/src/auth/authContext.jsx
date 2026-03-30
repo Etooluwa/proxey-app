@@ -364,10 +364,19 @@ export function AuthProvider({ children }) {
         persistSession(null);
     };
 
-    const loginWithGoogle = async (role = "client") => {
+    const loginWithGoogle = async (role = "client", pendingName = "") => {
         setAuthError(null);
         if (!supabase) {
             throw new Error("Supabase is not configured");
+        }
+
+        // Persist the intended role/profile context before OAuth redirects away.
+        window.localStorage.setItem('proxey.pending_role', role);
+        const normalizedPendingName = typeof pendingName === "string" ? pendingName.trim() : "";
+        if (normalizedPendingName) {
+            window.localStorage.setItem('proxey.pendingName', normalizedPendingName);
+        } else {
+            window.localStorage.removeItem('proxey.pendingName');
         }
 
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -382,13 +391,11 @@ export function AuthProvider({ children }) {
         });
 
         if (error) {
+            window.localStorage.removeItem('proxey.pending_role');
             const msg = SAFE_STRING(error.message || error);
             setAuthError(msg);
             throw error;
         }
-
-        // Store the intended role in localStorage so we can set it after redirect
-        window.localStorage.setItem('proxey.pending_role', role);
 
         return data;
     };
@@ -429,20 +436,6 @@ export function AuthProvider({ children }) {
                     console.warn("[auth] Failed to update user metadata", authError);
                 }
 
-                // Also update the profiles table directly
-                const { error: profileError } = await supabase
-                    .from('profiles')
-                    .upsert({
-                        id: session.user.id,
-                        ...nextProfile,
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'id'
-                    });
-
-                if (profileError) {
-                    console.warn("[auth] Failed to update profiles table", profileError);
-                }
             } catch (error) {
                 console.warn("[auth] Failed to update profile via Supabase", error);
             }

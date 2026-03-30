@@ -325,7 +325,7 @@ function ScreenSignup({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToLog
                     {submitting ? 'Creating account…' : 'Create Account & Connect'}
                 </BtnPrimary>
                 <Divider />
-                <BtnOutlined onClick={onGoogleAuth}><GoogleIcon /> Sign up with Google</BtnOutlined>
+                <BtnOutlined onClick={() => onGoogleAuth(name)}><GoogleIcon /> Sign up with Google</BtnOutlined>
 
                 <div style={{ marginTop: 'auto', padding: '20px 0 24px', textAlign: 'center' }}>
                     <button onClick={onSwitchToLogin} style={{ fontFamily: F, fontSize: 13, color: T.muted, background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -599,11 +599,11 @@ export default function InviteAcceptPage() {
     };
 
     // ── Google OAuth ────────────────────────────────────────────────────────────
-    const handleGoogle = async () => {
+    const handleGoogle = async (pendingName = '') => {
         // Store the invite code so AuthCallback can redirect back
         sessionStorage.setItem('kliques.pending_invite_code', code);
         try {
-            await loginWithGoogle('client');
+            await loginWithGoogle('client', pendingName);
         } catch {
             // OAuth redirects, nothing to catch
         }

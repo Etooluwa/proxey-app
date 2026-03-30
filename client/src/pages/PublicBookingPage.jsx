@@ -676,7 +676,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
                     <span style={{ fontFamily: F, fontSize: 11, color: T.faded, letterSpacing: '0.05em', textTransform: 'uppercase' }}>or</span>
                     <div style={{ flex: 1, height: 1, background: T.line }} />
                 </div>
-                <BtnOutlined onClick={() => loginWithGoogle('client').catch(() => {})} style={{ padding: 16, borderRadius: 14 }}>
+                <BtnOutlined onClick={() => loginWithGoogle('client', mode === 'signup' ? name : '').catch(() => {})} style={{ padding: 16, borderRadius: 14 }}>
                     <GoogleIcon /> Continue with Google
                 </BtnOutlined>
 

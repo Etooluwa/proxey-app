@@ -353,7 +353,7 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
 
             <BtnPrimary onClick={handleSubmit} disabled={submitting}>{submitting ? 'Creating account…' : 'Create Account'}</BtnPrimary>
             <Divider />
-            <BtnOutlined onClick={onGoogleSignup}><GoogleIcon /> Sign up with Google</BtnOutlined>
+            <BtnOutlined onClick={() => onGoogleSignup(name)}><GoogleIcon /> Sign up with Google</BtnOutlined>
             <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
                 <button onClick={onLogin} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
                     Already have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign in</span>
@@ -528,8 +528,8 @@ export default function LoginPage() {
         navigate('/');
     };
 
-    const handleGoogle = async () => {
-        try { await loginWithGoogle(flowRole); } catch (e) { /* handled by context */ }
+    const handleGoogle = async (pendingName = '') => {
+        try { await loginWithGoogle(flowRole, pendingName); } catch (e) { /* handled by context */ }
     };
 
     const renderScreen = () => {
