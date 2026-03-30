@@ -227,7 +227,7 @@ const ProviderDashboard = () => {
         return () => { cancelled = true; };
     }, []);
 
-    const firstName = sessionProfile?.name?.split(' ')[0] || 'there';
+    const providerDisplayName = sessionProfile?.name?.trim() || 'there';
     const initials = getInitials(sessionProfile?.name);
     const avatarSrc = sessionProfile?.photo || sessionProfile?.avatar || '';
     const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
@@ -295,7 +295,7 @@ const ProviderDashboard = () => {
                         <div>
                             <HeroPill className="mb-3">{todayPill()}</HeroPill>
                             <h2 style={{ fontFamily: F, fontSize: '28px', fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1.15, color: T.ink, margin: 0 }}>
-                                {greeting()},<br />{firstName}
+                                {greeting()},<br />{providerDisplayName}
                             </h2>
                         </div>
                         <div>
@@ -407,7 +407,7 @@ const ProviderDashboard = () => {
                     <div className="mb-5">
                         <HeroPill className="mb-3">{todayPill()}</HeroPill>
                         <h1 className="text-[32px] font-semibold text-ink tracking-[-0.03em] leading-tight m-0">
-                            {greeting()},<br />{firstName}
+                            {greeting()},<br />{providerDisplayName}
                         </h1>
                     </div>
                     <div>
