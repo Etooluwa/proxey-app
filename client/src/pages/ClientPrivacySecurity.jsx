@@ -47,6 +47,21 @@ function maskPhone(phone) {
   return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
 }
 
+function normalizePasswordError(message) {
+  const text = String(message || '');
+  if (!text) return 'Failed to update password.';
+
+  const lowered = text.toLowerCase();
+  if (
+    lowered.includes('password should contain at least one character of each') ||
+    (lowered.includes('uppercase') && lowered.includes('lowercase') && lowered.includes('0123456789'))
+  ) {
+    return 'Password must include at least one uppercase letter, one lowercase letter, and one number.';
+  }
+
+  return text;
+}
+
 // ─── Change Password Panel ────────────────────────────────────────────────────
 
 function ChangePasswordPanel({ onClose }) {
@@ -72,7 +87,7 @@ function ChangePasswordPanel({ onClose }) {
       if (authErr) throw new Error(authErr.message);
       setDone(true);
     } catch (err) {
-      setError(err.message || 'Failed to update password.');
+      setError(normalizePasswordError(err.message));
     } finally {
       setSaving(false);
     }
