@@ -57,7 +57,7 @@ const BUFFER_VALUES  = [0, 10, 15, 30];
 const WINDOW_OPTIONS = ['1 week','2 weeks','4 weeks','8 weeks','Custom'];
 const WINDOW_VALUES  = [7, 14, 28, 56, null];
 
-const TOTAL_STEPS = 4; // steps 1-4 (step 0 is welcome)
+const TOTAL_STEPS = 3; // steps 1-3 (step 0 is welcome)
 
 // ─── Shared components ────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ const StepHeader = ({ step, total, title, sub }) => (
 // STEP 0: Welcome
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const STEP_LIST = ['Category','Profile & Photo','Availability','Handle & Payouts'];
+const STEP_LIST = ['Category','Profile & Photo','Handle & Payouts'];
 
 const WelcomeStep = ({ onNext }) => (
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: '#FBF7F2' }}>
@@ -625,8 +625,8 @@ const AvailabilityStep = ({ avail, onToggle, onTime, buffer, onBuffer, window: w
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe, stripeLoading, onLaunch, launching, onBack, error }) => (
-    <StepShell step={4} onBack={onBack}>
-        <StepHeader step={4} total={4} title="Almost there." sub="Choose your public handle now. Stripe can be connected later before you accept paid bookings." />
+    <StepShell step={3} onBack={onBack}>
+        <StepHeader step={3} total={3} title="Almost there." sub="Choose your public handle now. Stripe can be connected later before you accept paid bookings." />
 
         {/* Handle */}
         <Lbl className="mb-2">Your Handle</Lbl>
@@ -808,7 +808,10 @@ export default function ProviderOnboarding() {
                 profileUpdate.avatar = uploadedPhotoUrl;
             }
             await updateProfile(profileUpdate);
-            go(3); // skip services — go straight to availability
+            // Auto-suggest handle from business name
+            const suggested = profile.businessName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+            if (suggested) { setHandle(suggested); triggerHandleCheck(suggested); }
+            go(3);
         } catch (err) {
             setError(err.message || 'Failed to save profile.');
         } finally {
@@ -861,9 +864,6 @@ export default function ProviderOnboarding() {
                 method: 'POST',
                 body: JSON.stringify({ hours, bufferMinutes: BUFFER_VALUES[bufferIdx], bookingWindowDays }),
             });
-            // Auto-suggest handle from business name
-            const suggested = profile.businessName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
-            if (suggested) { setHandle(suggested); triggerHandleCheck(suggested); }
             go(4);
         } catch (err) {
             setError(err.message || 'Failed to save availability.');
@@ -946,6 +946,5 @@ export default function ProviderOnboarding() {
     if (step === 0) return <WelcomeStep onNext={() => go(1)} />;
     if (step === 1) return <CategoryStep category={category} customCat={customCat} onCategory={setCategory} onCustom={setCustomCat} onNext={submitCategory} onBack={() => navigate(-1)} error={error} />;
     if (step === 2) return <ProfileStep profile={profile} onChange={changeProfile} onNext={submitProfile} onBack={() => go(1)} saving={saving} error={error} />;
-    if (step === 3) return <AvailabilityStep avail={avail} onToggle={toggleDay} onTime={setTime} buffer={bufferIdx} onBuffer={setBufferIdx} window={windowIdx} onWindow={setWindowIdx} customDays={customDays} onCustomDays={setCustomDays} onNext={submitAvailability} onBack={() => go(2)} error={error} />;
-    return <HandleStep handle={handle} onHandle={onHandleChange} handleStatus={handleStatus} stripeConnected={stripeConnected} onStripe={connectStripe} stripeLoading={stripeLoading} onLaunch={launchPage} launching={launching} onBack={() => go(3)} error={error} />;
+    return <HandleStep handle={handle} onHandle={onHandleChange} handleStatus={handleStatus} stripeConnected={stripeConnected} onStripe={connectStripe} stripeLoading={stripeLoading} onLaunch={launchPage} launching={launching} onBack={() => go(2)} error={error} />;
 }
