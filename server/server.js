@@ -9093,7 +9093,7 @@ app.get("/api/provider/public/:handle", async (req, res) => {
       .eq("provider_id", provider.user_id)
       .maybeSingle();
 
-    const [servicesRes, groupsRes, reviewsRes] = await Promise.all([
+    const [servicesRes, groupsRes, reviewsRes, clientCountRes] = await Promise.all([
       supabase
         .from("services")
         .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description, group_id, metadata")
@@ -9112,6 +9112,10 @@ app.get("/api/provider/public/:handle", async (req, res) => {
         .eq("is_visible", true)
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("provider_clients")
+        .select("id", { count: "exact", head: true })
+        .eq("provider_id", provider.user_id),
     ]);
 
     const bookingWindow = provider.booking_window_weeks
@@ -9120,9 +9124,10 @@ app.get("/api/provider/public/:handle", async (req, res) => {
     const bufferMins = provider.buffer_minutes
       || profile?.booking_settings?.buffer_time
       || 0;
+    const clientCount = clientCountRes.count || 0;
 
     res.json({
-      provider: { ...provider, booking_window_weeks: bookingWindow, buffer_minutes: bufferMins },
+      provider: { ...provider, booking_window_weeks: bookingWindow, buffer_minutes: bufferMins, client_count: clientCount },
       services: servicesRes.data || [],
       groups: groupsRes.data || [],
       reviews: reviewsRes.data || [],

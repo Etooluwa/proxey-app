@@ -194,6 +194,18 @@ function BookingSummaryCard({ service, date, time }) {
     );
 }
 
+const StarIcon = ({ filled }) => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? T.accent : T.faded}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+);
+
+function StarRow({ rating, max = 5 }) {
+    return (
+        <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+            {Array.from({ length: max }, (_, i) => <StarIcon key={i} filled={i < rating} />)}
+        </div>
+    );
+}
+
 // ─── STEP 1: Provider Profile ───────────────────────────────────────────────────
 function Step1Profile({ provider, services, groups, reviews, selectedService, onSelectService, onContinue }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
@@ -204,119 +216,180 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
     // Group services
     const grouped = [];
     const ungrouped = services.filter(s => !s.group_id);
-
     for (const g of (groups || [])) {
         const gServices = services.filter(s => s.group_id === g.id);
         if (gServices.length > 0) grouped.push({ group: g, services: gServices });
     }
-    if (ungrouped.length > 0) {
-        grouped.push({ group: { id: 'general', name: 'Services' }, services: ungrouped });
-    }
+    if (ungrouped.length > 0) grouped.push({ group: { id: 'general', name: 'Services' }, services: ungrouped });
 
     const noServices = services.length === 0;
-    const noAvailability = provider?.no_availability;
 
     return (
         <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
+            <style>{`
+                @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+                @keyframes spin{to{transform:rotate(360deg)}}
+                .fade-1{animation:fadeUp .5s ease .05s both}
+                .fade-2{animation:fadeUp .5s ease .15s both}
+                .fade-3{animation:fadeUp .5s ease .25s both}
+                .fade-4{animation:fadeUp .5s ease .35s both}
+                .svc-card{transition:all .2s;position:relative;padding:18px 22px;background:#fff;border:1px solid rgba(140,106,100,0.18);border-radius:16px;margin-bottom:8px;cursor:pointer;text-align:left;width:100%}
+                .svc-card:hover{border-color:#C25E4A;box-shadow:0 4px 16px rgba(194,94,74,0.06);transform:translateY(-1px)}
+                .svc-card.selected{border:2px solid #C25E4A;background:rgba(194,94,74,0.02)}
+                .svc-check{position:absolute;top:18px;right:22px;width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(140,106,100,0.18);display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+                .svc-card.selected .svc-check{background:#C25E4A;border-color:#C25E4A}
+            `}</style>
+
             {/* Top nav */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: `1px solid ${T.line}` }}>
-                <span style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 20, fontWeight: 600, color: T.accent, letterSpacing: '-0.02em' }}>kliques</span>
-                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, background: T.abg, padding: '4px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>Public booking page</span>
+            <div className="fade-1" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
+                <span style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: 20, fontWeight: 500, color: T.accent, letterSpacing: '-0.02em' }}>kliques</span>
+                <span style={{ padding: '5px 12px', borderRadius: 9999, background: T.abg, fontSize: 11, fontWeight: 500, color: T.muted, fontFamily: F }}>Public booking page</span>
             </div>
 
             {/* Hero */}
-            <div style={{ background: T.hero, position: 'relative', overflow: 'hidden', padding: '48px 24px 36px' }}>
-                <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.12, pointerEvents: 'none' }} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: 16 }}>
-                        <ProviderAvatar provider={provider} size={88} />
-                        <div style={{ position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: T.success, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <div className="fade-1" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px' }}>
+                <div style={{ background: T.hero, borderRadius: 24, padding: '40px 36px 36px', position: 'relative', overflow: 'hidden', marginBottom: 28 }}>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.08, pointerEvents: 'none', borderRadius: 24 }} />
+                    {/* Profile row */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, position: 'relative', zIndex: 1 }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: '3px solid rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                {(provider?.avatar || provider?.photo)
+                                    ? <img src={provider.avatar || provider.photo} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                    : <span style={{ fontFamily: F, fontSize: 26, fontWeight: 500, color: T.muted }}>{initials(displayName)}</span>
+                                }
+                            </div>
+                            <div style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: '50%', background: T.success, border: `3px solid ${T.hero}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, paddingTop: 4 }}>
+                            <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 400, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 4px', lineHeight: 1.2 }}>{displayName}</h1>
+                            {subtitle && <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 14px' }}>{subtitle}</p>}
+                            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                                {provider?.rating && (
+                                    <>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                                            <svg width="14" height="14" fill={T.accent} viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                                            <span style={{ fontWeight: 500, color: T.accent }}>{parseFloat(provider.rating).toFixed(1)}</span>
+                                        </div>
+                                        <span style={{ color: T.line }}>·</span>
+                                    </>
+                                )}
+                                {provider?.review_count > 0 && (
+                                    <>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: T.muted }}>
+                                            <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            {provider.review_count} review{provider.review_count !== 1 ? 's' : ''}
+                                        </div>
+                                        <span style={{ color: T.line }}>·</span>
+                                    </>
+                                )}
+                                {provider?.client_count > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: T.muted }}>
+                                        <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        {provider.client_count} clients
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 4px' }}>{displayName}</h1>
-                    {subtitle && <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 12px' }}>{subtitle}</p>}
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                        {provider?.rating && (
-                            <span style={{ fontFamily: F, fontSize: 13, color: T.ink }}>
-                                ★ {parseFloat(provider.rating).toFixed(1)}
-                                {provider.review_count ? <span style={{ color: T.muted }}> ({provider.review_count})</span> : ''}
-                            </span>
-                        )}
-                    </div>
-                    {provider?.bio && <p style={{ fontFamily: F, fontSize: 14, color: T.ink, margin: '12px 0 0', lineHeight: 1.6, opacity: 0.85 }}>{provider.bio}</p>}
+                    {/* Bio */}
+                    {provider?.bio && (
+                        <div style={{ position: 'relative', zIndex: 1, marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(61,35,30,0.08)' }}>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, lineHeight: 1.7, margin: 0 }}>{provider.bio}</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Body */}
-            <div style={{ padding: '0 0 100px' }}>
+            {/* Services + Reviews */}
+            <div className="content" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 120px' }}>
                 {noServices ? (
-                    <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+                    <div className="fade-2" style={{ padding: '32px 0', textAlign: 'center' }}>
                         <p style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{firstName} hasn't added any services yet.</p>
                     </div>
-                ) : noAvailability ? (
-                    <div style={{ padding: '32px 24px', textAlign: 'center' }}>
-                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, marginBottom: 16 }}>{firstName} hasn't set up availability yet. Try messaging directly.</p>
-                    </div>
                 ) : (
-                    grouped.map(({ group, services: gsvcs }) => (
-                        <div key={group.id}>
-                            <div style={{ padding: '24px 24px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, margin: 0 }}>{group.name}</p>
-                                <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.accent, background: T.hero, padding: '2px 8px', borderRadius: 20 }}>{gsvcs.length}</span>
-                            </div>
-                            {gsvcs.map((svc, i) => {
-                                const selected = selectedService?.id === svc.id;
-                                return (
-                                    <div key={svc.id}>
-                                        <button
-                                            onClick={() => onSelectService(svc)}
-                                            style={{
-                                                width: '100%', textAlign: 'left', padding: '16px 24px',
-                                                background: selected ? 'rgba(194,94,74,0.04)' : 'transparent',
-                                                border: 'none', borderLeft: selected ? `3px solid ${T.accent}` : '3px solid transparent',
-                                                cursor: 'pointer', display: 'block',
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>{svc.name}</p>
-                                                {svc.base_price && <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0, flexShrink: 0, marginLeft: 12 }}>{fmtPrice(svc.base_price)}</p>}
-                                            </div>
-                                            {svc.duration && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 4px' }}>{fmtDuration(svc.duration)}</p>}
-                                            {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.5 }}>{svc.description}</p>}
-                                        </button>
-                                        {i < gsvcs.length - 1 && <HRule />}
-                                    </div>
-                                );
-                            })}
-                            <HRule />
-                        </div>
-                    ))
-                )}
-
-                {/* Reviews */}
-                {reviews?.length > 0 && (
-                    <div style={{ padding: '24px 24px 0' }}>
-                        <Lbl style={{ marginBottom: 16 }}>Reviews</Lbl>
-                        {reviews.slice(0, 3).map(r => (
-                            <div key={r.id} style={{ marginBottom: 16, padding: '16px', background: T.abg, borderRadius: 14 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                    <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, margin: 0 }}>{r.client_name || 'Client'}</p>
-                                    <p style={{ fontFamily: F, fontSize: 13, color: T.accent, margin: 0 }}>{'★'.repeat(r.rating)}</p>
+                    <div className="fade-2">
+                        {grouped.map(({ group, services: gsvcs }) => (
+                            <div key={group.id} style={{ marginBottom: 28 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                    <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{group.name}</span>
+                                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, color: T.muted, fontFamily: F }}>{gsvcs.length}</div>
                                 </div>
-                                {r.comment && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.5 }}>{r.comment}</p>}
+                                {gsvcs.map(svc => {
+                                    const selected = selectedService?.id === svc.id;
+                                    return (
+                                        <button
+                                            key={svc.id}
+                                            onClick={() => onSelectService(selected ? null : svc)}
+                                            className={`svc-card${selected ? ' selected' : ''}`}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
+                                                <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{svc.name}</span>
+                                                {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtPrice(svc.base_price)}</span>}
+                                            </div>
+                                            {svc.duration && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                                                    <svg width="12" height="12" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                    <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtDuration(svc.duration)}</span>
+                                                </div>
+                                            )}
+                                            {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0 }}>{svc.description}</p>}
+                                            <div className="svc-check">
+                                                <svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
                 )}
+
+                {/* Reviews */}
+                {reviews?.length > 0 && (
+                    <div className="fade-3" style={{ marginTop: 32 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                            <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>Reviews</span>
+                            {provider?.review_count > reviews.length && (
+                                <span style={{ fontFamily: F, fontSize: 13, color: T.accent, fontWeight: 500 }}>See all {provider.review_count}</span>
+                            )}
+                        </div>
+                        {reviews.slice(0, 3).map(r => {
+                            const name = r.client_name || 'Client';
+                            const reviewInitials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                            const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                            return (
+                                <div key={r.id} style={{ padding: '18px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, marginBottom: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, color: T.muted, fontFamily: F, flexShrink: 0 }}>{reviewInitials}</div>
+                                        <span style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, flex: 1 }}>{name}</span>
+                                        {dateStr && <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>{dateStr}</span>}
+                                    </div>
+                                    <StarRow rating={r.rating} />
+                                    {r.comment && <p style={{ fontFamily: F, fontSize: 13, color: T.muted, lineHeight: 1.6, margin: 0 }}>{r.comment}</p>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Powered by */}
+                <div className="fade-4" style={{ textAlign: 'center', padding: '32px 0 16px' }}>
+                    <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>Powered by </span>
+                    <span style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: 12, color: T.accent, fontWeight: 500 }}>kliques</span>
+                </div>
             </div>
 
             {/* Sticky CTA */}
             {!noServices && (
-                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: T.base, borderTop: `1px solid ${T.line}` }}>
-                    <BtnPrimary onClick={onContinue} disabled={!selectedService}>
-                        {selectedService ? `Continue with ${selectedService.name}` : 'Select a service to continue'}
-                    </BtnPrimary>
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: `linear-gradient(transparent, ${T.base} 20%)`, zIndex: 10 }}>
+                    <div style={{ maxWidth: 672, margin: '0 auto' }}>
+                        <BtnPrimary onClick={onContinue} disabled={!selectedService} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
+                            {selectedService ? `Continue with ${selectedService.name} · ${fmtPrice(selectedService.base_price)}` : 'Select a service to continue'}
+                        </BtnPrimary>
+                    </div>
                 </div>
             )}
         </div>
