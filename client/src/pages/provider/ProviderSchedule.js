@@ -966,7 +966,7 @@ const ProviderSchedule = () => {
                             onClick={() => navigate('/provider/availability')}
                             style={{ padding: '10px 16px', borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.muted, cursor: 'pointer' }}
                         >
-                            Hours
+                            Set weekly hours
                         </button>
                     </div>
 
@@ -1038,7 +1038,7 @@ const ProviderSchedule = () => {
                     className="px-3.5 py-2.5 rounded-[12px] text-[12px] font-semibold focus:outline-none active:opacity-70"
                     style={{ border: `1px solid ${T.line}`, background: 'transparent', color: T.muted }}
                 >
-                    Hours
+                    Set weekly hours
                 </button>
             </div>
 
