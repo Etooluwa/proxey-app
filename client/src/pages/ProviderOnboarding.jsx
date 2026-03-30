@@ -18,7 +18,7 @@
  *   POST  /api/provider/connected-account   → { accountId }
  *   POST  /api/provider/onboarding-link     → { url }
  */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
@@ -748,13 +748,20 @@ export default function ProviderOnboarding() {
     // Step 5 — handle + stripe
     const [handle, setHandle] = useState('');
     const [handleStatus, setHandleStatus] = useState(null); // null | 'checking' | 'available' | 'taken' | 'invalid'
-    const [stripeConnected, setStripeConnected] = useState(false);
+    const [stripeConnected, setStripeConnected] = useState(
+        () => new URLSearchParams(window.location.search).get('stripe') === 'done'
+    );
     const [stripeLoading, setStripeLoading] = useState(false);
     const [launching, setLaunching] = useState(false);
 
     const handleCheckTimer = useRef(null);
 
     const go = (n) => { setError(null); setStep(n); };
+
+    // If returning from Stripe, jump to handle step
+    useEffect(() => {
+        if (stripeConnected) setStep(3);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Step 1: category ──────────────────────────────────────────────────────
     const submitCategory = () => {
@@ -917,13 +924,6 @@ export default function ProviderOnboarding() {
             setStripeLoading(false);
         }
     };
-
-    // Check if returning from Stripe
-    const stripeParam = new URLSearchParams(window.location.search).get('stripe');
-    if (stripeParam === 'done' && !stripeConnected) {
-        setStripeConnected(true);
-        setStep(5);
-    }
 
     const launchPage = async () => {
         if (handleStatus !== 'available') return;
