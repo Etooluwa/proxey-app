@@ -550,13 +550,30 @@ const ProviderServiceEditor = () => {
                         <FieldLabel>Payment collection</FieldLabel>
                         <Segment
                             options={[
+                                { id: 'save_card', label: 'Card on file' },
+                                { id: 'deposit', label: 'Deposit' },
                                 { id: 'full', label: 'Full upfront' },
-                                { id: 'deposit', label: 'Deposit + remainder' },
                             ]}
                             value={form.payType}
                             onChange={set('payType')}
                         />
                     </div>
+
+                    {form.payType === 'save_card' && (
+                        <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
+                            <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#92400E' }}>
+                                Client saves a card at booking — no charge is made upfront. You charge the full amount from your bookings page once the session is complete.
+                            </p>
+                        </div>
+                    )}
+
+                    {form.payType === 'full' && priceNum > 0 && (
+                        <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
+                            <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#92400E' }}>
+                                Client pays <strong>{fmt$(priceNum)}</strong> in full at booking. You still confirm before the session takes place.
+                            </p>
+                        </div>
+                    )}
 
                     {form.payType === 'deposit' && (
                         <>
