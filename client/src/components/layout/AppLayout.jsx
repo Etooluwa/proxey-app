@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideMenu from '../ui/SideMenu';
 import { DesktopSidebar, DesktopHeader } from './DesktopSidebar';
@@ -6,6 +6,8 @@ import { useSession } from '../../auth/authContext';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useMessages } from '../../contexts/MessageContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { request } from '../../data/apiClient';
+import { supabase } from '../../utils/supabase';
 
 // ─── Client nav items ─────────────────────────────────────────────────────────
 const CLIENT_MENU = [
@@ -84,6 +86,7 @@ function usePageMeta(items, rootPath) {
 
 const AppLayout = () => {
     const [menuOpen, setMenuOpen] = useState(false);
+    const [upcomingCount, setUpcomingCount] = useState(0);
     const navigate = useNavigate();
     const { session, profile, logout } = useSession();
     const isDesktop = useIsDesktop();
@@ -91,6 +94,41 @@ const AppLayout = () => {
     const { unreadCount: notifUnread } = useNotifications();
 
     const msgUnread = getUnreadCount();
+    const clientId = session?.user?.id;
+
+    const refreshUpcomingCount = useCallback(() => {
+        if (!clientId) { setUpcomingCount(0); return Promise.resolve(); }
+        return request('/bookings/me')
+            .then((data) => {
+                const bookings = data?.bookings || data || [];
+                const now = new Date();
+                const count = bookings.filter((b) => {
+                    if (b.status !== 'confirmed') return false;
+                    const d = b.scheduled_at;
+                    return d && new Date(d) >= now;
+                }).length;
+                setUpcomingCount(count);
+            })
+            .catch(() => setUpcomingCount(0));
+    }, [clientId]);
+
+    useEffect(() => {
+        refreshUpcomingCount();
+    }, [refreshUpcomingCount]);
+
+    useEffect(() => {
+        if (!supabase || !clientId) return undefined;
+        const channel = supabase
+            .channel(`client-layout-bookings:${clientId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bookings',
+                filter: `client_id=eq.${clientId}`,
+            }, () => { refreshUpcomingCount(); })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [clientId, refreshUpcomingCount]);
 
     const activeId = useActiveId(CLIENT_MENU, '/app');
     const { title, subtitle } = usePageMeta(CLIENT_MENU, '/app');
@@ -103,6 +141,7 @@ const AppLayout = () => {
     const navItems = CLIENT_MENU.map((item) => {
         if (item.id === 'messages') return { ...item, badge: false, count: msgUnread > 0 ? msgUnread : undefined };
         if (item.id === 'notifications') return { ...item, badge: false, count: notifUnread > 0 ? notifUnread : undefined };
+        if (item.id === 'bookings') return { ...item, count: upcomingCount > 0 ? upcomingCount : undefined };
         return item;
     });
 
