@@ -23,11 +23,11 @@ import { useToast } from '../../components/ui/ToastProvider';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-// Time options in 30-min increments 6am–11:30pm
+// Time options in 15-min increments 6am–11:45pm
 const TIME_OPTIONS = (() => {
     const opts = [];
     for (let h = 6; h <= 23; h++) {
-        for (const m of [0, 30]) {
+        for (const m of [0, 15, 30, 45]) {
             const ampm = h >= 12 ? 'PM' : 'AM';
             const hr = h % 12 || 12;
             const label = `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
