@@ -242,8 +242,8 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
             `}</style>
 
             {/* Top nav */}
-            <div className="fade-1" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
-                <img src={klogo} alt="kliques" style={{ height: 22, width: 'auto' }} />
+            <div className="fade-1" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
+                <img src={klogo} alt="kliques" style={{ height: 36, width: 'auto' }} />
             </div>
 
             {/* Hero */}
