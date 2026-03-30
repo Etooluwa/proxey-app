@@ -57,7 +57,7 @@ const BUFFER_VALUES  = [0, 10, 15, 30];
 const WINDOW_OPTIONS = ['1 week','2 weeks','4 weeks','8 weeks','Custom'];
 const WINDOW_VALUES  = [7, 14, 28, 56, null];
 
-const TOTAL_STEPS = 5; // steps 1-5 (step 0 is welcome)
+const TOTAL_STEPS = 4; // steps 1-4 (step 0 is welcome)
 
 // ─── Shared components ────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ const StepHeader = ({ step, total, title, sub }) => (
 // STEP 0: Welcome
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const STEP_LIST = ['Category','Profile & Photo','Services & Pricing','Availability','Handle & Payouts'];
+const STEP_LIST = ['Category','Profile & Photo','Availability','Handle & Payouts'];
 
 const WelcomeStep = ({ onNext }) => (
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: '#FBF7F2' }}>
@@ -177,7 +177,7 @@ const WelcomeStep = ({ onNext }) => (
                         Build your<br />practice here.
                     </h1>
                     <p className="text-[15px] text-muted leading-relaxed m-0">
-                        Set up your profile, services, and start getting booked in minutes.
+                        Set up your profile, availability, and start getting booked in minutes.
                     </p>
                 </div>
             </div>
@@ -517,8 +517,8 @@ const TimeSelect = ({ value, onChange }) => (
 );
 
 const AvailabilityStep = ({ avail, onToggle, onTime, buffer, onBuffer, window: windowIdx, onWindow, customDays, onCustomDays, onNext, onBack, error }) => (
-    <StepShell step={4} onBack={onBack}>
-        <StepHeader step={4} total={5} title="Availability." sub="Set your weekly schedule. You can always adjust this later." />
+    <StepShell step={3} onBack={onBack}>
+        <StepHeader step={3} total={4} title="Availability." sub="Set your weekly schedule. You can always adjust this later." />
 
         <Divider />
         {DAYS.map((d, i) => {
@@ -620,8 +620,8 @@ const AvailabilityStep = ({ avail, onToggle, onTime, buffer, onBuffer, window: w
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe, stripeLoading, onLaunch, launching, onBack, error }) => (
-    <StepShell step={5} onBack={onBack}>
-        <StepHeader step={5} total={5} title="Almost there." sub="Choose your public handle now. Stripe can be connected later before you accept paid bookings." />
+    <StepShell step={4} onBack={onBack}>
+        <StepHeader step={4} total={4} title="Almost there." sub="Choose your public handle now. Stripe can be connected later before you accept paid bookings." />
 
         {/* Handle */}
         <Lbl className="mb-2">Your Handle</Lbl>
@@ -803,7 +803,7 @@ export default function ProviderOnboarding() {
                 profileUpdate.avatar = uploadedPhotoUrl;
             }
             await updateProfile(profileUpdate);
-            go(3);
+            go(3); // skip services — go straight to availability
         } catch (err) {
             setError(err.message || 'Failed to save profile.');
         } finally {
@@ -859,7 +859,7 @@ export default function ProviderOnboarding() {
             // Auto-suggest handle from business name
             const suggested = profile.businessName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
             if (suggested) { setHandle(suggested); triggerHandleCheck(suggested); }
-            go(5);
+            go(4);
         } catch (err) {
             setError(err.message || 'Failed to save availability.');
         } finally {
@@ -941,7 +941,6 @@ export default function ProviderOnboarding() {
     if (step === 0) return <WelcomeStep onNext={() => go(1)} />;
     if (step === 1) return <CategoryStep category={category} customCat={customCat} onCategory={setCategory} onCustom={setCustomCat} onNext={submitCategory} onBack={() => navigate(-1)} error={error} />;
     if (step === 2) return <ProfileStep profile={profile} onChange={changeProfile} onNext={submitProfile} onBack={() => go(1)} saving={saving} error={error} />;
-    if (step === 3) return <ServicesStep services={services} onAdd={addService} onEdit={editService} onNext={submitServices} onBack={() => go(2)} error={error} />;
-    if (step === 4) return <AvailabilityStep avail={avail} onToggle={toggleDay} onTime={setTime} buffer={bufferIdx} onBuffer={setBufferIdx} window={windowIdx} onWindow={setWindowIdx} customDays={customDays} onCustomDays={setCustomDays} onNext={submitAvailability} onBack={() => go(3)} error={error} />;
-    return <HandleStep handle={handle} onHandle={onHandleChange} handleStatus={handleStatus} stripeConnected={stripeConnected} onStripe={connectStripe} stripeLoading={stripeLoading} onLaunch={launchPage} launching={launching} onBack={() => go(4)} error={error} />;
+    if (step === 3) return <AvailabilityStep avail={avail} onToggle={toggleDay} onTime={setTime} buffer={bufferIdx} onBuffer={setBufferIdx} window={windowIdx} onWindow={setWindowIdx} customDays={customDays} onCustomDays={setCustomDays} onNext={submitAvailability} onBack={() => go(2)} error={error} />;
+    return <HandleStep handle={handle} onHandle={onHandleChange} handleStatus={handleStatus} stripeConnected={stripeConnected} onStripe={connectStripe} stripeLoading={stripeLoading} onLaunch={launchPage} launching={launching} onBack={() => go(3)} error={error} />;
 }
