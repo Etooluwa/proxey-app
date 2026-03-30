@@ -5523,13 +5523,26 @@ app.get("/api/provider/weekly-hours", async (req, res) => {
   const providerIdentity = await getProviderIdentity(getProviderId(req));
   const providerIds = providerIdentity.ids;
   try {
-    const { data, error } = await supabase
-      .from("provider_time_blocks")
-      .select("*")
-      .in("provider_id", providerIds)
-      .order("day_index", { ascending: true });
+    const [{ data, error }, { data: profileData, error: profileError }] = await Promise.all([
+      supabase
+        .from("provider_time_blocks")
+        .select("*")
+        .in("provider_id", providerIds)
+        .order("day_index", { ascending: true }),
+      supabase
+        .from("provider_profiles")
+        .select("booking_settings")
+        .eq("provider_id", providerIdentity.authId || getProviderId(req))
+        .maybeSingle(),
+    ]);
+
     if (error) throw error;
-    res.status(200).json({ hours: data || [] });
+    if (profileError) throw profileError;
+
+    res.status(200).json({
+      hours: data || [],
+      bookingWindowDays: profileData?.booking_settings?.bookingWindowDays ?? null,
+    });
   } catch (err) {
     console.error("[weekly-hours GET]", err);
     res.status(500).json({ error: "Failed to load weekly hours." });
@@ -5557,16 +5570,31 @@ app.post("/api/provider/weekly-hours", async (req, res) => {
     }));
     const { data, error } = await supabase.from("provider_time_blocks").insert(payload).select();
     if (error) throw error;
-    // Persist booking window in provider_profiles.metadata
+
+    // Persist booking window in provider_profiles.booking_settings
     if (bookingWindowDays !== undefined) {
-      const { data: prof } = await supabase
+      const { data: prof, error: profileError } = await supabase
         .from("provider_profiles")
-        .select("metadata")
+        .select("booking_settings")
         .eq("provider_id", providerAuthId)
         .maybeSingle();
-      const meta = prof?.metadata || {};
-      meta.bookingWindowDays = bookingWindowDays;
-      await supabase.from("provider_profiles").update({ metadata: meta }).eq("provider_id", providerAuthId);
+      if (profileError) throw profileError;
+
+      const bookingSettings = prof?.booking_settings || {};
+      bookingSettings.bookingWindowDays = bookingWindowDays;
+
+      const { error: bookingSettingsError } = await supabase
+        .from("provider_profiles")
+        .upsert(
+          {
+            provider_id: providerAuthId,
+            booking_settings: bookingSettings,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "provider_id" }
+        );
+
+      if (bookingSettingsError) throw bookingSettingsError;
     }
     res.status(201).json({ hours: data });
   } catch (err) {

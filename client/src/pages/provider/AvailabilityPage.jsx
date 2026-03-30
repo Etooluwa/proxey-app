@@ -12,7 +12,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../../data/apiClient';
-import { fetchProviderProfile } from '../../data/provider';
 import BackBtn from '../../components/ui/BackBtn';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
@@ -119,34 +118,26 @@ const AvailabilityPage = () => {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [hoursResult, profileResult] = await Promise.allSettled([
-                request('/provider/weekly-hours'),
-                fetchProviderProfile(),
-            ]);
+            const hoursResult = await request('/provider/weekly-hours');
 
-            if (hoursResult.status === 'fulfilled') {
-                const hours = hoursResult.value?.hours || [];
-                const newSchedule = DAYS.map(() => ({ enabled: false, slots: [] }));
-                for (const h of hours) {
-                    const idx = h.day_index;
-                    if (idx >= 0 && idx < 7) {
-                        newSchedule[idx] = {
-                            enabled: h.is_available !== false,
-                            slots: Array.isArray(h.time_slots) ? [...h.time_slots].sort() : [],
-                        };
-                    }
+            const hours = hoursResult?.hours || [];
+            const newSchedule = DAYS.map(() => ({ enabled: false, slots: [] }));
+            for (const h of hours) {
+                const idx = h.day_index;
+                if (idx >= 0 && idx < 7) {
+                    newSchedule[idx] = {
+                        enabled: h.is_available !== false,
+                        slots: Array.isArray(h.time_slots) ? [...h.time_slots].sort() : [],
+                    };
                 }
-                setSchedule(newSchedule);
             }
+            setSchedule(newSchedule);
 
-            if (profileResult.status === 'fulfilled') {
-                const meta = profileResult.value?.metadata || {};
-                const wd = meta.bookingWindowDays;
-                if (wd) {
-                    const known = WINDOW_OPTIONS.find((o) => o.id === wd);
-                    if (known) { setWindowDays(wd); setCustomDays(''); }
-                    else { setWindowDays(-1); setCustomDays(String(wd)); }
-                }
+            const wd = hoursResult?.bookingWindowDays;
+            if (wd) {
+                const known = WINDOW_OPTIONS.find((o) => o.id === wd);
+                if (known) { setWindowDays(wd); setCustomDays(''); }
+                else { setWindowDays(-1); setCustomDays(String(wd)); }
             }
         } catch (err) {
             console.error('[AvailabilityPage] load error:', err);
