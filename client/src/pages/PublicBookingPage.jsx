@@ -15,6 +15,7 @@ import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
 import klogo from '../klogo.png';
+import BookingPaymentForm, { fmtCents } from '../components/payment/BookingPaymentForm';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -35,8 +36,8 @@ const isValidEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 function fmtPrice(cents) {
     if (!cents && cents !== 0) return '';
-    const d = cents > 1000 ? cents / 100 : cents;
-    return `$${Math.round(d)}`;
+    const dollars = Number(cents) / 100;
+    return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 function fmtDuration(mins) {
     if (!mins) return '';
@@ -696,6 +697,13 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
 function Step4Review({ provider, service, selectedDate, selectedTime, onBack, onSubmit, submitting }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
     const category = provider?.category || (provider?.categories?.[0]) || '';
+    const paymentType = service?.payment_type;
+    const hasPayment = paymentType && paymentType !== 'none';
+
+    const paymentLabel = hasPayment
+        ? { save_card: 'Card on file required', deposit: 'Deposit required', full: 'Full payment required' }[paymentType] || ''
+        : null;
+    const btnLabel = hasPayment ? 'Continue to Payment →' : 'Request Booking';
 
     const rows = [
         { label: 'Service', value: service?.name },
@@ -738,7 +746,7 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
                 </div>
 
                 {/* Callout */}
-                <div style={{ background: T.callout, borderRadius: 14, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ background: T.callout, borderRadius: 14, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: hasPayment ? 10 : 0 }}>
                     <svg width="18" height="18" fill="none" stroke={T.calloutText} strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
                         <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" />
                     </svg>
@@ -746,11 +754,18 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
                         This is a booking request. <strong>{displayName}</strong> will review and confirm it. You'll be notified once it's accepted.
                     </p>
                 </div>
+                {/* Payment type notice */}
+                {hasPayment && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: T.abg, borderRadius: 12 }}>
+                        <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" /><path d="M1 10h22" /></svg>
+                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{paymentLabel}</span>
+                    </div>
+                )}
             </div>
             <StickyFooter>
                 <BtnPrimary onClick={onSubmit} disabled={submitting} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
                     {submitting && <Spinner />}
-                    {submitting ? 'Sending request…' : 'Request Booking'}
+                    {submitting ? 'Sending request…' : btnLabel}
                 </BtnPrimary>
             </StickyFooter>
         </StepWrap>
@@ -814,6 +829,29 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, handle })
     );
 }
 
+// ─── STEP 45: Payment ───────────────────────────────────────────────────────────
+
+function Step45Payment({ service, provider, session, onSuccess, onBack }) {
+    return (
+        <StepWrap>
+            <StepHeader onBack={onBack} current={5} total={5} />
+            <StepTitle
+                title={{ save_card: 'Save your card', deposit: 'Pay deposit', full: 'Pay in full' }[service?.payment_type || 'full']}
+                sub={{ save_card: 'Your card is saved securely. No charge is made now.', deposit: 'The remaining balance is due after your session.', full: 'Your card will be charged now to secure the booking.' }[service?.payment_type || 'full']}
+            />
+            <div style={{ padding: '0 24px 100px' }} className="step-fade">
+                <BookingPaymentForm
+                    service={service}
+                    provider={provider}
+                    session={session}
+                    onSuccess={onSuccess}
+                    onError={() => {}}
+                />
+            </div>
+        </StepWrap>
+    );
+}
+
 // ─── Loading / Error screens ────────────────────────────────────────────────────
 function ScreenLoading() {
     return (
@@ -866,6 +904,7 @@ export default function PublicBookingPage() {
     // Submission
     const [submitting, setSubmitting] = useState(false);
     const [bookingId, setBookingId] = useState(null);
+    const [paymentData, setPaymentData] = useState(null);
 
     // Load provider
     useEffect(() => {
@@ -899,7 +938,7 @@ export default function PublicBookingPage() {
         } catch { }
     }, [session]);
 
-    const handleSubmitBooking = async () => {
+    const handleSubmitBooking = async (pmtData) => {
         if (!session) return;
         setSubmitting(true);
         try {
@@ -919,6 +958,7 @@ export default function PublicBookingPage() {
                 requested_date: selectedDate,
                 requested_time: selectedTime,
                 message: intakeFreeform || null,
+                ...(pmtData || {}),
             };
             const data = await request('/bookings/request-time', { method: 'POST', body: JSON.stringify(body) });
 
@@ -1008,8 +1048,28 @@ export default function PublicBookingPage() {
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onBack={() => session ? setStep(hasIntake ? 3 : 2) : setStep(35)}
-            onSubmit={handleSubmitBooking}
+            onSubmit={() => {
+                const pt = selectedService?.payment_type;
+                if (pt && pt !== 'none') {
+                    setStep(45);
+                } else {
+                    handleSubmitBooking(null);
+                }
+            }}
             submitting={submitting}
+        />
+    );
+
+    if (step === 45) return (
+        <Step45Payment
+            service={selectedService}
+            provider={provider}
+            session={session}
+            onBack={() => setStep(4)}
+            onSuccess={(pmtData) => {
+                setPaymentData(pmtData);
+                handleSubmitBooking(pmtData);
+            }}
         />
     );
 

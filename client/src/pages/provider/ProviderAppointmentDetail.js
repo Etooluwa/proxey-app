@@ -215,6 +215,8 @@ const ProviderAppointmentDetail = () => {
     const [notes, setNotes] = useState('');
     const [savingNotes, setSavingNotes] = useState(false);
     const [completing, setCompleting] = useState(false);
+    const [charging, setCharging] = useState(false);
+    const [chargeError, setChargeError] = useState(null);
 
     // Completion state
     const [completed, setCompleted] = useState(false);
@@ -264,6 +266,20 @@ const ProviderAppointmentDetail = () => {
             navigate(`/provider/messages/${conv.id}`);
         } catch (err) {
             console.error('[message]', err);
+        }
+    };
+
+    const handleChargeCard = async () => {
+        if (!job || charging) return;
+        setCharging(true);
+        setChargeError(null);
+        try {
+            await request(`/bookings/${id}/charge-card`, { method: 'POST' });
+            setJob((prev) => ({ ...prev, payment_status: 'paid' }));
+        } catch (err) {
+            setChargeError(err.message || 'Charge failed. Please try again.');
+        } finally {
+            setCharging(false);
         }
     };
 
@@ -441,7 +457,42 @@ const ProviderAppointmentDetail = () => {
                 {totalDollars && (
                     <div className="py-5">
                         <Lbl className="block mb-3">Payment</Lbl>
-                        {paymentType === 'deposit' && depositPaid !== null ? (
+                        {paymentType === 'save_card' ? (
+                            <>
+                                <div className="flex justify-between mb-3">
+                                    <span className="text-[14px] text-muted">Total</span>
+                                    <span className="text-[14px] font-semibold text-ink">{price}</span>
+                                </div>
+                                {job.payment_status === 'paid' ? (
+                                    <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
+                                        <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Card charged successfully.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
+                                            <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
+                                                Client has a card on file. Charge it below when ready.
+                                            </p>
+                                        </div>
+                                        {chargeError && (
+                                            <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FDEDEA' }}>
+                                                <p className="text-[13px] m-0" style={{ color: '#B04040' }}>{chargeError}</p>
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={handleChargeCard}
+                                            disabled={charging}
+                                            className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                                            style={{ background: '#3D231E', border: 'none', opacity: charging ? 0.7 : 1 }}
+                                        >
+                                            {charging && <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+                                            {charging ? 'Charging…' : `Charge ${price}`}
+                                        </button>
+                                    </>
+                                )}
+                            </>
+                        ) : paymentType === 'deposit' && depositPaid !== null ? (
                             <>
                                 <div className="flex justify-between mb-2">
                                     <span className="text-[14px] text-muted">Deposit paid</span>
@@ -451,14 +502,18 @@ const ProviderAppointmentDetail = () => {
                                     <span className="text-[14px] text-muted">Remaining balance</span>
                                     <span className="text-[14px] font-semibold text-ink">${remaining.toFixed(2)}</span>
                                 </div>
-                                <div
-                                    className="px-4 py-3 rounded-[12px]"
-                                    style={{ background: '#FFF5E6' }}
-                                >
-                                    <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
-                                        Remaining ${remaining.toFixed(2)} will be charged automatically on completion.
-                                    </p>
-                                </div>
+                                {job.payment_status === 'paid' ? (
+                                    <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
+                                        <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Remaining balance charged.</p>
+                                    </div>
+                                ) : (
+                                    <div className="px-4 py-3 rounded-[12px]" style={{ background: '#FFF5E6' }}>
+                                        <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
+                                            Remaining ${remaining.toFixed(2)} will be charged automatically on completion.
+                                        </p>
+                                    </div>
+                                )}
                             </>
                         ) : (
                             <div className="flex justify-between">

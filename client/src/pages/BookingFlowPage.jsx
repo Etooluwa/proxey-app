@@ -7,13 +7,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
-import { createBooking } from '../data/bookings';
 import { clearDraft, loadDraft, saveDraft } from '../bookings/draftStore';
+import { supabase } from '../utils/supabase';
+import BookingPaymentForm, { computeDepositCents } from '../components/payment/BookingPaymentForm';
 import BackBtn from '../components/ui/BackBtn';
 import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
-import Avatar from '../components/ui/Avatar';
-import HeroCard from '../components/ui/HeroCard';
 import Footer from '../components/ui/Footer';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 
@@ -718,51 +717,65 @@ const StepTimeRequestSent = ({ onDone }) => (
 
 // ─── Step: Payment ────────────────────────────────────────────────────────────
 
-const StepPayment = ({ service, selectedOption, scheduledLabel, intakeResponses, clientNote, providerId, session, onConfirmed, onBack, onClose }) => {
+const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, scheduledLabel, intakeResponses, clientNote, providerId, session, onConfirmed, onBack, onClose }) => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
 
-    const price = selectedOption?.price ?? service?.base_price ?? service?.basePrice ?? null;
+    // Honor option-level price if set, otherwise fall back to service base_price
+    const effectivePrice = selectedOption?.price ?? service?.base_price ?? null;
+
+    // Build a service object with the effective price so BookingPaymentForm charges the right amount
+    const serviceForPayment = effectivePrice != null && effectivePrice !== service?.base_price
+        ? { ...service, base_price: effectivePrice }
+        : service;
+
     const paymentType = service?.payment_type || 'full';
-    const depositType = service?.deposit_type || null;
-    const depositValue = service?.deposit_value ?? null;
+    const depositAmount = paymentType === 'deposit' ? computeDepositCents(serviceForPayment) : null;
+    const remainingAmount = effectivePrice != null && depositAmount != null ? effectivePrice - depositAmount : null;
 
-    const depositAmount = useMemo(() => {
-        if (paymentType !== 'deposit' || price == null) return null;
-        if (depositType === 'percent' && depositValue != null) {
-            return Math.round((price * depositValue) / 100);
-        }
-        if (depositType === 'fixed' && depositValue != null) {
-            return Math.round(depositValue * 100); // depositValue in dollars
-        }
-        return Math.round(price * 0.3); // default 30%
-    }, [paymentType, price, depositType, depositValue]);
-
-    const remainingAmount = price != null && depositAmount != null ? price - depositAmount : null;
-
-    const handleConfirm = async () => {
+    const handlePaymentSuccess = async (pmtData) => {
         setSubmitting(true);
         setError(null);
         try {
-            const notes = clientNote || undefined;
-            const booking = await createBooking({
-                serviceId: service.id,
-                providerId,
-                scheduledAt: null, // will be resolved from form state passed up
-                price,
-                notes,
-                intakeResponses: intakeResponses || [],
-                status: 'pending',
+            const body = {
+                // snake_case keys to match backend contract
+                service_id: service.id,
+                provider_id: providerId,
+                requested_date: scheduledDate,
+                requested_time: scheduledTime,
+                message: clientNote || undefined,
+                ...pmtData,
+            };
+            const data = await request('/bookings/request-time', {
+                method: 'POST',
+                body: JSON.stringify(body),
             });
-            onConfirmed({ booking, price, depositAmount, remainingAmount, service, providerId });
+
+            // Save intake responses client-side — non-blocking, booking already confirmed
+            if (intakeResponses?.length > 0 && data.booking?.id) {
+                const intakeRows = intakeResponses.map(r => ({
+                    booking_id: data.booking.id,
+                    question_id: r.questionId,
+                    response_text: r.responseText,
+                }));
+                supabase.from('booking_intake_responses').insert(intakeRows).catch(() => {});
+            }
+
+            onConfirmed({
+                booking: data.booking,
+                price: effectivePrice,
+                depositAmount: pmtData.payment_type === 'deposit' ? pmtData.deposit_paid_cents : null,
+                remainingAmount: pmtData.payment_type === 'deposit' ? remainingAmount : null,
+                paymentType: pmtData.payment_type,
+                service,
+                providerId,
+            });
         } catch (err) {
             setError(err.message || 'Booking failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
     };
-
-    const pctLabel = depositType === 'percent' && depositValue ? `${depositValue}%` : '30%';
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
@@ -775,7 +788,7 @@ const StepPayment = ({ service, selectedOption, scheduledLabel, intakeResponses,
                     <div className="rounded-[16px] bg-white overflow-hidden" style={{ border: '1px solid rgba(140,106,100,0.15)' }}>
                         <div className="flex justify-between items-center px-4 py-3.5">
                             <span className="text-[15px] font-semibold text-ink">{service?.name}</span>
-                            {price != null && <span className="text-[15px] font-semibold text-ink">{fmtPrice(price)}</span>}
+                            {effectivePrice != null && <span className="text-[15px] font-semibold text-ink">{fmtPrice(effectivePrice)}</span>}
                         </div>
                         <Divider />
                         {selectedOption?.duration && (
@@ -796,78 +809,38 @@ const StepPayment = ({ service, selectedOption, scheduledLabel, intakeResponses,
                     </div>
                 </div>
 
-                {/* Payment model */}
-                {paymentType === 'deposit' && depositAmount != null && (
-                    <div className="mb-5">
-                        <Lbl className="block mb-3">Payment</Lbl>
-                        <div className="rounded-[16px] overflow-hidden" style={{ border: '1px solid rgba(140,106,100,0.15)' }}>
-                            <HeroCard className="!rounded-none !p-4">
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted m-0 mb-0.5">Due now</p>
-                                        <p className="text-[26px] font-semibold text-ink tracking-[-0.02em] m-0">{fmtPrice(depositAmount)}</p>
-                                        <p className="text-[12px] text-muted m-0">{pctLabel} deposit</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted m-0 mb-0.5">After session</p>
-                                        <p className="text-[20px] font-semibold text-muted tracking-[-0.02em] m-0">{fmtPrice(remainingAmount)}</p>
-                                        <p className="text-[12px] text-faded m-0">remainder</p>
-                                    </div>
-                                </div>
-                            </HeroCard>
-                        </div>
-                    </div>
-                )}
-
-                {paymentType === 'full' && price != null && (
-                    <div className="mb-5">
-                        <Lbl className="block mb-3">Payment</Lbl>
-                        <div className="rounded-[16px] bg-avatarBg px-4 py-4" style={{ border: '1px solid rgba(140,106,100,0.15)' }}>
-                            <div className="flex justify-between items-center">
-                                <span className="text-[14px] font-semibold text-ink">Total due now</span>
-                                <span className="text-[22px] font-semibold text-ink">{fmtPrice(price)}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Placeholder for saved card / Stripe */}
-                <div className="mb-5">
-                    <Lbl className="block mb-3">Payment method</Lbl>
-                    <div className="rounded-[16px] bg-white px-4 py-4 flex items-center gap-3" style={{ border: '1px solid rgba(140,106,100,0.15)' }}>
-                        <div className="w-10 h-7 rounded-[6px] bg-avatarBg flex items-center justify-center flex-shrink-0">
-                            <svg width="16" height="16" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
-                                <path d="M3 10h18M3 6h18a2 2 0 012 2v8a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2z" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                        <span className="text-[14px] text-muted flex-1">Card on file</span>
-                        <button className="text-[13px] font-semibold text-accent focus:outline-none">
-                            Change
-                        </button>
-                    </div>
-                </div>
-
                 {error && (
                     <div className="px-4 py-3 rounded-[12px] bg-dangerBg mb-4">
                         <p className="text-[13px] text-accent m-0">{error}</p>
                     </div>
                 )}
-            </div>
 
-            <StickyBar>
-                <PrimaryBtn onClick={handleConfirm} loading={submitting} disabled={submitting}>
-                    {paymentType === 'deposit' && depositAmount != null
-                        ? `Pay ${fmtPrice(depositAmount)} deposit`
-                        : price != null ? `Pay ${fmtPrice(price)}` : 'Confirm booking'}
-                </PrimaryBtn>
-            </StickyBar>
+                <BookingPaymentForm
+                    service={serviceForPayment}
+                    provider={{ id: providerId }}
+                    session={session}
+                    onSuccess={handlePaymentSuccess}
+                    onError={(msg) => setError(msg)}
+                    renderFooter={({ handleSubmit, processing, btnLabel, stripe }) => (
+                        <StickyBar>
+                            <PrimaryBtn
+                                onClick={handleSubmit}
+                                loading={processing || submitting}
+                                disabled={processing || submitting || !stripe}
+                            >
+                                {processing || submitting ? 'Processing…' : btnLabel}
+                            </PrimaryBtn>
+                        </StickyBar>
+                    )}
+                />
+            </div>
         </div>
     );
 };
 
 // ─── Step: Confirmed ──────────────────────────────────────────────────────────
 
-const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount, providerName, onDone }) => {
+const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount, paymentType, providerName, onDone }) => {
     const initials = getInitials(providerName);
 
     return (
@@ -906,11 +879,20 @@ const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount
                         <span className="text-[14px] font-semibold text-ink">{service?.name}</span>
                         {price != null && <span className="text-[14px] font-semibold text-ink">{fmtPrice(price)}</span>}
                     </div>
-                    {depositAmount != null && (
+                    {paymentType === 'save_card' && (
                         <>
                             <Divider />
                             <div className="px-4 py-3 flex justify-between items-center bg-successBg">
-                                <span className="text-[13px] font-semibold text-success">Paid now (deposit)</span>
+                                <span className="text-[13px] font-semibold text-success">Card saved — no charge now</span>
+                                <span className="text-[13px] font-semibold text-success">$0</span>
+                            </div>
+                        </>
+                    )}
+                    {paymentType === 'deposit' && depositAmount != null && (
+                        <>
+                            <Divider />
+                            <div className="px-4 py-3 flex justify-between items-center bg-successBg">
+                                <span className="text-[13px] font-semibold text-success">Deposit paid</span>
                                 <span className="text-[13px] font-semibold text-success">{fmtPrice(depositAmount)}</span>
                             </div>
                             <Divider />
@@ -920,7 +902,7 @@ const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount
                             </div>
                         </>
                     )}
-                    {depositAmount == null && price != null && (
+                    {(paymentType === 'full' || (!paymentType && depositAmount == null)) && price != null && (
                         <>
                             <Divider />
                             <div className="px-4 py-3 flex justify-between items-center bg-successBg">
@@ -964,7 +946,6 @@ function BookingFlowPage() {
     const [providerId] = useState(preProviderId);
     const [service, setService] = useState(null);
     const [selectedOption, setSelectedOption] = useState(null);
-    const [price, setPrice] = useState(null);
     const [intakeQuestions, setIntakeQuestions] = useState([]);
     const [clientNotesEnabled, setClientNotesEnabled] = useState(false);
     const [intakeResponses, setIntakeResponses] = useState([]);
@@ -991,7 +972,6 @@ function BookingFlowPage() {
 
     const handleDetailNext = ({ selectedOption: opt, price: p }) => {
         setSelectedOption(opt);
-        setPrice(p);
         if (intakeQuestions.length > 0 || clientNotesEnabled) {
             setStepKey('intake');
         } else {
@@ -1012,9 +992,9 @@ function BookingFlowPage() {
         setStepKey('payment');
     };
 
-    const handleConfirmed = ({ booking, price: p, depositAmount, remainingAmount, service: svc, providerId: pid }) => {
+    const handleConfirmed = ({ booking, price: p, depositAmount, remainingAmount, paymentType: pt, service: svc, providerId: pid }) => {
         clearDraft();
-        setConfirmResult({ booking, price: p, depositAmount, remainingAmount });
+        setConfirmResult({ booking, price: p, depositAmount, remainingAmount, paymentType: pt });
         setStepKey('confirmed');
     };
 
@@ -1066,6 +1046,7 @@ function BookingFlowPage() {
                 price={confirmResult?.price}
                 depositAmount={confirmResult?.depositAmount}
                 remainingAmount={confirmResult?.remainingAmount}
+                paymentType={confirmResult?.paymentType}
                 providerName={providerName || service?.provider_name || 'Your provider'}
                 onDone={() => navigate('/app')}
             />
@@ -1078,6 +1059,8 @@ function BookingFlowPage() {
             <StepPayment
                 service={service}
                 selectedOption={selectedOption}
+                scheduledDate={scheduledDate}
+                scheduledTime={scheduledTime}
                 scheduledLabel={scheduledLabel}
                 intakeResponses={intakeResponses}
                 clientNote={clientNote}

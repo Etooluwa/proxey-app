@@ -2881,15 +2881,10 @@ app.get("/api/provider/earnings", async (req, res) => {
 
     const getEarningDate = (booking) => new Date(booking.completed_at || booking.scheduled_at || booking.created_at);
     const getNetBookingAmountCents = (booking) => {
-      const grossCents = booking.price || 0;
-      if (!grossCents) return 0;
-
-      if (typeof booking.net_amount === "number" && !Number.isNaN(booking.net_amount)) {
-        return booking.net_amount;
-      }
-
-      const feeCents = Math.round(grossCents * BOOKING_PLATFORM_FEE_RATE);
-      return Math.max(grossCents - feeCents, 0);
+      // Under the current fee model, the client pays the platform fee on top of
+      // the service price. booking.price stores the service price in cents —
+      // that is the full amount the provider earns.
+      return Math.round(Number(booking.price) || 0);
     };
 
     // Calculate available balance (completed + paid) as provider net earnings
@@ -9362,6 +9357,92 @@ app.post("/api/payments/setup-intent", async (req, res) => {
   }
 });
 
+// POST /api/payments/payment-intent — create PaymentIntent for deposit or full payment
+// Body: { serviceId, providerId, amountCents, currency?, email, name }
+app.post("/api/payments/payment-intent", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+
+  const { serviceId, providerId, amountCents, email, name, isDeposit } = req.body || {};
+  if (!amountCents || !providerId) {
+    return res.status(400).json({ error: "amountCents and providerId are required." });
+  }
+  if (amountCents < 50) {
+    return res.status(400).json({ error: "Amount must be at least $0.50." });
+  }
+
+  try {
+    // Resolve provider's Stripe account
+    const { data: providerRow } = await supabase
+      .from("providers")
+      .select("stripe_account_id")
+      .eq("user_id", providerId)
+      .maybeSingle();
+    const stripeAccountId = providerRow?.stripe_account_id;
+
+    // Find or create Stripe customer for client
+    let customerId;
+    if (supabase) {
+      const { data: cp } = await supabase
+        .from("client_profiles")
+        .select("stripe_customer_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      customerId = cp?.stripe_customer_id;
+    }
+    if (!customerId) {
+      const customers = await stripe.customers.list({ limit: 100 });
+      const existing = customers.data.find((c) => c.metadata?.userId === userId);
+      customerId = existing?.id;
+    }
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email,
+        name,
+        metadata: { userId, userType: "client" },
+      });
+      customerId = customer.id;
+    }
+    if (supabase) {
+      await supabase
+        .from("client_profiles")
+        .upsert(
+          { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        )
+        .catch(() => {});
+    }
+
+    // Client pays service amount + platform fee on top.
+    // Provider receives the full service amount. Platform keeps the fee and absorbs Stripe's cut.
+    const platformFee = Math.round(amountCents * PLATFORM_FEE_RATE);
+    const totalCharge = amountCents + platformFee; // what client actually pays
+
+    const intentParams = {
+      amount: totalCharge,
+      currency: PLATFORM_CURRENCY,
+      customer: customerId,
+      payment_method_types: ["card"],
+      capture_method: "automatic",
+      // For deposit payments, save the card for the remaining off-session charge later
+      setup_future_usage: isDeposit ? "off_session" : undefined,
+      metadata: { userId, serviceId: serviceId || "", providerId, serviceCents: amountCents },
+    };
+
+    // Route service amount to provider's Stripe account; platform keeps the fee
+    if (stripeAccountId) {
+      intentParams.transfer_data = { destination: stripeAccountId };
+      intentParams.application_fee_amount = platformFee;
+    }
+
+    const intent = await stripe.paymentIntents.create(intentParams);
+    res.json({ clientSecret: intent.client_secret, customerId, paymentIntentId: intent.id });
+  } catch (err) {
+    console.error("[payments/payment-intent]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/payments/methods/:paymentMethodId/default — set default card
 app.post("/api/payments/methods/:paymentMethodId/default", async (req, res) => {
   const userId = getUserId(req);
@@ -9601,7 +9682,11 @@ app.post("/api/bookings/request-time", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
 
   const clientId = getUserId(req);
-  const { provider_id, service_id, requested_date, requested_time, message } = req.body || {};
+  const {
+    provider_id, service_id, requested_date, requested_time, message,
+    payment_type, stripe_setup_intent_id, stripe_payment_method_id,
+    stripe_payment_intent_id, deposit_paid_cents,
+  } = req.body || {};
 
   if (!provider_id || !requested_date || !requested_time) {
     return res.status(400).json({ error: "provider_id, requested_date, and requested_time are required." });
@@ -9654,7 +9739,13 @@ app.post("/api/bookings/request-time", async (req, res) => {
       hour: "numeric", minute: "2-digit",
     });
 
-    // Create booking with status='pending', payment_status='unpaid'
+    // Determine payment_status based on payment_type
+    let resolvedPaymentStatus = "unpaid";
+    if (payment_type === "save_card" && stripe_payment_method_id) resolvedPaymentStatus = "card_saved";
+    else if (payment_type === "deposit" && deposit_paid_cents > 0) resolvedPaymentStatus = "deposit_paid";
+    else if (payment_type === "full" && stripe_payment_intent_id) resolvedPaymentStatus = "paid";
+
+    // Create booking with status='pending', payment_status resolved
     const { data: booking, error: insertErr } = await supabase
       .from("bookings")
       .insert({
@@ -9665,13 +9756,18 @@ app.post("/api/bookings/request-time", async (req, res) => {
         service_name: serviceName || "Session",
         scheduled_at: scheduledAt,
         status: providerBookingRules.autoAccept ? "confirmed" : "pending",
-        payment_status: "unpaid",
+        payment_status: resolvedPaymentStatus,
+        payment_type: payment_type || "none",
+        stripe_setup_intent_id: stripe_setup_intent_id || null,
+        stripe_payment_method_id: stripe_payment_method_id || null,
+        deposit_paid_cents: deposit_paid_cents || 0,
         price: servicePrice,
         metadata: {
           type: "time_request",
           client_message: message || null,
           requested_date,
           requested_time,
+          stripe_payment_intent_id: stripe_payment_intent_id || null,
         },
       })
       .select()
@@ -9820,34 +9916,71 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
     if (updateErr) throw updateErr;
 
     // 4. Charge remaining balance via Stripe if deposit was collected
-    const meta = booking.metadata || {};
-    const depositPaidCents = meta.deposit_paid || 0;
-    const totalCents = booking.price || 0;
+    // booking.price is stored in cents (base_price from services table is always cents)
+    const depositPaidCents = booking.deposit_paid_cents || 0;
+    const totalCents = Math.round(Number(booking.price) || 0); // always cents
     const remainingCents = Math.max(totalCents - depositPaidCents, 0);
 
-    if (depositPaidCents > 0 && remainingCents > 0 && booking.payment_intent_id) {
+    if (booking.payment_type === "deposit" && depositPaidCents > 0 && remainingCents > 0 && booking.stripe_payment_method_id) {
       try {
-        // Capture any uncaptured remaining amount via a new PaymentIntent on the saved method
-        const pi = await stripe.paymentIntents.retrieve(booking.payment_intent_id);
-        if (pi.status === "requires_capture") {
-          await stripe.paymentIntents.capture(booking.payment_intent_id);
+        // Fetch provider Stripe account for Connect routing
+        const { data: provRow } = await supabase
+          .from("providers")
+          .select("stripe_account_id")
+          .eq("user_id", booking.provider_id)
+          .maybeSingle();
+        const stripeAccountId = provRow?.stripe_account_id;
+
+        // Find or use Stripe customer from client_profiles
+        const { data: cp } = await supabase
+          .from("client_profiles")
+          .select("stripe_customer_id")
+          .eq("user_id", booking.client_id)
+          .maybeSingle();
+        const customerId = cp?.stripe_customer_id;
+
+        // Client pays remaining + platform fee on top; provider receives remaining in full
+        const platformFeeRemaining = Math.round(remainingCents * PLATFORM_FEE_RATE);
+        const totalRemainingCharge = remainingCents + platformFeeRemaining;
+
+        const piParams = {
+          amount: totalRemainingCharge,
+          currency: PLATFORM_CURRENCY,
+          customer: customerId || undefined,
+          payment_method: booking.stripe_payment_method_id,
+          confirm: true,
+          off_session: true,
+          metadata: { booking_id: bookingId, type: "deposit_remaining", serviceCents: remainingCents },
+        };
+        if (stripeAccountId) {
+          piParams.transfer_data = { destination: stripeAccountId };
+          piParams.application_fee_amount = platformFeeRemaining;
         }
+
+        await stripe.paymentIntents.create(piParams);
+
+        // Update payment_status
+        await supabase.from("bookings").update({ payment_status: "paid" }).eq("id", bookingId);
       } catch (stripeErr) {
         console.warn("[bookings/complete] Stripe remaining charge failed:", stripeErr.message);
         // Non-fatal — continue with completion
       }
     }
 
-    // 5 + 6. Calculate fee and create provider_earnings record
+    // 5 + 6. Calculate fee and create provider_earnings record.
+    // With Option 1 pricing: client pays service + 10% fee. Provider receives full service price.
+    // gross_amount = what client paid for the service portion (totalCents)
+    // platform_fee = 10% added on top (paid by client, kept by platform)
+    // net_amount = full service price (provider receives this in full)
     const grossDollars = +(totalCents / 100).toFixed(2);
-    const platformFee = +(grossDollars * BOOKING_PLATFORM_FEE_RATE).toFixed(2);
-    const netAmount = +(grossDollars - platformFee).toFixed(2);
+    const platformFeeDollars = +(grossDollars * BOOKING_PLATFORM_FEE_RATE).toFixed(2);
+    const netAmount = grossDollars; // provider receives full service price
 
     await supabase.from("provider_earnings").insert({
       provider_id: booking.provider_id,
       booking_id: bookingId,
       gross_amount: Math.round(grossDollars * 100),
-      platform_fee: Math.round(platformFee * 100),
+      platform_fee: Math.round(platformFeeDollars * 100),
       net_amount: Math.round(netAmount * 100),
       payout_status: "pending",
       created_at: now,
@@ -9967,7 +10100,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         grossAmount: grossDollars,
         depositCollected: +(depositPaidCents / 100).toFixed(2),
         remainingCharged: +(remainingCents / 100).toFixed(2),
-        platformFee,
+        platformFee: platformFeeDollars,
         netAmount,
       },
       invoice_number: invoiceNumber,
@@ -9976,6 +10109,90 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
   } catch (err) {
     console.error("[bookings/:id/complete]", err);
     return res.status(500).json({ error: "Failed to complete booking." });
+  }
+});
+
+// POST /api/bookings/:id/charge-card
+// Provider charges the saved card for a save_card booking
+app.post("/api/bookings/:id/charge-card", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+
+  const bookingId = req.params.id;
+  const requestingUserId = getUserId(req);
+  if (!requestingUserId) return res.status(401).json({ error: "Unauthorized." });
+
+  try {
+    const { data: booking, error: bookingErr } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .single();
+
+    if (bookingErr || !booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.provider_id !== requestingUserId) return res.status(403).json({ error: "Not authorized." });
+    if (booking.payment_type !== "save_card") return res.status(400).json({ error: "Booking is not a save_card booking." });
+    if (booking.payment_status === "paid") return res.status(409).json({ error: "Card already charged." });
+    if (!booking.stripe_payment_method_id) return res.status(400).json({ error: "No saved payment method on this booking." });
+
+    // booking.price is always in cents (base_price from services table)
+    const totalCents = Math.round(Number(booking.price) || 0);
+    if (totalCents < 50) return res.status(400).json({ error: "Amount too small to charge." });
+
+    // Fetch provider Stripe account
+    const { data: provRow } = await supabase
+      .from("providers")
+      .select("stripe_account_id")
+      .eq("user_id", booking.provider_id)
+      .maybeSingle();
+    const stripeAccountId = provRow?.stripe_account_id;
+
+    // Get Stripe customer
+    const { data: cp } = await supabase
+      .from("client_profiles")
+      .select("stripe_customer_id")
+      .eq("user_id", booking.client_id)
+      .maybeSingle();
+    const customerId = cp?.stripe_customer_id;
+
+    // Client pays service amount + platform fee on top; provider receives full service amount
+    const platformFee = Math.round(totalCents * PLATFORM_FEE_RATE);
+    const totalCharge = totalCents + platformFee;
+
+    const piParams = {
+      amount: totalCharge,
+      currency: PLATFORM_CURRENCY,
+      customer: customerId || undefined,
+      payment_method: booking.stripe_payment_method_id,
+      confirm: true,
+      off_session: true,
+      metadata: { booking_id: bookingId, type: "save_card_charge", serviceCents: totalCents },
+    };
+    if (stripeAccountId) {
+      piParams.transfer_data = { destination: stripeAccountId };
+      piParams.application_fee_amount = platformFee;
+    }
+
+    const pi = await stripe.paymentIntents.create(piParams);
+
+    // Update booking payment_status
+    const now = new Date().toISOString();
+    await supabase
+      .from("bookings")
+      .update({ payment_status: "paid", updated_at: now })
+      .eq("id", bookingId);
+
+    return res.json({
+      ok: true,
+      paymentIntentId: pi.id,
+      amountCharged: totalCents,
+    });
+  } catch (err) {
+    console.error("[bookings/charge-card]", err);
+    // Surface Stripe card errors clearly
+    if (err.type === "StripeCardError") {
+      return res.status(402).json({ error: err.message });
+    }
+    return res.status(500).json({ error: err.message || "Failed to charge card." });
   }
 });
 
