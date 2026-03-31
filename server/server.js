@@ -9385,13 +9385,14 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       customerId = customer.id;
     }
     if (supabase) {
-      await supabase
-        .from("client_profiles")
-        .upsert(
-          { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" }
-        )
-        .catch(() => {});
+      try {
+        await supabase
+          .from("client_profiles")
+          .upsert(
+            { user_id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+            { onConflict: "user_id" }
+          );
+      } catch (_) {}
     }
 
     // Client pays service amount + platform fee on top.
