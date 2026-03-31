@@ -1975,7 +1975,7 @@ app.get("/api/bookings/:id", async (req, res) => {
   try {
     const { data: booking, error } = await supabase
       .from("bookings")
-      .select("*, services(name, description, duration_minutes), provider_profiles!bookings_provider_id_fkey(name, business_name, handle, avatar_url)")
+      .select("*")
       .eq("id", bookingId)
       .single();
 
@@ -1984,17 +1984,35 @@ app.get("/api/bookings/:id", async (req, res) => {
       return res.status(403).json({ error: "Not authorized." });
     }
 
-    // Enrich with provider info
-    const pp = booking.provider_profiles;
+    let serviceInfo = null;
+    if (booking.service_id) {
+      const { data } = await supabase
+        .from("services")
+        .select("name, description, duration_minutes")
+        .eq("id", booking.service_id)
+        .maybeSingle();
+      serviceInfo = data || null;
+    }
+
+    let providerInfo = null;
+    if (booking.provider_id) {
+      const { data } = await supabase
+        .from("providers")
+        .select("name, business_name, handle, avatar, photo")
+        .eq("user_id", booking.provider_id)
+        .maybeSingle();
+      providerInfo = data || null;
+    }
+
     const enriched = {
       ...booking,
-      provider_name: pp?.business_name || pp?.name || booking.provider_name || "Provider",
-      provider_handle: pp?.handle || null,
-      service_name: booking.services?.name || booking.service_name || "Service",
-      duration_minutes: booking.services?.duration_minutes || booking.duration_minutes || null,
+      provider_name: providerInfo?.business_name || providerInfo?.name || booking.provider_name || "Provider",
+      provider_handle: providerInfo?.handle || null,
+      provider_avatar: providerInfo?.photo || providerInfo?.avatar || null,
+      service_name: serviceInfo?.name || booking.service_name || "Service",
+      service_description: serviceInfo?.description || booking.service_description || null,
+      duration_minutes: serviceInfo?.duration_minutes || booking.duration_minutes || booking.duration || null,
     };
-    delete enriched.provider_profiles;
-    delete enriched.services;
 
     return res.status(200).json({ booking: enriched });
   } catch (err) {
@@ -2747,7 +2765,7 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
       await createClientNotification(clientId, {
         type: "booking_completed",
         title: "Session Complete!",
-        body: `Your session for ${job.service_name || "your service"} is complete. How was it?`,
+        body: `Your session for ${job.service_name || "your service"} is complete. Your invoice is now available in the Invoices page.`,
         booking_id: job.booking_id || jobId,
         data: { provider_id: providerId, status: "completed" },
       }).catch(() => {});
@@ -3033,7 +3051,7 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
           await createClientNotification(clientId, {
             type: 'booking_completed',
             title: 'Service Completed!',
-            body: `Your booking for ${data.service_name || 'your service'} has been marked as completed. How was it?`,
+            body: `Your booking for ${data.service_name || 'your service'} has been marked as completed. Your invoice is now available in the Invoices page.`,
             booking_id: data.id,
             data: {
               provider_id: data.provider_id,
@@ -10386,7 +10404,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         await createClientNotification(booking.client_id, {
           type: "session_complete",
           title: "Session complete",
-          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete.`,
+          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
           booking_id: bookingId,
           data: {
             provider_id: booking.provider_id,
@@ -10397,6 +10415,13 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
             invoice_id: invoice?.id || null,
             invoice_number: invoiceNumber,
           },
+        }).catch(() => {});
+        await sendClientPushNotification(booking.client_id, {
+          type: "session_complete",
+          title: "Session complete",
+          body: "Your appointment is complete. Your invoice is now available in the Invoices page.",
+          url: "/app/invoices",
+          tag: `session-complete-${bookingId}`,
         }).catch(() => {});
       }
 
