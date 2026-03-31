@@ -582,6 +582,62 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt }) {
+  if (!to) return;
+
+  const resolvedProvider = providerName || "Your provider";
+  const resolvedService = serviceName || "Service";
+
+  return sendEmail({
+    to,
+    subject: `Your booking is confirmed — ${fmtDate(scheduledAt)}`,
+    html: emailBase(`
+      <h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;color:#331D19;">Booking confirmed</h1>
+      <p style="margin:0 0 24px;color:#8C6A64;font-size:15px;line-height:1.6;">Your appointment has been confirmed.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F3ECE7;border-radius:16px;padding:20px 24px;">
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Provider</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:16px;">${resolvedProvider}</td></tr>
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:16px;">${resolvedService}</td></tr>
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(scheduledAt)}</td></tr>
+      </table>
+      <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">You can view your appointment details anytime in Kliques.</p>
+    `),
+  });
+}
+
+async function sendProviderNewBookingEmail({ to, clientName, serviceName, scheduledAt, autoAccepted = false }) {
+  if (!to) return;
+
+  const resolvedClient = clientName || "A client";
+  const resolvedService = serviceName || "a service";
+
+  return sendEmail({
+    to,
+    subject: autoAccepted
+      ? `New booking confirmed — ${fmtDate(scheduledAt)}`
+      : `New booking request — ${fmtDate(scheduledAt)}`,
+    html: emailBase(`
+      <h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;color:#331D19;">${autoAccepted ? "New booking confirmed" : "New booking request"}</h1>
+      <p style="margin:0 0 24px;color:#8C6A64;font-size:15px;line-height:1.6;">
+        ${autoAccepted
+          ? `${resolvedClient} booked ${resolvedService} and the appointment was confirmed automatically.`
+          : `${resolvedClient} booked ${resolvedService} and is waiting for your confirmation.`}
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F3ECE7;border-radius:16px;padding:20px 24px;">
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Client</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:16px;">${resolvedClient}</td></tr>
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:16px;">${resolvedService}</td></tr>
+        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
+        <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(scheduledAt)}</td></tr>
+      </table>
+      <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">Open Kliques to review the appointment.</p>
+    `),
+  });
+}
+
 // ─── Session reminder scheduler (runs every 5 min) ───────────────────────────
 // Sends a push notification 3 hours before confirmed appointments
 setInterval(async () => {
@@ -2253,6 +2309,17 @@ app.post("/api/bookings", async (req, res) => {
               }).catch(() => {});
             }
           }
+          if (data.status === 'confirmed') {
+            const provInfo = await getProviderEmailInfo(data.provider_id);
+            const { name: clientName } = await getClientNotifPrefs(data.client_id);
+            await sendProviderNewBookingEmail({
+              to: provInfo.email,
+              clientName,
+              serviceName: data.service_name,
+              scheduledAt: data.scheduled_at,
+              autoAccepted: true,
+            }).catch(() => {});
+          }
         }
 
         if (data.status === "confirmed" && data.client_id) {
@@ -2274,6 +2341,14 @@ app.post("/api/bookings", async (req, res) => {
             body: "Your appointment has been confirmed in Kliques.",
             url: "/app/bookings",
             tag: `booking-confirmed-${data.id}`,
+          }).catch(() => {});
+          const provInfo = await getProviderEmailInfo(data.provider_id);
+          const { email: clientEmail } = await getClientNotifPrefs(data.client_id);
+          await sendClientBookingConfirmedEmail({
+            to: clientEmail,
+            providerName: provInfo.name || data.provider_name,
+            serviceName: data.service_name,
+            scheduledAt: data.scheduled_at,
           }).catch(() => {});
         }
         return res.status(201).json({ booking: data });
@@ -9848,6 +9923,26 @@ app.post("/api/bookings/create", async (req, res) => {
       booking_id: bookingId,
     }).catch(() => {});
 
+    const providerEmailInfo = await getProviderEmailInfo(providerId);
+    const { name: bookingClientName, email: bookingClientEmail } = userId
+      ? await getClientNotifPrefs(userId)
+      : { name: "A client", email: null };
+    const { data: bookingService } = serviceId
+      ? await supabase
+        .from("services")
+        .select("name")
+        .eq("id", serviceId)
+        .maybeSingle()
+      : { data: null };
+
+    await sendProviderNewBookingEmail({
+      to: providerEmailInfo.email,
+      clientName: bookingClientName,
+      serviceName: bookingService?.name || null,
+      scheduledAt,
+      autoAccepted: providerBookingRules.autoAccept,
+    }).catch(() => {});
+
     if (providerBookingRules.autoAccept && userId) {
       await createClientNotification(userId, {
         type: "accepted",
@@ -9867,6 +9962,12 @@ app.post("/api/bookings/create", async (req, res) => {
         body: "Your appointment has been confirmed in Kliques.",
         url: "/app/bookings",
         tag: `booking-confirmed-${bookingId}`,
+      }).catch(() => {});
+      await sendClientBookingConfirmedEmail({
+        to: bookingClientEmail,
+        providerName: providerEmailInfo.name,
+        serviceName: bookingService?.name || null,
+        scheduledAt,
       }).catch(() => {});
     }
 
@@ -10036,6 +10137,16 @@ app.post("/api/bookings/request-time", async (req, res) => {
       },
     }).catch(() => {});
 
+    const providerEmailInfo = await getProviderEmailInfo(provider_id);
+    const { email: clientEmail } = await getClientNotifPrefs(clientId);
+    await sendProviderNewBookingEmail({
+      to: providerEmailInfo.email,
+      clientName,
+      serviceName,
+      scheduledAt,
+      autoAccepted: providerBookingRules.autoAccept,
+    }).catch(() => {});
+
     if (providerBookingRules.autoAccept) {
       await createClientNotification(clientId, {
         type: "accepted",
@@ -10055,6 +10166,12 @@ app.post("/api/bookings/request-time", async (req, res) => {
         body: "Your appointment has been confirmed in Kliques.",
         url: "/app/bookings",
         tag: `booking-confirmed-${booking.id}`,
+      }).catch(() => {});
+      await sendClientBookingConfirmedEmail({
+        to: clientEmail,
+        providerName: providerEmailInfo.name || providerName,
+        serviceName,
+        scheduledAt,
       }).catch(() => {});
     }
 
