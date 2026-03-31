@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 import Skeleton from "../../components/ui/Skeleton";
 import { useToast } from "../../components/ui/ToastProvider";
 import { useSession } from "../../auth/authContext";
-import { fetchProviderInvoices, createProviderInvoice, fetchProviderJobs, downloadInvoicePDF } from "../../data/provider";
+import { fetchProviderInvoices, downloadInvoicePDF } from "../../data/provider";
 import "../../styles/provider/providerInvoices.css";
 
 function ProviderInvoices() {
@@ -24,18 +24,6 @@ function ProviderInvoices() {
       const data = await fetchProviderInvoices();
       const normalized = (data || []).map(normalizeInvoice);
       setInvoices(normalized);
-      // If no invoices, attempt to generate from completed jobs
-      if (!normalized || normalized.length === 0) {
-        const jobs = await fetchProviderJobs({ status: "completed" });
-        if (jobs?.length) {
-          const generated = await Promise.all(
-            jobs.map((job) =>
-              createProviderInvoice(generateInvoiceFromAppointment(job))
-            )
-          );
-          setInvoices(generated.map(normalizeInvoice));
-        }
-      }
     } catch (error) {
       console.error("Error loading invoices:", error);
       toast.push({
@@ -90,35 +78,6 @@ function ProviderInvoices() {
     setFilteredInvoices(filtered);
   }, [invoices, searchQuery, statusFilter, sortBy]);
 
-  const generateInvoiceFromAppointment = (appointment) => {
-    const invoiceDate = new Date(appointment.scheduled_at || appointment.date || Date.now());
-    const invoiceNumber = `INV-${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)
-      .toUpperCase()}`;
-
-    return {
-      id: `inv_${appointment.id}`,
-      invoiceNumber,
-      invoiceDate: invoiceDate.toISOString(),
-      appointmentId: appointment.id,
-      clientName: appointment.client_name || appointment.clientName,
-      clientEmail: appointment.clientEmail || "N/A",
-      clientPhone: appointment.phone || "N/A",
-      service: appointment.service_name || appointment.service,
-      description: `Service provided: ${appointment.service_name || appointment.service}`,
-      quantity: 1,
-      unitPrice: appointment.price || appointment.total_amount || 0,
-      totalAmount: appointment.price || appointment.total_amount || 0,
-      depositAmount: appointment.depositAmount || 0,
-      finalAmount: (appointment.price || 0) - (appointment.depositAmount || 0),
-      status: appointment.status || "paid",
-      paymentDate: new Date(appointment.date),
-      notes: appointment.notes || "",
-      address: appointment.address || "N/A",
-    };
-  };
-
   const normalizeInvoice = (inv) => ({
     id: inv.id,
     invoiceNumber: inv.invoice_number || inv.invoiceNumber,
@@ -127,14 +86,14 @@ function ProviderInvoices() {
     clientName: inv.client_name || inv.clientName,
     clientEmail: inv.client_email || inv.clientEmail || "N/A",
     clientPhone: inv.client_phone || inv.clientPhone || "N/A",
-    service: inv.service || "Service",
-    description: inv.description || "",
+    service: inv.service_name || inv.service || "Service",
+    description: inv.service_description || inv.description || "",
     quantity: 1,
-    unitPrice: inv.unit_price || inv.unitPrice || inv.total_amount || 0,
-    totalAmount: inv.total_amount || inv.totalAmount || 0,
+    unitPrice: inv.unit_price || inv.unitPrice || inv.total_amount || inv.total || inv.subtotal || 0,
+    totalAmount: inv.total_amount || inv.totalAmount || inv.total || inv.subtotal || 0,
     depositAmount: inv.deposit_amount || inv.depositAmount || 0,
-    finalAmount: inv.final_amount || inv.finalAmount || inv.total_amount || 0,
-    status: inv.status || "pending",
+    finalAmount: inv.final_amount || inv.finalAmount || inv.remaining_amount || inv.total_amount || inv.total || 0,
+    status: inv.status || inv.payment_status || "pending",
     paymentDate: inv.paid_at || inv.paymentDate,
     notes: inv.notes || "",
     address: inv.address || "N/A",

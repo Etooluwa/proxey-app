@@ -70,7 +70,7 @@ const ClientInvoices = () => {
     const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
-            const res = await fetch(`/api/bookings/${invoice.booking_id}/invoice`, {
+            const res = await fetch(`/api/invoices/${invoice.id}/pdf`, {
                 headers: { 'x-user-id': session?.user?.id },
             });
             if (!res.ok) throw new Error('Failed');

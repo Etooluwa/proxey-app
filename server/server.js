@@ -5733,49 +5733,30 @@ app.get("/api/client/invoices", async (req, res) => {
   }
 
   try {
-    // Fetch all bookings for this client - these serve as invoices
-    const { data: bookings, error } = await supabase
-      .from("bookings")
+    // Fetch the actual generated provider invoices for this client
+    const { data: invoices, error } = await supabase
+      .from("provider_invoices")
       .select("*")
       .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
+      .order("issued_at", { ascending: false });
 
     if (error) {
       console.error("[supabase] Failed to fetch client invoices:", error);
       return res.status(500).json({ error: "Failed to fetch invoices" });
     }
 
-    // Transform bookings to invoice format
-    const invoices = (bookings || []).map(booking => ({
-      id: booking.id,
-      booking_id: booking.id,
-      invoice_number: `INV-${booking.id.substring(0, 8).toUpperCase()}`,
-      client_id: booking.client_id,
-      client_name: booking.client_name,
-      client_email: booking.client_email,
-      provider_id: booking.provider_id,
-      provider_name: booking.provider_name,
-      service_id: booking.service_id,
-      service_name: booking.service_name,
-      service_description: booking.service_description,
-      scheduled_at: booking.scheduled_at,
-      duration: booking.duration,
-      location: booking.location,
-      address: booking.address,
-      price: booking.price,
-      total_amount: booking.price,
-      currency: booking.currency || 'USD',
-      status: booking.status,
-      payment_status: booking.payment_status,
-      payment_intent_id: booking.payment_intent_id,
-      notes: booking.notes,
-      created_at: booking.created_at,
-      issued_at: booking.created_at,
-      updated_at: booking.updated_at,
-      completed_at: booking.completed_at
+    const normalized = (invoices || []).map((invoice) => ({
+      ...invoice,
+      provider_name: invoice.business_name || invoice.provider_name || "Provider",
+      service_name: invoice.service_name || invoice.service || "Service",
+      service_description: invoice.service_description || invoice.description || null,
+      total_amount: invoice.total_amount ?? invoice.total ?? invoice.subtotal ?? 0,
+      issued_at: invoice.issued_at || invoice.created_at,
+      created_at: invoice.created_at || invoice.issued_at,
+      payment_status: invoice.payment_status || invoice.status || "paid",
     }));
 
-    res.status(200).json({ invoices });
+    res.status(200).json({ invoices: normalized });
   } catch (err) {
     console.error("[client invoices] Unexpected error:", err);
     res.status(500).json({ error: "Failed to fetch invoices" });
@@ -10026,6 +10007,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       .from("provider_invoices")
       .insert({
         provider_id: booking.provider_id,
+        client_id: booking.client_id,
         booking_id: bookingId,
         invoice_number: invoiceNumber,
         business_name: providerDisplayName,
@@ -10034,16 +10016,23 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         business_phone: providerProfile?.phone || null,
         client_name: clientProfile?.name || booking.client_name || null,
         client_email: clientProfile?.email || booking.client_email || null,
+        client_phone: clientProfile?.phone || booking.client_phone || null,
+        address: booking.address || null,
+        service: serviceName,
+        description: serviceDesc,
         service_name: serviceName,
         service_description: serviceDesc,
         date_of_service: booking.scheduled_at || booking.created_at,
         duration: durationMins ? `${durationMins} min` : null,
+        total_amount: totalCents,
+        final_amount: remainingCents,
         subtotal: totalCents,
         deposit_amount: depositPaidCents,
         remaining_amount: remainingCents,
         total: totalCents,
         status: "paid",
         issued_at: now,
+        paid_at: now,
       })
       .select()
       .single();
