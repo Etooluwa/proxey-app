@@ -235,7 +235,7 @@ const ProviderServiceEditor = () => {
                     durationHr:         Math.floor(totalMins / 60),
                     durationMin:        totalMins % 60,
                     description:        svc.description || '',
-                    price:              svc.base_price != null ? String(svc.base_price) : '',
+                    price:              svc.base_price != null ? String(svc.base_price / 100) : '',
                     payType:            svc.payment_type || 'full',
                     depositType:        svc.deposit_type || 'percent',
                     depositValue:       svc.deposit_value != null ? svc.deposit_value : 50,

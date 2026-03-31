@@ -189,6 +189,11 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
                                                 {svc.duration && svc.base_price ? ' · ' : ''}
                                                 {svc.base_price ? `${fmtPrice(svc.base_price)} ${svc.unit || ''}`.trim() : 'POA'}
                                             </p>
+                                            {svc.description ? (
+                                                <p className="text-[12px] text-faded m-0 mt-1 leading-relaxed line-clamp-2">
+                                                    {svc.description}
+                                                </p>
+                                            ) : null}
                                         </div>
                                         {/* Circle checkmark toggle */}
                                         <div

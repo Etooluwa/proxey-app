@@ -1504,7 +1504,7 @@ app.post("/api/services", async (req, res) => {
     name,
     description: description || "",
     category,
-    base_price: basePrice,
+    base_price: Math.round((parseFloat(basePrice) || 0) * 100), // store cents
     unit: unit || "visit",
     duration: duration || 60,
     provider_id: providerId,
@@ -1649,7 +1649,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
     if (name !== undefined)                 updates.name = name;
     if (description !== undefined)          updates.description = description;
     if (category !== undefined)             updates.category = category;
-    if (basePrice !== undefined)            updates.base_price = basePrice;
+    if (basePrice !== undefined)            updates.base_price = Math.round((parseFloat(basePrice) || 0) * 100); // store cents
     if (duration !== undefined)             updates.duration = duration;
     if (isActive !== undefined)             updates.is_active = isActive;
     if (paymentType !== undefined)          updates.payment_type = paymentType;
@@ -6831,8 +6831,21 @@ app.post("/api/charge", async (req, res) => {
     }
 
     await assertPaymentMethodBelongsToCustomer(paymentMethodId, customerId);
-    const providerStripe = await getProviderStripeConnectStatus(providerId, { requireReady: true });
-    const connectParams = buildConnectTransferParams(Math.round(amount), providerStripe.accountId);
+
+    // Resolve provider's stripe_account_id — providerId may be user_id (not providers.id)
+    let providerStripeAccountId = null;
+    if (providerId) {
+      const { data: provRow } = await supabase
+        .from("providers")
+        .select("stripe_account_id")
+        .or(`user_id.eq.${providerId},id.eq.${providerId}`)
+        .maybeSingle();
+      providerStripeAccountId = provRow?.stripe_account_id || null;
+    }
+    if (!providerStripeAccountId) {
+      return res.status(400).json({ error: "Provider has not connected Stripe yet." });
+    }
+    const connectParams = buildConnectTransferParams(Math.round(amount), providerStripeAccountId);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
