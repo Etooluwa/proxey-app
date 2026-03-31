@@ -96,7 +96,7 @@ function TopNav({ onBack }) {
                     <BackBtn onClick={onBack} />
                 </div>
             )}
-            <img src={klogo} alt="kliques" style={{ height: 34, width: 'auto', display: 'block' }} />
+            <img src={klogo} alt="kliques" style={{ height: 44, width: 'auto', display: 'block' }} />
         </div>
     );
 }
