@@ -21,6 +21,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const PLATFORM_CURRENCY = "cad";
 const PLATFORM_FEE_RATE = 0.10;
+const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || "";
+const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY || "";
+const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || "mailto:info@mykliques.com";
 
 const supabase =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -90,6 +93,34 @@ app.get("/", (req, res) => {
 // Health check — used by frontend to warm up the server on cold start
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/push/public-key", (req, res) => {
+  res.status(200).json({ publicKey: WEB_PUSH_PUBLIC_KEY || null });
+});
+
+app.post("/api/client/push-subscriptions", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+
+  const userId = getUserId(req);
+  const { subscription } = req.body || {};
+
+  if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+    return res.status(400).json({ error: "Valid push subscription is required." });
+  }
+
+  try {
+    const record = await saveClientPushSubscription(
+      userId,
+      subscription,
+      req.headers["user-agent"] || null,
+    );
+
+    return res.status(201).json({ subscription: record });
+  } catch (error) {
+    console.error("[push-subscriptions] Failed to save subscription:", error);
+    return res.status(500).json({ error: "Failed to save push subscription." });
+  }
 });
 
 // ============================================
@@ -334,6 +365,187 @@ async function getClientNotifPrefs(userId) {
     email: data?.email || null,
     name: data?.name || null,
   };
+}
+
+function base64UrlEncode(input) {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function base64UrlDecode(input) {
+  const normalized = String(input || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(String(input || "").length / 4) * 4, "=");
+  return Buffer.from(normalized, "base64");
+}
+
+function getWebPushKeyMaterial() {
+  if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) return null;
+
+  try {
+    const publicKeyBytes = base64UrlDecode(WEB_PUSH_PUBLIC_KEY);
+    const privateKeyBytes = base64UrlDecode(WEB_PUSH_PRIVATE_KEY);
+
+    if (publicKeyBytes.length !== 65 || publicKeyBytes[0] !== 0x04 || privateKeyBytes.length !== 32) {
+      return null;
+    }
+
+    const x = base64UrlEncode(publicKeyBytes.subarray(1, 33));
+    const y = base64UrlEncode(publicKeyBytes.subarray(33, 65));
+    const d = base64UrlEncode(privateKeyBytes);
+
+    const privateKey = crypto.createPrivateKey({
+      key: {
+        kty: "EC",
+        crv: "P-256",
+        x,
+        y,
+        d,
+      },
+      format: "jwk",
+    });
+
+    return {
+      publicKey: WEB_PUSH_PUBLIC_KEY,
+      privateKey,
+    };
+  } catch (error) {
+    console.warn("[push] Invalid VAPID key material:", error.message);
+    return null;
+  }
+}
+
+const webPushKeyMaterial = getWebPushKeyMaterial();
+
+function createVapidJwt(audience) {
+  if (!webPushKeyMaterial) return null;
+
+  const header = base64UrlEncode(JSON.stringify({ typ: "JWT", alg: "ES256" }));
+  const payload = base64UrlEncode(JSON.stringify({
+    aud: audience,
+    exp: Math.floor(Date.now() / 1000) + (12 * 60 * 60),
+    sub: WEB_PUSH_SUBJECT,
+  }));
+  const unsignedToken = `${header}.${payload}`;
+  const signature = crypto.sign("sha256", Buffer.from(unsignedToken), {
+    key: webPushKeyMaterial.privateKey,
+    dsaEncoding: "ieee-p1363",
+  });
+
+  return `${unsignedToken}.${base64UrlEncode(signature)}`;
+}
+
+function sendPushRequest(subscription, notification) {
+  if (!subscription?.endpoint || !webPushKeyMaterial) {
+    return Promise.resolve({ ok: false, statusCode: 0 });
+  }
+
+  const endpointUrl = new URL(subscription.endpoint);
+  const audience = `${endpointUrl.protocol}//${endpointUrl.host}`;
+  const vapidJwt = createVapidJwt(audience);
+
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: endpointUrl.hostname,
+      port: endpointUrl.port || 443,
+      path: `${endpointUrl.pathname}${endpointUrl.search}`,
+      method: "POST",
+      headers: {
+        TTL: "60",
+        Urgency: "high",
+        Topic: notification.tag || "booking-confirmed",
+        Authorization: `vapid t=${vapidJwt}, k=${webPushKeyMaterial.publicKey}`,
+        "Crypto-Key": `p256ecdsa=${webPushKeyMaterial.publicKey}`,
+        "Content-Length": 0,
+      },
+    }, (response) => {
+      response.resume();
+      response.on("end", () => {
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          statusCode: response.statusCode || 0,
+        });
+      });
+    });
+
+    req.on("error", (error) => {
+      console.warn("[push] request failed:", error.message);
+      resolve({ ok: false, statusCode: 0 });
+    });
+
+    req.end();
+  });
+}
+
+async function saveClientPushSubscription(userId, subscription, userAgent) {
+  if (!supabase || !userId || !subscription?.endpoint) return null;
+
+  const keyData = subscription.keys || {};
+  if (!keyData.p256dh || !keyData.auth) return null;
+
+  const { data, error } = await supabase
+    .from("client_push_subscriptions")
+    .upsert({
+      user_id: userId,
+      endpoint: subscription.endpoint,
+      p256dh: keyData.p256dh,
+      auth: keyData.auth,
+      user_agent: userAgent || null,
+      updated_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    }, { onConflict: "endpoint" })
+    .select()
+    .single();
+
+  if (error) {
+    console.warn("[push] Failed to save client push subscription:", error.message);
+    return null;
+  }
+
+  return data;
+}
+
+async function deleteClientPushSubscription(endpoint) {
+  if (!supabase || !endpoint) return;
+  await supabase
+    .from("client_push_subscriptions")
+    .delete()
+    .eq("endpoint", endpoint);
+}
+
+async function sendClientPushNotification(userId, notification) {
+  if (!supabase || !userId || !webPushKeyMaterial) return;
+
+  const prefKey = getClientPushPrefKey(notification?.type);
+  if (prefKey) {
+    const { prefs } = await getClientNotifPrefs(userId);
+    if (prefs?.[prefKey] === false) return;
+  }
+
+  const { data: subscriptions, error } = await supabase
+    .from("client_push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId);
+
+  if (error || !subscriptions?.length) return;
+
+  await Promise.all(subscriptions.map(async (subscription) => {
+    const result = await sendPushRequest({
+      endpoint: subscription.endpoint,
+      keys: {
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+      },
+    }, notification);
+
+    if ([404, 410].includes(result.statusCode)) {
+      await deleteClientPushSubscription(subscription.endpoint);
+    }
+  }));
 }
 
 // ─── Helper: fetch provider email + name ─────────────────────────────────────
@@ -2038,6 +2250,13 @@ app.post("/api/bookings", async (req, res) => {
               status: "confirmed",
             },
           }).catch(() => {});
+          await sendClientPushNotification(data.client_id, {
+            type: "accepted",
+            title: "Booking confirmed",
+            body: "Your appointment has been confirmed in Kliques.",
+            url: "/app/bookings",
+            tag: `booking-confirmed-${data.id}`,
+          }).catch(() => {});
         }
         return res.status(201).json({ booking: data });
       }
@@ -2603,6 +2822,13 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
               status: 'accepted'
             }
           });
+          await sendClientPushNotification(clientId, {
+            type: "booking_accepted",
+            title: "Booking confirmed",
+            body: "Your appointment has been confirmed in Kliques.",
+            url: "/app/bookings",
+            tag: `booking-confirmed-${data.id}`,
+          }).catch(() => {});
 
           // Email client: booking confirmed
           const { email: clientEmail, name: clientName } = await getClientNotifPrefs(clientId);
@@ -9617,6 +9843,13 @@ app.post("/api/bookings/create", async (req, res) => {
           status: "confirmed",
         },
       }).catch(() => {});
+      await sendClientPushNotification(userId, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your appointment has been confirmed in Kliques.",
+        url: "/app/bookings",
+        tag: `booking-confirmed-${bookingId}`,
+      }).catch(() => {});
     }
 
     res.json({ ok: true, bookingId, paymentIntentId });
@@ -9798,6 +10031,13 @@ app.post("/api/bookings/request-time", async (req, res) => {
           status: "confirmed",
         },
       }).catch(() => {});
+      await sendClientPushNotification(clientId, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your appointment has been confirmed in Kliques.",
+        url: "/app/bookings",
+        tag: `booking-confirmed-${booking.id}`,
+      }).catch(() => {});
     }
 
     return res.status(201).json({ booking });
@@ -9856,6 +10096,100 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
           status: "confirmed",
         },
       }).catch(() => {});
+      await sendClientPushNotification(booking.client_id, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your appointment has been confirmed in Kliques.",
+        url: "/app/bookings",
+        tag: `booking-confirmed-${bookingId}`,
+      }).catch(() => {});
+
+      const { email: clientEmail } = await getClientNotifPrefs(booking.client_id);
+      const providerInfo = await getProviderEmailInfo(requestingUserId);
+      if (clientEmail) {
+        sendEmail({
+          to: clientEmail,
+          subject: `Your booking is confirmed — ${fmtDate(booking.scheduled_at)}`,
+          html: `<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Booking Confirmed - Kliques</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; }
+        .hero-card { background-color: #FBE4D5 !important; border-radius: 24px !important; }
+        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
+        .data-table { background-color: #F3ECE7 !important; border-radius: 16px !important; }
+        @media screen and (max-width: 480px) {
+            .mobile-padding { padding: 20px !important; }
+            .logo-img { height: 80px !important; }
+            .h1-mobile { font-size: 24px !important; }
+        }
+    </style>
+</head>
+<body style="background-color: #FBF7F2; margin: 0; padding: 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FBF7F2;">
+        <tr>
+            <td align="center" style="padding: 40px 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 640px;">
+                    <tr>
+                        <td align="center" style="padding-bottom: 24px;">
+                            <img src="https://mykliques.com/logo512.png" alt="Kliques" width="100" class="logo-img" style="height: 100px; display: block;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="hero-card mobile-padding" style="padding: 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <div style="width: 72px; height: 72px; background-color: #331D19; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+                                            <span style="color: white; font-size: 32px;">✓</span>
+                                        </div>
+                                        <h1 class="h1-mobile" style="font-size: 28px; font-weight: 600; color: #331D19; margin: 0 0 12px 0; letter-spacing: -0.02em;">Booking confirmed</h1>
+                                        <p style="color: #8E7A75; font-size: 15px; line-height: 1.6; margin: 0;">Your booking has been confirmed. We'll see you there!</p>
+                                    </td>
+                                </tr>
+                                <tr><td height="40"></td></tr>
+                                <tr>
+                                    <td align="left" class="data-table" style="padding: 32px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Provider</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${providerInfo.name || providerLabel || 'Your provider'}</td></tr>
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Service</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${sessionLabel}</td></tr>
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Date &amp; Time</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19;">${fmtDate(booking.scheduled_at)}</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding: 40px 0 24px 0;">
+                                        <a href="https://mykliques.com/app" class="cta-button">View my kliques →</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-bottom: 40px;">
+                                        <p style="color: #331D19; font-weight: 500; font-size: 15px; margin: 0;">- The Kliques Team</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
+        }).catch(() => {});
+      }
     }
 
     return res.status(200).json({ booking: updatedBooking });

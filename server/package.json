@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:webhook": "node ./scripts/simulateWebhook.mjs"
+    "test:webhook": "node ./scripts/simulateWebhook.mjs",
+    "push:keys": "node ./scripts/generateVapidKeys.mjs"
   },
   "keywords": [],
   "author": "",

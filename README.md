@@ -43,6 +43,9 @@ STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+WEB_PUSH_PUBLIC_KEY=
+WEB_PUSH_PRIVATE_KEY=
+WEB_PUSH_SUBJECT=mailto:info@mykliques.com
 JWT_SECRET=your-dev-secret
 ```
 
@@ -57,6 +60,7 @@ In one terminal:
 ```bash
 cd server
 npm install
+npm run push:keys
 npm start
 ```
 
