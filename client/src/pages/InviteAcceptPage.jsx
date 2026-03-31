@@ -73,6 +73,52 @@ const inputStyle = {
     color: T.ink, outline: 'none', background: T.abg, boxSizing: 'border-box',
 };
 
+const shellStyle = {
+    minHeight: '100dvh',
+    background: T.base,
+    fontFamily: F,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px 16px',
+};
+
+const wrapStyle = {
+    width: '100%',
+    maxWidth: 480,
+};
+
+function TopNav({ onBack }) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', paddingBottom: 24 }}>
+            {onBack && (
+                <div style={{ position: 'absolute', left: 0 }}>
+                    <BackBtn onClick={onBack} />
+                </div>
+            )}
+            <img src={klogo} alt="kliques" style={{ height: 22, width: 'auto', display: 'block' }} />
+        </div>
+    );
+}
+
+function ProviderMiniCard({ provider }) {
+    const displayName = provider?.business_name || provider?.name || 'Your Provider';
+    const subtitle = [fmtCategory(provider?.category), provider?.city].filter(Boolean).join(' · ');
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: T.hero, borderRadius: 14, marginBottom: 28 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 500, color: T.muted, flexShrink: 0, border: '2px solid rgba(255,255,255,0.65)', overflow: 'hidden' }}>
+                {(provider?.photo || provider?.avatar)
+                    ? <img src={provider.photo || provider.avatar} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : initials(displayName)}
+            </div>
+            <div>
+                <p style={{ fontSize: 13, fontWeight: 500, margin: 0, color: T.ink }}>Joining {displayName}'s klique</p>
+                <p style={{ fontSize: 11, color: T.muted, margin: 0 }}>{subtitle || 'Provider invite'}</p>
+            </div>
+        </div>
+    );
+}
+
 const Divider = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '20px 0' }}>
         <div style={{ flex: 1, height: 1, background: T.line }} />
@@ -200,38 +246,59 @@ function ScreenLanding({ provider, hasAccount, onPrimary, onSecondary }) {
     const subtitle = [fmtCategory(provider?.category), provider?.city].filter(Boolean).join(' · ');
 
     const benefits = [
-        { title: 'Book sessions directly', desc: `Skip the back-and-forth. Book with ${firstName} in a few taps.` },
-        { title: 'Stay connected', desc: 'Get reminders, updates, and session notes in one place.' },
-        { title: 'Secure payments', desc: 'Pay safely through Stripe. No cash needed.' },
+        {
+            title: 'Book sessions directly',
+            desc: `Skip the back-and-forth. Book with ${firstName} in a few taps.`,
+            icon: <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/>,
+        },
+        {
+            title: 'Stay connected',
+            desc: 'Get reminders, updates, and session notes in one place.',
+            icon: <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round"/>,
+        },
+        {
+            title: 'Secure payments',
+            desc: 'Pay safely through Stripe. No cash needed.',
+            icon: <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round"/>,
+        },
     ];
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column' }}>
-            {/* Hero card */}
-            <div style={{ margin: 16, background: T.hero, borderRadius: 28, padding: '48px 24px 32px', position: 'relative', overflow: 'hidden', minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.12, pointerEvents: 'none', borderRadius: 28 }} />
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ marginBottom: 16 }}>
-                        <ProviderAvatar provider={provider} size={72} />
-                    </div>
-                    <img src={klogo} alt="kliques" style={{ height: 16, width: 'auto', display: 'block', marginBottom: 8 }} />
-                    <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1.2, margin: '0 0 8px' }}>
-                        {firstName} invited you<br/>to join their klique.
-                    </h1>
-                    <p style={{ fontSize: 14, color: T.muted, margin: 0 }}>
-                        {displayName}{subtitle ? ` · ${subtitle}` : ''}
-                    </p>
-                </div>
-            </div>
+        <div style={shellStyle}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap');
+                @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+                .invite-fade { animation: fadeUp .5s ease both; }
+            `}</style>
+            <div style={wrapStyle} className="invite-fade">
+                <TopNav />
 
-            {/* Benefits + CTAs */}
-            <div style={{ padding: '24px 24px 0', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: T.hero, borderRadius: 24, padding: '36px 32px', position: 'relative', overflow: 'hidden', marginBottom: 28 }}>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.1, pointerEvents: 'none' }} />
+                    <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <div style={{ marginBottom: 20, position: 'relative' }}>
+                            <ProviderAvatar provider={provider} size={80} />
+                            <div style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: '50%', background: T.success, border: `3px solid ${T.hero}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1.25, margin: '0 0 8px', color: T.ink }}>
+                            {displayName} invited you<br />to join their klique.
+                        </h1>
+                        <p style={{ fontSize: 14, color: T.muted, margin: 0 }}>
+                            {displayName}{subtitle ? ` · ${subtitle}` : ''}
+                        </p>
+                    </div>
+                </div>
+
                 <div style={{ marginBottom: 24 }}>
                     {benefits.map(b => (
-                        <div key={b.title} style={{ display: 'flex', gap: 14, padding: '12px 0', alignItems: 'flex-start' }}>
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div key={b.title} style={{ display: 'flex', gap: 16, padding: '14px 0', alignItems: 'flex-start' }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 12, background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                 <svg width="16" height="16" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24">
-                                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/>
+                                    {b.icon}
                                 </svg>
                             </div>
                             <div>
@@ -296,11 +363,11 @@ function ScreenSignup({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToLog
     };
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '32px 24px 0', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-                <BackBtn onClick={onBack} />
-            </div>
-            <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={shellStyle}>
+            <div style={wrapStyle}>
+                <TopNav onBack={onBack} />
+                <ProviderMiniCard provider={provider} />
+
                 <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Create your account</h1>
                 <p style={{ fontSize: 14, color: T.muted, margin: '0 0 28px' }}>Sign up to connect with {displayName}</p>
 
@@ -361,11 +428,11 @@ function ScreenLogin({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToSign
     };
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '32px 24px 0', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-                <BackBtn onClick={onBack} />
-            </div>
-            <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={shellStyle}>
+            <div style={wrapStyle}>
+                <TopNav onBack={onBack} />
+                <ProviderMiniCard provider={provider} />
+
                 <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Welcome back</h1>
                 <p style={{ fontSize: 14, color: T.muted, margin: '0 0 28px' }}>Sign in to connect with {displayName}</p>
 
@@ -403,28 +470,32 @@ function ScreenConnecting({ provider, clientName }) {
     const providerInits = initials(displayName);
     const clientInits = initials(clientName || 'You');
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={shellStyle}>
             <style>{`
                 @keyframes pop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}
                 @keyframes draw{to{stroke-dashoffset:0}}
             `}</style>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32 }}>
+            <div style={{ ...wrapStyle, textAlign: 'center' }}>
+                <TopNav />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 36 }}>
                 {/* Provider avatar */}
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+                    <div style={{ width: 68, height: 68, borderRadius: '50%', background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
                     {provider?.photo || provider?.avatar
-                        ? <img src={provider.photo || provider.avatar} alt="" style={{ width: 58, height: 58, borderRadius: '50%', objectFit: 'cover' }} />
+                        ? <img src={provider.photo || provider.avatar} alt="" style={{ width: 62, height: 62, borderRadius: '50%', objectFit: 'cover' }} />
                         : providerInits}
-                </div>
+                    </div>
                 {/* Animated line */}
-                <svg width="48" height="4" style={{ margin: '0 -6px', zIndex: 1 }}>
-                    <line x1="0" y1="2" x2="48" y2="2" stroke={T.accent} strokeWidth="2" strokeDasharray="48" strokeDashoffset="48" strokeLinecap="round" style={{ animation: 'draw .6s ease .3s both' }} />
-                </svg>
+                    <svg width="56" height="4" style={{ margin: '0 -8px', zIndex: 1 }}>
+                        <line x1="0" y1="2" x2="56" y2="2" stroke={T.accent} strokeWidth="2.5" strokeDasharray="56" strokeDashoffset="56" strokeLinecap="round" style={{ animation: 'draw .6s ease .3s both' }} />
+                    </svg>
                 {/* Client avatar */}
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) .15s both' }}>
-                    {clientInits}
+                    <div style={{ width: 68, height: 68, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) .15s both' }}>
+                        {clientInits}
+                    </div>
                 </div>
+                <h2 style={{ fontSize: 20, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 8px', color: T.ink }}>Connecting you with {displayName}...</h2>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.faded, margin: 0 }}>This will only take a moment</p>
             </div>
-            <p style={{ fontFamily: F, fontSize: 16, color: T.muted, margin: 0 }}>Connecting you with {displayName}…</p>
         </div>
     );
 }
@@ -444,26 +515,23 @@ function ScreenConnected({ provider, clientName }) {
     ];
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={shellStyle}>
             <style>{`@keyframes pop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}`}</style>
+            <div style={{ ...wrapStyle, textAlign: 'center' }}>
+                <TopNav />
 
             {/* Two avatars + solid line */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
+                    <div style={{ width: 68, height: 68, borderRadius: '50%', background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
                     {provider?.photo || provider?.avatar
-                        ? <img src={provider.photo || provider.avatar} alt="" style={{ width: 58, height: 58, borderRadius: '50%', objectFit: 'cover' }} />
+                        ? <img src={provider.photo || provider.avatar} alt="" style={{ width: 62, height: 62, borderRadius: '50%', objectFit: 'cover' }} />
                         : providerInits}
+                    </div>
+                    <div style={{ width: 56, height: 3, margin: '0 -8px', zIndex: 1, background: T.accent, borderRadius: 2 }} />
+                    <div style={{ width: 68, height: 68, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) .1s both' }}>
+                        {clientInits}
+                    </div>
                 </div>
-                <div style={{ width: 48, height: 4, margin: '0 -6px', zIndex: 1, background: T.accent, borderRadius: 2 }} />
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 500, color: T.muted, border: `3px solid ${T.base}`, zIndex: 2, animation: 'pop .4s cubic-bezier(0.34,1.56,0.64,1) .1s both' }}>
-                    {clientInits}
-                </div>
-            </div>
-
-            <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px' }}>You're connected.</h1>
-            <p style={{ fontSize: 15, color: T.muted, margin: '0 0 20px', lineHeight: 1.6 }}>
-                You and {displayName} are now in each other's klique.
-            </p>
 
             {/* Connected pill */}
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9999, background: T.successBg, marginBottom: 32 }}>
@@ -473,24 +541,31 @@ function ScreenConnected({ provider, clientName }) {
                 <span style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.success }}>Connected</span>
             </div>
 
-            {/* What you can do now */}
-            <div style={{ width: '100%', textAlign: 'left', padding: 20, background: T.abg, borderRadius: 16, marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 8px', color: T.ink }}>You're in!</h1>
+                <p style={{ fontSize: 15, color: T.muted, margin: '0 0 32px', lineHeight: 1.6, maxWidth: 340, marginInline: 'auto' }}>
+                    You and {displayName} are now in each other's klique. Your relationship starts here.
+                </p>
+
+                <div style={{ width: '100%', textAlign: 'left', padding: 24, background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, marginBottom: 24 }}>
                 <Lbl>What you can do now</Lbl>
                 <div style={{ marginTop: 4 }}>
                     {items.map(item => (
                         <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                            <svg width="14" height="14" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24">
-                                <path d="M7 17L17 7M17 7H7M17 7V17" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <div style={{ width: 32, height: 32, borderRadius: 10, background: T.abg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <svg width="15" height="15" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M7 17L17 7M17 7H7M17 7V17" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
                             <span style={{ fontFamily: F, fontSize: 13, color: T.ink }}>{item}</span>
                         </div>
                     ))}
                 </div>
-            </div>
+                </div>
 
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <BtnPrimary onClick={() => navigate('/app')}>Book a Session</BtnPrimary>
-                <BtnOutlined onClick={() => navigate('/app')}>Go to My Kliques</BtnOutlined>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <BtnPrimary onClick={() => navigate('/app')}>Book a Session</BtnPrimary>
+                    <BtnOutlined onClick={() => navigate('/app')}>Go to My Kliques</BtnOutlined>
+                </div>
             </div>
         </div>
     );
@@ -502,16 +577,20 @@ function ScreenAlreadyConnected({ provider }) {
     const displayName = provider?.business_name || provider?.name || 'Your Provider';
 
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
-            <ProviderAvatar provider={provider} size={72} />
-            <div style={{ height: 20 }} />
-            <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Already connected</h1>
-            <p style={{ fontSize: 15, color: T.muted, margin: '0 0 32px', lineHeight: 1.6 }}>
-                You're already in {displayName}'s klique.
-            </p>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <BtnPrimary onClick={() => navigate('/app')}>Book a Session</BtnPrimary>
-                <BtnOutlined onClick={() => navigate('/app')}>Go to My Kliques</BtnOutlined>
+        <div style={shellStyle}>
+            <div style={{ ...wrapStyle, textAlign: 'center' }}>
+                <TopNav />
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                    <ProviderAvatar provider={provider} size={72} />
+                </div>
+                <h1 style={{ fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px', color: T.ink }}>Already connected</h1>
+                <p style={{ fontSize: 15, color: T.muted, margin: '0 0 32px', lineHeight: 1.6 }}>
+                    You're already in {displayName}'s klique.
+                </p>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <BtnPrimary onClick={() => navigate('/app')}>Book a Session</BtnPrimary>
+                    <BtnOutlined onClick={() => navigate('/app')}>Go to My Kliques</BtnOutlined>
+                </div>
             </div>
         </div>
     );
