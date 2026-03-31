@@ -266,9 +266,12 @@ const ProviderAppointmentDetail = () => {
         }
     };
 
+    const [completeError, setCompleteError] = useState(null);
+
     const handleMarkComplete = async () => {
         if (!job || completing) return;
         setCompleting(true);
+        setCompleteError(null);
         try {
             const data = await request(`/bookings/${id}/complete`, {
                 method: 'POST',
@@ -282,12 +285,20 @@ const ProviderAppointmentDetail = () => {
                     providerPayout: data.payout.netAmount,
                     paymentType: job.payment_type || 'full',
                 }
-                : null;
+                : {
+                    totalPrice: job.price ? job.price / 100 : 0,
+                    depositCollected: 0,
+                    remainingCharged: 0,
+                    platformFee: 0,
+                    providerPayout: job.price ? job.price / 100 : 0,
+                    paymentType: job.payment_type || 'full',
+                };
             setPayoutData(payout);
             setJob((prev) => ({ ...prev, status: 'completed', completed_at: new Date().toISOString() }));
             setCompleted(true);
         } catch (err) {
             console.error('[markComplete]', err);
+            setCompleteError(err.message || 'Failed to complete. Please try again.');
         } finally {
             setCompleting(false);
         }
@@ -493,6 +504,45 @@ const ProviderAppointmentDetail = () => {
 
                 <Divider />
 
+                {/* ─ Client intake & notes ─ */}
+                {(job.client_message || (job.intake_responses && job.intake_responses.length > 0)) && (
+                    <>
+                        <div className="py-5">
+                            <Lbl className="block mb-3">From the Client</Lbl>
+
+                            {job.client_message && (
+                                <div
+                                    className="px-4 py-3 rounded-[12px] mb-4"
+                                    style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.12)' }}
+                                >
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1">
+                                        Client Note
+                                    </p>
+                                    <p className="text-[14px] text-ink m-0 leading-relaxed">
+                                        {job.client_message}
+                                    </p>
+                                </div>
+                            )}
+
+                            {job.intake_responses && job.intake_responses.length > 0 && (
+                                <div className="flex flex-col gap-3">
+                                    {job.intake_responses.map((item, i) => (
+                                        <div key={i}>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1">
+                                                {item.question}
+                                            </p>
+                                            <p className="text-[14px] text-ink m-0 leading-relaxed">
+                                                {item.answer || <span className="text-muted italic">No answer</span>}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <Divider />
+                    </>
+                )}
+
                 {/* ─ Session notes ─ */}
                 <div className="py-5">
                     <Lbl className="block mb-3">Session Notes</Lbl>
@@ -546,13 +596,19 @@ const ProviderAppointmentDetail = () => {
             {/* ── Sticky bottom bar ── */}
             {!isAlreadyCompleted && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 flex gap-3 px-5 py-3"
+                    className="fixed bottom-0 left-0 right-0 flex flex-col px-5 py-3"
                     style={{
                         background: '#FBF7F2',
                         borderTop: '1px solid rgba(140,106,100,0.15)',
                         paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                     }}
                 >
+                    {completeError && (
+                        <p className="w-full text-center text-[12px] mb-2 m-0" style={{ color: '#C25E4A' }}>
+                            {completeError}
+                        </p>
+                    )}
+                    <div className="flex gap-3 w-full">
                     <button
                         onClick={handleMessage}
                         className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
@@ -571,6 +627,7 @@ const ProviderAppointmentDetail = () => {
                         )}
                         {completing ? 'Completing…' : 'Mark Complete'}
                     </button>
+                    </div>
                 </div>
             )}
 

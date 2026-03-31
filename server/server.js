@@ -2060,6 +2060,19 @@ app.get("/api/bookings/:id", async (req, res) => {
       providerInfo = data || null;
     }
 
+    // Fetch intake responses for this booking
+    let intakeResponses = [];
+    const { data: intakeRows } = await supabase
+      .from("booking_intake_responses")
+      .select("question_id, response_text, intake_questions(question_text, question_type)")
+      .eq("booking_id", bookingId);
+    if (intakeRows?.length) {
+      intakeResponses = intakeRows.map(r => ({
+        question: r.intake_questions?.question_text || r.question_id,
+        answer: r.response_text,
+      }));
+    }
+
     const enriched = {
       ...booking,
       provider_name: providerInfo?.business_name || providerInfo?.name || booking.provider_name || "Provider",
@@ -2068,6 +2081,8 @@ app.get("/api/bookings/:id", async (req, res) => {
       service_name: serviceInfo?.name || booking.service_name || "Service",
       service_description: serviceInfo?.description || booking.service_description || null,
       duration_minutes: serviceInfo?.duration_minutes || booking.duration_minutes || booking.duration || null,
+      intake_responses: intakeResponses,
+      client_message: booking.metadata?.client_message || null,
     };
 
     return res.status(200).json({ booking: enriched });
@@ -2500,60 +2515,6 @@ app.post("/api/payments/create-checkout", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-app.get("/api/bookings/:id", async (req, res) => {
-  const bookingId = req.params.id;
-
-  if (!supabase) {
-    return res
-      .status(500)
-      .json({ error: "Supabase client is not configured on the server." });
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("bookings")
-      .select(
-        `
-        id,
-        service_name,
-        service_title,
-        service_description,
-        amount_due,
-        amount_total,
-        amount,
-        price,
-        currency,
-        provider_id,
-        providerId,
-        client_email,
-        customer_email,
-        customerEmail,
-        status
-      `
-      )
-      .eq("id", bookingId)
-      .single();
-
-    if (error) {
-      console.error(`[supabase] Failed to load booking ${bookingId}:`, error);
-      return res.status(500).json({
-        error: `Failed to load booking ${bookingId}.`,
-        details: error.message,
-      });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: "Booking not found." });
-    }
-
-    const normalized = normalizeBooking(data);
-    res.status(200).json({ booking: normalized });
-  } catch (err) {
-    console.error(`[supabase] Unexpected error fetching booking ${bookingId}`, err);
-    res.status(500).json({ error: "Unexpected error fetching booking." });
-  }
-});
-
 app.get("/api/provider/jobs", async (req, res) => {
   const providerId = getProviderId(req);
   const { status } = req.query;
