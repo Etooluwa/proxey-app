@@ -215,9 +215,6 @@ const ProviderAppointmentDetail = () => {
     const [notes, setNotes] = useState('');
     const [savingNotes, setSavingNotes] = useState(false);
     const [completing, setCompleting] = useState(false);
-    const [charging, setCharging] = useState(false);
-    const [chargeError, setChargeError] = useState(null);
-
     // Completion state
     const [completed, setCompleted] = useState(false);
     const [payoutData, setPayoutData] = useState(null);
@@ -266,20 +263,6 @@ const ProviderAppointmentDetail = () => {
             navigate(`/provider/messages/${conv.id}`);
         } catch (err) {
             console.error('[message]', err);
-        }
-    };
-
-    const handleChargeCard = async () => {
-        if (!job || charging) return;
-        setCharging(true);
-        setChargeError(null);
-        try {
-            await request(`/bookings/${id}/charge-card`, { method: 'POST' });
-            setJob((prev) => ({ ...prev, payment_status: 'paid' }));
-        } catch (err) {
-            setChargeError(err.message || 'Charge failed. Please try again.');
-        } finally {
-            setCharging(false);
         }
     };
 
@@ -469,27 +452,11 @@ const ProviderAppointmentDetail = () => {
                                         <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Card charged successfully.</p>
                                     </div>
                                 ) : (
-                                    <>
-                                        <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
-                                            <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
-                                                Client has a card on file. Charge it below when ready.
-                                            </p>
-                                        </div>
-                                        {chargeError && (
-                                            <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FDEDEA' }}>
-                                                <p className="text-[13px] m-0" style={{ color: '#B04040' }}>{chargeError}</p>
-                                            </div>
-                                        )}
-                                        <button
-                                            onClick={handleChargeCard}
-                                            disabled={charging}
-                                            className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                                            style={{ background: '#3D231E', border: 'none', opacity: charging ? 0.7 : 1 }}
-                                        >
-                                            {charging && <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
-                                            {charging ? 'Charging…' : `Charge ${price}`}
-                                        </button>
-                                    </>
+                                    <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
+                                        <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
+                                            The full amount will be charged automatically when you mark this booking complete.
+                                        </p>
+                                    </div>
                                 )}
                             </>
                         ) : paymentType === 'deposit' && depositPaid !== null ? (

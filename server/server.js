@@ -9915,13 +9915,17 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       .eq("id", bookingId);
     if (updateErr) throw updateErr;
 
-    // 4. Charge remaining balance via Stripe if deposit was collected
+    // 4. Charge any completion-time balance via Stripe when applicable
     // booking.price is stored in cents (base_price from services table is always cents)
     const depositPaidCents = booking.deposit_paid_cents || 0;
     const totalCents = Math.round(Number(booking.price) || 0); // always cents
     const remainingCents = Math.max(totalCents - depositPaidCents, 0);
+    let chargedOnCompletionCents = 0;
 
-    if (booking.payment_type === "deposit" && depositPaidCents > 0 && remainingCents > 0 && booking.stripe_payment_method_id) {
+    if (
+      (booking.payment_type === "deposit" && depositPaidCents > 0 && remainingCents > 0 && booking.stripe_payment_method_id) ||
+      (booking.payment_type === "save_card" && totalCents > 0 && booking.stripe_payment_method_id)
+    ) {
       try {
         // Fetch provider Stripe account for Connect routing
         const { data: provRow } = await supabase
@@ -9939,9 +9943,11 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
           .maybeSingle();
         const customerId = cp?.stripe_customer_id;
 
-        // Client pays remaining + platform fee on top; provider receives remaining in full
-        const platformFeeRemaining = Math.round(remainingCents * PLATFORM_FEE_RATE);
-        const totalRemainingCharge = remainingCents + platformFeeRemaining;
+        const serviceChargeCents = booking.payment_type === "save_card" ? totalCents : remainingCents;
+
+        // Client pays service charge + platform fee on top; provider receives service charge in full
+        const platformFeeRemaining = Math.round(serviceChargeCents * PLATFORM_FEE_RATE);
+        const totalRemainingCharge = serviceChargeCents + platformFeeRemaining;
 
         const piParams = {
           amount: totalRemainingCharge,
@@ -9950,7 +9956,11 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
           payment_method: booking.stripe_payment_method_id,
           confirm: true,
           off_session: true,
-          metadata: { booking_id: bookingId, type: "deposit_remaining", serviceCents: remainingCents },
+          metadata: {
+            booking_id: bookingId,
+            type: booking.payment_type === "save_card" ? "save_card_completion_charge" : "deposit_remaining",
+            serviceCents: serviceChargeCents,
+          },
         };
         if (stripeAccountId) {
           piParams.transfer_data = { destination: stripeAccountId };
@@ -9961,8 +9971,9 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
 
         // Update payment_status
         await supabase.from("bookings").update({ payment_status: "paid" }).eq("id", bookingId);
+        chargedOnCompletionCents = serviceChargeCents;
       } catch (stripeErr) {
-        console.warn("[bookings/complete] Stripe remaining charge failed:", stripeErr.message);
+        console.warn("[bookings/complete] Stripe completion charge failed:", stripeErr.message);
         // Non-fatal — continue with completion
       }
     }
@@ -10099,7 +10110,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       payout: {
         grossAmount: grossDollars,
         depositCollected: +(depositPaidCents / 100).toFixed(2),
-        remainingCharged: +(remainingCents / 100).toFixed(2),
+        remainingCharged: +(chargedOnCompletionCents / 100).toFixed(2),
         platformFee: platformFeeDollars,
         netAmount,
       },
