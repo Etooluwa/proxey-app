@@ -4879,7 +4879,7 @@ app.get("/api/client/kliques", async (req, res) => {
     // 3. Provider profiles (try providers table first, fall back to provider_profiles)
     const { data: providers } = await supabase
       .from("providers")
-      .select("user_id, name, business_name, avatar, photo, category, categories, city")
+      .select("user_id, handle, name, business_name, avatar, photo, category, categories, city")
       .in("user_id", providerIds);
 
     const providerMap = {};
@@ -4915,6 +4915,7 @@ app.get("/api/client/kliques", async (req, res) => {
 
       return {
         provider_id: pid,
+        handle: p.handle || null,
         name: p.business_name || p.name || "Provider",
         avatar: p.avatar || p.photo || null,
         role: category,
@@ -4959,7 +4960,7 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
         .maybeSingle(),
       supabase
         .from("providers")
-        .select("user_id, name, business_name, avatar, photo, bio, category, categories, city")
+        .select("user_id, handle, name, business_name, avatar, photo, bio, category, categories, city")
         .eq("user_id", providerId)
         .maybeSingle(),
       supabase
@@ -5006,6 +5007,7 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
     res.status(200).json({
       provider: {
         provider_id: providerId,
+        handle: providerRow?.handle || null,
         name: providerRow?.business_name || providerRow?.name || profile?.name || "Provider",
         avatar: providerRow?.avatar || providerRow?.photo || profile?.avatar || null,
         photo: providerRow?.photo || providerRow?.avatar || null,

@@ -9,7 +9,7 @@
  *   4 — Review & request
  *   5 — Confirmation (pending)
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
@@ -905,6 +905,7 @@ export default function PublicBookingPage() {
     const [submitting, setSubmitting] = useState(false);
     const [bookingId, setBookingId] = useState(null);
     const [paymentData, setPaymentData] = useState(null);
+    const preselectedServiceAppliedRef = useRef(false);
 
     // Load provider
     useEffect(() => {
@@ -926,6 +927,25 @@ export default function PublicBookingPage() {
         const inviteCode = searchParams.get('invite');
         if (inviteCode) sessionStorage.setItem('kliques.pending_invite_code', inviteCode);
     }, [searchParams]);
+
+    useEffect(() => {
+        const serviceId = searchParams.get('service');
+        if (
+            preselectedServiceAppliedRef.current ||
+            step !== 1 ||
+            !serviceId ||
+            services.length === 0
+        ) {
+            return;
+        }
+
+        const matchedService = services.find((svc) => svc.id === serviceId);
+        if (!matchedService) return;
+
+        preselectedServiceAppliedRef.current = true;
+        setSelectedService(matchedService);
+        setStep(2);
+    }, [searchParams, services, step]);
 
     // Connect to provider (provider_clients) after auth
     const ensureConnected = useCallback(async (providerId) => {

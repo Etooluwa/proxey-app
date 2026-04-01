@@ -219,6 +219,12 @@ const RelationshipPage = () => {
     const unreviewedBooking = bookings.find(
         (b) => b.status === 'completed' && !b.reviewed_at && !b.has_review
     );
+    const providerHandle = provider?.handle || null;
+    const openPublicBooking = (serviceId = null) => {
+        if (!providerHandle) return;
+        const qs = serviceId ? `?service=${encodeURIComponent(serviceId)}` : '';
+        navigate(`/book/${providerHandle}${qs}`);
+    };
 
     const handleMessage = async () => {
         try {
@@ -294,7 +300,7 @@ const RelationshipPage = () => {
 
                                 {/* CTA buttons */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    <button onClick={() => navigate(`/app/book/${providerId}`)} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                                    <button onClick={() => openPublicBooking()} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: providerHandle ? 'pointer' : 'default', opacity: providerHandle ? 1 : 0.55 }} disabled={!providerHandle}>
                                         Book a Session →
                                     </button>
                                     <button onClick={handleMessage} style={{ padding: '12px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(61,35,30,0.25)', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
@@ -357,7 +363,7 @@ const RelationshipPage = () => {
                                     booking={booking}
                                     isFirst={i === bookings.length - 1}
                                     isLast={i === bookings.length - 1}
-                                    onRebook={() => navigate(`/app/book/${providerId}`, { state: { serviceId: booking.service_id } })}
+                                    onRebook={() => openPublicBooking(booking.service_id)}
                                 />
                             ))}
                         </div>
@@ -435,8 +441,10 @@ const RelationshipPage = () => {
             {/* ── CTA buttons ── */}
             <div className="px-5 flex gap-3 mb-7">
                 <button
-                    onClick={() => navigate(`/app/book/${providerId}`)}
+                    onClick={() => openPublicBooking()}
                     className="flex-1 py-3.5 rounded-pill bg-ink text-white text-[14px] font-semibold focus:outline-none active:opacity-80 transition-opacity"
+                    disabled={!providerHandle}
+                    style={{ opacity: providerHandle ? 1 : 0.55 }}
                 >
                     Book a Session →
                 </button>
@@ -516,9 +524,7 @@ const RelationshipPage = () => {
                                         isFirst={i === bookings.length - 1} // oldest = first = milestone
                                         isLast={i === bookings.length - 1}
                                         onRebook={() =>
-                                            navigate(`/app/book/${providerId}`, {
-                                                state: { serviceId: booking.service_id },
-                                            })
+                                            openPublicBooking(booking.service_id)
                                         }
                                     />
                                 ))}
