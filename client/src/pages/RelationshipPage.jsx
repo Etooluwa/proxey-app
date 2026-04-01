@@ -81,6 +81,7 @@ const Shimmer = ({ className }) => (
 const BookingCard = ({ booking, isFirst, isLast, onRebook }) => {
     const dot = dotColor(booking, isFirst);
     const isUpcoming = booking.status === 'pending' || booking.status === 'confirmed';
+    const canRebook = !isUpcoming && Boolean(booking.service_id) && typeof onRebook === 'function';
 
     return (
         <div className="flex gap-4">
@@ -152,12 +153,18 @@ const BookingCard = ({ booking, isFirst, isLast, onRebook }) => {
                         </span>
                     ) : null}
 
-                    {!isUpcoming && booking.status !== 'cancelled' && (
+                    {canRebook && (
                         <button
                             onClick={onRebook}
                             className="text-[12px] font-semibold text-accent focus:outline-none"
+                            style={{
+                                border: '1px solid rgba(194,94,74,0.22)',
+                                background: 'rgba(194,94,74,0.08)',
+                                borderRadius: 9999,
+                                padding: '6px 12px',
+                            }}
                         >
-                            Rebook →
+                            Rebook this service
                         </button>
                     )}
                 </div>
@@ -287,7 +294,7 @@ const RelationshipPage = () => {
 
                                 {/* CTA buttons */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    <button onClick={() => navigate('/app/booking-flow', { state: { providerId } })} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                                    <button onClick={() => navigate(`/app/book/${providerId}`)} style={{ padding: '12px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
                                         Book a Session →
                                     </button>
                                     <button onClick={handleMessage} style={{ padding: '12px', borderRadius: 12, background: 'transparent', border: '1.5px solid rgba(61,35,30,0.25)', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}>
@@ -350,7 +357,7 @@ const RelationshipPage = () => {
                                     booking={booking}
                                     isFirst={i === bookings.length - 1}
                                     isLast={i === bookings.length - 1}
-                                    onRebook={() => navigate('/app/booking-flow', { state: { providerId, serviceId: booking.service_id } })}
+                                    onRebook={() => navigate(`/app/book/${providerId}`, { state: { serviceId: booking.service_id } })}
                                 />
                             ))}
                         </div>
@@ -428,7 +435,7 @@ const RelationshipPage = () => {
             {/* ── CTA buttons ── */}
             <div className="px-5 flex gap-3 mb-7">
                 <button
-                    onClick={() => navigate('/app/booking-flow', { state: { providerId } })}
+                    onClick={() => navigate(`/app/book/${providerId}`)}
                     className="flex-1 py-3.5 rounded-pill bg-ink text-white text-[14px] font-semibold focus:outline-none active:opacity-80 transition-opacity"
                 >
                     Book a Session →
@@ -509,8 +516,8 @@ const RelationshipPage = () => {
                                         isFirst={i === bookings.length - 1} // oldest = first = milestone
                                         isLast={i === bookings.length - 1}
                                         onRebook={() =>
-                                            navigate('/app/booking-flow', {
-                                                state: { providerId, serviceId: booking.service_id },
+                                            navigate(`/app/book/${providerId}`, {
+                                                state: { serviceId: booking.service_id },
                                             })
                                         }
                                     />

@@ -3,8 +3,8 @@
  *
  * Steps: services → detail (bottom sheet) → intake → time → time-request (branch) → payment → confirmed
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
 import { clearDraft, loadDraft, saveDraft } from '../bookings/draftStore';
@@ -108,6 +108,7 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
     const [selectedId, setSelectedId] = useState(preSelectedId || null);
     const [intakeLoading, setIntakeLoading] = useState(false);
     const navigate = useNavigate();
+    const autoOpenedRef = useRef(false);
 
     useEffect(() => {
         if (!providerId) return;
@@ -117,6 +118,11 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
             .catch(() => setServices([]))
             .finally(() => setLoading(false));
     }, [providerId]);
+
+    useEffect(() => {
+        if (!preSelectedId) return;
+        setSelectedId(preSelectedId);
+    }, [preSelectedId]);
 
     // Group by category
     const groups = useMemo(() => {
@@ -147,6 +153,34 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
             setIntakeLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (loading || intakeLoading || !preSelectedId || autoOpenedRef.current) return;
+        const preselectedService = services.find((svc) => svc.id === preSelectedId);
+        if (!preselectedService) return;
+        autoOpenedRef.current = true;
+        setSelectedId(preSelectedId);
+
+        (async () => {
+            setIntakeLoading(true);
+            try {
+                const intakeData = await request(`/services/${preSelectedId}/intake`);
+                onContinue({
+                    service: preselectedService,
+                    intakeQuestions: intakeData.questions || [],
+                    clientNotesEnabled: intakeData.clientNotesEnabled !== false,
+                });
+            } catch {
+                onContinue({
+                    service: preselectedService,
+                    intakeQuestions: [],
+                    clientNotesEnabled: false,
+                });
+            } finally {
+                setIntakeLoading(false);
+            }
+        })();
+    }, [intakeLoading, loading, onContinue, preSelectedId, services]);
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
@@ -938,10 +972,11 @@ const TIME_REQUEST_STEPS = ['time-request', 'time-request-sent'];
 function BookingFlowPage() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { providerId: routeProviderId = '' } = useParams();
     const { session } = useSession();
 
     const existingDraft = useMemo(() => loadDraft(), []);
-    const preProviderId = location.state?.providerId || existingDraft?.providerId || '';
+    const preProviderId = location.state?.providerId || routeProviderId || existingDraft?.providerId || '';
     const preServiceId = location.state?.serviceId || existingDraft?.serviceId || '';
 
     // Step routing

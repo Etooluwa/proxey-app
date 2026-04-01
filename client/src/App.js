@@ -201,7 +201,10 @@ function App() {
                       {/* Relationship timeline with a specific provider */}
                       <Route path="relationship/:providerId" element={<RelationshipPage />} />
                       {/* Booking flow (multi-step) */}
+                      <Route path="book" element={<BookingFlowPage />} />
                       <Route path="book/:providerId" element={<BookingFlowPage />} />
+                      <Route path="booking-flow" element={<BookingFlowPage />} />
+                      <Route path="booking-flow/:providerId" element={<BookingFlowPage />} />
                       {/* Leave a review */}
                       <Route path="review/:bookingId" element={<ReviewPage />} />
                       {/* Messaging */}
