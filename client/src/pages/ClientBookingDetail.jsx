@@ -1,7 +1,7 @@
 /**
  * ClientBookingDetail — /app/bookings/:id
- * Client's read-only view of a booking: session info, payment, intake responses,
- * provider notes/recommendations, and session photos.
+ * Client's view of a booking: session info, payment, intake responses,
+ * provider notes/recommendations, session photos, and cancel/reschedule actions.
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -45,6 +45,124 @@ const Shimmer = ({ className }) => (
     <div className={`bg-line/60 rounded animate-pulse ${className}`} />
 );
 
+// ─── Reason Modal ─────────────────────────────────────────────────────────────
+
+const ReasonModal = ({ title, placeholder, onConfirm, onCancel, loading }) => {
+    const [reason, setReason] = useState('');
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={onCancel}
+        >
+            <div
+                className="w-full max-w-lg rounded-t-[24px] px-5 pt-6 pb-8"
+                style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <p className="text-[18px] font-semibold text-ink tracking-[-0.02em] m-0 mb-4">{title}</p>
+                <textarea
+                    autoFocus
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder={placeholder}
+                    rows={3}
+                    className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-5"
+                    style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                />
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Go back
+                    </button>
+                    <button
+                        onClick={() => onConfirm(reason)}
+                        disabled={loading}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none"
+                        style={{ background: '#3D231E', border: 'none', opacity: loading ? 0.7 : 1 }}
+                    >
+                        {loading ? 'Please wait…' : 'Confirm'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Reschedule Modal ─────────────────────────────────────────────────────────
+
+const RescheduleModal = ({ onConfirm, onCancel, loading }) => {
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+    const [reason, setReason] = useState('');
+    const canSubmit = date && time;
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={onCancel}
+        >
+            <div
+                className="w-full max-w-lg rounded-t-[24px] px-5 pt-6 pb-8"
+                style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <p className="text-[18px] font-semibold text-ink tracking-[-0.02em] m-0 mb-4">Reschedule Booking</p>
+                <div className="flex gap-3 mb-4">
+                    <div className="flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">New Date</p>
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="w-full text-[14px] text-ink focus:outline-none"
+                            style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">New Time</p>
+                        <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                            className="w-full text-[14px] text-ink focus:outline-none"
+                            style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                </div>
+                <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Reason for rescheduling (optional)…"
+                    rows={2}
+                    className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-5"
+                    style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                />
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Go back
+                    </button>
+                    <button
+                        onClick={() => onConfirm({ new_date: date, new_time: time, reason })}
+                        disabled={!canSubmit || loading}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none"
+                        style={{ background: '#3D231E', border: 'none', opacity: (!canSubmit || loading) ? 0.5 : 1 }}
+                    >
+                        {loading ? 'Please wait…' : 'Confirm Reschedule'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ClientBookingDetail = () => {
@@ -53,6 +171,10 @@ const ClientBookingDetail = () => {
 
     const [booking, setBooking] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -67,6 +189,40 @@ const ClientBookingDetail = () => {
     }, [id]);
 
     useEffect(() => { load(); }, [load]);
+
+    const handleCancel = async (reason) => {
+        setActionLoading(true);
+        setActionError(null);
+        try {
+            await request(`/bookings/${id}/cancel`, {
+                method: 'PATCH',
+                body: JSON.stringify({ reason }),
+            });
+            setShowCancelModal(false);
+            load();
+        } catch (err) {
+            setActionError(err.message || 'Could not cancel. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleReschedule = async ({ new_date, new_time, reason }) => {
+        setActionLoading(true);
+        setActionError(null);
+        try {
+            await request(`/bookings/${id}/reschedule`, {
+                method: 'PATCH',
+                body: JSON.stringify({ new_date, new_time, reason }),
+            });
+            setShowRescheduleModal(false);
+            load();
+        } catch (err) {
+            setActionError(err.message || 'Could not reschedule. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -117,8 +273,28 @@ const ClientBookingDetail = () => {
     };
     const sc = statusColors[booking.status?.toLowerCase()] || { bg: '#F2EBE5', text: '#8C6A64' };
 
+    const statusLower = (booking.status || '').toLowerCase();
+    const canModify = statusLower === 'pending' || statusLower === 'confirmed';
+
     return (
         <div className="flex flex-col bg-base" style={{ minHeight: '100dvh' }}>
+
+            {showCancelModal && (
+                <ReasonModal
+                    title="Cancel Booking"
+                    placeholder="Reason for cancelling (optional)…"
+                    onConfirm={handleCancel}
+                    onCancel={() => { setShowCancelModal(false); setActionError(null); }}
+                    loading={actionLoading}
+                />
+            )}
+            {showRescheduleModal && (
+                <RescheduleModal
+                    onConfirm={handleReschedule}
+                    onCancel={() => { setShowRescheduleModal(false); setActionError(null); }}
+                    loading={actionLoading}
+                />
+            )}
 
             {/* Back nav */}
             <div className="flex items-center px-5 pt-10 pb-2">
@@ -129,7 +305,7 @@ const ClientBookingDetail = () => {
 
                 {/* Provider info */}
                 <div className="flex items-center gap-4 mb-4 pt-2">
-                    <Avatar initials={getInitials(booking.provider_name)} size={56} />
+                    <Avatar initials={getInitials(booking.provider_name)} src={booking.provider_avatar || ''} size={56} />
                     <div className="flex-1 min-w-0">
                         <p className="text-[22px] font-semibold text-ink tracking-[-0.02em] m-0 mb-0.5 truncate">
                             {booking.provider_name || 'Provider'}
@@ -147,6 +323,29 @@ const ClientBookingDetail = () => {
                         {booking.status || 'Pending'}
                     </span>
                 </div>
+
+                {/* Cancel / Reschedule actions */}
+                {canModify && (
+                    <div className="flex gap-3 mb-5">
+                        <button
+                            onClick={() => { setActionError(null); setShowRescheduleModal(true); }}
+                            className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                            style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                        >
+                            Reschedule
+                        </button>
+                        <button
+                            onClick={() => { setActionError(null); setShowCancelModal(true); }}
+                            className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                            style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+                {actionError && (
+                    <p className="text-[13px] mb-4 m-0" style={{ color: '#B04040' }}>{actionError}</p>
+                )}
 
                 <Divider />
 

@@ -2508,14 +2508,15 @@ app.post("/api/bookings", async (req, res) => {
 app.patch("/api/bookings/:id/cancel", async (req, res) => {
   const bookingId = req.params.id;
   const userId = getUserId(req);
+  const { reason } = req.body || {};
 
   if (supabase) {
     try {
+      // Allow both client and provider to cancel
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
         .eq("id", bookingId)
-        .eq("client_id", userId)
         .single();
 
       if (error) {
@@ -2523,47 +2524,96 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
       } else if (!data) {
         return res.status(404).json({ error: "Booking not found." });
       } else {
-        const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(data.provider_id));
-        const scheduledTime = new Date(data.scheduled_at).getTime();
-        const cutoffTime = scheduledTime - providerBookingRules.cancellationWindowHours * 60 * 60 * 1000;
+        // Verify the caller is the client or the provider
+        const isClient = data.client_id === userId;
+        const isProvider = data.provider_id === userId;
+        if (!isClient && !isProvider) {
+          // Check if userId matches provider's user_id via providers table
+          const { data: provRow } = await supabase
+            .from("providers")
+            .select("user_id")
+            .eq("id", data.provider_id)
+            .single();
+          if (!provRow || provRow.user_id !== userId) {
+            return res.status(403).json({ error: "Not authorized to cancel this booking." });
+          }
+        }
 
-        if (Number.isFinite(cutoffTime) && Date.now() > cutoffTime) {
-          return res.status(400).json({
-            error: `This booking can only be cancelled at least ${providerBookingRules.cancellationWindowHours} hours before the appointment.`,
-          });
+        // Cancellation window check (skip for providers cancelling)
+        if (isClient) {
+          const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(data.provider_id));
+          const scheduledTime = new Date(data.scheduled_at).getTime();
+          const cutoffTime = scheduledTime - providerBookingRules.cancellationWindowHours * 60 * 60 * 1000;
+          if (Number.isFinite(cutoffTime) && Date.now() > cutoffTime) {
+            return res.status(400).json({
+              error: `This booking can only be cancelled at least ${providerBookingRules.cancellationWindowHours} hours before the appointment.`,
+            });
+          }
         }
 
         const { data: cancelledBooking, error: cancelErr } = await supabase
           .from("bookings")
           .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
           .eq("id", bookingId)
-          .eq("client_id", userId)
           .select()
           .single();
 
         if (cancelErr) throw cancelErr;
 
-        // Notify provider about the cancelled booking
-        if (cancelledBooking.provider_id) {
-          const scheduledDate = new Date(cancelledBooking.scheduled_at).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-          });
-          await createProviderNotification(cancelledBooking.provider_id, {
-            type: 'booking_cancelled',
-            title: 'Booking Cancelled',
-            body: `A booking for ${scheduledDate} has been cancelled by the client`,
-            booking_id: cancelledBooking.id,
-            data: {
-              client_id: cancelledBooking.client_id,
-              scheduled_at: cancelledBooking.scheduled_at,
-              status: 'cancelled'
+        const scheduledDate = new Date(cancelledBooking.scheduled_at).toLocaleDateString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        });
+        const reasonText = reason ? ` Reason: ${reason}` : '';
+
+        if (isClient) {
+          // Client cancelled — notify provider
+          if (cancelledBooking.provider_id) {
+            const clientName = cancelledBooking.client_name || 'A client';
+            await createProviderNotification(cancelledBooking.provider_id, {
+              type: 'booking_cancelled',
+              title: 'Booking Cancelled',
+              body: `${clientName} cancelled their booking for ${scheduledDate}.${reasonText}`,
+              booking_id: cancelledBooking.id,
+              data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
+            }).catch(() => {});
+            const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
+            if (provInfo?.email) {
+              await sendEmail({
+                to: provInfo.email,
+                subject: 'Booking Cancelled',
+                html: `<p>Hi ${provInfo.name || 'there'},</p>
+<p>${clientName} has cancelled their booking scheduled for <strong>${scheduledDate}</strong>.</p>
+${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+<p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated schedule.</p>`
+              }).catch(() => {});
             }
-          });
+          }
+        } else {
+          // Provider cancelled — notify client
+          if (cancelledBooking.client_id) {
+            const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
+            const providerName = provInfo?.name || 'Your provider';
+            await createClientNotification(cancelledBooking.client_id, {
+              type: 'booking_cancelled',
+              title: 'Booking Cancelled',
+              body: `${providerName} has cancelled your booking for ${scheduledDate}.${reasonText}`,
+              booking_id: cancelledBooking.id,
+              data: { provider_id: cancelledBooking.provider_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
+            }).catch(() => {});
+            const { email: clientEmail, name: clientName } = await getClientNotifPrefs(cancelledBooking.client_id);
+            if (clientEmail) {
+              await sendEmail({
+                to: clientEmail,
+                subject: 'Booking Cancelled',
+                html: `<p>Hi ${clientName || 'there'},</p>
+<p>${providerName} has cancelled your booking scheduled for <strong>${scheduledDate}</strong>.</p>
+${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+<p>Log in to <a href="https://mykliques.com">Kliques</a> to book another time.</p>`
+              }).catch(() => {});
+            }
+          }
         }
+
         return res.status(200).json({ booking: cancelledBooking });
       }
     } catch (error) {
@@ -2583,6 +2633,126 @@ app.patch("/api/bookings/:id/cancel", async (req, res) => {
   booking.updatedAt = new Date().toISOString();
 
   res.status(200).json({ booking });
+});
+
+app.patch("/api/bookings/:id/reschedule", async (req, res) => {
+  const bookingId = req.params.id;
+  const userId = getUserId(req);
+  const { new_date, new_time, reason } = req.body || {};
+
+  if (!new_date || !new_time) {
+    return res.status(400).json({ error: "new_date and new_time are required." });
+  }
+
+  // Combine date and time into ISO string
+  const newScheduledAt = new Date(`${new_date}T${new_time}`).toISOString();
+  if (!newScheduledAt || newScheduledAt === 'Invalid Date') {
+    return res.status(400).json({ error: "Invalid date or time." });
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("id", bookingId)
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({ error: "Booking not found." });
+      }
+
+      // Verify the caller is the client or the provider
+      const isClient = data.client_id === userId;
+      let isProvider = data.provider_id === userId;
+      if (!isClient && !isProvider) {
+        const { data: provRow } = await supabase
+          .from("providers")
+          .select("user_id")
+          .eq("id", data.provider_id)
+          .single();
+        if (provRow?.user_id === userId) isProvider = true;
+      }
+      if (!isClient && !isProvider) {
+        return res.status(403).json({ error: "Not authorized to reschedule this booking." });
+      }
+
+      const { data: rescheduled, error: reschedErr } = await supabase
+        .from("bookings")
+        .update({ scheduled_at: newScheduledAt, status: 'confirmed' })
+        .eq("id", bookingId)
+        .select()
+        .single();
+
+      if (reschedErr) throw reschedErr;
+
+      const oldDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+      const newDateLabel = new Date(newScheduledAt).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+      const reasonText = reason ? ` Reason: ${reason}` : '';
+
+      if (isClient) {
+        // Client rescheduled — notify provider
+        if (rescheduled.provider_id) {
+          const clientName = rescheduled.client_name || 'A client';
+          await createProviderNotification(rescheduled.provider_id, {
+            type: 'booking_rescheduled',
+            title: 'Booking Rescheduled',
+            body: `${clientName} rescheduled from ${oldDate} to ${newDateLabel}.${reasonText}`,
+            booking_id: rescheduled.id,
+            data: { client_id: rescheduled.client_id, scheduled_at: newScheduledAt, status: 'confirmed' }
+          }).catch(() => {});
+          const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
+          if (provInfo?.email) {
+            await sendEmail({
+              to: provInfo.email,
+              subject: 'Booking Rescheduled',
+              html: `<p>Hi ${provInfo.name || 'there'},</p>
+<p>${clientName} has rescheduled their booking.</p>
+<p><strong>From:</strong> ${oldDate}<br/><strong>To:</strong> ${newDateLabel}</p>
+${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+<p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated schedule.</p>`
+            }).catch(() => {});
+          }
+        }
+      } else {
+        // Provider rescheduled — notify client
+        if (rescheduled.client_id) {
+          const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
+          const providerName = provInfo?.name || 'Your provider';
+          await createClientNotification(rescheduled.client_id, {
+            type: 'booking_rescheduled',
+            title: 'Booking Rescheduled',
+            body: `${providerName} rescheduled your booking from ${oldDate} to ${newDateLabel}.${reasonText}`,
+            booking_id: rescheduled.id,
+            data: { provider_id: rescheduled.provider_id, scheduled_at: newScheduledAt, status: 'confirmed' }
+          }).catch(() => {});
+          const { email: clientEmail, name: clientName } = await getClientNotifPrefs(rescheduled.client_id);
+          if (clientEmail) {
+            await sendEmail({
+              to: clientEmail,
+              subject: 'Booking Rescheduled',
+              html: `<p>Hi ${clientName || 'there'},</p>
+<p>${providerName} has rescheduled your booking.</p>
+<p><strong>From:</strong> ${oldDate}<br/><strong>To:</strong> ${newDateLabel}</p>
+${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+<p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated booking.</p>`
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return res.status(200).json({ booking: rescheduled });
+    } catch (error) {
+      console.warn("[supabase] Unexpected error rescheduling booking", error);
+      return res.status(500).json({ error: "Failed to reschedule booking." });
+    }
+  }
+
+  res.status(200).json({ booking: { id: bookingId, scheduled_at: newScheduledAt } });
 });
 
 app.post("/api/payments/create-checkout", async (req, res) => {

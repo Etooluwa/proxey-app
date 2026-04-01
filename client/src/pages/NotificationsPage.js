@@ -28,6 +28,7 @@ const F = "'Sora',system-ui,sans-serif";
 
 const ACCEPTED_TYPES = new Set([
     'accepted', 'booking_accepted', 'appointment_accepted', 'time_request_accepted',
+    'booking_rescheduled',
 ]);
 const REJECTED_TYPES = new Set([
     'rejected', 'booking_declined', 'appointment_declined', 'time_request_declined',

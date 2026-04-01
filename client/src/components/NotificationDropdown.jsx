@@ -19,7 +19,7 @@ const F = "'Sora',system-ui,sans-serif";
 // ─── Type normalisation (mirrors ProviderNotifications) ───────────────────────
 const BOOKING_TYPES = new Set([
     'booking_request', 'new_booking', 'time_request', 'appointment_request',
-    'accepted', 'rejected', 'booking_accepted', 'appointment_accepted', 'booking_declined', 'appointment_declined', 'booking_cancelled',
+    'accepted', 'rejected', 'booking_accepted', 'appointment_accepted', 'booking_declined', 'appointment_declined', 'booking_cancelled', 'booking_rescheduled',
 ]);
 const COMPLETED_TYPES = new Set([
     'booking_completed', 'completed', 'session_completed',

@@ -79,6 +79,124 @@ const Shimmer = ({ className }) => (
     <div className={`bg-line/60 rounded animate-pulse ${className}`} />
 );
 
+// ─── Reason Modal ─────────────────────────────────────────────────────────────
+
+const ReasonModal = ({ title, placeholder, onConfirm, onCancel, loading }) => {
+    const [reason, setReason] = useState('');
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={onCancel}
+        >
+            <div
+                className="w-full max-w-lg rounded-t-[24px] px-5 pt-6 pb-8"
+                style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <p className="text-[18px] font-semibold text-ink tracking-[-0.02em] m-0 mb-4">{title}</p>
+                <textarea
+                    autoFocus
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder={placeholder}
+                    rows={3}
+                    className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-5"
+                    style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                />
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Go back
+                    </button>
+                    <button
+                        onClick={() => onConfirm(reason)}
+                        disabled={loading}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none"
+                        style={{ background: '#3D231E', border: 'none', opacity: loading ? 0.7 : 1 }}
+                    >
+                        {loading ? 'Please wait…' : 'Confirm'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Reschedule Modal ─────────────────────────────────────────────────────────
+
+const RescheduleModal = ({ onConfirm, onCancel, loading }) => {
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+    const [reason, setReason] = useState('');
+    const canSubmit = date && time;
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={onCancel}
+        >
+            <div
+                className="w-full max-w-lg rounded-t-[24px] px-5 pt-6 pb-8"
+                style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <p className="text-[18px] font-semibold text-ink tracking-[-0.02em] m-0 mb-4">Reschedule Booking</p>
+                <div className="flex gap-3 mb-4">
+                    <div className="flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">New Date</p>
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="w-full text-[14px] text-ink focus:outline-none"
+                            style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">New Time</p>
+                        <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                            className="w-full text-[14px] text-ink focus:outline-none"
+                            style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                </div>
+                <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Reason for rescheduling (optional)…"
+                    rows={2}
+                    className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-5"
+                    style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                />
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    >
+                        Go back
+                    </button>
+                    <button
+                        onClick={() => onConfirm({ new_date: date, new_time: time, reason })}
+                        disabled={!canSubmit || loading}
+                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none"
+                        style={{ background: '#3D231E', border: 'none', opacity: (!canSubmit || loading) ? 0.5 : 1 }}
+                    >
+                        {loading ? 'Please wait…' : 'Confirm Reschedule'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Completion screen ────────────────────────────────────────────────────────
 
 const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
@@ -220,6 +338,11 @@ const ProviderAppointmentDetail = () => {
     // Completion state
     const [completed, setCompleted] = useState(false);
     const [payoutData, setPayoutData] = useState(null);
+    // Cancel / Reschedule state
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -350,6 +473,40 @@ const ProviderAppointmentDetail = () => {
         }
     };
 
+    const handleCancelBooking = async (reason) => {
+        setActionLoading(true);
+        setActionError(null);
+        try {
+            await request(`/bookings/${id}/cancel`, {
+                method: 'PATCH',
+                body: JSON.stringify({ reason }),
+            });
+            setShowCancelModal(false);
+            load();
+        } catch (err) {
+            setActionError(err.message || 'Could not cancel. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRescheduleBooking = async ({ new_date, new_time, reason }) => {
+        setActionLoading(true);
+        setActionError(null);
+        try {
+            await request(`/bookings/${id}/reschedule`, {
+                method: 'PATCH',
+                body: JSON.stringify({ new_date, new_time, reason }),
+            });
+            setShowRescheduleModal(false);
+            load();
+        } catch (err) {
+            setActionError(err.message || 'Could not reschedule. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     // ── Loading ──────────────────────────────────────────────────────────────
     if (loading) {
         return (
@@ -433,6 +590,23 @@ const ProviderAppointmentDetail = () => {
     // ─── Render detail view ───────────────────────────────────────────────────
     return (
         <div className="flex flex-col bg-base" style={{ minHeight: '100dvh' }}>
+
+            {showCancelModal && (
+                <ReasonModal
+                    title="Cancel Booking"
+                    placeholder="Reason for cancelling (optional)…"
+                    onConfirm={handleCancelBooking}
+                    onCancel={() => { setShowCancelModal(false); setActionError(null); }}
+                    loading={actionLoading}
+                />
+            )}
+            {showRescheduleModal && (
+                <RescheduleModal
+                    onConfirm={handleRescheduleBooking}
+                    onCancel={() => { setShowRescheduleModal(false); setActionError(null); }}
+                    loading={actionLoading}
+                />
+            )}
 
             {/* ── Back nav ── */}
             <div className="flex items-center px-5 pt-10 pb-2">
@@ -709,31 +883,49 @@ const ProviderAppointmentDetail = () => {
                         paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                     }}
                 >
-                    {completeError && (
+                    {(completeError || actionError) && (
                         <p className="w-full text-center text-[12px] mb-2 m-0" style={{ color: '#C25E4A' }}>
-                            {completeError}
+                            {completeError || actionError}
                         </p>
                     )}
                     <div className="flex gap-3 w-full">
-                    <button
-                        onClick={handleMessage}
-                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
-                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
-                    >
-                        Message
-                    </button>
-                    <button
-                        onClick={handleMarkComplete}
-                        disabled={completing}
-                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                        style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
-                    >
-                        {completing && (
-                            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                        )}
-                        {completing ? 'Completing…' : 'Mark Complete'}
-                    </button>
+                        <button
+                            onClick={handleMessage}
+                            className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                            style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                        >
+                            Message
+                        </button>
+                        <button
+                            onClick={handleMarkComplete}
+                            disabled={completing}
+                            className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                            style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
+                        >
+                            {completing && (
+                                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                            )}
+                            {completing ? 'Completing…' : 'Mark Complete'}
+                        </button>
                     </div>
+                    {isConfirmed && (
+                        <div className="flex gap-3 w-full mt-2">
+                            <button
+                                onClick={() => { setActionError(null); setShowRescheduleModal(true); }}
+                                className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                                style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                            >
+                                Reschedule
+                            </button>
+                            <button
+                                onClick={() => { setActionError(null); setShowCancelModal(true); }}
+                                className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                                style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
+                            >
+                                Cancel Booking
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
