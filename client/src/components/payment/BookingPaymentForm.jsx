@@ -233,6 +233,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
             // ── Path A: client has a saved card selected ──────────────────────
             if (!usingNewCard && selectedSavedId) {
                 const providerId = provider?.user_id || provider?.id;
+                console.log('[PaymentForm] Path A: saved card', { paymentType, providerId, totalChargeCents, selectedSavedId });
 
                 if (paymentType === 'save_card') {
                     // No charge — just return the saved pm so the booking records it
@@ -244,6 +245,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                 }
 
                 // full or deposit — charge via /api/charge (off-session)
+                console.log('[PaymentForm] Calling /charge...');
                 const data = await request('/charge', {
                     method: 'POST',
                     body: JSON.stringify({
@@ -252,6 +254,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                         providerId,
                     }),
                 });
+                console.log('[PaymentForm] /charge response:', data);
                 onSuccess({
                     payment_type: paymentType,
                     stripe_payment_intent_id: data.chargeId,
@@ -312,6 +315,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                 });
             }
         } catch (err) {
+            console.error('[PaymentForm] handleSubmit error:', err);
             const msg = err.message || 'Payment failed. Please try again.';
             setCardError(msg);
             onError?.(msg);

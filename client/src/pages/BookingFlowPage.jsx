@@ -775,6 +775,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
     const handlePaymentSuccess = async (pmtData) => {
         setSubmitting(true);
         setError(null);
+        console.log('[BookingFlow] handlePaymentSuccess called', pmtData);
         try {
             const body = {
                 // snake_case keys to match backend contract
@@ -785,6 +786,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                 message: clientNote || undefined,
                 ...pmtData,
             };
+            console.log('[BookingFlow] calling /bookings/request-time with body', body);
             const data = await request('/bookings/request-time', {
                 method: 'POST',
                 body: JSON.stringify(body),
@@ -800,6 +802,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                 supabase.from('booking_intake_responses').insert(intakeRows).catch(() => {});
             }
 
+            console.log('[BookingFlow] /bookings/request-time response:', data);
             onConfirmed({
                 booking: data.booking,
                 price: effectivePrice,
@@ -810,6 +813,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                 providerId,
             });
         } catch (err) {
+            console.error('[BookingFlow] request-time error:', err);
             setError(err.message || 'Booking failed. Please try again.');
         } finally {
             setSubmitting(false);
