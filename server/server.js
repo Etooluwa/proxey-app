@@ -7837,8 +7837,10 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const bookedBookingRanges = [];
     for (const b of bookings || []) {
       // Parse HH:MM directly from the stored string to avoid timezone shifts
-      const timeStr = (b.scheduled_at || '').slice(11, 16); // "HH:MM"
-      if (!timeStr) continue;
+      // Handles both "2026-04-15T14:30:00" and "2026-04-15 14:30:00" formats
+      const timePart = (b.scheduled_at || '').replace('T', ' ').split(' ')[1] || '';
+      const timeStr = timePart.slice(0, 5); // "HH:MM"
+      if (!timeStr || timeStr.length < 5) continue;
       const [bh, bm] = timeStr.split(":").map(Number);
       const startMins = bh * 60 + bm;
       const dur = parseInt(b.duration) || 60;
