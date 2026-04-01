@@ -927,7 +927,7 @@ function ProviderOnboardingPage() {
   };
 
   // ── Profile helper ────────────────────────────────────────────────────────
-  const updateProfile = (key, val) => setProfile((prev) => ({ ...prev, [key]: val }));
+  const setProfileField = (key, val) => setProfile((prev) => ({ ...prev, [key]: val }));
 
   // ── Handle check ─────────────────────────────────────────────────────────
   const checkHandle = async () => {
@@ -1078,7 +1078,7 @@ function ProviderOnboardingPage() {
           <StepCategory selected={category} onChange={setCategory} />
         )}
         {step === 2 && (
-          <StepProfile data={profile} onChange={updateProfile} />
+          <StepProfile data={profile} onChange={setProfileField} />
         )}
         {step === 3 && (
           <StepServices
