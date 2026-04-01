@@ -211,8 +211,11 @@ const ProviderAppointmentDetail = () => {
 
     const [job, setJob] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [notes, setNotes] = useState('');
+    const [sessionNotes, setSessionNotes] = useState('');
+    const [sessionRec, setSessionRec] = useState('');
     const [savingNotes, setSavingNotes] = useState(false);
+    const [photos, setPhotos] = useState([]);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [completing, setCompleting] = useState(false);
     // Completion state
     const [completed, setCompleted] = useState(false);
@@ -224,7 +227,9 @@ const ProviderAppointmentDetail = () => {
             const data = await request(`/bookings/${id}`);
             const j = data.booking ? normaliseBookingJob(data.booking) : null;
             setJob(j);
-            setNotes('');
+            setSessionNotes(j?.session_notes || '');
+            setSessionRec(j?.session_recommendation || '');
+            setPhotos(j?.session_photos || []);
             if (j?.status === 'completed') {
                 setCompleted(true);
             }
@@ -237,19 +242,61 @@ const ProviderAppointmentDetail = () => {
 
     useEffect(() => { load(); }, [load]);
 
-    const handleSaveNotes = async () => {
-        if (job?.source === 'booking') return;
-        if (!notes.trim() || savingNotes) return;
+    const handleSaveNotes = async (notesVal, recVal) => {
+        if (savingNotes) return;
         setSavingNotes(true);
         try {
-            await request(`/provider/jobs/${id}/notes`, {
+            await request(`/bookings/${id}/notes`, {
                 method: 'PATCH',
-                body: JSON.stringify({ notes }),
+                body: JSON.stringify({
+                    session_notes: notesVal ?? sessionNotes,
+                    session_recommendation: recVal ?? sessionRec,
+                }),
             });
         } catch (err) {
             console.error('[saveNotes]', err);
         } finally {
             setSavingNotes(false);
+        }
+    };
+
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file || uploadingPhoto) return;
+        setUploadingPhoto(true);
+        try {
+            // Get signed upload URL from server
+            const { uploadUrl, filePath } = await request(`/bookings/${id}/photos/upload-url`, {
+                method: 'POST',
+                body: JSON.stringify({ filename: file.name, contentType: file.type }),
+            });
+            // Upload to Supabase Storage
+            await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+            // Get the public URL
+            const { supabase: sb } = await import('../../utils/supabase');
+            const { data: urlData } = sb.storage.from('kliques-media').getPublicUrl(filePath);
+            const photoUrl = urlData?.publicUrl;
+            if (!photoUrl) throw new Error('Could not get public URL');
+            // Register photo with server
+            const { photo } = await request(`/bookings/${id}/photos`, {
+                method: 'POST',
+                body: JSON.stringify({ photo_url: photoUrl }),
+            });
+            setPhotos((prev) => [...prev, photo]);
+        } catch (err) {
+            console.error('[photoUpload]', err);
+        } finally {
+            setUploadingPhoto(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleDeletePhoto = async (photoId) => {
+        try {
+            await request(`/bookings/${id}/photos/${photoId}`, { method: 'DELETE' });
+            setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+        } catch (err) {
+            console.error('[deletePhoto]', err);
         }
     };
 
@@ -542,50 +589,110 @@ const ProviderAppointmentDetail = () => {
                     </>
                 )}
 
-                {/* ─ Session notes ─ */}
+                {/* ─ Session Notes & Recommendations ─ */}
                 <div className="py-5">
-                    <Lbl className="block mb-3">Session Notes</Lbl>
-
-                    {/* Previous notes */}
-                    <div
-                        className="px-4 py-3 rounded-[12px] mb-3"
-                        style={{ background: '#F2EBE5' }}
-                    >
-                        <p className="text-[13px] text-muted m-0 italic leading-relaxed">
-                            {job.previous_notes
-                                ? `Last: ${job.previous_notes}`
-                                : 'No previous session notes.'}
-                        </p>
+                    <div className="flex items-center justify-between mb-3">
+                        <Lbl>Session Notes & Recommendations</Lbl>
+                        {savingNotes && (
+                            <span className="text-[11px] text-muted">Saving…</span>
+                        )}
                     </div>
 
-                    {/* Current notes textarea */}
-                    {!isAlreadyCompleted && job.source !== 'booking' && (
-                        <textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            onBlur={handleSaveNotes}
-                            disabled={savingNotes}
-                            placeholder="Add notes for this session…"
-                            rows={3}
-                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
-                            style={{
-                                padding: '13px 16px',
-                                borderRadius: 12,
-                                border: '1px solid rgba(140,106,100,0.2)',
-                                background: '#F2EBE5',
-                                fontFamily: 'inherit',
-                                lineHeight: 1.6,
-                                boxSizing: 'border-box',
-                            }}
-                        />
+                    {/* Previous session notes (from last booking) */}
+                    {job.previous_notes && (
+                        <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#F2EBE5' }}>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1">Last session</p>
+                            <p className="text-[13px] text-muted m-0 italic leading-relaxed">{job.previous_notes}</p>
+                        </div>
                     )}
-                    {!isAlreadyCompleted && job.source === 'booking' && (
-                        <p className="text-[14px] text-muted m-0 leading-relaxed">
-                            This booking will move to Completed after you tap Mark Complete.
+
+                    {/* Notes textarea */}
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">Notes</p>
+                    {!isAlreadyCompleted ? (
+                        <textarea
+                            value={sessionNotes}
+                            onChange={(e) => setSessionNotes(e.target.value)}
+                            onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
+                            disabled={savingNotes}
+                            placeholder="Add session notes…"
+                            rows={3}
+                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-4"
+                            style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                        />
+                    ) : (
+                        <p className="text-[14px] text-ink m-0 leading-relaxed mb-4">
+                            {sessionNotes || <span className="text-muted italic">No session notes.</span>}
                         </p>
                     )}
-                    {isAlreadyCompleted && notes && (
-                        <p className="text-[14px] text-ink m-0 leading-relaxed">{notes}</p>
+
+                    {/* Recommendation textarea */}
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">Recommendations for client</p>
+                    {!isAlreadyCompleted ? (
+                        <textarea
+                            value={sessionRec}
+                            onChange={(e) => setSessionRec(e.target.value)}
+                            onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
+                            disabled={savingNotes}
+                            placeholder="What should the client do before the next session?…"
+                            rows={2}
+                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
+                            style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                        />
+                    ) : (
+                        <p className="text-[14px] text-ink m-0 leading-relaxed">
+                            {sessionRec || <span className="text-muted italic">No recommendations.</span>}
+                        </p>
+                    )}
+                </div>
+
+                <Divider />
+
+                {/* ─ Session Photos ─ */}
+                <div className="py-5">
+                    <div className="flex items-center justify-between mb-3">
+                        <Lbl>Session Photos</Lbl>
+                        {!isAlreadyCompleted && (
+                            <label
+                                className="text-[12px] font-semibold cursor-pointer focus:outline-none"
+                                style={{ color: '#C25E4A' }}
+                            >
+                                {uploadingPhoto ? 'Uploading…' : '+ Add photo'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handlePhotoUpload}
+                                    disabled={uploadingPhoto}
+                                />
+                            </label>
+                        )}
+                    </div>
+
+                    {photos.length === 0 ? (
+                        <p className="text-[13px] text-muted italic m-0">No photos yet.</p>
+                    ) : (
+                        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                            {photos.map((p) => (
+                                <div key={p.id} className="relative rounded-[10px] overflow-hidden" style={{ aspectRatio: '1/1' }}>
+                                    <img
+                                        src={p.photo_url}
+                                        alt={p.caption || 'Session photo'}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    {!isAlreadyCompleted && (
+                                        <button
+                                            onClick={() => handleDeletePhoto(p.id)}
+                                            className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center focus:outline-none"
+                                            style={{ background: 'rgba(0,0,0,0.5)' }}
+                                        >
+                                            <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                                                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
 

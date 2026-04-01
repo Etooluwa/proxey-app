@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kliques — Bookings Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--base:#FBF7F2;--ink:#3D231E;--muted:#8C6A64;--faded:#B0948F;--accent:#C25E4A;--hero:#FDDCC6;--abg:#F2EBE5;--line:rgba(140,106,100,0.18);--card:#FFF;--callout:#FFF5E6;--success:#5A8A5E;--sbg:#EBF2EC;--sidebar:#F5EFE8;--amber:#C27A1A;--amberbg:#FEF3E2;--danger:#B04040;--dangerbg:#FDEDEA}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',system-ui,sans-serif;background:var(--base);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex}
+button{font-family:inherit;cursor:pointer;border:none;background:none}button:active{transform:scale(0.98)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.topo{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");background-size:cover;pointer-events:none}
+
+/* Sidebar */
+.sb{width:260px;background:var(--sidebar);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;padding:28px 0;z-index:10}
+.sb-logo{padding:0 28px 8px;font-family:'Playfair Display',serif;font-size:22px;font-weight:500;color:var(--accent)}
+.sb-sub{padding:0 28px 24px;font-size:11px;color:var(--faded);letter-spacing:0.03em}
+.sb-user{margin:0 16px 24px;padding:16px;background:var(--base);border-radius:16px;display:flex;align-items:center;gap:12px}
+.sb-av{width:40px;height:40px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--muted)}
+.ni{display:flex;align-items:center;gap:10px;padding:13px 24px;margin:1px 8px;border-radius:12px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s}
+.ni:hover{background:rgba(194,94,74,0.04)}.ni.ac{background:rgba(194,94,74,0.08);color:var(--accent);font-weight:600}
+.ni svg{width:18px;height:18px;flex-shrink:0}
+.sb-bottom{margin-top:auto;padding:0 16px}
+.sb-signout{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12px;color:var(--faded);cursor:pointer;border-radius:10px;width:100%}
+
+/* Main */
+.main{margin-left:260px;flex:1;min-height:100vh}
+.topbar{padding:20px 40px;display:flex;justify-content:flex-end;position:sticky;top:0;z-index:5;background:var(--base)}
+.notif-btn{padding:8px;border-radius:10px}
+.content{padding:0 40px 60px;max-width:900px}
+
+/* Switcher */
+.role-sw{display:flex;gap:4px;justify-content:center;margin-bottom:16px;position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:20;background:var(--abg);border-radius:12px;padding:4px}
+.role-sw button{padding:8px 20px;border-radius:9px;font-size:11px;color:var(--muted)}.role-sw button.ac{background:var(--ink);color:#fff;font-weight:600}
+.state-sw{display:flex;gap:4px;justify-content:center;margin-bottom:16px;position:fixed;top:20px;right:20px;z-index:20;background:var(--abg);border-radius:12px;padding:4px}
+.state-sw button{padding:8px 16px;border-radius:9px;font-size:11px;color:var(--muted)}.state-sw button.ac{background:var(--ink);color:#fff;font-weight:600}
+
+/* Page header */
+.page-hdr{margin-bottom:28px}
+.page-hdr-label{font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.page-hdr h1{font-size:34px;font-weight:400;letter-spacing:-0.03em;margin:0}
+
+/* Tab cards */
+.tabs{display:flex;gap:8px;margin-bottom:28px}
+.tab{flex:1;padding:20px 16px;border-radius:16px;border:1px solid var(--line);cursor:pointer;text-align:center;transition:all .2s;position:relative;background:var(--card)}
+.tab:hover{border-color:rgba(140,106,100,0.35)}
+.tab.ac{border:2px solid var(--accent);background:linear-gradient(135deg,rgba(194,94,74,0.04),rgba(253,220,198,0.15))}
+.tab-count{font-size:28px;font-weight:400;letter-spacing:-0.04em;display:block;margin-bottom:4px;transition:color .2s}
+.tab.ac .tab-count{color:var(--accent)}
+.tab-label{font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--faded)}
+.tab.ac .tab-label{color:var(--accent)}
+.tab-dot{position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;background:var(--accent);display:none}
+.tab-dot.show{display:block}
+
+/* Booking cards */
+.bcard{padding:20px 24px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:10px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .2s}
+.bcard:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(194,94,74,0.06);transform:translateY(-1px)}
+.bcard-date{width:52px;height:56px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.bcard-date-day{font-size:11px;font-weight:500;letter-spacing:0.03em;text-transform:uppercase}
+.bcard-date-num{font-size:22px;font-weight:400;letter-spacing:-0.03em}
+.bcard-info{flex:1;min-width:0}
+.bcard-title{font-size:15px;font-weight:500;margin-bottom:2px}
+.bcard-sub{font-size:13px;color:var(--muted)}
+.bcard-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.bcard-price{font-size:15px;font-weight:500;color:var(--accent)}
+.bcard-pill{padding:4px 10px;border-radius:9999px;font-size:10px;font-weight:600;letter-spacing:0.03em;text-transform:uppercase}
+.pill-pending{background:var(--amberbg);color:var(--amber)}
+.pill-confirmed{background:var(--sbg);color:var(--success)}
+.pill-completed{background:var(--abg);color:var(--muted)}
+.pill-cancelled{background:var(--dangerbg);color:var(--danger)}
+.bcard-chevron{color:var(--faded);transition:transform .2s}
+.bcard:hover .bcard-chevron{transform:translateX(3px);color:var(--accent)}
+
+/* Provider action buttons on pending cards */
+.bcard-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-accept{padding:8px 16px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;font-weight:500;display:flex;align-items:center;gap:4px}
+.btn-accept:hover{opacity:.9}
+.btn-decline{padding:8px 16px;border-radius:10px;border:1px solid var(--line);font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:4px}
+.btn-decline:hover{background:var(--dangerbg);border-color:var(--danger);color:var(--danger)}
+
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 20px}
+.empty-icon{width:72px;height:72px;border-radius:20px;background:var(--abg);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.empty h3{font-size:20px;font-weight:400;letter-spacing:-0.02em;margin:0 0 8px}
+.empty p{font-size:14px;color:var(--muted);margin:0;line-height:1.6;max-width:300px}
+
+/* Section dividers */
+.section-label{font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--faded);margin-bottom:12px}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-1{animation:fadeUp .4s ease .05s both}
+.fade-2{animation:fadeUp .4s ease .12s both}
+.fade-3{animation:fadeUp .4s ease .19s both}
+</style>
+</head>
+<body>
+
+<!-- Switchers -->
+<div class="role-sw">
+  <button class="ac" onclick="setRole('client')">Client View</button>
+  <button onclick="setRole('provider')">Provider View</button>
+</div>
+<div class="state-sw">
+  <button class="ac" onclick="setState('empty')">Empty</button>
+  <button onclick="setState('data')">With Data</button>
+</div>
+
+<!-- Sidebar -->
+<nav class="sb" id="sidebar"></nav>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button class="notif-btn"><svg width="20" height="20" fill="none" stroke="var(--ink)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+  <div class="content" id="page"></div>
+</div>
+
+<script>
+var role='client', state='empty', activeTab='pending';
+var chev='<svg class="bcard-chevron" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function setRole(r){role=r;activeTab='pending';render();document.querySelectorAll('.role-sw button').forEach(function(b){b.classList.toggle('ac',b.textContent.toLowerCase().includes(r))})}
+function setState(s){state=s;render();document.querySelectorAll('.state-sw button').forEach(function(b){b.classList.toggle('ac',b.textContent.toLowerCase()===s)})}
+function setTab(t){activeTab=t;render()}
+
+function sidebarHTML(){
+  var isP=role==='provider';
+  var items=isP?
+    [{id:'dashboard',icon:'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',label:'Dashboard'},
+     {id:'bookings',icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',label:'Bookings',active:true},
+     {id:'clients',icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',label:'My Kliques'},
+     {id:'services',icon:'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',label:'Services'},
+     {id:'calendar',icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',label:'Calendar'},
+     {id:'messages',icon:'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',label:'Messages'},
+     {id:'earnings',icon:'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',label:'Earnings'},
+     {id:'invoices',icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',label:'Invoices'}]:
+    [{id:'kliques',icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',label:'My Kliques'},
+     {id:'messages',icon:'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',label:'Messages'},
+     {id:'bookings',icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',label:'Bookings',active:true},
+     {id:'invoices',icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',label:'Invoices'},
+     {id:'notifications',icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',label:'Notifications'},
+     {id:'profile',icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',label:'Profile'}];
+
+  return '<div class="sb-logo">kliques</div><div class="sb-sub">Relationship OS</div>'+
+    '<div class="sb-user"><div class="sb-av">'+(isP?'AW':'ES')+'</div><div><div style="font-size:14px;font-weight:500">'+(isP?'Anny Wong':'Eto Segun')+'</div><div style="font-size:10px;color:var(--faded);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">'+(isP?'Provider':'Client')+'</div></div></div>'+
+    items.map(function(it){return '<div class="ni'+(it.active?' ac':'')+'" onclick=""><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="'+it.icon+'" stroke-linecap="round" stroke-linejoin="round"/></svg>'+it.label+'</div>'}).join('')+
+    '<div class="sb-bottom"><button class="sb-signout"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"/></svg>Sign Out</button></div>';
+}
+
+function tabsHTML(counts){
+  var tabs=[{id:'pending',label:'Pending',count:counts[0]},{id:'upcoming',label:'Upcoming',count:counts[1]},{id:'past',label:'Past',count:counts[2]}];
+  return '<div class="tabs fade-2">'+tabs.map(function(t){
+    var ac=activeTab===t.id;
+    return '<div class="tab'+(ac?' ac':'')+'" onclick="setTab(\''+t.id+'\')">'+
+      '<div class="tab-dot'+(t.id==='pending'&&t.count>0?' show':'')+'"></div>'+
+      '<span class="tab-count">'+t.count+'</span>'+
+      '<span class="tab-label">'+t.label+'</span>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+function emptyHTML(){
+  var msgs={
+    pending:{icon:'M3 19V9a2 2 0 011.106-1.789L12 3l7.894 4.211A2 2 0 0121 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2zM3 9l9 6 9-6',title:role==='provider'?'Inbox zero. Feels good.':'No pending bookings',desc:role==='provider'?'When clients request a booking, you\'ll review and accept them here.':'When you request a booking, it\'ll show here until your provider confirms.'},
+    upcoming:{icon:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',title:'Nothing upcoming',desc:role==='provider'?'Confirmed sessions will appear here as they\'re scheduled.':'Once a provider confirms your booking, it\'ll show up here.'},
+    past:{icon:'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',title:'No past sessions',desc:'Your completed and cancelled sessions will be listed here.'}
+  };
+  var m=msgs[activeTab];
+  return '<div class="empty fade-3"><div class="empty-icon"><svg width="32" height="32" fill="none" stroke="var(--faded)" stroke-width="1.5" viewBox="0 0 24 24"><path d="'+m.icon+'" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>'+m.title+'</h3><p>'+m.desc+'</p></div>';
+}
+
+function bookingCard(data){
+  var dateBg=data.status==='pending'?'var(--amberbg)':data.status==='confirmed'?'var(--hero)':'var(--abg)';
+  var dateColor=data.status==='pending'?'var(--amber)':data.status==='confirmed'?'var(--accent)':'var(--muted)';
+  var pillClass=data.status==='pending'?'pill-pending':data.status==='confirmed'?'pill-confirmed':data.status==='completed'?'pill-completed':'pill-cancelled';
+
+  var h='<div class="bcard">'+
+    '<div class="bcard-date" style="background:'+dateBg+'"><span class="bcard-date-day" style="color:'+dateColor+'">'+data.dayName+'</span><span class="bcard-date-num" style="color:'+dateColor+'">'+data.dayNum+'</span></div>'+
+    '<div class="bcard-info"><div class="bcard-title">'+data.service+'</div><div class="bcard-sub">'+data.person+' · '+data.time+' · '+data.duration+'</div></div>'+
+    '<div class="bcard-right">';
+
+  if(data.status==='pending'&&role==='provider'){
+    h+='<div class="bcard-actions"><button class="btn-accept"><svg width="14" height="14" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>Accept</button><button class="btn-decline">Decline</button></div>';
+  } else {
+    h+='<span class="bcard-price">'+data.price+'</span><span class="bcard-pill '+pillClass+'">'+data.statusLabel+'</span>';
+  }
+
+  h+=chev+'</div></div>';
+  return h;
+}
+
+var sampleBookings={
+  pending:[
+    {dayName:'Thu',dayNum:'27',service:'1-on-1 Vocal Lesson',person:role==='provider'?'Eto Segun':'Anny Wong',time:'10:30 AM',duration:'60 min',price:'$85',status:'pending',statusLabel:'Pending'},
+    {dayName:'Fri',dayNum:'28',service:'Performance Coaching',person:role==='provider'?'Maya Chen':'Anny Wong',time:'2:00 PM',duration:'45 min',price:'$95',status:'pending',statusLabel:'Pending'}
+  ],
+  upcoming:[
+    {dayName:'Mon',dayNum:'31',service:'Group Class',person:role==='provider'?'3 attendees':'Anny Wong',time:'11:00 AM',duration:'90 min',price:'$45',status:'confirmed',statusLabel:'Confirmed'},
+    {dayName:'Wed',dayNum:'2',service:'1-on-1 Vocal Lesson',person:role==='provider'?'Eto Segun':'Anny Wong',time:'9:00 AM',duration:'60 min',price:'$85',status:'confirmed',statusLabel:'Confirmed'}
+  ],
+  past:[
+    {dayName:'Mon',dayNum:'17',service:'1-on-1 Vocal Lesson',person:role==='provider'?'Eto Segun':'Anny Wong',time:'10:30 AM',duration:'60 min',price:'$85',status:'completed',statusLabel:'Completed'},
+    {dayName:'Thu',dayNum:'13',service:'Performance Coaching',person:role==='provider'?'Eto Segun':'Anny Wong',time:'3:00 PM',duration:'45 min',price:'$95',status:'cancelled',statusLabel:'Cancelled'}
+  ]
+};
+
+function render(){
+  document.getElementById('sidebar').innerHTML=sidebarHTML();
+
+  var counts=state==='empty'?[0,0,0]:[2,2,2];
+  var isP=role==='provider';
+
+  var h='<div class="page-hdr fade-1"><div class="page-hdr-label">'+(isP?'Manage':'Your Sessions')+'</div><h1>Bookings</h1></div>';
+  h+=tabsHTML(counts);
+
+  if(state==='empty'){
+    h+=emptyHTML();
+  } else {
+    var bookings=sampleBookings[activeTab];
+    // Update person names based on role
+    bookings=bookings.map(function(b){
+      var copy=Object.assign({},b);
+      if(activeTab==='pending'){
+        copy.person=isP?(copy.dayNum==='27'?'Eto Segun':'Maya Chen'):'Anny Wong';
+      } else {
+        copy.person=isP?'Eto Segun':'Anny Wong';
+      }
+      return copy;
+    });
+
+    if(activeTab==='pending'&&isP){
+      h+='<div class="section-label fade-3">'+bookings.length+' request'+(bookings.length!==1?'s':'')+' awaiting your response</div>';
+    }
+
+    h+='<div class="fade-3">';
+    bookings.forEach(function(b){h+=bookingCard(b)});
+    h+='</div>';
+  }
+
+  document.getElementById('page').innerHTML=h;
+}
+
+render();
+</script>
+</body>
+</html>

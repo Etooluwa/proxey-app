@@ -170,7 +170,7 @@ const AppLayout = () => {
                 />
                 <div style={{ marginLeft: '260px', minHeight: '100vh' }}>
                     <DesktopHeader title={title} subtitle={subtitle} />
-                    <main>
+                    <main style={{ paddingTop: 16 }}>
                         <Outlet context={{ onMenu: () => {}, isDesktop: true }} />
                     </main>
                 </div>

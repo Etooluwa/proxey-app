@@ -78,13 +78,16 @@ const Shimmer = ({ className }) => (
 
 // ─── Timeline booking card ────────────────────────────────────────────────────
 
-const BookingCard = ({ booking, isFirst, isLast, onRebook }) => {
+const BookingCard = ({ booking, isFirst, isLast, onRebook, onPress }) => {
     const dot = dotColor(booking, isFirst);
     const isUpcoming = booking.status === 'pending' || booking.status === 'confirmed';
     const canRebook = !isUpcoming && Boolean(booking.service_id) && typeof onRebook === 'function';
 
     return (
-        <div className="flex gap-4">
+        <div
+            className={`flex gap-4 ${typeof onPress === 'function' ? 'cursor-pointer active:opacity-70' : ''}`}
+            onClick={typeof onPress === 'function' ? onPress : undefined}
+        >
             {/* Spine */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 20 }}>
                 <div className="mt-5 flex-shrink-0">
@@ -115,16 +118,28 @@ const BookingCard = ({ booking, isFirst, isLast, onRebook }) => {
                             {booking.duration ? ` · ${formatDuration(booking.duration)}` : ''}
                         </p>
                     </div>
-                    {booking.price != null && (
-                        <span className="text-[15px] font-semibold text-ink flex-shrink-0">
-                            {formatPrice(booking.price)}
-                        </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        {booking.price != null && (
+                            <span className="text-[15px] font-semibold text-ink">
+                                {formatPrice(booking.price)}
+                            </span>
+                        )}
+                        {typeof onPress === 'function' && (
+                            <svg width="14" height="14" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+                                <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        )}
+                    </div>
                 </div>
 
-                {booking.notes && (
-                    <p className="text-[13px] text-muted leading-relaxed mt-1.5 mb-2">
-                        {booking.notes}
+                {booking.session_notes && (
+                    <p className="text-[13px] text-muted leading-relaxed mt-1.5 mb-1 italic">
+                        "{booking.session_notes.slice(0, 100)}{booking.session_notes.length > 100 ? '…' : ''}"
+                    </p>
+                )}
+                {booking.session_recommendation && (
+                    <p className="text-[12px] leading-relaxed mt-1 mb-1" style={{ color: '#C25E4A' }}>
+                        Rec: {booking.session_recommendation.slice(0, 80)}{booking.session_recommendation.length > 80 ? '…' : ''}
                     </p>
                 )}
 
@@ -155,7 +170,7 @@ const BookingCard = ({ booking, isFirst, isLast, onRebook }) => {
 
                     {canRebook && (
                         <button
-                            onClick={onRebook}
+                            onClick={(e) => { e.stopPropagation(); onRebook(); }}
                             className="text-[12px] font-semibold text-accent focus:outline-none"
                             style={{
                                 border: '1px solid rgba(194,94,74,0.22)',
@@ -364,6 +379,7 @@ const RelationshipPage = () => {
                                     isFirst={i === bookings.length - 1}
                                     isLast={i === bookings.length - 1}
                                     onRebook={() => openPublicBooking(booking.service_id)}
+                                    onPress={() => navigate(`/app/bookings/${booking.id}`)}
                                 />
                             ))}
                         </div>
@@ -523,9 +539,8 @@ const RelationshipPage = () => {
                                         booking={booking}
                                         isFirst={i === bookings.length - 1} // oldest = first = milestone
                                         isLast={i === bookings.length - 1}
-                                        onRebook={() =>
-                                            openPublicBooking(booking.service_id)
-                                        }
+                                        onRebook={() => openPublicBooking(booking.service_id)}
+                                        onPress={() => navigate(`/app/bookings/${booking.id}`)}
                                     />
                                 ))}
                             </div>

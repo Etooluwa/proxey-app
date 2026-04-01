@@ -1264,7 +1264,10 @@ app.get("/api/provider/:providerId/services", async (req, res) => {
           base_price: s.base_price,
           unit: s.unit || 'visit',
           duration: s.duration || 60,
-          provider_id: s.provider_id
+          provider_id: s.provider_id,
+          payment_type: s.payment_type || 'full',
+          deposit_type: s.deposit_type || null,
+          deposit_value: s.deposit_value != null ? s.deposit_value : null,
         }));
         return res.status(200).json({ services });
       }
@@ -2060,6 +2063,25 @@ app.get("/api/bookings/:id", async (req, res) => {
       providerInfo = data || null;
     }
 
+    // Resolve client name if not stored on booking
+    let clientName = booking.client_name || null;
+    if (!clientName && booking.client_id) {
+      const { data: cp } = await supabase
+        .from("client_profiles")
+        .select("name")
+        .eq("user_id", booking.client_id)
+        .maybeSingle();
+      clientName = cp?.name || null;
+    }
+
+    // Fetch session photos for this booking
+    const { data: photosData } = await supabase
+      .from("booking_photos")
+      .select("id, photo_url, caption, created_at")
+      .eq("booking_id", bookingId)
+      .order("created_at", { ascending: true });
+    const sessionPhotos = photosData || [];
+
     // Fetch intake responses for this booking
     let intakeResponses = [];
     const { data: intakeRows } = await supabase
@@ -2075,6 +2097,7 @@ app.get("/api/bookings/:id", async (req, res) => {
 
     const enriched = {
       ...booking,
+      client_name: clientName,
       provider_name: providerInfo?.business_name || providerInfo?.name || booking.provider_name || "Provider",
       provider_handle: providerInfo?.handle || null,
       provider_avatar: providerInfo?.photo || providerInfo?.avatar || null,
@@ -2083,12 +2106,117 @@ app.get("/api/bookings/:id", async (req, res) => {
       duration_minutes: serviceInfo?.duration_minutes || booking.duration_minutes || booking.duration || null,
       intake_responses: intakeResponses,
       client_message: booking.metadata?.client_message || null,
+      session_notes: booking.session_notes || null,
+      session_recommendation: booking.session_recommendation || null,
+      session_photos: sessionPhotos,
     };
 
     return res.status(200).json({ booking: enriched });
   } catch (err) {
     console.error("[bookings/:id] GET error:", err);
     return res.status(500).json({ error: "Failed to load booking." });
+  }
+});
+
+// PATCH /api/bookings/:id/notes — provider saves session notes + recommendation
+app.patch("/api/bookings/:id/notes", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const bookingId = req.params.id;
+  const userId = getUserId(req);
+  const { session_notes, session_recommendation } = req.body || {};
+
+  try {
+    const { data: booking } = await supabase
+      .from("bookings").select("provider_id").eq("id", bookingId).single();
+    if (!booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (session_notes !== undefined) updates.session_notes = session_notes;
+    if (session_recommendation !== undefined) updates.session_recommendation = session_recommendation;
+
+    const { data, error } = await supabase
+      .from("bookings").update(updates).eq("id", bookingId).select().single();
+    if (error) throw error;
+    res.json({ booking: data });
+  } catch (err) {
+    console.error("[bookings/:id/notes]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/bookings/:id/photos — provider uploads a session photo URL
+app.post("/api/bookings/:id/photos", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const bookingId = req.params.id;
+  const userId = getUserId(req);
+  const { photo_url, caption } = req.body || {};
+
+  if (!photo_url) return res.status(400).json({ error: "photo_url is required." });
+
+  try {
+    const { data: booking } = await supabase
+      .from("bookings").select("provider_id").eq("id", bookingId).single();
+    if (!booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
+
+    const { data, error } = await supabase
+      .from("booking_photos")
+      .insert({ booking_id: bookingId, provider_id: userId, photo_url, caption: caption || null })
+      .select().single();
+    if (error) throw error;
+    res.status(201).json({ photo: data });
+  } catch (err) {
+    console.error("[bookings/:id/photos POST]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/bookings/:bookingId/photos/:photoId — provider deletes a session photo
+app.delete("/api/bookings/:bookingId/photos/:photoId", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const { bookingId, photoId } = req.params;
+  const userId = getUserId(req);
+
+  try {
+    const { data: photo } = await supabase
+      .from("booking_photos").select("provider_id").eq("id", photoId).eq("booking_id", bookingId).single();
+    if (!photo) return res.status(404).json({ error: "Photo not found." });
+    if (photo.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
+
+    const { error } = await supabase.from("booking_photos").delete().eq("id", photoId);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[bookings/:id/photos DELETE]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/bookings/:id/photos/upload-url — get a signed Supabase Storage upload URL
+app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const bookingId = req.params.id;
+  const userId = getUserId(req);
+  const { filename, contentType } = req.body || {};
+
+  if (!filename) return res.status(400).json({ error: "filename is required." });
+
+  try {
+    const { data: booking } = await supabase
+      .from("bookings").select("provider_id").eq("id", bookingId).single();
+    if (!booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
+
+    const filePath = `booking-photos/${bookingId}/${Date.now()}-${filename}`;
+    const { data, error } = await supabase.storage
+      .from("kliques-media")
+      .createSignedUploadUrl(filePath);
+    if (error) throw error;
+    res.json({ uploadUrl: data.signedUrl, filePath, token: data.token });
+  } catch (err) {
+    console.error("[bookings/:id/photos/upload-url]", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -4980,7 +5108,7 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
     // Fetch all bookings between this client and provider, newest first
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, created_at, reviewed_at")
+      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, session_notes, session_recommendation, created_at, reviewed_at")
       .eq("client_id", userId)
       .eq("provider_id", providerId)
       .order("scheduled_at", { ascending: false });
@@ -5326,7 +5454,7 @@ async function buildProviderClientTimeline(providerIdentifier, clientId) {
       .maybeSingle(),
     supabase
       .from("bookings")
-      .select("id, service_id, service_name, scheduled_at, duration, price, status, notes, completed_at, created_at, client_name")
+      .select("id, service_id, service_name, scheduled_at, duration, price, status, notes, session_notes, session_recommendation, completed_at, created_at, client_name")
       .eq("provider_id", identity.authId)
       .eq("client_id", clientId)
       .order("scheduled_at", { ascending: false }),
@@ -10025,6 +10153,16 @@ app.post("/api/bookings/request-time", async (req, res) => {
       servicePrice = svc?.base_price || null;
     }
 
+    if (payment_type && payment_type !== "none" && Number(servicePrice) > 0) {
+      try {
+        await getProviderStripeConnectStatus(provider_id, { requireReady: true });
+      } catch (providerStripeError) {
+        return res.status(providerStripeError.statusCode || 400).json({
+          error: providerStripeError.message || "Provider has not connected Stripe yet.",
+        });
+      }
+    }
+
     // Fetch provider name to store on booking
     const { data: providerRow } = await supabase
       .from("providers")
@@ -10060,6 +10198,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
       .from("bookings")
       .insert({
         client_id: clientId,
+        client_name: clientName !== "A client" ? clientName : null,
         provider_id,
         provider_name: providerName,
         service_id: service_id || null,

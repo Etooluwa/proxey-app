@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book with Hii — Kliques</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--base:#FBF7F2;--ink:#3D231E;--muted:#8C6A64;--faded:#B0948F;--accent:#C25E4A;--hero:#FDDCC6;--abg:#F2EBE5;--line:rgba(140,106,100,0.18);--card:#FFF;--callout:#FFF5E6;--success:#5A8A5E;--sbg:#EBF2EC}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',system-ui,sans-serif;background:var(--base);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;background:none}button:active{transform:scale(0.98)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.topo{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");background-size:cover;pointer-events:none}
+
+/* Top nav */
+.topnav{padding:16px 24px;display:flex;justify-content:space-between;align-items:center;max-width:720px;margin:0 auto}
+.topnav-logo{font-family:'Playfair Display',Georgia,serif;font-size:20px;font-weight:500;color:var(--accent);letter-spacing:-0.02em}
+.topnav-badge{padding:5px 12px;border-radius:9999px;background:var(--abg);font-size:11px;font-weight:500;color:var(--muted)}
+
+/* Hero */
+.hero{max-width:720px;margin:0 auto;padding:0 24px}
+.hero-card{background:var(--hero);border-radius:24px;padding:40px 36px 36px;position:relative;overflow:hidden;margin-bottom:28px}
+.hero-profile{display:flex;align-items:flex-start;gap:20px;position:relative;z-index:1}
+.hero-av{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.5);border:3px solid rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.hero-av-initials{font-size:26px;font-weight:500;color:var(--muted)}
+.hero-av .verified{position:absolute;bottom:2px;right:2px;width:22px;height:22px;border-radius:50%;background:var(--success);border:3px solid var(--hero);display:flex;align-items:center;justify-content:center}
+.hero-info{flex:1;padding-top:4px}
+.hero-name{font-size:26px;font-weight:400;letter-spacing:-0.03em;margin:0 0 4px;line-height:1.2}
+.hero-role{font-size:14px;color:var(--muted);margin:0 0 14px}
+.hero-stats{display:flex;gap:16px;flex-wrap:wrap}
+.hero-stat{display:flex;align-items:center;gap:5px;font-size:13px}
+.hero-stat svg{flex-shrink:0}
+.hero-bio{position:relative;z-index:1;margin-top:20px;padding-top:20px;border-top:1px solid rgba(61,35,30,0.08)}
+.hero-bio p{font-size:14px;color:var(--muted);line-height:1.7;margin:0}
+
+/* Content */
+.content{max-width:720px;margin:0 auto;padding:0 24px 120px}
+
+/* Service groups */
+.group{margin-bottom:28px}
+.group-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.group-name{font-size:15px;font-weight:500}
+.group-count{width:22px;height:22px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--muted)}
+
+/* Service cards */
+.svc{padding:18px 22px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative}
+.svc:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(194,94,74,0.06);transform:translateY(-1px)}
+.svc.selected{border:2px solid var(--accent);background:rgba(194,94,74,0.02)}
+.svc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.svc-name{font-size:15px;font-weight:500;flex:1}
+.svc-price{font-size:16px;font-weight:500;color:var(--accent);flex-shrink:0;margin-left:16px}
+.svc-meta{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.svc-dur{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.svc-dur svg{flex-shrink:0}
+.svc-desc{font-size:13px;color:var(--faded);line-height:1.5}
+.svc-check{position:absolute;top:18px;right:22px;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.svc.selected .svc-check{background:var(--accent);border-color:var(--accent)}
+
+/* Reviews section */
+.reviews-section{margin-top:32px}
+.reviews-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.reviews-title{font-size:15px;font-weight:500}
+.reviews-see-all{font-size:13px;color:var(--accent);font-weight:500;cursor:pointer}
+.review-card{padding:18px 22px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:8px}
+.review-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.review-av{width:32px;height:32px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--muted)}
+.review-name{font-size:13px;font-weight:500;flex:1}
+.review-date{font-size:11px;color:var(--faded)}
+.review-stars{display:flex;gap:2px;margin-bottom:8px}
+.review-text{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* Sticky CTA */
+.sticky-cta{position:fixed;bottom:0;left:0;right:0;padding:16px 24px 24px;background:linear-gradient(transparent,var(--base) 20%);z-index:10}
+.sticky-cta-inner{max-width:672px;margin:0 auto}
+.btn-book{width:100%;padding:18px;border-radius:14px;background:var(--ink);color:#fff;font-size:15px;font-weight:500;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-book:hover{opacity:.9}
+.btn-book:disabled{opacity:.4;cursor:default}
+
+/* Powered by */
+.powered{text-align:center;padding:32px 0 16px}
+.powered span{font-size:11px;color:var(--faded)}
+.powered a{font-family:'Playfair Display',Georgia,serif;font-size:12px;color:var(--accent);text-decoration:none;font-weight:500}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fade-1{animation:fadeUp .5s ease .05s both}
+.fade-2{animation:fadeUp .5s ease .15s both}
+.fade-3{animation:fadeUp .5s ease .25s both}
+.fade-4{animation:fadeUp .5s ease .35s both}
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<div class="topnav fade-1">
+  <div class="topnav-logo">kliques</div>
+  <div class="topnav-badge">Public booking page</div>
+</div>
+
+<!-- Hero -->
+<div class="hero fade-1">
+  <div class="hero-card">
+    <div class="topo" style="opacity:.08;border-radius:24px"></div>
+    <div class="hero-profile">
+      <div class="hero-av">
+        <span class="hero-av-initials">HI</span>
+        <div class="verified">
+          <svg width="12" height="12" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="hero-info">
+        <h1 class="hero-name">Hii</h1>
+        <p class="hero-role">Yoga & Pilates · London</p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <svg width="14" height="14" fill="var(--accent)" stroke="none" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span style="font-weight:500;color:var(--accent)">5.0</span>
+          </div>
+          <span style="color:var(--line)">·</span>
+          <div class="hero-stat" style="color:var(--muted)">
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            12 reviews
+          </div>
+          <span style="color:var(--line)">·</span>
+          <div class="hero-stat" style="color:var(--muted)">
+            <svg width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            8 clients
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-bio">
+      <p>Helping you find balance, strength, and calm — whether you're stepping onto the mat for the first time or deepening your practice.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Services -->
+<div class="content">
+  <div class="fade-2">
+    <div class="group">
+      <div class="group-header">
+        <span class="group-name">Vocal Testing</span>
+        <div class="group-count">1</div>
+      </div>
+      <div class="svc" onclick="selectSvc(this)">
+        <div class="svc-top">
+          <span class="svc-name">Test Vocals</span>
+          <span class="svc-price">$500</span>
+        </div>
+        <div class="svc-meta">
+          <span class="svc-dur">
+            <svg width="12" height="12" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            1 hour
+          </span>
+        </div>
+        <div class="svc-desc">Test your vocal range and technique in a comprehensive assessment session.</div>
+        <div class="svc-check">
+          <svg width="14" height="14" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">
+        <span class="group-name">Services</span>
+        <div class="group-count">1</div>
+      </div>
+      <div class="svc" onclick="selectSvc(this)">
+        <div class="svc-top">
+          <span class="svc-name">Vocal Lesson</span>
+          <span class="svc-price">$100</span>
+        </div>
+        <div class="svc-meta">
+          <span class="svc-dur">
+            <svg width="12" height="12" fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            1 hour
+          </span>
+        </div>
+        <div class="svc-desc">One-on-one vocal coaching tailored to your goals and skill level.</div>
+        <div class="svc-check">
+          <svg width="14" height="14" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reviews -->
+  <div class="reviews-section fade-3">
+    <div class="reviews-header">
+      <span class="reviews-title">Reviews</span>
+      <span class="reviews-see-all">See all 12</span>
+    </div>
+    <div class="review-card">
+      <div class="review-top">
+        <div class="review-av">ES</div>
+        <span class="review-name">Eto S.</span>
+        <span class="review-date">Mar 19</span>
+      </div>
+      <div class="review-stars">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </div>
+      <p class="review-text">Incredible session. Really helped me understand my vocal range and gave me exercises I can practice at home.</p>
+    </div>
+    <div class="review-card">
+      <div class="review-top">
+        <div class="review-av">MC</div>
+        <span class="review-name">Maya C.</span>
+        <span class="review-date">Mar 12</span>
+      </div>
+      <div class="review-stars">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--faded)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </div>
+      <p class="review-text">Such a warm and encouraging teacher. I felt comfortable from the very first minute.</p>
+    </div>
+  </div>
+
+  <!-- Powered by -->
+  <div class="powered fade-4">
+    <span>Powered by </span><a href="#">kliques</a>
+  </div>
+</div>
+
+<!-- Sticky CTA -->
+<div class="sticky-cta">
+  <div class="sticky-cta-inner">
+    <button class="btn-book" id="ctaBtn" disabled>Select a service to continue</button>
+  </div>
+</div>
+
+<script>
+var selectedEl=null;
+
+function selectSvc(el){
+  if(selectedEl){selectedEl.classList.remove('selected')}
+  if(selectedEl===el){selectedEl=null;updateCTA();return}
+  el.classList.add('selected');
+  selectedEl=el;
+  updateCTA();
+}
+
+function updateCTA(){
+  var btn=document.getElementById('ctaBtn');
+  if(selectedEl){
+    var name=selectedEl.querySelector('.svc-name').textContent;
+    var price=selectedEl.querySelector('.svc-price').textContent;
+    btn.disabled=false;
+    btn.innerHTML='Continue with '+name+' · '+price+' <svg width="16" height="16" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  } else {
+    btn.disabled=true;
+    btn.innerHTML='Select a service to continue';
+  }
+}
+</script>
+</body>
+</html>

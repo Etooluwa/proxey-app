@@ -38,6 +38,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import AllNotificationsPage from './pages/AllNotificationsPage';
 import AccountPage from './pages/AccountPage';
 import ClientBookings from './pages/ClientBookings';
+import ClientBookingDetail from './pages/ClientBookingDetail';
 import ClientInvoices from './pages/ClientInvoices';
 
 // ── Provider pages ───────────────────────────────────────────────────────────
@@ -212,6 +213,7 @@ function App() {
                       <Route path="messages/:conversationId" element={<ChatPage />} />
                       {/* Bookings */}
                       <Route path="bookings" element={<ClientBookings />} />
+                      <Route path="bookings/:id" element={<ClientBookingDetail />} />
                       {/* Invoices */}
                       <Route path="invoices" element={<ClientInvoices />} />
                       {/* Notifications */}

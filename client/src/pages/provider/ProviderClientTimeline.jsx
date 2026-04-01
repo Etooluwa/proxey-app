@@ -72,12 +72,13 @@ const Shimmer = ({ className }) => (
 
 // ─── Timeline entry ───────────────────────────────────────────────────────────
 
-const TimelineEntry = ({ entry, isLast, clientName }) => {
+const TimelineEntry = ({ entry, isLast, clientName, onPress }) => {
     const isConnected = entry.type === 'connected';
     const isUpcoming = entry.status === 'pending' || entry.status === 'confirmed';
     const isCompleted = entry.status === 'completed';
     const isCancelled = entry.status === 'cancelled';
     const dot = timelineDotColor(entry);
+    const clickable = !isConnected && entry.id && typeof onPress === 'function';
     const price = fmtPrice(entry.price);
     const duration = fmtDuration(entry.duration);
     const dateLabel = fmtDate(entry.scheduled_at);
@@ -95,7 +96,10 @@ const TimelineEntry = ({ entry, isLast, clientName }) => {
 
     return (
         <div>
-            <div className="flex gap-3.5 py-5">
+            <div
+                className={`flex gap-3.5 py-5 ${clickable ? 'cursor-pointer active:opacity-70' : ''}`}
+                onClick={clickable ? onPress : undefined}
+            >
                 {/* Spine */}
                 <div className="flex flex-col items-center flex-shrink-0" style={{ width: 12 }}>
                     <div
@@ -116,9 +120,16 @@ const TimelineEntry = ({ entry, isLast, clientName }) => {
                         <p className="text-[15px] text-ink m-0 leading-snug flex-1">
                             {serviceLabel}
                         </p>
-                        {!isConnected && price && (
-                            <span className="text-[15px] text-ink flex-shrink-0">{price}</span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {!isConnected && price && (
+                                <span className="text-[15px] text-ink">{price}</span>
+                            )}
+                            {clickable && (
+                                <svg width="14" height="14" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            )}
+                        </div>
                     </div>
 
                     <Lbl className="block mb-1">
@@ -128,9 +139,9 @@ const TimelineEntry = ({ entry, isLast, clientName }) => {
 
                     <p className="text-[13px] text-muted m-0 mt-1">{metaLabel}</p>
 
-                    {!isConnected && entry.notes && (
+                    {!isConnected && entry.session_notes && (
                         <p className="text-[13px] text-muted leading-relaxed italic m-0 mt-1.5">
-                            {entry.notes}
+                            "{entry.session_notes.slice(0, 100)}{entry.session_notes.length > 100 ? '…' : ''}"
                         </p>
                     )}
 
@@ -371,6 +382,9 @@ const ProviderClientTimeline = () => {
                                         entry={entry}
                                         clientName={client?.name}
                                         isLast={i === timeline.length - 1}
+                                        onPress={entry.id && entry.type !== 'connected'
+                                            ? () => navigate(`/provider/appointments/${entry.id}`)
+                                            : undefined}
                                     />
                                 ))}
                             </div>
