@@ -922,7 +922,7 @@ async function getProviderStripeConnectStatus(providerId, { requireReady = false
   const { data: provider, error: providerError } = await supabase
     .from("providers")
     .select("stripe_account_id, business_name, name")
-    .eq("id", providerId)
+    .or(`id.eq.${providerId},user_id.eq.${providerId}`)
     .maybeSingle();
 
   if (providerError) {
