@@ -16,15 +16,21 @@ const F = "'Sora',system-ui,sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function parseLocalDate(iso) {
+    if (!iso) return null;
+    return new Date(iso.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, ''));
+}
+
 function formatDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const d = parseLocalDate(iso);
+    if (!d || isNaN(d)) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatShortDate(iso) {
-    if (!iso) return '—';
-    // e.g. "Jan 2026"
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const d = parseLocalDate(iso);
+    if (!d || isNaN(d)) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function formatDuration(minutes) {
@@ -308,7 +314,7 @@ const RelationshipPage = () => {
                                     <div>
                                         <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Last Visit</span>
                                         <span style={{ fontFamily: F, fontSize: 32, fontWeight: 600, color: T.accent, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                                            {loading ? '—' : (lastVisit ? new Date(lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')}
+                                            {loading ? '—' : (lastVisit ? parseLocalDate(lastVisit)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')}
                                         </span>
                                     </div>
                                 </div>
@@ -445,7 +451,7 @@ const RelationshipPage = () => {
                             <Lbl>Last Visit</Lbl>
                             <p className="text-[28px] font-semibold text-accent tracking-[-0.02em] m-0 leading-tight">
                                 {loading ? '—' : (lastVisit
-                                    ? new Date(lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                    ? parseLocalDate(lastVisit)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                                     : '—'
                                 )}
                             </p>

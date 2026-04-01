@@ -18,7 +18,8 @@ import {
 } from '../components/bookings/BookingsShared';
 
 function getLocalDateKey(value = new Date()) {
-    const date = value instanceof Date ? value : new Date(value);
+    const raw = value instanceof Date ? value : new Date(String(value).replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, ''));
+    const date = isNaN(raw.getTime()) ? new Date(value) : raw;
     if (Number.isNaN(date.getTime())) return null;
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, '0');

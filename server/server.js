@@ -7832,13 +7832,19 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       .gte("scheduled_at", dayStart)
       .lte("scheduled_at", dayEnd);
 
-    // Build set of booked start times (HH:MM) to exclude
+    // Build booked minute-ranges (start inclusive, end exclusive) to block full duration
     const bookedTimes = new Set();
+    const bookedBookingRanges = [];
     for (const b of bookings || []) {
-      const start = new Date(b.scheduled_at);
-      const h = start.getHours().toString().padStart(2, "0");
-      const m = start.getMinutes().toString().padStart(2, "0");
-      bookedTimes.add(`${h}:${m}`);
+      // Parse HH:MM directly from the stored string to avoid timezone shifts
+      const timeStr = (b.scheduled_at || '').slice(11, 16); // "HH:MM"
+      if (!timeStr) continue;
+      const [bh, bm] = timeStr.split(":").map(Number);
+      const startMins = bh * 60 + bm;
+      const dur = parseInt(b.duration) || 60;
+      const endMins = startMins + dur;
+      bookedTimes.add(timeStr);
+      bookedBookingRanges.push({ start: startMins, end: endMins });
     }
 
     // Also build blocked minute-ranges from partial blocks for filtering
@@ -7870,9 +7876,10 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       slots = [...new Set(allSlots)]
         .sort()
         .filter((slot) => {
-          if (bookedTimes.has(slot)) return false;
           const [h, m] = slot.split(":").map(Number);
           const mins = h * 60 + m;
+          // Block if this slot overlaps any existing booking's duration
+          if (bookedBookingRanges.some((r) => mins >= r.start && mins < r.end)) return false;
           // Check partial blocks
           if (blockedRanges.some((r) => mins >= r.start && mins < r.end)) return false;
           // Check override window
@@ -7899,10 +7906,11 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
         for (let t = windowStart; t + slotDuration <= windowEnd; t += 30) {
           const slotEnd = t + slotDuration;
           const isBlocked = blockedRanges.some((r) => t < r.end && slotEnd > r.start);
+          const isBookingConflict = bookedBookingRanges.some((r) => t < r.end && slotEnd > r.start);
           const h = Math.floor(t / 60).toString().padStart(2, "0");
           const mm = (t % 60).toString().padStart(2, "0");
           const slot = `${h}:${mm}`;
-          if (!isBlocked && !bookedTimes.has(slot)) slots.push(slot);
+          if (!isBlocked && !isBookingConflict) slots.push(slot);
         }
       }
     }

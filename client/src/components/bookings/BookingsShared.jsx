@@ -42,16 +42,19 @@ export function formatBookingDuration(minutes) {
     return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
 }
 
+function parseLocalDate(iso) {
+    if (!iso) return null;
+    return new Date(String(iso).replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, ''));
+}
+
 export function formatBookingTime(iso) {
-    if (!iso) return 'TBD';
-    return new Date(iso).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+    const d = parseLocalDate(iso);
+    if (!d || isNaN(d)) return 'TBD';
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 export function getDateBlock(iso) {
-    const date = iso ? new Date(iso) : null;
+    const date = parseLocalDate(iso);
     if (!date || Number.isNaN(date.getTime())) {
         return { day: 'TBD', dayNumber: '—' };
     }

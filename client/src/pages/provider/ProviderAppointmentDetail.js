@@ -27,16 +27,21 @@ function getInitials(name) {
     return (name || 'C').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
+function parseLocalDate(iso) {
+    if (!iso) return null;
+    return new Date(iso.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, ''));
+}
+
 function fmtDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric',
-    });
+    const d = parseLocalDate(iso);
+    if (!d || isNaN(d)) return '—';
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function fmtTime(iso) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const d = parseLocalDate(iso);
+    if (!d || isNaN(d)) return '';
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 function fmtDuration(mins) {
