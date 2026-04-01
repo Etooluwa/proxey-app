@@ -193,7 +193,7 @@ export default function ClientBookings() {
                             booking={booking}
                             personName={booking.provider_name || 'Provider'}
                             isDesktop={isDesktop}
-                            onClick={() => navigate(`/app/relationship/${booking.provider_id}`)}
+                            onClick={() => navigate(`/app/bookings/${booking.id}`)}
                         />
                     ))
                 )}
