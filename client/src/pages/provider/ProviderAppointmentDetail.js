@@ -49,8 +49,7 @@ function fmtDuration(mins) {
 
 function fmtPrice(val) {
     if (!val && val !== 0) return null;
-    const dollars = val > 1000 ? val / 100 : val;
-    return `$${Math.round(dollars)}`;
+    return `$${Math.round(val / 100)}`;
 }
 
 function fmt$(n) {
@@ -371,7 +370,7 @@ const ProviderAppointmentDetail = () => {
     const clientSubtitle = [visitLabel, sinceLabel].filter(Boolean).join(' · ');
 
     // Payment breakdown
-    const totalDollars = job.price ? (job.price > 1000 ? job.price / 100 : job.price) : null;
+    const totalDollars = job.price ? job.price / 100 : null;
     const paymentType = job.payment_type || 'full';
     const depositValue = job.deposit_value;
     const depositType = job.deposit_type; // 'percent' | 'fixed'

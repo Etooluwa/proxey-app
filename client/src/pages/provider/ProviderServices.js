@@ -28,8 +28,7 @@ const F = "'Sora',system-ui,sans-serif";
 
 function fmtPrice(val) {
     if (!val && val !== 0) return null;
-    const dollars = val > 1000 ? val / 100 : val;
-    return `$${Math.round(dollars)}`;
+    return `$${Math.round(val / 100)}`;
 }
 
 function fmtDuration(mins) {
