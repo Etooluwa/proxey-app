@@ -343,6 +343,7 @@ const ProviderMessages = () => {
                 onMenu={onMenu}
                 showAvatar
                 initials={initials}
+                onNotif={() => navigate('/provider/notifications')}
             />
 
             <div className="px-5 pb-6 flex-1 flex flex-col">

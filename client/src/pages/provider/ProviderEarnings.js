@@ -7,7 +7,7 @@
  *                   availableBalance, nextPayoutDate } }
  */
 import { useEffect, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { request } from '../../data/apiClient';
 import {
@@ -80,6 +80,7 @@ const EarningsEmpty = () => (
 
 const ProviderEarnings = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
+    const navigate = useNavigate();
     const { session, profile } = useSession();
 
     const [earnings, setEarnings] = useState(null);
@@ -241,7 +242,7 @@ const ProviderEarnings = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar initials={initials} />
+            <Header onMenu={onMenu} showAvatar initials={initials} onNotif={() => navigate('/provider/notifications')} />
 
             <div className="px-5 pb-10 flex-1 flex flex-col">
                 <div className="mb-5">

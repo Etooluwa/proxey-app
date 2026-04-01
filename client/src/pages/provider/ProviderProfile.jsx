@@ -182,7 +182,7 @@ const ProviderProfile = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar initials={initials} avatarSrc={avatarSrc} />
+            <Header onMenu={onMenu} showAvatar initials={initials} avatarSrc={avatarSrc} onNotif={() => navigate('/provider/notifications')} />
 
             {/* ── Hero card ── */}
             <div className="px-4 pt-2 pb-1">

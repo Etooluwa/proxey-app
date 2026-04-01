@@ -268,6 +268,7 @@ const ProviderAppointments = () => {
                 showAvatar
                 initials={initials}
                 notifCount={unreadCount}
+                onNotif={() => navigate('/provider/notifications')}
             />
             <div style={{ padding: '0 20px 24px', flex: 1 }}>
                 {content}
