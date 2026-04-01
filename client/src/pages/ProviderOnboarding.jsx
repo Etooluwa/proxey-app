@@ -837,13 +837,14 @@ export default function ProviderOnboarding() {
         setSaving(true);
         try {
             for (const svc of services) {
-                await request('/provider/services', {
+                await request('/services', {
                     method: 'POST',
                     body: JSON.stringify({
                         name: svc.name,
-                        duration_minutes: parseInt(svc.duration),
-                        price: parseFloat(svc.price) * 100,
+                        duration: parseInt(svc.duration, 10),
+                        basePrice: parseFloat(svc.price),
                         category: category === 'Other' ? customCat.trim() : category,
+                        unit: 'visit',
                     }),
                 }).catch(() => {}); // best-effort
             }

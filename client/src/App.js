@@ -21,7 +21,7 @@ import AdminShell from './components/layout/AdminShell';
 import LoginPage from './pages/auth/LoginPage';
 import AuthCallback from './pages/AuthCallback';
 import ClientOnboarding from './pages/ClientOnboarding';
-import ProviderOnboarding from './pages/ProviderOnboarding';
+import ProviderOnboarding from './pages/ProviderOnboardingPage';
 
 // ── Public (no auth) ─────────────────────────────────────────────────────────
 import PublicBookingPage from './pages/PublicBookingPage';
