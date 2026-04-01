@@ -25,7 +25,7 @@ export function formatBookingPrice(value) {
     if (value === null || value === undefined || value === '') return null;
     const cents = Number(value);
     if (!Number.isFinite(cents)) return null;
-    const dollars = cents > 1000 ? cents / 100 : cents;
+    const dollars = cents / 100;
     return new Intl.NumberFormat('en-CA', {
         style: 'currency',
         currency: 'CAD',
