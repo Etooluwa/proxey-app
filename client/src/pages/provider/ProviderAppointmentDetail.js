@@ -478,6 +478,39 @@ const ProviderAppointmentDetail = () => {
         }
     };
 
+    const [accepting, setAccepting] = useState(false);
+    const [declining, setDeclining] = useState(false);
+
+    const handleAccept = async () => {
+        setAccepting(true);
+        setActionError(null);
+        try {
+            const data = await request(`/bookings/${id}/accept`, { method: 'POST' });
+            setJob((prev) => ({ ...prev, status: data.booking?.status || 'confirmed' }));
+        } catch (err) {
+            setActionError(err.message || 'Could not accept. Please try again.');
+        } finally {
+            setAccepting(false);
+        }
+    };
+
+    const handleDecline = async (reason) => {
+        setActionLoading(true);
+        setActionError(null);
+        try {
+            await request(`/bookings/${id}/decline`, {
+                method: 'POST',
+                body: JSON.stringify({ reason }),
+            });
+            setShowCancelModal(false);
+            load();
+        } catch (err) {
+            setActionError(err.message || 'Could not decline. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleCancelBooking = async (reason) => {
         setActionLoading(true);
         setActionError(null);
@@ -567,8 +600,10 @@ const ProviderAppointmentDetail = () => {
     }
 
     // ── Derived values ───────────────────────────────────────────────────────
-    const isConfirmed = ['confirmed', 'accepted', 'pending'].includes((job.status || '').toLowerCase());
-    const isAlreadyCompleted = job.status?.toLowerCase() === 'completed';
+    const statusLower = (job.status || '').toLowerCase();
+    const isPending = statusLower === 'pending';
+    const isConfirmed = statusLower === 'confirmed' || statusLower === 'accepted';
+    const isAlreadyCompleted = statusLower === 'completed';
     const price = fmtPrice(job.price);
     const duration = fmtDuration(job.duration);
     const dateLabel = fmtDate(job.scheduled_at);
@@ -598,9 +633,9 @@ const ProviderAppointmentDetail = () => {
 
             {showCancelModal && (
                 <ReasonModal
-                    title="Cancel Booking"
-                    placeholder="Reason for cancelling (optional)…"
-                    onConfirm={handleCancelBooking}
+                    title={isPending ? 'Decline Booking' : 'Cancel Booking'}
+                    placeholder={isPending ? 'Reason for declining (optional)…' : 'Reason for cancelling (optional)…'}
+                    onConfirm={isPending ? handleDecline : handleCancelBooking}
                     onCancel={() => { setShowCancelModal(false); setActionError(null); }}
                     loading={actionLoading}
                 />
@@ -635,6 +670,16 @@ const ProviderAppointmentDetail = () => {
                 </div>
 
                 {/* Status pill */}
+                {isPending && (
+                    <div className="mb-5">
+                        <span
+                            className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
+                            style={{ background: '#FFF5E6', color: '#92400E' }}
+                        >
+                            Awaiting your response
+                        </span>
+                    </div>
+                )}
                 {isConfirmed && (
                     <div className="mb-5">
                         <span
@@ -893,43 +938,71 @@ const ProviderAppointmentDetail = () => {
                             {completeError || actionError}
                         </p>
                     )}
-                    <div className="flex gap-3 w-full">
-                        <button
-                            onClick={handleMessage}
-                            className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
-                            style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
-                        >
-                            Message
-                        </button>
-                        <button
-                            onClick={handleMarkComplete}
-                            disabled={completing}
-                            className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                            style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
-                        >
-                            {completing && (
-                                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                            )}
-                            {completing ? 'Completing…' : 'Mark Complete'}
-                        </button>
-                    </div>
-                    {isConfirmed && (
-                        <div className="flex gap-3 w-full mt-2">
-                            <button
-                                onClick={() => { setActionError(null); setShowRescheduleModal(true); }}
-                                className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
-                                style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
-                            >
-                                Reschedule
-                            </button>
+
+                    {/* Pending: Accept / Decline only */}
+                    {isPending && (
+                        <div className="flex gap-3 w-full">
                             <button
                                 onClick={() => { setActionError(null); setShowCancelModal(true); }}
-                                className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                                className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
                                 style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
                             >
-                                Cancel Booking
+                                Decline
+                            </button>
+                            <button
+                                onClick={handleAccept}
+                                disabled={accepting}
+                                className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                                style={{ background: '#3D231E', border: 'none', opacity: accepting ? 0.7 : 1 }}
+                            >
+                                {accepting && (
+                                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                                )}
+                                {accepting ? 'Accepting…' : 'Accept Booking'}
                             </button>
                         </div>
+                    )}
+
+                    {/* Confirmed: Message + Mark Complete + Reschedule + Cancel */}
+                    {isConfirmed && (
+                        <>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={handleMessage}
+                                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                                >
+                                    Message
+                                </button>
+                                <button
+                                    onClick={handleMarkComplete}
+                                    disabled={completing}
+                                    className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                                    style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
+                                >
+                                    {completing && (
+                                        <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                                    )}
+                                    {completing ? 'Completing…' : 'Mark Complete'}
+                                </button>
+                            </div>
+                            <div className="flex gap-3 w-full mt-2">
+                                <button
+                                    onClick={() => { setActionError(null); setShowRescheduleModal(true); }}
+                                    className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                                >
+                                    Reschedule
+                                </button>
+                                <button
+                                    onClick={() => { setActionError(null); setShowCancelModal(true); }}
+                                    className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                                    style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
+                                >
+                                    Cancel Booking
+                                </button>
+                            </div>
+                        </>
                     )}
                 </div>
             )}
