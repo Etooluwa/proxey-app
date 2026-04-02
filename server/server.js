@@ -286,6 +286,14 @@ async function createClientNotification(userId, notification) {
   if (!supabase || !userId) return null;
 
   try {
+    // Merge booking_id / request_id into the data JSONB field
+    // (client_notifications table has no booking_id or request_id columns)
+    const dataPayload = {
+      ...(notification.data || {}),
+      ...(notification.booking_id ? { booking_id: notification.booking_id } : {}),
+      ...(notification.request_id ? { request_id: notification.request_id } : {}),
+    };
+
     const { data, error } = await supabase
       .from("client_notifications")
       .insert({
@@ -293,9 +301,7 @@ async function createClientNotification(userId, notification) {
         type: notification.type || 'general',
         title: notification.title,
         body: notification.body || null,
-        data: notification.data || {},
-        request_id: notification.request_id || null,
-        booking_id: notification.booking_id || null,
+        data: dataPayload,
         is_read: false,
       })
       .select()
@@ -997,6 +1003,42 @@ async function getProviderIdentity(providerIdentifier) {
       ids: providerIdentifier ? [providerIdentifier] : [],
     };
   }
+}
+
+async function hasProviderBookingConflict({ providerId, scheduledAt, durationMinutes = 60, excludeBookingId = null }) {
+  if (!supabase || !providerId || !scheduledAt) return false;
+
+  const providerIdentity = await getProviderIdentity(providerId);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerId];
+  const requestedStart = new Date(scheduledAt).getTime();
+  const requestedEnd = requestedStart + (parseInt(durationMinutes, 10) || 60) * 60000;
+
+  if (!Number.isFinite(requestedStart) || !Number.isFinite(requestedEnd)) return false;
+
+  const windowStart = new Date(requestedStart - 24 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(requestedEnd + 24 * 60 * 60 * 1000).toISOString();
+
+  let query = supabase
+    .from("bookings")
+    .select("id, scheduled_at, duration")
+    .in("provider_id", providerIds)
+    .in("status", ["pending", "confirmed"])
+    .gte("scheduled_at", windowStart)
+    .lte("scheduled_at", windowEnd);
+
+  if (excludeBookingId) {
+    query = query.neq("id", excludeBookingId);
+  }
+
+  const { data: existingBookings, error } = await query;
+  if (error) throw error;
+
+  return (existingBookings || []).some((booking) => {
+    const existingStart = new Date(booking.scheduled_at).getTime();
+    const existingEnd = existingStart + (parseInt(booking.duration, 10) || 60) * 60000;
+    if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) return false;
+    return requestedStart < existingEnd && requestedEnd > existingStart;
+  });
 }
 
 async function ensureProviderClientConnection({ providerId, clientId, inviteId = null, source = "booking", connectedAt = new Date().toISOString() }) {
@@ -2749,6 +2791,16 @@ app.patch("/api/bookings/:id/reschedule", async (req, res) => {
       }
       if (!isClient && !isProvider) {
         return res.status(403).json({ error: "Not authorized to reschedule this booking." });
+      }
+
+      const hasConflict = await hasProviderBookingConflict({
+        providerId: data.provider_id,
+        scheduledAt: newScheduledAt,
+        durationMinutes: data.duration || data.duration_minutes || 60,
+        excludeBookingId: bookingId,
+      });
+      if (hasConflict) {
+        return res.status(409).json({ error: "That time slot is no longer available." });
       }
 
       const { data: rescheduled, error: reschedErr } = await supabase
@@ -7861,7 +7913,6 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   try {
     const providerIdentity = await getProviderIdentity(providerId);
     const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerId];
-    const providerBookingId = providerIdentity.recordId || providerId;
     const dateObj = new Date(date + "T00:00:00");
     const jsDayIndex = dateObj.getDay(); // 0=Sun, 6=Sat
     const mondayFirstDayIndex = (jsDayIndex + 6) % 7; // 0=Mon, 6=Sun
@@ -7901,7 +7952,7 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
     const { data: bookings } = await supabase
       .from("bookings")
       .select("scheduled_at, duration")
-      .eq("provider_id", providerBookingId)
+      .in("provider_id", providerIds)
       .in("status", ["pending", "confirmed"])
       .gte("scheduled_at", dayStart)
       .lte("scheduled_at", dayEnd);
@@ -10200,6 +10251,16 @@ app.post("/api/bookings/create", async (req, res) => {
   const chargeAmount = depositAmount != null ? depositAmount : price;
   const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
   let providerStripe = null;
+  let serviceDuration = 60;
+
+  if (supabase && serviceId) {
+    const { data: serviceRow } = await supabase
+      .from("services")
+      .select("duration")
+      .eq("id", serviceId)
+      .maybeSingle();
+    serviceDuration = parseInt(serviceRow?.duration, 10) || 60;
+  }
 
   if (amountCents > 0) {
     try {
@@ -10212,6 +10273,15 @@ app.post("/api/bookings/create", async (req, res) => {
   }
 
   try {
+    const hasConflict = await hasProviderBookingConflict({
+      providerId,
+      scheduledAt,
+      durationMinutes: serviceDuration,
+    });
+    if (hasConflict) {
+      return res.status(409).json({ error: "That time slot is no longer available." });
+    }
+
     let bookingId = crypto.randomUUID();
 
     if (supabase) {
@@ -10223,6 +10293,7 @@ app.post("/api/bookings/create", async (req, res) => {
           service_id: serviceId,
           provider_id: providerId,
           scheduled_at: scheduledAt,
+          duration: serviceDuration,
           notes: notes || "",
           status: providerBookingRules.autoAccept ? "confirmed" : "pending",
           price: price ?? null,
@@ -10397,14 +10468,25 @@ app.post("/api/bookings/request-time", async (req, res) => {
     // Fetch service info for the notification body
     let serviceName = null;
     let servicePrice = null;
+    let serviceDuration = 60;
     if (service_id) {
       const { data: svc } = await supabase
         .from("services")
-        .select("name, base_price")
+        .select("name, base_price, duration")
         .eq("id", service_id)
         .maybeSingle();
       serviceName = svc?.name || null;
       servicePrice = svc?.base_price || null;
+      serviceDuration = parseInt(svc?.duration, 10) || 60;
+    }
+
+    const hasConflict = await hasProviderBookingConflict({
+      providerId: provider_id,
+      scheduledAt,
+      durationMinutes: serviceDuration,
+    });
+    if (hasConflict) {
+      return res.status(409).json({ error: "That time slot is no longer available." });
     }
 
     if (payment_type && payment_type !== "none" && Number(servicePrice) > 0) {
@@ -10458,6 +10540,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
         service_id: service_id || null,
         service_name: serviceName || "Session",
         scheduled_at: scheduledAt,
+        duration: serviceDuration,
         status: providerBookingRules.autoAccept ? "confirmed" : "pending",
         payment_status: resolvedPaymentStatus,
         payment_type: payment_type || "none",
