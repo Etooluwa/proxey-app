@@ -472,6 +472,28 @@ const ProviderAppointmentDetail = () => {
             setCompleted(true);
         } catch (err) {
             console.error('[markComplete]', err);
+            try {
+                const latest = await request(`/bookings/${id}`);
+                const latestJob = latest.booking ? normaliseBookingJob(latest.booking) : null;
+                if (latestJob?.status === 'completed') {
+                    setJob(latestJob);
+                    setSessionNotes(latestJob.session_notes || '');
+                    setSessionRec(latestJob.session_recommendation || '');
+                    setPhotos(latestJob.session_photos || []);
+                    setPayoutData((prev) => prev || {
+                        totalPrice: latestJob.price ? latestJob.price / 100 : 0,
+                        depositCollected: 0,
+                        remainingCharged: 0,
+                        platformFee: 0,
+                        providerPayout: latestJob.price ? latestJob.price / 100 : 0,
+                        paymentType: latestJob.payment_type || 'full',
+                    });
+                    setCompleted(true);
+                    return;
+                }
+            } catch (reloadErr) {
+                console.error('[markComplete:reload]', reloadErr);
+            }
             setCompleteError(err.message || 'Failed to complete. Please try again.');
         } finally {
             setCompleting(false);

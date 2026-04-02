@@ -286,14 +286,6 @@ async function createClientNotification(userId, notification) {
   if (!supabase || !userId) return null;
 
   try {
-    const prefKey = getClientPushPrefKey(notification?.type);
-    if (prefKey) {
-      const { prefs } = await getClientNotifPrefs(userId);
-      if (prefs?.[prefKey] === false) {
-        return null;
-      }
-    }
-
     const { data, error } = await supabase
       .from("client_notifications")
       .insert({
