@@ -10897,22 +10897,23 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
         const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
 
+        await createClientNotification(booking.client_id, {
+          type: "session_complete",
+          title: "Session complete",
+          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
+          booking_id: bookingId,
+          data: {
+            provider_id: booking.provider_id,
+            provider_name: providerDisplayName,
+            service_name: notifServiceName,
+            booking_date: booking.scheduled_at,
+            show_review_prompt: true,
+            invoice_id: invoiceId,
+            invoice_number: invoiceNumber,
+          },
+        }).catch(() => {});
+
         if (prefs.push_review_requests !== false) {
-          await createClientNotification(booking.client_id, {
-            type: "session_complete",
-            title: "Session complete",
-            body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
-            booking_id: bookingId,
-            data: {
-              provider_id: booking.provider_id,
-              provider_name: providerDisplayName,
-              service_name: notifServiceName,
-              booking_date: booking.scheduled_at,
-              show_review_prompt: true,
-              invoice_id: invoiceId,
-              invoice_number: invoiceNumber,
-            },
-          }).catch(() => {});
           await sendClientPushNotification(booking.client_id, {
             type: "session_complete",
             title: "Session complete",
