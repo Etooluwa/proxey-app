@@ -54,6 +54,19 @@ export const NotificationProvider = ({ children }) => {
         }
     }, [session?.user?.id, isProvider]);
 
+    const applyReadState = useCallback((id) => {
+        let nextUnread = 0;
+        setNotifications((prev) => {
+            const next = prev.map((n) => {
+                if (n.id !== id) return n;
+                return { ...n, is_read: true, read: true };
+            });
+            nextUnread = next.filter((n) => !n.is_read && !n.read).length;
+            return next;
+        });
+        setUnreadCount(nextUnread);
+    }, []);
+
     // Initial load
     useEffect(() => {
         refresh();
@@ -137,17 +150,23 @@ export const NotificationProvider = ({ children }) => {
     }, [session?.user?.id, isProvider]);
 
     const markAsRead = async (id) => {
+        const existing = notifications.find((n) => n.id === id);
+        if (!existing || existing.is_read || existing.read) return;
+
+        applyReadState(id);
         try {
             const markFn = isProvider ? markProviderNotificationRead : markClientNotificationRead;
             const updated = await markFn(id);
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? sanitizeNotification(updated) : n))
-            );
-            setUnreadCount((prev) => Math.max(0, prev - 1));
+            setNotifications((prev) => {
+                const next = prev.map((n) => (n.id === id ? sanitizeNotification(updated) : n));
+                setUnreadCount(next.filter((n) => !n.is_read && !n.read).length);
+                return next;
+            });
         } catch (error) {
             console.error("[notifications] Failed to mark as read", error);
+            refresh();
         }
-    };
+    }, [applyReadState, isProvider, notifications, refresh]);
 
     const markAllAsRead = async () => {
         try {

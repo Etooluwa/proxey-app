@@ -344,6 +344,15 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
         navigate(`/app/bookings/${bid}`);
     };
 
+    const handleOpenNotification = (notification) => {
+        const bid = bookingId(notification);
+        if (!bid) return;
+        if (!notification.is_read && !notification.read) {
+            markAsRead(notification.id);
+        }
+        handleOpenBooking(bid);
+    };
+
     const handleViewAll = () => {
         setSearchParams({ all: '1' });
     };
@@ -405,7 +414,7 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                                 return (
                                     <button
                                         key={n.id}
-                                        onClick={() => bid && handleOpenBooking(bid)}
+                                        onClick={() => handleOpenNotification(n)}
                                         style={{ padding: '18px 20px', borderBottom: i < displayed.length - 1 ? `1px solid ${T.line}` : 'none', opacity: unread ? 1 : 0.55, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: bid ? 'pointer' : 'default' }}
                                     >
                                         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
