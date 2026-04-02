@@ -10692,10 +10692,10 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
   const requestingUserId = getUserId(req);
 
   try {
-    // 1. Fetch booking with service + provider info
+    // 1. Fetch booking
     const { data: booking, error: bookingErr } = await supabase
       .from("bookings")
-      .select("*, services(name, description, duration_minutes)")
+      .select("*")
       .eq("id", bookingId)
       .single();
 
@@ -10705,6 +10705,16 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
     // Verify requesting user is the provider for this booking
     if (booking.provider_id !== requestingUserId) {
       return res.status(403).json({ error: "Not authorized to complete this booking." });
+    }
+
+    let serviceInfo = null;
+    if (booking.service_id) {
+      const { data: serviceData } = await supabase
+        .from("services")
+        .select("name, description, duration")
+        .eq("id", booking.service_id)
+        .maybeSingle();
+      serviceInfo = serviceData || null;
     }
 
     const now = new Date().toISOString();
@@ -10818,9 +10828,9 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       .eq("user_id", booking.client_id)
       .maybeSingle();
 
-    const serviceName = booking.services?.name || booking.service_name || "Service";
-    const serviceDesc = booking.services?.description || booking.service_description || null;
-    const durationMins = booking.services?.duration_minutes || booking.duration_minutes || null;
+    const serviceName = serviceInfo?.name || booking.service_name || "Service";
+    const serviceDesc = serviceInfo?.description || booking.service_description || null;
+    const durationMins = serviceInfo?.duration || booking.duration_minutes || booking.duration || null;
 
     // d. Insert into provider_invoices
     const { data: invoice, error: invoiceErr } = await supabase
@@ -10864,7 +10874,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
 
       // Derive service name for notification
-      const notifServiceName = booking.services?.name || booking.service_name || 'your service';
+      const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
 
       // Push: session_complete with review prompt (per spec)
       if (prefs.push_review_requests !== false) {
