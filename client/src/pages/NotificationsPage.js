@@ -187,7 +187,7 @@ const Empty = () => (
 
 // ─── Single notification item ─────────────────────────────────────────────────
 
-const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview, onOpenBooking }) => {
+const NotifItem = ({ n, onMarkRead, onLeaveReview, onOpenBooking }) => {
     const type = normaliseType(n.type);
     const badge = BADGE[type];
     const unread = !n.is_read && !n.read;
@@ -297,16 +297,6 @@ const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview, onOpenBooking }) =>
                             </div>
                         )}
 
-                        {/* Pay Now pill (accepted bookings) */}
-                        {type === 'accepted' && bid && unread && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onPayNow(bid); }}
-                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold text-white focus:outline-none"
-                                style={{ background: '#3D231E' }}
-                            >
-                                Pay Now
-                            </button>
-                        )}
                     </div>
                 </div>
             </button>
@@ -330,10 +320,6 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
 
     const handleMarkAllRead = () => {
         markAllAsRead();
-    };
-
-    const handlePayNow = (bid) => {
-        navigate('/app/booking-flow', { state: { bookingId: bid } });
     };
 
     const handleLeaveReview = (bid) => {
@@ -440,11 +426,6 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                                                         <p style={{ fontFamily: F, fontSize: 13, color: T.ink, margin: 0, fontStyle: 'italic' }}>"{reason}"</p>
                                                     </div>
                                                 )}
-                                                {type === 'accepted' && bid && unread && (
-                                                    <button onClick={(e) => { e.stopPropagation(); handlePayNow(bid); }} style={{ padding: '6px 14px', borderRadius: 8, background: T.ink, border: 'none', fontFamily: F, fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
-                                                        Pay Now
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                     </button>
@@ -505,7 +486,6 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                             key={n.id}
                             n={n}
                             onMarkRead={markAsRead}
-                            onPayNow={handlePayNow}
                             onLeaveReview={handleLeaveReview}
                             onOpenBooking={handleOpenBooking}
                         />
