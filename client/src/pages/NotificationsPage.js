@@ -187,7 +187,7 @@ const Empty = () => (
 
 // ─── Single notification item ─────────────────────────────────────────────────
 
-const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview }) => {
+const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview, onOpenBooking }) => {
     const type = normaliseType(n.type);
     const badge = BADGE[type];
     const unread = !n.is_read && !n.read;
@@ -197,9 +197,9 @@ const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview }) => {
     const showReview = showReviewPrompt(n);
 
     const handleClick = () => {
-        if (showReview && bid) {
+        if (bid) {
             onMarkRead(n.id);
-            onLeaveReview(bid);
+            onOpenBooking(bid);
         }
     };
 
@@ -208,7 +208,7 @@ const NotifItem = ({ n, onMarkRead, onPayNow, onLeaveReview }) => {
             <button
                 onClick={handleClick}
                 className="flex gap-3.5 py-5 w-full text-left"
-                style={{ opacity: unread ? 1 : 0.55, background: 'transparent', border: 'none', cursor: showReview ? 'pointer' : 'default' }}
+                style={{ opacity: unread ? 1 : 0.55, background: 'transparent', border: 'none', cursor: bid ? 'pointer' : 'default' }}
             >
                 {/* Icon circle (session_complete uses large icon, others use avatar+badge) */}
                 <div className="relative flex-shrink-0">
@@ -340,6 +340,10 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
         navigate(`/app/review/${bid}`);
     };
 
+    const handleOpenBooking = (bid) => {
+        navigate(`/app/bookings/${bid}`);
+    };
+
     const handleViewAll = () => {
         setSearchParams({ all: '1' });
     };
@@ -399,7 +403,11 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                                 const bid = bookingId(n);
                                 const ts = n.timestamp || n.created_at;
                                 return (
-                                    <div key={n.id} style={{ padding: '18px 20px', borderBottom: i < displayed.length - 1 ? `1px solid ${T.line}` : 'none', opacity: unread ? 1 : 0.55 }}>
+                                    <button
+                                        key={n.id}
+                                        onClick={() => bid && handleOpenBooking(bid)}
+                                        style={{ padding: '18px 20px', borderBottom: i < displayed.length - 1 ? `1px solid ${T.line}` : 'none', opacity: unread ? 1 : 0.55, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: bid ? 'pointer' : 'default' }}
+                                    >
                                         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                                             {/* Avatar + badge */}
                                             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -424,13 +432,13 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                                                     </div>
                                                 )}
                                                 {type === 'accepted' && bid && unread && (
-                                                    <button onClick={() => handlePayNow(bid)} style={{ padding: '6px 14px', borderRadius: 8, background: T.ink, border: 'none', fontFamily: F, fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                                                    <button onClick={(e) => { e.stopPropagation(); handlePayNow(bid); }} style={{ padding: '6px 14px', borderRadius: 8, background: T.ink, border: 'none', fontFamily: F, fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
                                                         Pay Now
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>
@@ -484,13 +492,14 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
                 {!loading && notifications.length > 0 && (
                     <>
                         {displayed.map((n) => (
-                            <NotifItem
-                                key={n.id}
-                                n={n}
-                                onMarkRead={markAsRead}
-                                onPayNow={handlePayNow}
-                                onLeaveReview={handleLeaveReview}
-                            />
+                        <NotifItem
+                            key={n.id}
+                            n={n}
+                            onMarkRead={markAsRead}
+                            onPayNow={handlePayNow}
+                            onLeaveReview={handleLeaveReview}
+                            onOpenBooking={handleOpenBooking}
+                        />
                         ))}
 
                         {/* View All button — only on preview */}

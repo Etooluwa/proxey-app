@@ -134,13 +134,13 @@ function getNavPath(n, isProvider) {
         return '/provider/notifications';
     } else {
         if (type === 'booking') {
-            return bookingId ? `/app/book/${providerId || ''}` : '/app';
+            return bookingId ? `/app/bookings/${bookingId}` : '/app';
         }
         if (type === 'connected') {
             return '/app';
         }
         if (type === 'completed') {
-            return '/app/notifications';
+            return bookingId ? `/app/bookings/${bookingId}` : '/app/notifications';
         }
         return '/app/notifications';
     }

@@ -2211,7 +2211,7 @@ app.post("/api/bookings/:id/photos", async (req, res) => {
 
   try {
     const { data: booking } = await supabase
-      .from("bookings").select("provider_id").eq("id", bookingId).single();
+      .from("bookings").select("provider_id, client_id, status").eq("id", bookingId).single();
     if (!booking) return res.status(404).json({ error: "Booking not found." });
     if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
 
@@ -2220,6 +2220,33 @@ app.post("/api/bookings/:id/photos", async (req, res) => {
       .insert({ booking_id: bookingId, provider_id: userId, photo_url, caption: caption || null })
       .select().single();
     if (error) throw error;
+
+    if (booking.client_id) {
+      const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(() => null);
+      const providerName = providerInfo?.name || "Your provider";
+      await createClientNotification(booking.client_id, {
+        type: "booking_completed",
+        title: "Provider update",
+        body: `${providerName} added new session photos to your booking.`,
+        booking_id: bookingId,
+        data: {
+          provider_id: booking.provider_id,
+          booking_id: bookingId,
+          status: booking.status || "completed",
+          show_review_prompt: false,
+          photos_added: true,
+        },
+      }).catch(() => {});
+
+      await sendClientPushNotification(booking.client_id, {
+        type: "booking_completed",
+        title: "Provider update",
+        body: `${providerName} added new session photos to your booking.`,
+        url: `/app/bookings/${bookingId}`,
+        tag: `booking-photos-${bookingId}`,
+      }).catch(() => {});
+    }
+
     res.status(201).json({ photo: data });
   } catch (err) {
     console.error("[bookings/:id/photos POST]", err);
