@@ -149,7 +149,7 @@ export const NotificationProvider = ({ children }) => {
         };
     }, [session?.user?.id, isProvider]);
 
-    const markAsRead = async (id) => {
+    const markAsRead = useCallback(async (id) => {
         const existing = notifications.find((n) => n.id === id);
         if (!existing || existing.is_read || existing.read) return;
 
