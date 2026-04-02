@@ -22,7 +22,7 @@ const BOOKING_TYPES = new Set([
     'accepted', 'rejected', 'booking_accepted', 'appointment_accepted', 'booking_declined', 'appointment_declined', 'booking_cancelled', 'booking_rescheduled',
 ]);
 const COMPLETED_TYPES = new Set([
-    'booking_completed', 'completed', 'session_completed',
+    'booking_completed', 'completed', 'session_completed', 'session_complete',
 ]);
 const CONNECTED_TYPES = new Set([
     'connected', 'new_client', 'new_connection',

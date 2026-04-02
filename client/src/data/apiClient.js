@@ -1,23 +1,47 @@
+import { supabase } from "../utils/supabase";
+
 const API_BASE = process.env.REACT_APP_API_BASE || "/api";
+
+async function resolveUserHeaders() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  let userId = null;
+
+  try {
+    const rawSession = window.localStorage.getItem("proxey.auth.session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      if (parsed?.user?.id) {
+        userId = parsed.user.id;
+      }
+    }
+  } catch (error) {
+    console.warn("[api] Unable to parse stored session", error);
+  }
+
+  // Fall back to the live Supabase session so API calls still identify the
+  // current user even if the local app session cache is stale or missing.
+  if (!userId && supabase?.auth?.getSession) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      userId = session?.user?.id || null;
+    } catch (error) {
+      console.warn("[api] Unable to resolve Supabase session", error);
+    }
+  }
+
+  return userId ? { "x-user-id": userId } : {};
+}
 
 async function request(path, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
-    let userHeaders = {};
-    if (typeof window !== "undefined") {
-      try {
-        const rawSession = window.localStorage.getItem("proxey.auth.session");
-        if (rawSession) {
-          const parsed = JSON.parse(rawSession);
-          if (parsed?.user?.id) {
-            userHeaders["x-user-id"] = parsed.user.id;
-          }
-        }
-      } catch (error) {
-        console.warn("[api] Unable to parse stored session", error);
-      }
-    }
+    const userHeaders = await resolveUserHeaders();
 
     const response = await fetch(`${API_BASE}${path}`, {
       headers: {
