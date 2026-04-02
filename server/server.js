@@ -10808,126 +10808,129 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       created_at: now,
     }).catch((err) => console.warn("[bookings/complete] provider_earnings insert:", err.message));
 
-    // 7. Generate invoice
-    // a. Get provider profile for name/contact info
-    const { data: providerProfile } = await supabase
-      .from("provider_profiles")
-      .select("business_name, name, address, email, phone, bio")
-      .eq("user_id", booking.provider_id)
-      .maybeSingle();
+    let invoiceNumber = null;
+    let invoiceId = null;
+    let providerDisplayName = "Provider";
 
-    const providerDisplayName = providerProfile?.business_name || providerProfile?.name || "Provider";
+    try {
+      // 7. Generate invoice
+      const { data: providerProfile } = await supabase
+        .from("provider_profiles")
+        .select("business_name, name, address, email, phone, bio")
+        .eq("user_id", booking.provider_id)
+        .maybeSingle();
 
-    // b+c. Generate invoice number
-    const invoiceNumber = await generateInvoiceNumber(supabase, booking.provider_id, providerDisplayName);
+      providerDisplayName = providerProfile?.business_name || providerProfile?.name || "Provider";
+      invoiceNumber = await generateInvoiceNumber(supabase, booking.provider_id, providerDisplayName);
 
-    // Get client profile
-    const { data: clientProfile } = await supabase
-      .from("client_profiles")
-      .select("name, email, phone")
-      .eq("user_id", booking.client_id)
-      .maybeSingle();
+      const { data: clientProfile } = await supabase
+        .from("client_profiles")
+        .select("name, email, phone")
+        .eq("user_id", booking.client_id)
+        .maybeSingle();
 
-    const serviceName = serviceInfo?.name || booking.service_name || "Service";
-    const serviceDesc = serviceInfo?.description || booking.service_description || null;
-    const durationMins = serviceInfo?.duration || booking.duration_minutes || booking.duration || null;
+      const serviceName = serviceInfo?.name || booking.service_name || "Service";
+      const serviceDesc = serviceInfo?.description || booking.service_description || null;
+      const durationMins = serviceInfo?.duration || booking.duration_minutes || booking.duration || null;
 
-    // d. Insert into provider_invoices
-    const { data: invoice, error: invoiceErr } = await supabase
-      .from("provider_invoices")
-      .insert({
-        provider_id: booking.provider_id,
-        client_id: booking.client_id,
-        booking_id: bookingId,
-        invoice_number: invoiceNumber,
-        business_name: providerDisplayName,
-        business_address: providerProfile?.address || null,
-        business_email: providerProfile?.email || null,
-        business_phone: providerProfile?.phone || null,
-        client_name: clientProfile?.name || booking.client_name || null,
-        client_email: clientProfile?.email || booking.client_email || null,
-        client_phone: clientProfile?.phone || booking.client_phone || null,
-        address: booking.address || null,
-        service: serviceName,
-        description: serviceDesc,
-        service_name: serviceName,
-        service_description: serviceDesc,
-        date_of_service: booking.scheduled_at || booking.created_at,
-        duration: durationMins ? `${durationMins} min` : null,
-        total_amount: totalCents,
-        final_amount: remainingCents,
-        subtotal: totalCents,
-        deposit_amount: depositPaidCents,
-        remaining_amount: remainingCents,
-        total: totalCents,
-        status: "paid",
-        issued_at: now,
-        paid_at: now,
-      })
-      .select()
-      .single();
-
-    if (invoiceErr) console.warn("[bookings/complete] invoice insert error:", invoiceErr.message);
-
-    // 8. Notify client
-    if (booking.client_id) {
-      const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
-
-      // Derive service name for notification
-      const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
-
-      // Push: session_complete with review prompt (per spec)
-      if (prefs.push_review_requests !== false) {
-        await createClientNotification(booking.client_id, {
-          type: "session_complete",
-          title: "Session complete",
-          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
+      const { data: invoice, error: invoiceErr } = await supabase
+        .from("provider_invoices")
+        .insert({
+          provider_id: booking.provider_id,
+          client_id: booking.client_id,
           booking_id: bookingId,
-          data: {
-            provider_id: booking.provider_id,
-            provider_name: providerDisplayName,
-            service_name: notifServiceName,
-            booking_date: booking.scheduled_at,
-            show_review_prompt: true,
-            invoice_id: invoice?.id || null,
-            invoice_number: invoiceNumber,
-          },
-        }).catch(() => {});
-        await sendClientPushNotification(booking.client_id, {
-          type: "session_complete",
-          title: "Session complete",
-          body: "Your appointment is complete. Your invoice is now available in the Invoices page.",
-          url: "/app/invoices",
-          tag: `session-complete-${bookingId}`,
-        }).catch(() => {});
+          invoice_number: invoiceNumber,
+          business_name: providerDisplayName,
+          business_address: providerProfile?.address || null,
+          business_email: providerProfile?.email || null,
+          business_phone: providerProfile?.phone || null,
+          client_name: clientProfile?.name || booking.client_name || null,
+          client_email: clientProfile?.email || booking.client_email || null,
+          client_phone: clientProfile?.phone || booking.client_phone || null,
+          address: booking.address || null,
+          service: serviceName,
+          description: serviceDesc,
+          service_name: serviceName,
+          service_description: serviceDesc,
+          date_of_service: booking.scheduled_at || booking.created_at,
+          duration: durationMins ? `${durationMins} min` : null,
+          total_amount: totalCents,
+          final_amount: remainingCents,
+          subtotal: totalCents,
+          deposit_amount: depositPaidCents,
+          remaining_amount: remainingCents,
+          total: totalCents,
+          status: "paid",
+          issued_at: now,
+          paid_at: now,
+        })
+        .select()
+        .single();
+
+      if (invoiceErr) {
+        console.warn("[bookings/complete] invoice insert error:", invoiceErr.message);
+      } else {
+        invoiceId = invoice?.id || null;
       }
 
-      // Email: booking invoice
-      if (prefs.email_invoices !== false && clientEmail) {
-        const totalStr = `$${(totalCents / 100).toFixed(2)}`;
-        const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
-        await sendEmail({
-          to: clientEmail,
-          subject: `Invoice #${invoiceNumber} — ${serviceName}`,
-          html: `
-            <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
-              <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
-                <h1 style="margin:0;font-size:22px;font-weight:700">Invoice #${invoiceNumber}</h1>
-              </div>
-              <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
-                <p style="margin:0 0 8px">Hi ${clientName || 'there'},</p>
-                <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}.</p>
-                <table style="width:100%;border-collapse:collapse">
-                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
-                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
-                  ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ''}
-                  <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
-                </table>
-                <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
-              </div>
-            </div>`,
-        });
+      // 8. Notify client
+      if (booking.client_id) {
+        const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
+        const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
+
+        if (prefs.push_review_requests !== false) {
+          await createClientNotification(booking.client_id, {
+            type: "session_complete",
+            title: "Session complete",
+            body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
+            booking_id: bookingId,
+            data: {
+              provider_id: booking.provider_id,
+              provider_name: providerDisplayName,
+              service_name: notifServiceName,
+              booking_date: booking.scheduled_at,
+              show_review_prompt: true,
+              invoice_id: invoiceId,
+              invoice_number: invoiceNumber,
+            },
+          }).catch(() => {});
+          await sendClientPushNotification(booking.client_id, {
+            type: "session_complete",
+            title: "Session complete",
+            body: "Your appointment is complete. Your invoice is now available in the Invoices page.",
+            url: "/app/invoices",
+            tag: `session-complete-${bookingId}`,
+          }).catch(() => {});
+        }
+
+        if (prefs.email_invoices !== false && clientEmail && invoiceNumber) {
+          const totalStr = `$${(totalCents / 100).toFixed(2)}`;
+          const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
+          await sendEmail({
+            to: clientEmail,
+            subject: `Invoice #${invoiceNumber} — ${serviceName}`,
+            html: `
+              <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+                <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
+                  <h1 style="margin:0;font-size:22px;font-weight:700">Invoice #${invoiceNumber}</h1>
+                </div>
+                <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+                  <p style="margin:0 0 8px">Hi ${clientName || 'there'},</p>
+                  <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}.</p>
+                  <table style="width:100%;border-collapse:collapse">
+                    <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
+                    <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
+                    ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ''}
+                    <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
+                  </table>
+                  <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+                </div>
+              </div>`,
+          });
+        }
       }
+    } catch (postCompleteErr) {
+      console.warn("[bookings/complete] post-completion follow-up failed:", postCompleteErr.message);
     }
 
     // 9. Return summary
@@ -10941,7 +10944,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         netAmount,
       },
       invoice_number: invoiceNumber,
-      invoice_id: invoice?.id || null,
+      invoice_id: invoiceId,
     });
   } catch (err) {
     console.error("[bookings/:id/complete]", err);
