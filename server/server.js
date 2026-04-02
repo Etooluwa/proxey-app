@@ -2086,11 +2086,23 @@ app.get("/api/bookings/:id", async (req, res) => {
     let intakeResponses = [];
     const { data: intakeRows } = await supabase
       .from("booking_intake_responses")
-      .select("question_id, response_text, intake_questions(question_text, question_type)")
+      .select("question_id, response_text")
       .eq("booking_id", bookingId);
     if (intakeRows?.length) {
+      // Look up question text from service_intake_questions table
+      const questionIds = intakeRows.map(r => r.question_id).filter(Boolean);
+      let questionMap = {};
+      if (questionIds.length) {
+        const { data: questionRows } = await supabase
+          .from("service_intake_questions")
+          .select("id, question_text")
+          .in("id", questionIds);
+        for (const q of questionRows || []) {
+          questionMap[q.id] = q.question_text;
+        }
+      }
       intakeResponses = intakeRows.map(r => ({
-        question: r.intake_questions?.question_text || r.question_id,
+        question: questionMap[r.question_id] || r.question_id,
         answer: r.response_text,
       }));
     }
