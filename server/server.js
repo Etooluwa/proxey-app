@@ -2195,39 +2195,6 @@ app.patch("/api/bookings/:id/notes", async (req, res) => {
     if (nextNotes && nextNotes !== previousNotes) addedDetails.push("notes");
     if (nextRecommendation && nextRecommendation !== previousRecommendation) addedDetails.push("recommendations");
 
-    if (booking.client_id && addedDetails.length > 0) {
-      const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(() => null);
-      const providerName = providerInfo?.name || "Your provider";
-      const detailLabel = addedDetails.length === 2
-        ? "session notes and recommendations"
-        : addedDetails[0] === "notes"
-          ? "session notes"
-          : "recommendations";
-
-      await createClientNotification(booking.client_id, {
-        type: "booking_completed",
-        title: "Provider update",
-        body: `${providerName} added ${detailLabel} to your booking.`,
-        booking_id: bookingId,
-        data: {
-          provider_id: booking.provider_id,
-          booking_id: bookingId,
-          status: data.status || booking.status || "completed",
-          show_review_prompt: false,
-          notes_added: addedDetails.includes("notes"),
-          recommendations_added: addedDetails.includes("recommendations"),
-        },
-      }).catch(() => {});
-
-      await sendClientPushNotification(booking.client_id, {
-        type: "booking_completed",
-        title: "Provider update",
-        body: `${providerName} added ${detailLabel} to your booking.`,
-        url: `/app/bookings/${bookingId}`,
-        tag: `booking-update-${bookingId}`,
-      }).catch(() => {});
-    }
-
     res.json({ booking: data });
   } catch (err) {
     console.error("[bookings/:id/notes]", err);
@@ -2255,32 +2222,6 @@ app.post("/api/bookings/:id/photos", async (req, res) => {
       .insert({ booking_id: bookingId, provider_id: userId, photo_url, caption: caption || null })
       .select().single();
     if (error) throw error;
-
-    if (booking.client_id) {
-      const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(() => null);
-      const providerName = providerInfo?.name || "Your provider";
-      await createClientNotification(booking.client_id, {
-        type: "booking_completed",
-        title: "Provider update",
-        body: `${providerName} added new session photos to your booking.`,
-        booking_id: bookingId,
-        data: {
-          provider_id: booking.provider_id,
-          booking_id: bookingId,
-          status: booking.status || "completed",
-          show_review_prompt: false,
-          photos_added: true,
-        },
-      }).catch(() => {});
-
-      await sendClientPushNotification(booking.client_id, {
-        type: "booking_completed",
-        title: "Provider update",
-        body: `${providerName} added new session photos to your booking.`,
-        url: `/app/bookings/${bookingId}`,
-        tag: `booking-photos-${bookingId}`,
-      }).catch(() => {});
-    }
 
     res.status(201).json({ photo: data });
   } catch (err) {
