@@ -816,7 +816,7 @@ const ProviderAppointmentDetail = () => {
                 {/* ─ Session Notes & Recommendations ─ */}
                 <div className="py-5">
                     <div className="flex items-center justify-between mb-3">
-                        <Lbl>Session Notes & Recommendations</Lbl>
+                        <Lbl>Session Notes</Lbl>
                         {savingNotes && (
                             <span className="text-[11px] text-muted">Saving…</span>
                         )}
@@ -838,7 +838,7 @@ const ProviderAppointmentDetail = () => {
                             onChange={(e) => setSessionNotes(e.target.value)}
                             onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
                             disabled={savingNotes}
-                            placeholder="Add session notes…"
+                            placeholder="Notes from this session"
                             rows={3}
                             className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-4"
                             style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}

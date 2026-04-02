@@ -2139,7 +2139,7 @@ app.patch("/api/bookings/:id/notes", async (req, res) => {
 
   try {
     const { data: booking } = await supabase
-      .from("bookings").select("provider_id").eq("id", bookingId).single();
+      .from("bookings").select("provider_id, client_id, status, session_notes, session_recommendation").eq("id", bookingId).single();
     if (!booking) return res.status(404).json({ error: "Booking not found." });
     if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
 
@@ -2150,6 +2150,49 @@ app.patch("/api/bookings/:id/notes", async (req, res) => {
     const { data, error } = await supabase
       .from("bookings").update(updates).eq("id", bookingId).select().single();
     if (error) throw error;
+
+    const previousNotes = String(booking.session_notes || "").trim();
+    const previousRecommendation = String(booking.session_recommendation || "").trim();
+    const nextNotes = String(data.session_notes || "").trim();
+    const nextRecommendation = String(data.session_recommendation || "").trim();
+    const addedDetails = [];
+
+    if (nextNotes && nextNotes !== previousNotes) addedDetails.push("notes");
+    if (nextRecommendation && nextRecommendation !== previousRecommendation) addedDetails.push("recommendations");
+
+    if (booking.client_id && addedDetails.length > 0) {
+      const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(() => null);
+      const providerName = providerInfo?.name || "Your provider";
+      const detailLabel = addedDetails.length === 2
+        ? "session notes and recommendations"
+        : addedDetails[0] === "notes"
+          ? "session notes"
+          : "recommendations";
+
+      await createClientNotification(booking.client_id, {
+        type: "booking_completed",
+        title: "Provider update",
+        body: `${providerName} added ${detailLabel} to your booking.`,
+        booking_id: bookingId,
+        data: {
+          provider_id: booking.provider_id,
+          booking_id: bookingId,
+          status: data.status || booking.status || "completed",
+          show_review_prompt: false,
+          notes_added: addedDetails.includes("notes"),
+          recommendations_added: addedDetails.includes("recommendations"),
+        },
+      }).catch(() => {});
+
+      await sendClientPushNotification(booking.client_id, {
+        type: "booking_completed",
+        title: "Provider update",
+        body: `${providerName} added ${detailLabel} to your booking.`,
+        url: `/app/bookings/${bookingId}`,
+        tag: `booking-update-${bookingId}`,
+      }).catch(() => {});
+    }
+
     res.json({ booking: data });
   } catch (err) {
     console.error("[bookings/:id/notes]", err);
