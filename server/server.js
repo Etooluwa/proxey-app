@@ -284,6 +284,7 @@ function getClientPushPrefKey(type) {
  */
 async function createClientNotification(userId, notification) {
   if (!supabase || !userId) return null;
+  // v2: booking_id/request_id stored in data JSONB (no dedicated columns)
 
   try {
     // Merge booking_id / request_id into the data JSONB field
