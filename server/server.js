@@ -10917,37 +10917,56 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         invoiceId = invoice?.id || null;
       }
 
-      // 8. Notify client
+      // 8. Notify client — in its own try so invoice errors don't block it
       if (booking.client_id) {
-        const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
-        const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
+        try {
+          const notifServiceName = serviceInfo?.name || booking.service_name || 'your service';
+          const hasNote = !!(booking.session_notes || '').trim();
+          const hasRec = !!(booking.session_recommendation || '').trim();
+          let completionBody = `Your ${notifServiceName} with ${providerDisplayName} is complete.`;
+          if (hasNote && hasRec) {
+            completionBody += ` ${providerDisplayName} left a session note and a recommendation for you.`;
+          } else if (hasNote) {
+            completionBody += ` ${providerDisplayName} left a session note for you.`;
+          } else if (hasRec) {
+            completionBody += ` ${providerDisplayName} left a recommendation for you.`;
+          }
+          completionBody += ' Your invoice is now available in the Invoices page.';
 
-        await createClientNotification(booking.client_id, {
-          type: "session_complete",
-          title: "Session complete",
-          body: `Your ${notifServiceName} with ${providerDisplayName} has been marked as complete. Your invoice is now available in the Invoices page.`,
-          booking_id: bookingId,
-          data: {
-            provider_id: booking.provider_id,
-            provider_name: providerDisplayName,
-            service_name: notifServiceName,
-            booking_date: booking.scheduled_at,
-            show_review_prompt: true,
-            invoice_id: invoiceId,
-            invoice_number: invoiceNumber,
-          },
-        }).catch(() => {});
+          await createClientNotification(booking.client_id, {
+            type: "session_complete",
+            title: "Session complete",
+            body: completionBody,
+            booking_id: bookingId,
+            data: {
+              provider_id: booking.provider_id,
+              provider_name: providerDisplayName,
+              service_name: notifServiceName,
+              booking_date: booking.scheduled_at,
+              show_review_prompt: true,
+              has_session_note: hasNote,
+              has_recommendation: hasRec,
+              invoice_id: invoiceId,
+              invoice_number: invoiceNumber,
+            },
+          });
 
-        if (prefs.push_review_requests !== false) {
           await sendClientPushNotification(booking.client_id, {
             type: "session_complete",
             title: "Session complete",
-            body: "Your appointment is complete. Your invoice is now available in the Invoices page.",
-            url: "/app/invoices",
+            body: hasNote || hasRec
+              ? `${providerDisplayName} left you a note. Your invoice is ready.`
+              : `Your ${notifServiceName} is complete. Your invoice is now available.`,
+            url: `/app/bookings/${bookingId}`,
             tag: `session-complete-${bookingId}`,
           }).catch(() => {});
+        } catch (notifErr) {
+          console.warn("[bookings/complete] client notification failed:", notifErr.message);
         }
+      }
 
+      if (booking.client_id) {
+        const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
         if (prefs.email_invoices !== false && clientEmail && invoiceNumber) {
           const totalStr = `$${(totalCents / 100).toFixed(2)}`;
           const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
