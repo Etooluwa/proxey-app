@@ -147,7 +147,7 @@ function paymentStatusMeta(status, paymentType = 'full') {
             label: 'Payment failed',
             bg: '#FDEDEA',
             color: '#B04040',
-            message: 'The charge did not go through. This booking should not be treated as paid.',
+            message: 'Charge failed, booking not completed. Ask the client to update their payment method, then try again.',
         };
     }
 
@@ -158,6 +158,11 @@ function paymentStatusMeta(status, paymentType = 'full') {
         color: '#8C6A64',
         message: 'Payment has not been collected yet.',
     };
+}
+
+function isChargeFailureMessage(message) {
+    const normalized = String(message || '').toLowerCase();
+    return normalized.includes('charge failed') || normalized.includes('payment failed');
 }
 
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
@@ -718,6 +723,7 @@ const ProviderAppointmentDetail = () => {
     const totalDollars = job.price ? job.price / 100 : null;
     const paymentType = job.payment_type || 'full';
     const paymentMeta = paymentStatusMeta(job.payment_status, paymentType);
+    const showChargeFailureBanner = paymentMeta.status === 'payment_failed' || isChargeFailureMessage(completeError);
     const depositValue = job.deposit_value;
     const depositType = job.deposit_type; // 'percent' | 'fixed'
     let depositPaid = null;
@@ -1037,9 +1043,41 @@ const ProviderAppointmentDetail = () => {
                         paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                     }}
                 >
-                    {(completeError || actionError) && (
+                    {showChargeFailureBanner && (
+                        <div
+                            className="w-full mb-3 rounded-[16px] px-4 py-3"
+                            style={{
+                                background: '#FDEDEA',
+                                border: '1px solid rgba(176,64,64,0.28)',
+                                boxShadow: '0 10px 24px rgba(176,64,64,0.14)',
+                            }}
+                        >
+                            <div className="flex gap-3">
+                                <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ background: '#F8D7D2' }}
+                                >
+                                    <svg width="16" height="16" fill="none" stroke="#B04040" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path d="M12 8v5" strokeLinecap="round" />
+                                        <path d="M12 16.5h.01" strokeLinecap="round" />
+                                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-semibold m-0 mb-1" style={{ color: '#8F2E2E' }}>
+                                        Charge failed, booking not completed
+                                    </p>
+                                    <p className="text-[12px] leading-relaxed m-0" style={{ color: '#B04040' }}>
+                                        {completeError || paymentMeta.message}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {((completeError && !showChargeFailureBanner) || actionError) && (
                         <p className="w-full text-center text-[12px] mb-2 m-0" style={{ color: '#C25E4A' }}>
-                            {completeError || actionError}
+                            {(completeError && !showChargeFailureBanner ? completeError : null) || actionError}
                         </p>
                     )}
 
