@@ -178,12 +178,30 @@ const RescheduleModal = ({ onConfirm, onCancel, loading }) => {
 
 // ─── Retry Payment Sheet ──────────────────────────────────────────────────────
 
+const R = {
+    ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F',
+    accent: '#C25E4A', line: 'rgba(140,106,100,0.18)',
+    abg: '#F2EBE5', base: '#FBF7F2',
+    danger: '#B04040',
+};
+const F = "'Sora',system-ui,sans-serif";
+
 const elementStyle = {
     style: {
-        base: { fontSize: '15px', color: '#3D231E', fontFamily: "'Sora',system-ui,sans-serif", '::placeholder': { color: '#B0948F' } },
-        invalid: { color: '#B04040' },
+        base: { fontSize: '15px', color: R.ink, fontFamily: F, '::placeholder': { color: R.faded } },
+        invalid: { color: R.danger },
     },
 };
+
+const BRAND_LABELS = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', discover: 'Discover' };
+function CardBrand({ brand }) {
+    const label = BRAND_LABELS[brand?.toLowerCase()] || (brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : '••');
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: R.abg, borderRadius: 6, padding: '2px 7px', fontSize: 11, fontWeight: 600, color: R.muted, letterSpacing: '0.03em', border: `1px solid ${R.line}`, flexShrink: 0 }}>
+            {label}
+        </span>
+    );
+}
 
 function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
     const stripe = useStripe();
@@ -209,7 +227,6 @@ function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
             if (data.ok) { onSuccess(); return; }
 
             if (data.requires_action && data.client_secret) {
-                // Need client-side Stripe confirmation (3DS or new card)
                 let result;
                 if (showNew) {
                     result = await stripe.confirmCardPayment(data.client_secret, {
@@ -221,7 +238,6 @@ function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
                     });
                 }
                 if (result.error) { setErr(result.error.message); return; }
-                // After confirmation, mark paid server-side
                 await request(`/bookings/${bookingId}/retry-payment`, {
                     method: 'POST',
                     body: JSON.stringify({ payment_intent_id: result.paymentIntent.id }),
@@ -236,23 +252,28 @@ function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
     };
 
     return (
-        <div style={{ fontFamily: "'Sora',system-ui,sans-serif" }}>
+        <div style={{ fontFamily: F }}>
             {savedCards.length > 0 && !showNew && (
                 <div style={{ marginBottom: 16 }}>
-                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8C6A64', margin: '0 0 10px' }}>Saved cards</p>
+                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: R.muted, margin: '0 0 10px' }}>Saved cards</p>
                     {savedCards.map(card => (
                         <button key={card.id} type="button" onClick={() => setSelectedId(card.id)}
-                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, marginBottom: 8, border: `1.5px solid ${selectedId === card.id ? '#C25E4A' : 'rgba(140,106,100,0.2)'}`, background: selectedId === card.id ? '#FFF5EE' : '#F2EBE5', cursor: 'pointer', textAlign: 'left' }}>
-                            <span style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${selectedId === card.id ? '#C25E4A' : '#B0948F'}`, background: selectedId === card.id ? '#C25E4A' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, marginBottom: 8, border: `1.5px solid ${selectedId === card.id ? R.accent : R.line}`, background: selectedId === card.id ? '#FFF5EE' : R.abg, cursor: 'pointer', textAlign: 'left' }}>
+                            <span style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${selectedId === card.id ? R.accent : R.faded}`, background: selectedId === card.id ? R.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {selectedId === card.id && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
                             </span>
-                            <span style={{ fontSize: 14, color: '#3D231E', flex: 1 }}>•••• {card.last4}</span>
-                            <span style={{ fontSize: 12, color: '#B0948F' }}>{card.expMonth}/{String(card.expYear).slice(-2)}</span>
+                            <CardBrand brand={card.brand} />
+                            <span style={{ fontSize: 14, color: R.ink, flex: 1 }}>•••• {card.last4}</span>
+                            <span style={{ fontSize: 12, color: R.faded }}>{card.expMonth}/{String(card.expYear).slice(-2)}</span>
+                            {card.isDefault && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: '#5A8A5E', background: '#EBF2EC', padding: '2px 7px', borderRadius: 9999, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Default</span>
+                            )}
                         </button>
                     ))}
                     <button type="button" onClick={() => { setShowNew(true); setSelectedId(null); }}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(140,106,100,0.3)', background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: '#8C6A64', cursor: 'pointer' }}>
-                        + Use a different card
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1px dashed ${R.line}`, background: 'transparent', fontFamily: F, fontSize: 13, color: R.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <svg width="14" height="14" fill="none" stroke={R.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                        Use a different card
                     </button>
                 </div>
             )}
@@ -261,33 +282,33 @@ function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
                 <div style={{ marginBottom: 16 }}>
                     {savedCards.length > 0 && (
                         <button type="button" onClick={() => { setShowNew(false); setSelectedId(savedCards[0].id); }}
-                            style={{ fontSize: 12, color: '#C25E4A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 12, fontFamily: 'inherit' }}>
+                            style={{ fontSize: 13, color: R.accent, background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 12, fontFamily: F }}>
                             ← Use a saved card
                         </button>
                     )}
-                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8C6A64', margin: '0 0 6px' }}>Card number</p>
-                    <div style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: R.muted, margin: '0 0 6px' }}>Card number</p>
+                    <div style={{ padding: '13px 16px', borderRadius: 12, border: `1px solid ${R.line}`, background: R.abg, marginBottom: 12 }}>
                         <CardNumberElement options={elementStyle} />
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
-                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5' }}>
+                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: `1px solid ${R.line}`, background: R.abg }}>
                             <CardExpiryElement options={elementStyle} />
                         </div>
-                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5' }}>
+                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: `1px solid ${R.line}`, background: R.abg }}>
                             <CardCvcElement options={elementStyle} />
                         </div>
                     </div>
                 </div>
             )}
 
-            {err && <p style={{ fontSize: 13, color: '#B04040', margin: '0 0 12px' }}>{err}</p>}
+            {err && <p style={{ fontSize: 13, color: R.danger, margin: '0 0 12px' }}>{err}</p>}
 
             <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose} style={{ flex: 1, padding: '14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer' }}>
+                <button onClick={onClose} style={{ flex: 1, padding: '14px', borderRadius: 12, border: `1px solid rgba(140,106,100,0.35)`, background: 'transparent', fontFamily: F, fontSize: 14, fontWeight: 600, color: R.ink, cursor: 'pointer' }}>
                     Cancel
                 </button>
                 <button onClick={handleRetry} disabled={processing}
-                    style={{ flex: 2, padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer', opacity: processing ? 0.7 : 1 }}>
+                    style={{ flex: 2, padding: '14px', borderRadius: 12, border: 'none', background: R.ink, fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer', opacity: processing ? 0.7 : 1 }}>
                     {processing ? 'Processing…' : 'Pay now'}
                 </button>
             </div>
@@ -308,12 +329,12 @@ function RetryPaymentSheet({ bookingId, onSuccess, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
-            <div className="w-full max-w-lg rounded-t-[24px] px-5 pt-6" style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }} onClick={e => e.stopPropagation()}>
-                <p style={{ fontSize: 18, fontWeight: 600, color: '#3D231E', letterSpacing: '-0.02em', margin: '0 0 6px', fontFamily: "'Sora',system-ui,sans-serif" }}>Retry payment</p>
-                <p style={{ fontSize: 13, color: '#8C6A64', margin: '0 0 20px', fontFamily: "'Sora',system-ui,sans-serif" }}>Use your saved card or enter a new one.</p>
+            <div className="w-full max-w-lg rounded-t-[24px] px-5 pt-6" style={{ background: R.base, paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }} onClick={e => e.stopPropagation()}>
+                <p className="text-[18px] font-semibold text-ink tracking-[-0.02em] m-0 mb-1" style={{ fontFamily: F }}>Retry payment</p>
+                <p style={{ fontSize: 13, color: R.muted, margin: '0 0 16px', fontFamily: F }}>Use your saved card or enter a new one.</p>
                 {loading ? (
                     <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${R.accent}`, borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
                     </div>
                 ) : (
                     <Elements stripe={stripePromise}>
