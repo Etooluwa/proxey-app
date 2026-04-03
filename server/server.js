@@ -21,6 +21,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const PLATFORM_CURRENCY = "cad";
 const PLATFORM_FEE_RATE = 0.10;
+const WEB_PUSH_ENABLED = process.env.ENABLE_WEB_PUSH === "true";
 const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || "";
 const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY || "";
 const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || "mailto:info@mykliques.com";
@@ -136,14 +137,6 @@ async function createProviderNotification(providerId, notification) {
   if (!supabase || !providerId) return null;
 
   try {
-    const prefKey = getProviderPushPrefKey(notification?.type);
-    if (prefKey) {
-      const { prefs } = await getProviderNotifPrefs(providerId);
-      if (prefs?.[prefKey] === false) {
-        return null;
-      }
-    }
-
     const { data, error } = await supabase
       .from("notifications")
       .insert({
@@ -326,7 +319,14 @@ async function createClientNotification(userId, notification) {
 // ─── Email helper (Resend REST API via built-in https) ───────────────────────
 async function sendEmail({ to, subject, html }) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || !to) return; // silently skip if not configured
+  if (!apiKey) {
+    console.warn(`[sendEmail] Skipped "${subject || "email"}" because RESEND_API_KEY is not configured.`);
+    return;
+  }
+  if (!to) {
+    console.warn(`[sendEmail] Skipped "${subject || "email"}" because no recipient email was provided.`);
+    return;
+  }
   return new Promise((resolve) => {
     const body = JSON.stringify({
       from: 'Kliques <noreply@mykliques.com>',
@@ -344,10 +344,22 @@ async function sendEmail({ to, subject, html }) {
         'Content-Length': Buffer.byteLength(body),
       },
     }, (res) => {
+      let responseBody = "";
+      res.on("data", (chunk) => {
+        responseBody += chunk.toString();
+      });
       res.resume();
-      res.on('end', resolve);
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          console.warn(`[sendEmail] Resend returned ${res.statusCode} for "${subject || "email"}" to ${to}: ${responseBody}`);
+        }
+        resolve();
+      });
     });
-    req.on('error', (e) => console.warn('[sendEmail] error:', e.message));
+    req.on('error', (e) => {
+      console.warn(`[sendEmail] Failed to send "${subject || "email"}" to ${to}:`, e.message);
+      resolve();
+    });
     req.write(body);
     req.end();
   });
@@ -585,6 +597,10 @@ async function deleteClientPushSubscription(endpoint) {
 }
 
 async function sendClientPushNotification(userId, notification) {
+  // Browser push is disabled for the web app unless explicitly enabled for a
+  // future native/mobile push pipeline.
+  if (!WEB_PUSH_ENABLED) return;
+
   if (!supabase || !userId || !webPushKeyMaterial) return;
 
   const prefKey = getClientPushPrefKey(notification?.type);
@@ -618,14 +634,28 @@ async function sendClientPushNotification(userId, notification) {
 // ─── Helper: fetch provider email + name ─────────────────────────────────────
 async function getProviderEmailInfo(providerId) {
   if (!supabase || !providerId) return {};
-  const { data } = await supabase
+  const { data: providerRow } = await supabase
     .from('providers')
     .select('email, name, business_name')
     .eq('user_id', providerId)
     .maybeSingle();
+
+  if (providerRow?.email) {
+    return {
+      email: providerRow.email,
+      name: providerRow.business_name || providerRow.name || null,
+    };
+  }
+
+  const { data: profileRow } = await supabase
+    .from('provider_profiles')
+    .select('email, name, business_name')
+    .eq('provider_id', providerId)
+    .maybeSingle();
+
   return {
-    email: data?.email || null,
-    name: data?.business_name || data?.name || null,
+    email: profileRow?.email || providerRow?.email || null,
+    name: providerRow?.business_name || providerRow?.name || profileRow?.business_name || profileRow?.name || null,
   };
 }
 
@@ -706,7 +736,7 @@ async function sendProviderNewBookingEmail({ to, clientName, serviceName, schedu
 }
 
 // ─── Session reminder scheduler (runs every 5 min) ───────────────────────────
-// Sends a push notification 3 hours before confirmed appointments
+// Sends an in-app reminder 3 hours before confirmed appointments.
 setInterval(async () => {
   if (!supabase) return;
   try {
@@ -725,17 +755,15 @@ setInterval(async () => {
 
     for (const booking of bookings) {
       // Check if reminder already sent for this booking
-      const { data: existing } = await supabase
+      const { data: existingReminders } = await supabase
         .from('client_notifications')
-        .select('id')
+        .select('id, data')
         .eq('user_id', booking.client_id)
-        .eq('type', 'session_reminder')
-        .eq('booking_id', booking.id)
-        .maybeSingle();
-      if (existing) continue; // already sent
-
-      const { prefs } = await getClientNotifPrefs(booking.client_id);
-      if (prefs.push_reminders === false) continue; // opted out
+        .eq('type', 'session_reminder');
+      const reminderAlreadySent = (existingReminders || []).some(
+        (row) => row?.data?.booking_id === booking.id
+      );
+      if (reminderAlreadySent) continue;
 
       const svcName = booking.services?.name || booking.service_name || 'your session';
       const displayTime = new Date(booking.scheduled_at).toLocaleTimeString('en-US', {
@@ -4028,6 +4056,7 @@ app.patch("/api/provider/me", async (req, res) => {
 
       providerPayload.name = fallbackProviderName;
       if (typeof updates.handle !== "undefined") providerPayload.handle = updates.handle || null;
+      if (typeof updates.email !== "undefined") providerPayload.email = updates.email || null;
       if (typeof updates.business_name !== "undefined") providerPayload.business_name = updates.business_name;
       if (typeof updates.bio !== "undefined") providerPayload.bio = updates.bio;
       if (typeof updates.city !== "undefined") providerPayload.city = updates.city;
@@ -4041,7 +4070,7 @@ app.patch("/api/provider/me", async (req, res) => {
         const { data, error } = await supabase
           .from("providers")
           .upsert(providerPayload, { onConflict: "user_id" })
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
+          .select("id, user_id, email, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .single();
         if (error) {
           console.warn("[supabase] Failed to update providers row for profile changes", error);
@@ -4051,7 +4080,7 @@ app.patch("/api/provider/me", async (req, res) => {
       } else {
         const { data } = await supabase
           .from("providers")
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
+          .select("id, user_id, email, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .eq("user_id", providerId)
           .maybeSingle();
         providerData = data || null;

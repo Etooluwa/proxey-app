@@ -20,7 +20,7 @@ const F = "'Sora',system-ui,sans-serif";
 const SETTINGS = [
     { label: 'Personal details',   sub: 'Name, email, phone',  route: '/app/profile/personal' },
     { label: 'Payment methods',    sub: 'Manage your cards',   route: '/app/profile/payment-methods' },
-    { label: 'Notifications',      sub: 'Email, push, SMS',    route: '/app/profile/notifications' },
+    { label: 'Notifications',      sub: 'Email preferences',    route: '/app/profile/notifications' },
     { label: 'Privacy & security', sub: 'Password, data',      route: '/app/profile/privacy' },
     { label: 'Help & support',     sub: 'FAQ, contact us',     route: '/app/profile/help' },
 ];

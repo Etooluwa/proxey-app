@@ -31,7 +31,7 @@ const SETTINGS = [
     { label: 'Photos & portfolio',  sub: 'Manage gallery images',      route: '/provider/profile/photos' },
     { label: 'Payouts & billing',   sub: 'Stripe Connect',             route: '/provider/profile/payouts' },
     { label: 'Working hours',       sub: 'Availability schedule',      route: '/provider/calendar/availability' },
-    { label: 'Notifications',       sub: 'Email, push, SMS',           route: '/provider/profile/notifications' },
+    { label: 'Notifications',       sub: 'Email preferences',           route: '/provider/profile/notifications' },
     { label: 'Booking settings',    sub: 'Cancellation, buffer times', route: '/provider/profile/booking-settings' },
     { label: 'Help & support',      sub: 'FAQ, contact Kliques',       route: '/provider/profile/help' },
     { label: 'Delete account',      sub: 'Permanently remove account', route: '/provider/profile/delete', danger: true },

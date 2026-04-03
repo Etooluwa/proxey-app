@@ -7,7 +7,6 @@ import { ToastProvider } from './components/ui/ToastProvider';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { BookingProvider } from './contexts/BookingContext';
 import { MessageProvider } from './contexts/MessageContext';
-import ClientPushRegistration from './components/ClientPushRegistration';
 import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRedirect from './routes/RoleRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -132,7 +131,6 @@ function App() {
             <NotificationProvider>
               <BookingProvider>
                 <MessageProvider>
-                  <ClientPushRegistration />
                   <Routes>
 
                     {/* ── Public routes (no auth) ──────────────────────────── */}

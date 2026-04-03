@@ -29,7 +29,7 @@ const CONNECTED_TYPES = new Set([
 ]);
 const MESSAGE_TYPES = new Set(['new_message']);
 const REVIEW_TYPES = new Set(['new_review']);
-const PAYMENT_SUCCESS_TYPES = new Set(['payment_succeeded']);
+const PAYMENT_SUCCESS_TYPES = new Set(['payment_success', 'payment_succeeded']);
 const PAYMENT_FAILED_TYPES = new Set(['payment_failed']);
 
 function normaliseType(rawType) {
@@ -153,7 +153,7 @@ function getNavPath(n, isProvider) {
         if (type === 'connected') {
             return '/app';
         }
-        if (type === 'completed') {
+        if (type === 'completed' || type === 'payment_failed') {
             return bookingId ? `/app/bookings/${bookingId}` : '/app/notifications';
         }
         return '/app/notifications';

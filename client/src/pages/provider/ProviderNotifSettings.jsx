@@ -11,23 +11,10 @@ const T = { ink: '#3D231E', muted: '#8C6A64' };
 const F = "'Sora',system-ui,sans-serif";
 
 const DEFAULT_PREFS = {
-    push_new_bookings:  true,
-    push_confirmations: true,
-    push_messages:      true,
-    push_reminders:     true,
-    push_payouts:       false,
     email_new_bookings: true,
     email_reviews:      true,
     email_payout_updates: false,
 };
-
-const PUSH_ITEMS = [
-    { key: 'push_new_bookings',  label: 'New booking requests' },
-    { key: 'push_confirmations', label: 'Booking confirmations' },
-    { key: 'push_messages',      label: 'Client messages' },
-    { key: 'push_reminders',     label: 'Session reminders' },
-    { key: 'push_payouts',       label: 'Payout updates' },
-];
 
 const EMAIL_ITEMS = [
     { key: 'email_new_bookings', label: 'New booking requests' },
@@ -92,18 +79,10 @@ export default function ProviderNotifSettings() {
         <SettingsPageLayout title="Notifications">
             {loading ? (
                 <p style={{ fontFamily: F, fontSize: 14, color: T.muted, marginTop: 24 }}>Loading…</p>
-            ) : isDesktop ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
-                    <NotifGroup items={PUSH_ITEMS} label="Push Notifications" />
+            ) : (
+                <div style={{ maxWidth: isDesktop ? 520 : 'none' }}>
                     <NotifGroup items={EMAIL_ITEMS} label="Email Notifications" />
                 </div>
-            ) : (
-                <>
-                    <NotifGroup items={PUSH_ITEMS} label="Push Notifications" />
-                    <div style={{ marginTop: 24 }}>
-                        <NotifGroup items={EMAIL_ITEMS} label="Email Notifications" />
-                    </div>
-                </>
             )}
         </SettingsPageLayout>
     );
