@@ -4,6 +4,7 @@ import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const T = {
     ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -43,6 +44,7 @@ const StatusPill = ({ status }) => {
 const ClientInvoices = () => {
     const navigate = useNavigate();
     const { session } = useSession();
+    const { unreadCount } = useNotifications();
     const { isDesktop, onMenu } = useOutletContext() || {};
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -264,7 +266,7 @@ const ClientInvoices = () => {
     // ── Mobile layout ────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
-            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} notifCount={unreadCount} showAvatar={false} />
 
             <div style={{ padding: '0 20px 24px', flex: 1 }}>
                 <div style={{ paddingTop: 8 }}>

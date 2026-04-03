@@ -5,6 +5,7 @@ import { request } from '../data/apiClient';
 import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const T = {
     base: '#FBF7F2',
@@ -460,6 +461,7 @@ const AppDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile: sessionProfile } = useSession();
+    const { unreadCount } = useNotifications();
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -588,7 +590,7 @@ const AppDashboard = () => {
 
     return (
         <div className="flex flex-col min-h-screen" style={{ background: T.base }}>
-            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} notifCount={unreadCount} showAvatar={false} />
             <div style={{ padding: '0 20px 24px', flex: 1 }}>
                 {content}
             </div>

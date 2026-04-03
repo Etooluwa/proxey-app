@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { useMessages } from '../contexts/MessageContext';
 import { useSession } from '../auth/authContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import Header from '../components/ui/Header';
 import Avatar from '../components/ui/Avatar';
 import Divider from '../components/ui/Divider';
@@ -242,6 +243,7 @@ const MessagesPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { session } = useSession();
+    const { unreadCount } = useNotifications();
     const { conversations, markAsRead, setCurrentConversation, loadMessages, messages, sendMessage, getOrCreateConversation } = useMessages();
     const [activeChat, setActiveChat] = useState(null);
     const [creatingConversation, setCreatingConversation] = useState(false);
@@ -386,7 +388,7 @@ const MessagesPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} notifCount={unreadCount} showAvatar={false} />
 
             <div className="px-5 pb-6 flex-1 flex flex-col">
                 {/* Page title */}

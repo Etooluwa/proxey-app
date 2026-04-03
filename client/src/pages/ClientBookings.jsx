@@ -5,6 +5,7 @@ import { request } from '../data/apiClient';
 import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
+import { useNotifications } from '../contexts/NotificationContext';
 import {
     BOOKING_TOKENS,
     BODY_FONT,
@@ -69,6 +70,7 @@ export default function ClientBookings() {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const navigate = useNavigate();
     const { session } = useSession();
+    const { unreadCount } = useNotifications();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('pending');
@@ -214,7 +216,7 @@ export default function ClientBookings() {
 
     return (
         <div className="flex flex-col min-h-screen" style={{ background: BOOKING_TOKENS.base }}>
-            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} notifCount={unreadCount} showAvatar={false} />
             <div style={{ padding: '0 20px 24px', flex: 1 }}>
                 {content}
             </div>

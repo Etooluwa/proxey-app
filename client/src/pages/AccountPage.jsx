@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import Header from '../components/ui/Header';
 import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
@@ -36,6 +37,7 @@ function memberSince(ts) {
 const AccountPage = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const { session, profile, logout } = useSession();
+    const { unreadCount } = useNotifications();
     const navigate = useNavigate();
 
     const handleRowTap = (row) => { if (row.route) navigate(row.route); };
@@ -84,7 +86,7 @@ const AccountPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} showAvatar={false} />
+            <Header onMenu={onMenu} onNotif={() => navigate('/app/notifications')} notifCount={unreadCount} showAvatar={false} />
 
             {/* ── Identity ── */}
             <div className="px-5 pb-5">
