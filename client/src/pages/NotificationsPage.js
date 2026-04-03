@@ -344,11 +344,7 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
     };
 
     const handleBack = () => {
-        if (showAll) {
-            navigate('/app');
-        } else {
-            navigate(-1);
-        }
+        navigate('/app');
     };
 
     if (isDesktop) {
