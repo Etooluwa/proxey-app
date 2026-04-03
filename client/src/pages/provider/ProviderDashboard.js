@@ -53,6 +53,20 @@ function todayPill() {
     return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
+function getLocalDateKey(value = new Date()) {
+    if (typeof value === 'string') {
+        const rawDate = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+        if (rawDate) return rawDate[1];
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function parseLocalDateTime(value) {
     if (!value) return null;
     const localValue = String(value).replace(' ', 'T').replace(/(Z|[+-]\d{2}:\d{2})$/, '');
@@ -106,6 +120,16 @@ function statusPillMeta(status) {
         return { label: 'Pending', bg: '#FFF5E6', color: '#C25E4A' };
     }
     return { label: 'Upcoming', bg: '#F2EBE5', color: '#8C6A64' };
+}
+
+function normalizeDashboardSchedule(scheduleRows = []) {
+    const todayKey = getLocalDateKey();
+    return (scheduleRows || [])
+        .filter((appt) => getLocalDateKey(appt?.scheduledAt) === todayKey)
+        .map((appt) => ({
+            ...appt,
+            dashboardStatus: getDashboardStatus(appt),
+        }));
 }
 
 // ─── Mobile: schedule row ─────────────────────────────────────────────────────
@@ -258,10 +282,7 @@ const ProviderDashboard = () => {
 
                 if (!cancelled) {
                     if (dash) {
-                        setSchedule((dash.schedule || []).map((appt) => ({
-                            ...appt,
-                            dashboardStatus: getDashboardStatus(appt),
-                        })));
+                        setSchedule(normalizeDashboardSchedule(dash.schedule || []));
                         setWeeklyEarnings(dash.weeklyEarnings || 0);
                         setNewClients(dash.newClientsThisWeek || 0);
                     } else {
@@ -322,10 +343,7 @@ const ProviderDashboard = () => {
 
     const handleDrawerCompleted = () => {
         request('/provider/dashboard').then((dash) => {
-            setSchedule((dash.schedule || []).map((appt) => ({
-                ...appt,
-                dashboardStatus: getDashboardStatus(appt),
-            })));
+            setSchedule(normalizeDashboardSchedule(dash.schedule || []));
             setWeeklyEarnings(dash.weeklyEarnings || 0);
             setNewClients(dash.newClientsThisWeek || 0);
         }).catch(() => {});
