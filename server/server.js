@@ -6483,7 +6483,7 @@ app.get("/api/client/invoices", async (req, res) => {
     return res.status(200).json({ invoices: [] });
   }
 
-  const clientId = getClientId(req);
+  const clientId = getUserId(req);
 
   if (!clientId) {
     return res.status(401).json({ error: "Client not authenticated" });

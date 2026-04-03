@@ -940,43 +940,31 @@ const ProviderAppointmentDetail = () => {
                         </div>
                     )}
 
-                    {/* Notes textarea */}
+                    {/* Notes textarea — always editable when confirmed or completed */}
                     <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">Notes</p>
-                    {!isAlreadyCompleted ? (
-                        <textarea
-                            value={sessionNotes}
-                            onChange={(e) => setSessionNotes(e.target.value)}
-                            onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
-                            disabled={savingNotes}
-                            placeholder="Notes from this session"
-                            rows={3}
-                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-4"
-                            style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
-                        />
-                    ) : (
-                        <p className="text-[14px] text-ink m-0 leading-relaxed mb-4">
-                            {sessionNotes || <span className="text-muted italic">No session notes.</span>}
-                        </p>
-                    )}
+                    <textarea
+                        value={sessionNotes}
+                        onChange={(e) => setSessionNotes(e.target.value)}
+                        onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
+                        disabled={savingNotes}
+                        placeholder="Notes from this session"
+                        rows={3}
+                        className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none mb-4"
+                        style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                    />
 
-                    {/* Recommendation textarea */}
+                    {/* Recommendation textarea — always editable when confirmed or completed */}
                     <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">Recommendations for client</p>
-                    {!isAlreadyCompleted ? (
-                        <textarea
-                            value={sessionRec}
-                            onChange={(e) => setSessionRec(e.target.value)}
-                            onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
-                            disabled={savingNotes}
-                            placeholder="What should the client do before the next session?…"
-                            rows={2}
-                            className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
-                            style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
-                        />
-                    ) : (
-                        <p className="text-[14px] text-ink m-0 leading-relaxed">
-                            {sessionRec || <span className="text-muted italic">No recommendations.</span>}
-                        </p>
-                    )}
+                    <textarea
+                        value={sessionRec}
+                        onChange={(e) => setSessionRec(e.target.value)}
+                        onBlur={() => handleSaveNotes(sessionNotes, sessionRec)}
+                        disabled={savingNotes}
+                        placeholder="What should the client do before the next session?…"
+                        rows={2}
+                        className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
+                        style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                    />
                 </div>}
 
                 {(isConfirmed || isAlreadyCompleted) && <Divider />}
@@ -985,21 +973,19 @@ const ProviderAppointmentDetail = () => {
                 {(isConfirmed || isAlreadyCompleted) && <div className="py-5">
                     <div className="flex items-center justify-between mb-3">
                         <Lbl>Session Photos</Lbl>
-                        {!isAlreadyCompleted && (
-                            <label
-                                className="text-[12px] font-semibold cursor-pointer focus:outline-none"
-                                style={{ color: '#C25E4A' }}
-                            >
-                                {uploadingPhoto ? 'Uploading…' : '+ Add photo'}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handlePhotoUpload}
-                                    disabled={uploadingPhoto}
-                                />
-                            </label>
-                        )}
+                        <label
+                            className="text-[12px] font-semibold cursor-pointer focus:outline-none"
+                            style={{ color: '#C25E4A' }}
+                        >
+                            {uploadingPhoto ? 'Uploading…' : '+ Add photo'}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handlePhotoUpload}
+                                disabled={uploadingPhoto}
+                            />
+                        </label>
                     </div>
 
                     {photos.length === 0 ? (
@@ -1013,17 +999,15 @@ const ProviderAppointmentDetail = () => {
                                         alt={p.caption || 'Session photo'}
                                         className="w-full h-full object-cover"
                                     />
-                                    {!isAlreadyCompleted && (
-                                        <button
-                                            onClick={() => handleDeletePhoto(p.id)}
-                                            className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center focus:outline-none"
-                                            style={{ background: 'rgba(0,0,0,0.5)' }}
-                                        >
-                                            <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
-                                                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                                            </svg>
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => handleDeletePhoto(p.id)}
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center focus:outline-none"
+                                        style={{ background: 'rgba(0,0,0,0.5)' }}
+                                    >
+                                        <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
                                 </div>
                             ))}
                         </div>
