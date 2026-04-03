@@ -53,9 +53,18 @@ function todayPill() {
     return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
+function parseLocalDateTime(value) {
+    if (!value) return null;
+    const localValue = String(value).replace(' ', 'T').replace(/(Z|[+-]\d{2}:\d{2})$/, '');
+    const parsed = new Date(localValue);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function fmtTime(iso) {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const date = parseLocalDateTime(iso);
+    if (!date) return '';
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 function fmtDuration(mins) {
@@ -69,6 +78,34 @@ function fmtDuration(mins) {
 function fmtEarnings(cents) {
     if (!cents) return '$0';
     return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+function getDashboardStatus(appt) {
+    const explicitStatus = String(appt?.status || '').toLowerCase();
+    if (explicitStatus === 'completed' || explicitStatus === 'cancelled') {
+        return explicitStatus;
+    }
+
+    const start = parseLocalDateTime(appt?.scheduledAt);
+    if (!start) return explicitStatus || 'confirmed';
+
+    const durationMs = (Number(appt?.duration) || 60) * 60000;
+    const endedAt = new Date(start.getTime() + durationMs);
+    if (endedAt.getTime() <= Date.now()) {
+        return 'completed';
+    }
+
+    return explicitStatus || 'confirmed';
+}
+
+function statusPillMeta(status) {
+    if (status === 'completed') {
+        return { label: 'Completed', bg: '#EBF2EC', color: '#5A8A5E' };
+    }
+    if (status === 'pending') {
+        return { label: 'Pending', bg: '#FFF5E6', color: '#C25E4A' };
+    }
+    return { label: 'Upcoming', bg: '#F2EBE5', color: '#8C6A64' };
 }
 
 // ─── Mobile: schedule row ─────────────────────────────────────────────────────
@@ -87,6 +124,12 @@ const ApptRow = ({ appt, onClick }) => (
                         {appt.serviceName}
                         {appt.duration ? ` · ${fmtDuration(appt.duration)}` : ''}
                     </p>
+                    <span
+                        className="inline-flex mt-2 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.04em]"
+                        style={{ background: statusPillMeta(appt.dashboardStatus).bg, color: statusPillMeta(appt.dashboardStatus).color }}
+                    >
+                        {statusPillMeta(appt.dashboardStatus).label}
+                    </span>
                 </div>
             </div>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-3">
@@ -154,6 +197,23 @@ const DesktopApptRow = ({ appt, onClick }) => (
                     <p style={{ fontFamily: F, fontSize: '13px', color: T.muted, margin: 0 }}>
                         {appt.serviceName}{appt.duration ? ` · ${fmtDuration(appt.duration)}` : ''}
                     </p>
+                    <span
+                        style={{
+                            display: 'inline-flex',
+                            marginTop: 8,
+                            padding: '5px 10px',
+                            borderRadius: 999,
+                            background: statusPillMeta(appt.dashboardStatus).bg,
+                            color: statusPillMeta(appt.dashboardStatus).color,
+                            fontFamily: F,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                        }}
+                    >
+                        {statusPillMeta(appt.dashboardStatus).label}
+                    </span>
                 </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -198,7 +258,10 @@ const ProviderDashboard = () => {
 
                 if (!cancelled) {
                     if (dash) {
-                        setSchedule(dash.schedule || []);
+                        setSchedule((dash.schedule || []).map((appt) => ({
+                            ...appt,
+                            dashboardStatus: getDashboardStatus(appt),
+                        })));
                         setWeeklyEarnings(dash.weeklyEarnings || 0);
                         setNewClients(dash.newClientsThisWeek || 0);
                     } else {
@@ -231,7 +294,7 @@ const ProviderDashboard = () => {
     const initials = getInitials(sessionProfile?.name);
     const avatarSrc = sessionProfile?.photo || sessionProfile?.avatar || '';
     const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
-    const upNext = schedule[0] || null;
+    const upNext = schedule.find((appt) => appt.dashboardStatus !== 'completed') || null;
 
     // Mobile-only color
     const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
@@ -246,7 +309,7 @@ const ProviderDashboard = () => {
             time: fmtTime(appt.scheduledAt),
             service: appt.serviceName,
             duration: fmtDuration(appt.duration),
-            status: appt.status,
+            status: appt.dashboardStatus || appt.status,
             messagesPath: '/provider/messages',
         });
         setDrawerOpen(true);
@@ -259,7 +322,10 @@ const ProviderDashboard = () => {
 
     const handleDrawerCompleted = () => {
         request('/provider/dashboard').then((dash) => {
-            setSchedule(dash.schedule || []);
+            setSchedule((dash.schedule || []).map((appt) => ({
+                ...appt,
+                dashboardStatus: getDashboardStatus(appt),
+            })));
             setWeeklyEarnings(dash.weeklyEarnings || 0);
             setNewClients(dash.newClientsThisWeek || 0);
         }).catch(() => {});
@@ -314,7 +380,7 @@ const ProviderDashboard = () => {
                                 </div>
                             ) : (
                                 <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>
-                                    No upcoming sessions today.
+                                    No upcoming appointments for today.
                                 </p>
                             )}
                         </div>
@@ -358,8 +424,8 @@ const ProviderDashboard = () => {
 
                     {!loading && schedule.length === 0 && (
                         <div style={{ padding: '32px 0', textAlign: 'center' }}>
-                            <p style={{ fontFamily: F, fontSize: '16px', color: T.ink, margin: '0 0 6px' }}>Your day is wide open.</p>
-                            <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>Once clients book, their sessions show up here.</p>
+                            <p style={{ fontFamily: F, fontSize: '16px', color: T.ink, margin: '0 0 6px' }}>No upcoming appointments for today.</p>
+                            <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>Once clients book for today, they show up here.</p>
                         </div>
                     )}
 
@@ -426,7 +492,7 @@ const ProviderDashboard = () => {
                                 <ArrowIcon />
                             </button>
                         ) : (
-                            <p className="text-[15px] text-muted m-0">No upcoming sessions today.</p>
+                            <p className="text-[15px] text-muted m-0">No upcoming appointments for today.</p>
                         )}
                     </div>
                 </HeroCard>
@@ -482,8 +548,8 @@ const ProviderDashboard = () => {
                 {!loading && schedule.length === 0 && (
                     <>
                         <div className="py-8 text-center">
-                            <p className="text-[16px] text-ink m-0 mb-1">Your day is wide open.</p>
-                            <p className="text-[14px] text-muted m-0">Once clients book, their sessions show up here.</p>
+                            <p className="text-[16px] text-ink m-0 mb-1">No upcoming appointments for today.</p>
+                            <p className="text-[14px] text-muted m-0">Once clients book for today, they show up here.</p>
                         </div>
                         <Divider />
                     </>
