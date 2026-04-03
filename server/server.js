@@ -11050,7 +11050,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
     const platformFeeDollars = +(grossDollars * BOOKING_PLATFORM_FEE_RATE).toFixed(2);
     const netAmount = grossDollars; // provider receives full service price
 
-    await supabase.from("provider_earnings").insert({
+    const { error: earningsErr } = await supabase.from("provider_earnings").insert({
       provider_id: booking.provider_id,
       booking_id: bookingId,
       gross_amount: Math.round(grossDollars * 100),
@@ -11058,7 +11058,8 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       net_amount: Math.round(netAmount * 100),
       payout_status: "pending",
       created_at: now,
-    }).catch((err) => console.warn("[bookings/complete] provider_earnings insert:", err.message));
+    });
+    if (earningsErr) console.warn("[bookings/complete] provider_earnings insert:", earningsErr.message);
 
     let invoiceNumber = null;
     let invoiceId = null;
