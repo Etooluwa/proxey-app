@@ -177,12 +177,14 @@ async function getProviderNotifPrefs(providerId) {
 
   const { data } = await supabase
     .from("provider_profiles")
-    .select("notification_preferences")
+    .select("notification_preferences, email, business_name, name")
     .eq("provider_id", providerId)
     .maybeSingle();
 
   return {
     prefs: data?.notification_preferences || {},
+    email: data?.email || null,
+    name: data?.business_name || data?.name || null,
   };
 }
 
@@ -364,6 +366,72 @@ async function getClientNotifPrefs(userId) {
     email: data?.email || null,
     name: data?.name || null,
   };
+}
+
+async function notifyProviderCompletionChargeResult(booking, {
+  paymentStatus,
+  serviceName,
+  clientName,
+  chargedAmountCents = 0,
+  failureReason = null,
+} = {}) {
+  if (!booking?.provider_id) return;
+
+  const serviceLabel = serviceName || booking.service_name || "your service";
+  const clientLabel = clientName || booking.client_name || "your client";
+  const amountLabel = `$${((Math.max(Number(chargedAmountCents) || 0, 0)) / 100).toFixed(2)}`;
+  const isFailed = paymentStatus === "payment_failed";
+  const title = isFailed ? "Charge failed" : "Charge successful";
+  const body = isFailed
+    ? `${clientLabel}'s card could not be charged for ${serviceLabel}. ${failureReason || "Ask the client to update their payment method and try again."}`
+    : `${clientLabel}'s card was charged ${amountLabel} for ${serviceLabel}.`;
+
+  await createProviderNotification(booking.provider_id, {
+    type: isFailed ? "payment_failed" : "payment_succeeded",
+    title,
+    body,
+    booking_id: booking.id,
+    data: {
+      booking_id: booking.id,
+      client_id: booking.client_id,
+      client_name: clientLabel,
+      service_name: serviceLabel,
+      payment_status: paymentStatus,
+      charged_amount_cents: chargedAmountCents,
+      failure_reason: failureReason,
+    },
+  }).catch(() => {});
+
+  if (!isFailed) return;
+
+  const { prefs, email: providerEmail, name: providerName } = await getProviderNotifPrefs(booking.provider_id).catch(() => ({}));
+  if (prefs?.email_payout_updates === false || !providerEmail) return;
+
+  await sendEmail({
+    to: providerEmail,
+    subject: `Charge failed — ${serviceLabel}`,
+    html: `
+      <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+        <div style="background:#FDEDEA;padding:28px 24px;border-radius:16px 16px 0 0;text-align:center">
+          <div style="width:56px;height:56px;background:#B04040;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <span style="color:white;font-size:24px">!</span>
+          </div>
+          <h1 style="margin:0;font-size:22px;font-weight:700;color:#8F2E2E">Charge failed</h1>
+        </div>
+        <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+          <p style="margin:0 0 12px">Hi ${providerName || 'there'},</p>
+          <p style="margin:0 0 16px;color:#8C6A64">We couldn't charge <strong>${clientLabel}</strong> for <strong>${serviceLabel}</strong>, so this booking was not marked complete.</p>
+          <div style="background:#FDEDEA;border-radius:12px;padding:16px;margin-bottom:20px;border-left:3px solid #B04040">
+            <p style="margin:0;font-size:13px;color:#8F2E2E;font-weight:600">Reason: ${failureReason || 'Payment could not be processed.'}</p>
+          </div>
+          <p style="margin:0 0 20px;color:#8C6A64">Open the booking, ask the client to update their payment method, then try Mark Complete again.</p>
+          <div style="text-align:center;margin-bottom:24px">
+            <a href="https://mykliques.com/provider/appointments/${booking.id}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">View booking →</a>
+          </div>
+          <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+        </div>
+      </div>`,
+  }).catch(() => {});
 }
 
 function base64UrlEncode(input) {
@@ -10793,6 +10861,13 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         .update({ payment_status: "payment_failed", updated_at: now })
         .eq("id", bookingId);
 
+      await notifyProviderCompletionChargeResult(booking, {
+        paymentStatus: "payment_failed",
+        serviceName: serviceInfo?.name || booking.service_name,
+        clientName: booking.client_name,
+        failureReason: "No saved payment method was found for this booking.",
+      });
+
       return res.status(400).json({
         error: "Charge failed, so this booking was not marked complete. No saved payment method was found for this booking.",
       });
@@ -10851,6 +10926,13 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
           .from("bookings")
           .update({ payment_status: "payment_failed", updated_at: now })
           .eq("id", bookingId);
+
+        await notifyProviderCompletionChargeResult(booking, {
+          paymentStatus: "payment_failed",
+          serviceName: serviceInfo?.name || booking.service_name,
+          clientName: booking.client_name,
+          failureReason: stripeErr.message || "Payment could not be processed.",
+        });
 
         // Notify client that their payment failed and they need to retry
         if (booking.client_id) {
@@ -10924,6 +11006,15 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       })
       .eq("id", bookingId);
     if (updateErr) throw updateErr;
+
+    if (requiresCompletionCharge) {
+      await notifyProviderCompletionChargeResult(booking, {
+        paymentStatus: "paid",
+        serviceName: serviceInfo?.name || booking.service_name,
+        clientName: booking.client_name,
+        chargedAmountCents: chargedOnCompletionCents,
+      });
+    }
 
     // 5 + 6. Calculate fee and create provider_earnings record.
     // With Option 1 pricing: client pays service + 10% fee. Provider receives full service price.

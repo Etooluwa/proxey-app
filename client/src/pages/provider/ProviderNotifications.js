@@ -37,6 +37,12 @@ const MESSAGE_TYPES = new Set([
 const REVIEW_TYPES = new Set([
     'new_review',
 ]);
+const PAYMENT_SUCCESS_TYPES = new Set([
+    'payment_succeeded',
+]);
+const PAYMENT_FAILED_TYPES = new Set([
+    'payment_failed',
+]);
 
 function normaliseType(rawType) {
     if (!rawType) return 'reminder';
@@ -46,6 +52,8 @@ function normaliseType(rawType) {
     if (CONNECTED_TYPES.has(t)) return 'connected';
     if (MESSAGE_TYPES.has(t)) return 'message';
     if (REVIEW_TYPES.has(t)) return 'review';
+    if (PAYMENT_SUCCESS_TYPES.has(t)) return 'completed';
+    if (PAYMENT_FAILED_TYPES.has(t)) return 'payment_failed';
     return 'reminder';
 }
 
@@ -98,6 +106,16 @@ const BADGE = {
         icon: (
             <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+    },
+    payment_failed: {
+        bg: '#B04040',
+        icon: (
+            <svg width="11" height="11" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 8v5" strokeLinecap="round" />
+                <path d="M12 16.5h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         ),
     },
@@ -254,6 +272,24 @@ const NotifItem = ({ n, onAction }) => {
                                 View Review
                             </button>
                         )}
+                        {type === 'completed' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold focus:outline-none"
+                                style={{ background: '#EBF2EC', color: '#3D6B41' }}
+                            >
+                                View Booking
+                            </button>
+                        )}
+                        {type === 'payment_failed' && unread && (
+                            <button
+                                onClick={() => onAction(n)}
+                                className="px-3.5 py-1.5 rounded-[8px] text-[11px] font-semibold focus:outline-none"
+                                style={{ background: '#FDEDEA', color: '#8F2E2E' }}
+                            >
+                                View Payment
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -297,7 +333,7 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
             const clientId = n.data?.client_id;
             if (clientId) navigate(`/provider/client/${clientId}`);
             else navigate('/provider/clients');
-        } else if (type === 'completed') {
+        } else if (type === 'completed' || type === 'payment_failed') {
             const bookingId = n.data?.booking_id;
             if (bookingId) navigate(`/provider/appointments/${bookingId}`);
             else navigate('/provider/appointments');

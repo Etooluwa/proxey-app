@@ -107,6 +107,44 @@ export function getStatusTheme(status) {
     };
 }
 
+export function getPaymentStatusTheme(paymentStatus, paymentType = 'full') {
+    const normalized = String(paymentStatus || '').toLowerCase();
+
+    if (normalized === 'paid') {
+        return {
+            pillBackground: BOOKING_TOKENS.successBg,
+            pillColor: BOOKING_TOKENS.success,
+            pillLabel: paymentType === 'deposit' ? 'Balance Paid' : 'Paid',
+        };
+    }
+
+    if (normalized === 'deposit_paid') {
+        return {
+            pillBackground: BOOKING_TOKENS.successBg,
+            pillColor: BOOKING_TOKENS.success,
+            pillLabel: 'Deposit Paid',
+        };
+    }
+
+    if (normalized === 'card_saved') {
+        return {
+            pillBackground: BOOKING_TOKENS.amberBg,
+            pillColor: BOOKING_TOKENS.amber,
+            pillLabel: 'Card on File',
+        };
+    }
+
+    if (normalized === 'payment_failed') {
+        return {
+            pillBackground: BOOKING_TOKENS.dangerBg,
+            pillColor: BOOKING_TOKENS.danger,
+            pillLabel: 'Payment Failed',
+        };
+    }
+
+    return null;
+}
+
 export function BookingsPageHeader({ label }) {
     return (
         <section style={{ marginBottom: 28, animation: 'fadeUp 0.4s ease 0.05s both' }}>
@@ -327,6 +365,7 @@ export function BookingCard({
     actioningId,
 }) {
     const theme = getStatusTheme(booking.status);
+    const paymentTheme = getPaymentStatusTheme(booking.payment_status, booking.payment_type);
     const date = getDateBlock(booking.scheduled_at);
     const subtitle = [personName, formatBookingTime(booking.scheduled_at), formatBookingDuration(booking.duration)]
         .filter(Boolean)
@@ -601,6 +640,23 @@ export function BookingCard({
                         >
                             {formatBookingPrice(booking.price) || '—'}
                         </span>
+                        {paymentTheme && (
+                            <span
+                                style={{
+                                    padding: '4px 10px',
+                                    borderRadius: 9999,
+                                    background: paymentTheme.pillBackground,
+                                    color: paymentTheme.pillColor,
+                                    fontFamily: BODY_FONT,
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    letterSpacing: '0.03em',
+                                    textTransform: 'uppercase',
+                                }}
+                            >
+                                {paymentTheme.pillLabel}
+                            </span>
+                        )}
                         <span
                             style={{
                                 padding: '4px 10px',

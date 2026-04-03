@@ -29,6 +29,8 @@ const CONNECTED_TYPES = new Set([
 ]);
 const MESSAGE_TYPES = new Set(['new_message']);
 const REVIEW_TYPES = new Set(['new_review']);
+const PAYMENT_SUCCESS_TYPES = new Set(['payment_succeeded']);
+const PAYMENT_FAILED_TYPES = new Set(['payment_failed']);
 
 function normaliseType(rawType) {
     if (!rawType) return 'reminder';
@@ -38,6 +40,8 @@ function normaliseType(rawType) {
     if (CONNECTED_TYPES.has(t)) return 'connected';
     if (MESSAGE_TYPES.has(t)) return 'message';
     if (REVIEW_TYPES.has(t)) return 'review';
+    if (PAYMENT_SUCCESS_TYPES.has(t)) return 'completed';
+    if (PAYMENT_FAILED_TYPES.has(t)) return 'payment_failed';
     return 'reminder';
 }
 
@@ -46,6 +50,7 @@ const BADGE_COLOR = {
     booking: T.accent,
     connected: T.success,
     completed: T.success,
+    payment_failed: '#B04040',
     reminder: T.muted,
     message: T.ink,
     review: T.success,
@@ -81,6 +86,15 @@ function BadgeIcon({ type }) {
         return (
             <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (type === 'payment_failed') {
+        return (
+            <svg width="9" height="9" fill="none" stroke="#fff" strokeWidth="2.25" viewBox="0 0 24 24">
+                <path d="M12 8v5" strokeLinecap="round" />
+                <path d="M12 16.5h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         );
     }
@@ -122,7 +136,7 @@ function getNavPath(n, isProvider) {
         if (type === 'connected') {
             return clientId ? `/provider/clients/${clientId}` : '/provider/clients';
         }
-        if (type === 'completed') {
+        if (type === 'completed' || type === 'payment_failed') {
             return bookingId ? `/provider/appointments/${bookingId}` : '/provider/bookings';
         }
         if (type === 'message') {
