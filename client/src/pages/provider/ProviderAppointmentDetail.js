@@ -924,7 +924,7 @@ const ProviderAppointmentDetail = () => {
                 )}
 
                 {/* ─ Session Notes & Recommendations ─ */}
-                <div className="py-5">
+                {(isConfirmed || isAlreadyCompleted) && <div className="py-5">
                     <div className="flex items-center justify-between mb-3">
                         <Lbl>Session Notes</Lbl>
                         {savingNotes && (
@@ -977,12 +977,12 @@ const ProviderAppointmentDetail = () => {
                             {sessionRec || <span className="text-muted italic">No recommendations.</span>}
                         </p>
                     )}
-                </div>
+                </div>}
 
-                <Divider />
+                {(isConfirmed || isAlreadyCompleted) && <Divider />}
 
                 {/* ─ Session Photos ─ */}
-                <div className="py-5">
+                {(isConfirmed || isAlreadyCompleted) && <div className="py-5">
                     <div className="flex items-center justify-between mb-3">
                         <Lbl>Session Photos</Lbl>
                         {!isAlreadyCompleted && (
@@ -1028,7 +1028,7 @@ const ProviderAppointmentDetail = () => {
                             ))}
                         </div>
                     )}
-                </div>
+                </div>}
 
                 <Footer />
             </div>
@@ -1105,30 +1105,28 @@ const ProviderAppointmentDetail = () => {
                         </div>
                     )}
 
-                    {/* Confirmed: Message + Mark Complete + Reschedule + Cancel */}
+                    {/* Confirmed: Mark Complete (primary) + Message, then Reschedule + Cancel */}
                     {isConfirmed && (
                         <>
-                            <div className="flex gap-3 w-full">
+                            <button
+                                onClick={handleMarkComplete}
+                                disabled={completing}
+                                className="w-full py-3.5 rounded-[12px] text-[14px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 mb-2"
+                                style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
+                            >
+                                {completing && (
+                                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                                )}
+                                {completing ? 'Completing…' : 'Mark Complete'}
+                            </button>
+                            <div className="flex gap-2 w-full">
                                 <button
                                     onClick={handleMessage}
-                                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                                    className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
                                     style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
                                 >
                                     Message
                                 </button>
-                                <button
-                                    onClick={handleMarkComplete}
-                                    disabled={completing}
-                                    className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                                    style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
-                                >
-                                    {completing && (
-                                        <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                                    )}
-                                    {completing ? 'Completing…' : 'Mark Complete'}
-                                </button>
-                            </div>
-                            <div className="flex gap-3 w-full mt-2">
                                 <button
                                     onClick={() => { setActionError(null); setShowRescheduleModal(true); }}
                                     className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
@@ -1141,7 +1139,7 @@ const ProviderAppointmentDetail = () => {
                                     className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
                                     style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
                                 >
-                                    Cancel Booking
+                                    Cancel
                                 </button>
                             </div>
                         </>
