@@ -3761,7 +3761,9 @@ app.get("/api/provider/me", async (req, res) => {
 
 // GET /api/provider/dashboard — today's schedule + weekly earnings + new clients this week
 app.get("/api/provider/dashboard", async (req, res) => {
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
 
   if (!supabase) {
     return res.status(200).json({ schedule: [], weeklyEarnings: 0, newClientsThisWeek: 0 });
@@ -3769,43 +3771,48 @@ app.get("/api/provider/dashboard", async (req, res) => {
 
   try {
     const now = new Date();
+    const todayKey = getLocalDateKey(now);
 
-    // Today window
-    const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
-    const todayEnd   = new Date(now); todayEnd.setHours(23,59,59,999);
+    // Today window in local wall-clock strings to match how scheduled_at is stored.
+    const todayStart = `${todayKey}T00:00:00`;
+    const todayEnd = `${todayKey}T23:59:59`;
 
-    // This-week window (Mon–Sun)
+    // This-week window (Mon-Sun), also as local wall-clock strings.
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
     weekStart.setHours(0,0,0,0);
+    const weekStartKey = getLocalDateKey(weekStart);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
+    const weekEndKey = getLocalDateKey(weekEnd);
 
     const [todayRes, weekRes] = await Promise.all([
       supabase
         .from("bookings")
         .select("id, client_id, client_name, service_name, scheduled_at, duration, status")
-        .eq("provider_id", providerId)
-        .gte("scheduled_at", todayStart.toISOString())
-        .lte("scheduled_at", todayEnd.toISOString())
+        .in("provider_id", providerIds)
+        .gte("scheduled_at", todayStart)
+        .lte("scheduled_at", todayEnd)
         .not("status", "eq", "cancelled")
         .order("scheduled_at", { ascending: true }),
       supabase
         .from("bookings")
         .select("client_id, price, status, scheduled_at")
-        .eq("provider_id", providerId)
-        .gte("scheduled_at", weekStart.toISOString())
-        .lt("scheduled_at", weekEnd.toISOString()),
+        .in("provider_id", providerIds)
+        .gte("scheduled_at", `${weekStartKey}T00:00:00`)
+        .lt("scheduled_at", `${weekEndKey}T00:00:00`),
     ]);
 
-    const todayBookings = (todayRes.data || []).map((b) => ({
-      id: b.id,
-      clientName: b.client_name || "Client",
-      serviceName: b.service_name || "Session",
-      scheduledAt: b.scheduled_at,
-      duration: b.duration,
-      status: b.status,
-    }));
+    const todayBookings = (todayRes.data || [])
+      .filter((b) => getLocalDateKey(b.scheduled_at) === todayKey)
+      .map((b) => ({
+        id: b.id,
+        clientName: b.client_name || "Client",
+        serviceName: b.service_name || "Session",
+        scheduledAt: b.scheduled_at,
+        duration: b.duration,
+        status: b.status,
+      }));
 
     const weekBookings = weekRes.data || [];
 
@@ -3820,8 +3827,8 @@ app.get("/api/provider/dashboard", async (req, res) => {
       const { data: priorBookings } = await supabase
         .from("bookings")
         .select("client_id")
-        .eq("provider_id", providerId)
-        .lt("scheduled_at", weekStart.toISOString())
+        .in("provider_id", providerIds)
+        .lt("scheduled_at", `${weekStartKey}T00:00:00`)
         .in("client_id", [...weekClientIds]);
 
       const priorIds = new Set((priorBookings || []).map((b) => b.client_id));
