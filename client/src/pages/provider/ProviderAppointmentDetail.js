@@ -91,6 +91,9 @@ function buildPayoutSummary(job, payoutPayload = null) {
     );
     const platformFee = payoutPayload?.platformFee ?? +(totalPrice * 0.1).toFixed(2);
     const providerPayout = payoutPayload?.netAmount ?? payoutPayload?.providerPayout ?? totalPrice;
+    const paymentStatus = payoutPayload?.paymentStatus || job?.payment_status || (
+        paymentType === 'deposit' && remainingCharged > 0 ? 'deposit_paid' : 'paid'
+    );
 
     return {
         totalPrice,
@@ -99,6 +102,61 @@ function buildPayoutSummary(job, payoutPayload = null) {
         platformFee,
         providerPayout,
         paymentType,
+        paymentStatus,
+    };
+}
+
+function paymentStatusMeta(status, paymentType = 'full') {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'paid') {
+        return {
+            status: normalized,
+            label: paymentType === 'deposit' ? 'Balance charged - Paid' : 'Paid',
+            bg: '#EBF2EC',
+            color: '#5A8A5E',
+            message: paymentType === 'deposit'
+                ? 'The remaining balance was charged successfully.'
+                : 'The client payment was charged successfully.',
+        };
+    }
+
+    if (normalized === 'deposit_paid') {
+        return {
+            status: normalized,
+            label: 'Deposit paid',
+            bg: '#EBF2EC',
+            color: '#5A8A5E',
+            message: 'The client deposit was charged successfully. Remaining balance is still due at completion.',
+        };
+    }
+
+    if (normalized === 'card_saved') {
+        return {
+            status: normalized,
+            label: 'Card on file',
+            bg: '#FFF5E6',
+            color: '#92400E',
+            message: 'The client card is saved and will be charged when you mark this booking complete.',
+        };
+    }
+
+    if (normalized === 'payment_failed') {
+        return {
+            status: normalized,
+            label: 'Payment failed',
+            bg: '#FDEDEA',
+            color: '#B04040',
+            message: 'The charge did not go through. This booking should not be treated as paid.',
+        };
+    }
+
+    return {
+        status: normalized || 'unpaid',
+        label: 'Not paid',
+        bg: '#F2EBE5',
+        color: '#8C6A64',
+        message: 'Payment has not been collected yet.',
     };
 }
 
@@ -231,6 +289,7 @@ const RescheduleModal = ({ onConfirm, onCancel, loading }) => {
 const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
     const providerInitials = getInitials(job?.provider_name || 'P');
     const clientInitials = getInitials(job?.client_name);
+    const paymentMeta = paymentStatusMeta(payout?.paymentStatus || job?.payment_status, payout?.paymentType || job?.payment_type);
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
@@ -254,6 +313,13 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
                 <p className="text-[14px] text-muted m-0 mb-8 text-center">
                     {job?.service_name || 'Session'} with {job?.client_name || 'client'}
                 </p>
+
+                <div
+                    className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em] mb-6"
+                    style={{ background: paymentMeta.bg, color: paymentMeta.color }}
+                >
+                    {paymentMeta.label}
+                </div>
 
                 {/* Payout summary card */}
                 {payout && (
@@ -316,14 +382,19 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
                 {/* Green info bar */}
                 <div
                     className="w-full flex items-start gap-3 px-4 py-3 rounded-[14px] mb-8"
-                    style={{ background: '#EBF2EC' }}
+                    style={{ background: paymentMeta.bg }}
                 >
-                    <svg width="16" height="16" fill="none" stroke="#5A8A5E" strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0 mt-0.5">
+                    <svg width="16" height="16" fill="none" stroke={paymentMeta.color} strokeWidth="1.5" viewBox="0 0 24 24" className="flex-shrink-0 mt-0.5">
                         <circle cx="12" cy="12" r="10" />
                         <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#5A8A5E' }}>
-                        Payout will arrive via Stripe within <strong>2–3 business days</strong>.
+                    <p className="text-[13px] m-0 leading-relaxed" style={{ color: paymentMeta.color }}>
+                        {paymentMeta.message}{' '}
+                        {paymentMeta.status !== 'payment_failed' && (
+                            <>
+                                Payout will arrive via Stripe within <strong>2-3 business days</strong>.
+                            </>
+                        )}
                     </p>
                 </div>
 
@@ -478,7 +549,12 @@ const ProviderAppointmentDetail = () => {
                 ...data.payout,
                 paymentType: job.payment_type || 'full',
             } : null));
-            setJob((prev) => ({ ...prev, status: 'completed', completed_at: new Date().toISOString() }));
+            setJob((prev) => ({
+                ...prev,
+                status: 'completed',
+                payment_status: data.payout?.paymentStatus || 'paid',
+                completed_at: new Date().toISOString(),
+            }));
             setCompleted(true);
         } catch (err) {
             console.error('[markComplete]', err);
@@ -641,6 +717,7 @@ const ProviderAppointmentDetail = () => {
     // Payment breakdown
     const totalDollars = job.price ? job.price / 100 : null;
     const paymentType = job.payment_type || 'full';
+    const paymentMeta = paymentStatusMeta(job.payment_status, paymentType);
     const depositValue = job.deposit_value;
     const depositType = job.deposit_type; // 'percent' | 'fixed'
     let depositPaid = null;
@@ -695,36 +772,38 @@ const ProviderAppointmentDetail = () => {
                 </div>
 
                 {/* Status pill */}
-                {isPending && (
-                    <div className="mb-5">
+                <div className="mb-5 flex flex-wrap gap-2">
+                    {isPending && (
                         <span
                             className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
                             style={{ background: '#FFF5E6', color: '#92400E' }}
                         >
                             Awaiting your response
                         </span>
-                    </div>
-                )}
-                {isConfirmed && (
-                    <div className="mb-5">
+                    )}
+                    {isConfirmed && (
                         <span
                             className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
                             style={{ background: '#FDDCC6', color: '#C25E4A' }}
                         >
                             Confirmed
                         </span>
-                    </div>
-                )}
-                {isAlreadyCompleted && (
-                    <div className="mb-5">
+                    )}
+                    {isAlreadyCompleted && (
                         <span
                             className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
                             style={{ background: '#EBF2EC', color: '#5A8A5E' }}
                         >
                             Completed
                         </span>
-                    </div>
-                )}
+                    )}
+                    <span
+                        className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
+                        style={{ background: paymentMeta.bg, color: paymentMeta.color }}
+                    >
+                        {paymentMeta.label}
+                    </span>
+                </div>
 
                 <Divider />
 
