@@ -78,6 +78,30 @@ function normaliseBookingJob(booking) {
     };
 }
 
+function buildPayoutSummary(job, payoutPayload = null) {
+    const paymentType = payoutPayload?.paymentType || job?.payment_type || 'full';
+    const totalPrice = payoutPayload?.grossAmount ?? payoutPayload?.totalPrice ?? ((Number(job?.price) || 0) / 100);
+    const depositCollected = payoutPayload?.depositCollected ?? ((Number(job?.deposit_paid_cents) || 0) / 100);
+    const remainingCharged = payoutPayload?.remainingCharged ?? (
+        paymentType === 'deposit'
+            ? Math.max(totalPrice - depositCollected, 0)
+            : paymentType === 'save_card'
+                ? totalPrice
+                : 0
+    );
+    const platformFee = payoutPayload?.platformFee ?? +(totalPrice * 0.1).toFixed(2);
+    const providerPayout = payoutPayload?.netAmount ?? payoutPayload?.providerPayout ?? totalPrice;
+
+    return {
+        totalPrice,
+        depositCollected,
+        remainingCharged,
+        platformFee,
+        providerPayout,
+        paymentType,
+    };
+}
+
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 
 const Shimmer = ({ className }) => (
@@ -450,24 +474,10 @@ const ProviderAppointmentDetail = () => {
             const data = await request(`/bookings/${id}/complete`, {
                 method: 'POST',
             });
-            const payout = data.payout
-                ? {
-                    totalPrice: data.payout.grossAmount,
-                    depositCollected: data.payout.depositCollected,
-                    remainingCharged: data.payout.remainingCharged,
-                    platformFee: data.payout.platformFee,
-                    providerPayout: data.payout.netAmount,
-                    paymentType: job.payment_type || 'full',
-                }
-                : {
-                    totalPrice: job.price ? job.price / 100 : 0,
-                    depositCollected: 0,
-                    remainingCharged: 0,
-                    platformFee: 0,
-                    providerPayout: job.price ? job.price / 100 : 0,
-                    paymentType: job.payment_type || 'full',
-                };
-            setPayoutData(payout);
+            setPayoutData(buildPayoutSummary(job, data.payout ? {
+                ...data.payout,
+                paymentType: job.payment_type || 'full',
+            } : null));
             setJob((prev) => ({ ...prev, status: 'completed', completed_at: new Date().toISOString() }));
             setCompleted(true);
         } catch (err) {
@@ -480,14 +490,7 @@ const ProviderAppointmentDetail = () => {
                     setSessionNotes(latestJob.session_notes || '');
                     setSessionRec(latestJob.session_recommendation || '');
                     setPhotos(latestJob.session_photos || []);
-                    setPayoutData((prev) => prev || {
-                        totalPrice: latestJob.price ? latestJob.price / 100 : 0,
-                        depositCollected: 0,
-                        remainingCharged: 0,
-                        platformFee: 0,
-                        providerPayout: latestJob.price ? latestJob.price / 100 : 0,
-                        paymentType: latestJob.payment_type || 'full',
-                    });
+                    setPayoutData((prev) => prev || buildPayoutSummary(latestJob));
                     setCompleted(true);
                     return;
                 }
