@@ -462,6 +462,19 @@ const ClientBookingDetail = () => {
     const canModify = statusLower === 'pending' || statusLower === 'confirmed';
     const paymentFailed = booking.payment_status === 'payment_failed';
 
+    // Payment display
+    const paymentType = booking.payment_type || 'full';
+    const totalCents = Number(booking.price) || 0;
+    const depositPaidCents = Number(booking.deposit_paid_cents) || 0;
+    const totalDollars = totalCents > 0 ? (totalCents / 100).toFixed(2) : null;
+    const depositDollars = depositPaidCents > 0 ? (depositPaidCents / 100).toFixed(2) : null;
+    const remainingDollars = totalCents > 0 && depositPaidCents > 0
+        ? Math.max((totalCents - depositPaidCents) / 100, 0).toFixed(2)
+        : null;
+    const isPaid = booking.payment_status === 'paid';
+    const isDepositPaid = booking.payment_status === 'deposit_paid' || (depositPaidCents > 0 && !isPaid && !paymentFailed);
+    const isCardSaved = booking.payment_status === 'card_saved' || (paymentType === 'save_card' && !isPaid && !paymentFailed);
+
     const handleRetrySuccess = () => {
         setShowRetrySheet(false);
         load();
@@ -588,6 +601,77 @@ const ClientBookingDetail = () => {
                         <p className="text-[13px] text-muted leading-relaxed m-0 mt-2">{booking.service_description}</p>
                     )}
                 </div>
+
+                {/* Payment */}
+                {totalDollars && (
+                    <>
+                        <Divider />
+                        <div className="py-5">
+                            <Lbl className="block mb-3">Payment</Lbl>
+
+                            {paymentType === 'save_card' && (
+                                <>
+                                    <div className="flex justify-between mb-3">
+                                        <span className="text-[14px] text-muted">Total</span>
+                                        <span className="text-[14px] font-semibold text-ink">${totalDollars}</span>
+                                    </div>
+                                    {isPaid ? (
+                                        <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
+                                            <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Payment confirmed — card charged successfully.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="px-4 py-3 rounded-[12px]" style={{ background: '#FFF5E6' }}>
+                                            <p className="text-[13px] m-0" style={{ color: '#92400E' }}>Your saved card will be charged automatically when your provider marks the session complete.</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {paymentType === 'deposit' && (
+                                <>
+                                    {depositDollars && (
+                                        <div className="flex justify-between mb-2">
+                                            <span className="text-[14px] text-muted">Deposit paid</span>
+                                            <span className="text-[14px] font-semibold text-ink">${depositDollars}</span>
+                                        </div>
+                                    )}
+                                    {remainingDollars && (
+                                        <div className="flex justify-between mb-3">
+                                            <span className="text-[14px] text-muted">Remaining balance</span>
+                                            <span className="text-[14px] font-semibold text-ink">${remainingDollars}</span>
+                                        </div>
+                                    )}
+                                    {isPaid ? (
+                                        <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
+                                            <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Remaining balance charged — fully paid.</p>
+                                        </div>
+                                    ) : isDepositPaid ? (
+                                        <div className="px-4 py-3 rounded-[12px]" style={{ background: '#FFF5E6' }}>
+                                            <p className="text-[13px] m-0" style={{ color: '#92400E' }}>Remaining balance will be charged automatically on completion.</p>
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
+
+                            {paymentType === 'full' && (
+                                <>
+                                    <div className="flex justify-between mb-3">
+                                        <span className="text-[14px] text-muted">Total paid</span>
+                                        <span className="text-[14px] font-semibold text-ink">${totalDollars}</span>
+                                    </div>
+                                    {isPaid && (
+                                        <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
+                                            <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Payment confirmed.</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </>
+                )}
 
                 {/* Client intake & notes */}
                 {(booking.client_message || (booking.intake_responses?.length > 0)) && (
