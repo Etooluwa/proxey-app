@@ -5,12 +5,17 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { request } from '../data/apiClient';
+import { useSession } from '../auth/authContext';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
 import Lbl from '../components/ui/Lbl';
 import Divider from '../components/ui/Divider';
 import Footer from '../components/ui/Footer';
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -171,16 +176,167 @@ const RescheduleModal = ({ onConfirm, onCancel, loading }) => {
     );
 };
 
+// ─── Retry Payment Sheet ──────────────────────────────────────────────────────
+
+const elementStyle = {
+    style: {
+        base: { fontSize: '15px', color: '#3D231E', fontFamily: "'Sora',system-ui,sans-serif", '::placeholder': { color: '#B0948F' } },
+        invalid: { color: '#B04040' },
+    },
+};
+
+function RetryInnerForm({ bookingId, savedCards, onSuccess, onClose }) {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [selectedId, setSelectedId] = useState(savedCards[0]?.id || null);
+    const [showNew, setShowNew] = useState(savedCards.length === 0);
+    const [processing, setProcessing] = useState(false);
+    const [err, setErr] = useState(null);
+
+    const handleRetry = async () => {
+        if (processing) return;
+        setProcessing(true);
+        setErr(null);
+        try {
+            const body = {};
+            if (!showNew && selectedId) body.payment_method_id = selectedId;
+
+            const data = await request(`/bookings/${bookingId}/retry-payment`, {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+
+            if (data.ok) { onSuccess(); return; }
+
+            if (data.requires_action && data.client_secret) {
+                // Need client-side Stripe confirmation (3DS or new card)
+                let result;
+                if (showNew) {
+                    result = await stripe.confirmCardPayment(data.client_secret, {
+                        payment_method: { card: elements.getElement(CardNumberElement) },
+                    });
+                } else {
+                    result = await stripe.confirmCardPayment(data.client_secret, {
+                        payment_method: selectedId,
+                    });
+                }
+                if (result.error) { setErr(result.error.message); return; }
+                // After confirmation, mark paid server-side
+                await request(`/bookings/${bookingId}/retry-payment`, {
+                    method: 'POST',
+                    body: JSON.stringify({ payment_intent_id: result.paymentIntent.id }),
+                });
+                onSuccess();
+            }
+        } catch (e) {
+            setErr(e.message || 'Payment failed. Please try again.');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    return (
+        <div style={{ fontFamily: "'Sora',system-ui,sans-serif" }}>
+            {savedCards.length > 0 && !showNew && (
+                <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8C6A64', margin: '0 0 10px' }}>Saved cards</p>
+                    {savedCards.map(card => (
+                        <button key={card.id} type="button" onClick={() => setSelectedId(card.id)}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, marginBottom: 8, border: `1.5px solid ${selectedId === card.id ? '#C25E4A' : 'rgba(140,106,100,0.2)'}`, background: selectedId === card.id ? '#FFF5EE' : '#F2EBE5', cursor: 'pointer', textAlign: 'left' }}>
+                            <span style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${selectedId === card.id ? '#C25E4A' : '#B0948F'}`, background: selectedId === card.id ? '#C25E4A' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {selectedId === card.id && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                            </span>
+                            <span style={{ fontSize: 14, color: '#3D231E', flex: 1 }}>•••• {card.last4}</span>
+                            <span style={{ fontSize: 12, color: '#B0948F' }}>{card.expMonth}/{String(card.expYear).slice(-2)}</span>
+                        </button>
+                    ))}
+                    <button type="button" onClick={() => { setShowNew(true); setSelectedId(null); }}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(140,106,100,0.3)', background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: '#8C6A64', cursor: 'pointer' }}>
+                        + Use a different card
+                    </button>
+                </div>
+            )}
+
+            {showNew && (
+                <div style={{ marginBottom: 16 }}>
+                    {savedCards.length > 0 && (
+                        <button type="button" onClick={() => { setShowNew(false); setSelectedId(savedCards[0].id); }}
+                            style={{ fontSize: 12, color: '#C25E4A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 12, fontFamily: 'inherit' }}>
+                            ← Use a saved card
+                        </button>
+                    )}
+                    <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8C6A64', margin: '0 0 6px' }}>Card number</p>
+                    <div style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', marginBottom: 12 }}>
+                        <CardNumberElement options={elementStyle} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5' }}>
+                            <CardExpiryElement options={elementStyle} />
+                        </div>
+                        <div style={{ flex: 1, padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5' }}>
+                            <CardCvcElement options={elementStyle} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {err && <p style={{ fontSize: 13, color: '#B04040', margin: '0 0 12px' }}>{err}</p>}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={onClose} style={{ flex: 1, padding: '14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer' }}>
+                    Cancel
+                </button>
+                <button onClick={handleRetry} disabled={processing}
+                    style={{ flex: 2, padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer', opacity: processing ? 0.7 : 1 }}>
+                    {processing ? 'Processing…' : 'Pay now'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function RetryPaymentSheet({ bookingId, onSuccess, onClose }) {
+    const [savedCards, setSavedCards] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        request('/payments/methods')
+            .then(d => setSavedCards(d?.paymentMethods || []))
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+            <div className="w-full max-w-lg rounded-t-[24px] px-5 pt-6" style={{ background: '#FBF7F2', paddingBottom: 'calc(32px + env(safe-area-inset-bottom))' }} onClick={e => e.stopPropagation()}>
+                <p style={{ fontSize: 18, fontWeight: 600, color: '#3D231E', letterSpacing: '-0.02em', margin: '0 0 6px', fontFamily: "'Sora',system-ui,sans-serif" }}>Retry payment</p>
+                <p style={{ fontSize: 13, color: '#8C6A64', margin: '0 0 20px', fontFamily: "'Sora',system-ui,sans-serif" }}>Use your saved card or enter a new one.</p>
+                {loading ? (
+                    <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #C25E4A', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+                    </div>
+                ) : (
+                    <Elements stripe={stripePromise}>
+                        <RetryInnerForm bookingId={bookingId} savedCards={savedCards} onSuccess={onSuccess} onClose={onClose} />
+                    </Elements>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ClientBookingDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { session } = useSession();
 
     const [booking, setBooking] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [showRetrySheet, setShowRetrySheet] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState(null);
 
@@ -283,6 +439,12 @@ const ClientBookingDetail = () => {
 
     const statusLower = (booking.status || '').toLowerCase();
     const canModify = statusLower === 'pending' || statusLower === 'confirmed';
+    const paymentFailed = booking.payment_status === 'payment_failed';
+
+    const handleRetrySuccess = () => {
+        setShowRetrySheet(false);
+        load();
+    };
 
     return (
         <div className="flex flex-col bg-base" style={{ minHeight: '100dvh' }}>
@@ -301,6 +463,14 @@ const ClientBookingDetail = () => {
                     onConfirm={handleReschedule}
                     onCancel={() => { setShowRescheduleModal(false); setActionError(null); }}
                     loading={actionLoading}
+                />
+            )}
+
+            {showRetrySheet && (
+                <RetryPaymentSheet
+                    bookingId={id}
+                    onSuccess={handleRetrySuccess}
+                    onClose={() => setShowRetrySheet(false)}
                 />
             )}
 
@@ -331,6 +501,33 @@ const ClientBookingDetail = () => {
                         {booking.status || 'Pending'}
                     </span>
                 </div>
+
+                {/* Payment failed banner */}
+                {paymentFailed && (
+                    <div className="mb-5 rounded-[14px] p-4" style={{ background: '#FDEDEA', border: '1px solid rgba(176,64,64,0.25)' }}>
+                        <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F8D7D2' }}>
+                                <svg width="16" height="16" fill="none" stroke="#B04040" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M12 8v5M12 16.5h.01" strokeLinecap="round" />
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[14px] font-semibold m-0 mb-1" style={{ color: '#8F2E2E' }}>Payment unsuccessful</p>
+                                <p className="text-[13px] leading-relaxed m-0 mb-3" style={{ color: '#B04040' }}>
+                                    Your payment couldn't be processed. Please retry with the same card or use a different one.
+                                </p>
+                                <button
+                                    onClick={() => setShowRetrySheet(true)}
+                                    className="text-[13px] font-semibold px-4 py-2 rounded-[10px] focus:outline-none"
+                                    style={{ background: '#B04040', color: '#fff', border: 'none', cursor: 'pointer' }}
+                                >
+                                    Retry payment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Cancel / Reschedule actions */}
                 {canModify && (

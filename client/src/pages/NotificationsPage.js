@@ -37,6 +37,8 @@ const REJECTED_TYPES = new Set([
 const CONNECTED_TYPES = new Set(['connected', 'new_connection']);
 const REMINDER_TYPES = new Set(['reminder', 'upcoming_session']);
 const SESSION_COMPLETE_TYPES = new Set(['session_complete', 'booking_completed']);
+const PAYMENT_FAILED_TYPES = new Set(['payment_failed']);
+const PAYMENT_SUCCESS_TYPES = new Set(['payment_success']);
 
 function normaliseType(rawType) {
     if (!rawType) return 'reminder';
@@ -44,6 +46,8 @@ function normaliseType(rawType) {
     if (REJECTED_TYPES.has(rawType)) return 'rejected';
     if (CONNECTED_TYPES.has(rawType)) return 'connected';
     if (SESSION_COMPLETE_TYPES.has(rawType)) return 'session_complete';
+    if (PAYMENT_FAILED_TYPES.has(rawType)) return 'payment_failed';
+    if (PAYMENT_SUCCESS_TYPES.has(rawType)) return 'payment_success';
     return 'reminder';
 }
 
@@ -119,6 +123,35 @@ const BADGE = {
             </svg>
         ),
         badgeBg: '#8C6A64',
+    },
+    payment_failed: {
+        bg: '#FDEDEA',
+        icon: (
+            <svg width="20" height="20" fill="none" stroke="#B04040" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M12 8v5M12 16.5h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
+            <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 8v5M12 16.5h.01" strokeLinecap="round" />
+            </svg>
+        ),
+        badgeBg: '#B04040',
+    },
+    payment_success: {
+        bg: '#EBF2EC',
+        icon: (
+            <svg width="20" height="20" fill="none" stroke="#5A8A5E" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        iconBadge: (
+            <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        ),
+        badgeBg: '#5A8A5E',
     },
 };
 
@@ -297,6 +330,24 @@ const NotifItem = ({ n, onMarkRead, onLeaveReview, onOpenBooking }) => {
                             </div>
                         )}
 
+                        {/* Retry payment pill (payment_failed) */}
+                        {type === 'payment_failed' && bid && (
+                            <div
+                                onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); onOpenBooking(bid); }}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 14px', borderRadius: 9999,
+                                    background: '#FDEDEA', cursor: 'pointer',
+                                    border: '1px solid rgba(176,64,64,0.25)',
+                                }}
+                            >
+                                <svg width="12" height="12" fill="none" stroke="#B04040" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path d="M1 4v6h6M23 20v-6h-6" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#B04040', fontFamily: "'Sora',system-ui,sans-serif" }}>Retry payment</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </button>

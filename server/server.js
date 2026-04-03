@@ -10852,6 +10852,55 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
           .update({ payment_status: "payment_failed", updated_at: now })
           .eq("id", bookingId);
 
+        // Notify client that their payment failed and they need to retry
+        if (booking.client_id) {
+          const notifServiceName = booking.service_name || 'your service';
+          const { data: provProfile } = await supabase
+            .from("provider_profiles")
+            .select("business_name, name")
+            .eq("user_id", booking.provider_id)
+            .maybeSingle().catch(() => ({ data: null }));
+          const provName = provProfile?.business_name || provProfile?.name || "Your provider";
+
+          await createClientNotification(booking.client_id, {
+            type: "payment_failed",
+            title: "Payment unsuccessful",
+            body: `Your payment for ${notifServiceName} with ${provName} couldn't be processed. Please update your payment method to complete your booking.`,
+            booking_id: bookingId,
+            data: { booking_id: bookingId, provider_id: booking.provider_id },
+          }).catch(() => {});
+
+          // Email the client
+          const { email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id).catch(() => ({}));
+          if (clientEmail) {
+            sendEmail({
+              to: clientEmail,
+              subject: `Action required — payment failed for ${notifServiceName}`,
+              html: `
+                <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+                  <div style="background:#FDEDEA;padding:28px 24px;border-radius:16px 16px 0 0;text-align:center">
+                    <div style="width:56px;height:56px;background:#B04040;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px">
+                      <span style="color:white;font-size:24px">✕</span>
+                    </div>
+                    <h1 style="margin:0;font-size:22px;font-weight:700;color:#8F2E2E">Payment unsuccessful</h1>
+                  </div>
+                  <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+                    <p style="margin:0 0 12px">Hi ${clientName || 'there'},</p>
+                    <p style="margin:0 0 20px;color:#8C6A64">Your payment for <strong>${notifServiceName}</strong> with <strong>${provName}</strong> couldn't be processed. Your provider has marked the session as complete but the charge was unsuccessful.</p>
+                    <div style="background:#FDEDEA;border-radius:12px;padding:16px;margin-bottom:20px;border-left:3px solid #B04040">
+                      <p style="margin:0;font-size:13px;color:#8F2E2E;font-weight:600">Reason: ${stripeErr.message || 'Card declined'}</p>
+                    </div>
+                    <p style="margin:0 0 20px;color:#8C6A64">Please open your booking in the Kliques app to retry payment with the same card or a new one.</p>
+                    <div style="text-align:center;margin-bottom:24px">
+                      <a href="https://mykliques.com/app/bookings/${bookingId}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">Retry payment →</a>
+                    </div>
+                    <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+                  </div>
+                </div>`,
+            }).catch(() => {});
+          }
+        }
+
         const statusCode = stripeErr.type === "StripeCardError" ? 402 : 500;
         return res.status(statusCode).json({
           error: stripeErr.message || "Charge failed, so this booking was not marked complete.",
@@ -11142,6 +11191,102 @@ app.post("/api/bookings/:id/charge-card", async (req, res) => {
       return res.status(402).json({ error: err.message });
     }
     return res.status(500).json({ error: err.message || "Failed to charge card." });
+  }
+});
+
+// POST /api/bookings/:id/retry-payment
+// Client retries a failed charge — creates a PaymentIntent the client confirms via Stripe.js
+// Supports swapping in a new payment method id (passed in body as payment_method_id)
+app.post("/api/bookings/:id/retry-payment", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const bookingId = req.params.id;
+  const requestingUserId = getUserId(req);
+  const { payment_method_id } = req.body || {};
+
+  try {
+    const { data: booking, error: bookingErr } = await supabase
+      .from("bookings").select("*").eq("id", bookingId).single();
+
+    if (bookingErr || !booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.client_id !== requestingUserId) return res.status(403).json({ error: "Not authorized." });
+    if (booking.payment_status === "paid") return res.status(409).json({ error: "Already paid." });
+
+    const totalCents = Math.round(Number(booking.price) || 0);
+    const depositPaidCents = booking.deposit_paid_cents || 0;
+    const amountCents = booking.payment_type === "deposit"
+      ? Math.max(totalCents - depositPaidCents, 0)
+      : totalCents;
+
+    if (amountCents < 50) return res.status(400).json({ error: "Amount too small." });
+
+    const platformFee = Math.round(amountCents * PLATFORM_FEE_RATE);
+    const totalCharge = amountCents + platformFee;
+
+    // Fetch provider Stripe account
+    const { data: provRow } = await supabase
+      .from("providers").select("stripe_account_id").eq("user_id", booking.provider_id).maybeSingle();
+    const stripeAccountId = provRow?.stripe_account_id;
+
+    // Resolve customer
+    const { data: cp } = await supabase
+      .from("client_profiles").select("stripe_customer_id, email").eq("user_id", requestingUserId).maybeSingle();
+    const customerId = cp?.stripe_customer_id;
+
+    // Use the new pm if provided, otherwise fall back to saved one
+    const pmId = payment_method_id || booking.stripe_payment_method_id;
+
+    const piParams = {
+      amount: totalCharge,
+      currency: PLATFORM_CURRENCY,
+      customer: customerId || undefined,
+      ...(pmId ? { payment_method: pmId } : {}),
+      metadata: { booking_id: bookingId, type: "retry_payment" },
+    };
+    if (stripeAccountId) {
+      piParams.transfer_data = { destination: stripeAccountId };
+      piParams.application_fee_amount = platformFee;
+    }
+
+    // If we have a pm, try off-session first; otherwise create intent for client confirmation
+    if (pmId) {
+      piParams.confirm = true;
+      piParams.off_session = true;
+      try {
+        await stripe.paymentIntents.create(piParams);
+        const now = new Date().toISOString();
+        // Save new pm if it's different
+        const updates = { payment_status: "paid", updated_at: now };
+        if (payment_method_id && payment_method_id !== booking.stripe_payment_method_id) {
+          updates.stripe_payment_method_id = payment_method_id;
+        }
+        await supabase.from("bookings").update(updates).eq("id", bookingId);
+
+        // Notify client that payment succeeded
+        await createClientNotification(requestingUserId, {
+          type: "payment_success",
+          title: "Payment successful",
+          body: `Your payment for ${booking.service_name || 'your booking'} was processed successfully.`,
+          booking_id: bookingId,
+          data: { booking_id: bookingId },
+        }).catch(() => {});
+
+        return res.json({ ok: true, status: "paid" });
+      } catch (stripeErr) {
+        if (stripeErr.code === "authentication_required" || stripeErr.raw?.payment_intent) {
+          // Card requires 3DS — return client_secret for frontend confirmation
+          const pi = await stripe.paymentIntents.create({ ...piParams, confirm: false, off_session: false });
+          return res.json({ requires_action: true, client_secret: pi.client_secret });
+        }
+        return res.status(402).json({ error: stripeErr.message || "Payment failed." });
+      }
+    }
+
+    // No saved pm — create intent for client to confirm with new card in-browser
+    const pi = await stripe.paymentIntents.create(piParams);
+    return res.json({ requires_action: true, client_secret: pi.client_secret });
+  } catch (err) {
+    console.error("[bookings/retry-payment]", err);
+    return res.status(500).json({ error: err.message || "Failed to process payment." });
   }
 });
 
