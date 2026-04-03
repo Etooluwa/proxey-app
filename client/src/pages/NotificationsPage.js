@@ -340,12 +340,12 @@ const NotificationsPage = ({ showAll: showAllProp = false }) => {
     };
 
     const handleViewAll = () => {
-        setSearchParams({ all: '1' });
+        setSearchParams({ all: '1' }, { replace: true });
     };
 
     const handleBack = () => {
         if (showAll) {
-            setSearchParams({});
+            navigate('/app');
         } else {
             navigate(-1);
         }
