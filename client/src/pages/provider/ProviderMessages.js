@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { useMessages } from '../../contexts/MessageContext';
 import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import Header from '../../components/ui/Header';
 import Avatar from '../../components/ui/Avatar';
 import Divider from '../../components/ui/Divider';
@@ -237,6 +238,7 @@ const ProviderMessages = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { profile, session } = useSession();
+    const { unreadCount: notifUnread } = useNotifications();
     const { conversations, markAsRead, setCurrentConversation, loadMessages, messages, sendMessage } = useMessages();
     const [activeChat, setActiveChat] = useState(null);
   
@@ -344,6 +346,7 @@ const ProviderMessages = () => {
                 showAvatar
                 initials={initials}
                 onNotif={() => navigate('/provider/notifications')}
+                notifCount={notifUnread}
             />
 
             <div className="px-5 pb-6 flex-1 flex flex-col">

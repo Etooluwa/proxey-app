@@ -9,6 +9,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
 import {
     BarChart, Bar, XAxis, Cell, ResponsiveContainer,
@@ -87,6 +88,7 @@ const ProviderEarnings = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const navigate = useNavigate();
     const { session, profile } = useSession();
+    const { unreadCount } = useNotifications();
 
     const [earnings, setEarnings] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -252,7 +254,7 @@ const ProviderEarnings = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar initials={initials} onNotif={() => navigate('/provider/notifications')} />
+            <Header onMenu={onMenu} showAvatar initials={initials} onNotif={() => navigate('/provider/notifications')} notifCount={unreadCount} />
 
             <div className="px-5 pb-10 flex-1 flex flex-col">
                 <div className="mb-5">

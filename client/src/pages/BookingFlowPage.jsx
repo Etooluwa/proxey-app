@@ -758,6 +758,7 @@ const StepTimeRequestSent = ({ onDone }) => (
 
 const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, scheduledLabel, intakeResponses, clientNote, providerId, session, onConfirmed, onBack, onClose }) => {
     const [submitting, setSubmitting] = useState(false);
+    const [stripeProcessing, setStripeProcessing] = useState(false);
     const [error, setError] = useState(null);
 
     // Honor option-level price if set, otherwise fall back to service base_price
@@ -820,6 +821,20 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
         }
     };
 
+    if (submitting || stripeProcessing) {
+        return (
+            <div className="flex flex-col min-h-screen bg-base items-center justify-center" style={{ fontFamily: 'inherit' }}>
+                <div
+                    className="w-12 h-12 rounded-full mb-5"
+                    style={{ border: '3px solid rgba(140,106,100,0.2)', borderTop: '3px solid #C25E4A', animation: 'spin 0.8s linear infinite' }}
+                />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <p className="text-[16px] font-semibold text-ink m-0 mb-1.5">Processing payment…</p>
+                <p className="text-[13px] text-muted m-0">Please don't close this page</p>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col min-h-screen bg-base">
             <SubNav onBack={onBack} title="Payment" onClose={onClose} />
@@ -864,6 +879,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                     session={session}
                     onSuccess={handlePaymentSuccess}
                     onError={(msg) => setError(msg)}
+                    onProcessingChange={setStripeProcessing}
                     renderFooter={({ handleSubmit, processing, btnLabel, stripe }) => (
                         <StickyBar>
                             <PrimaryBtn

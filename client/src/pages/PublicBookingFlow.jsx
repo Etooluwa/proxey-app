@@ -280,6 +280,11 @@ function StepServices({ provider, services, onNext }) {
                     </span>
                   )}
                 </p>
+                {svc.metadata?.preAppointmentInfo?.filter(Boolean).length > 0 && (
+                  <p style={{ fontSize: 12, color: "#C25E4A", margin: "6px 0 0", fontWeight: 500 }}>
+                    ⓘ {svc.metadata.preAppointmentInfo.filter(Boolean).length} thing{svc.metadata.preAppointmentInfo.filter(Boolean).length !== 1 ? "s" : ""} to know before booking
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => toggle(svc)}
@@ -898,6 +903,17 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
 
   if (loading) return <PageShell onBack={onBack}><p style={{ color: MUTED, padding: 24 }}>Loading…</p></PageShell>;
 
+  if (submitting) {
+    return (
+      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Sora', system-ui, sans-serif" }}>
+        <div style={{ width: 48, height: 48, borderRadius: "50%", border: `3px solid rgba(140,106,100,0.2)`, borderTop: `3px solid ${ACCENT}`, animation: "spin 0.8s linear infinite", marginBottom: 20 }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ fontSize: 16, fontWeight: 600, color: FG, margin: "0 0 6px" }}>Processing payment…</p>
+        <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Please don't close this page</p>
+      </div>
+    );
+  }
+
   return (
     <PageShell onBack={onBack} title="Payment">
       {/* Booking summary */}
@@ -939,6 +955,21 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
           </div>
         )}
       </Card>
+
+      {/* Pre-appointment info */}
+      {service?.metadata?.preAppointmentInfo?.filter(Boolean).length > 0 && (
+        <div style={{ background: "#FFF5E6", borderRadius: 14, padding: "14px 16px", margin: "16px 0", border: "1px solid rgba(194,94,74,0.15)" }}>
+          <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#C25E4A", margin: "0 0 10px" }}>
+            Before your appointment
+          </p>
+          {service.metadata.preAppointmentInfo.filter(Boolean).map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: i < service.metadata.preAppointmentInfo.filter(Boolean).length - 1 ? 8 : 0 }}>
+              <span style={{ color: "#C25E4A", flexShrink: 0, marginTop: 1 }}>•</span>
+              <span style={{ fontSize: 14, color: "#3D231E", lineHeight: 1.6 }}>{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Payment method */}
       <h2 style={{ fontSize: 18, fontWeight: 700, color: FG, margin: "16px 0 12px" }}>

@@ -198,6 +198,7 @@ const EMPTY_FORM = {
     clientNotesEnabled: true,
     is_active: true,
     group_id: null,
+    preAppointmentInfo: [],
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -242,6 +243,7 @@ const ProviderServiceEditor = () => {
                     clientNotesEnabled: svc.client_notes_enabled !== false,
                     is_active:          svc.is_active !== false,
                     group_id:           svc.group_id || null,
+                    preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
                 });
             }
             setQuestions(data.questions || []);
@@ -336,6 +338,7 @@ const ProviderServiceEditor = () => {
                 depositType:        form.payType === 'deposit' ? form.depositType : null,
                 depositValue:       form.payType === 'deposit' ? Number(form.depositValue) : null,
                 clientNotesEnabled: form.clientNotesEnabled,
+                preAppointmentInfo: form.preAppointmentInfo,
             };
 
             let serviceId = id;
@@ -673,6 +676,59 @@ const ProviderServiceEditor = () => {
                         }}
                     >
                         + Add Question
+                    </button>
+                </Section>
+
+                <Divider />
+
+                {/* ─ Must-knows / Pre-appointment info ─ */}
+                <Section>
+                    <SectionLabel>Before the appointment</SectionLabel>
+                    <p className="text-[13px] text-muted m-0 mb-4 leading-relaxed">
+                        Add things clients should know or prepare before coming. These will be shown during booking and in their confirmation.
+                    </p>
+
+                    {(form.preAppointmentInfo || []).map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-2">
+                            <div
+                                className="flex-1 flex items-center gap-2 px-4 py-3 rounded-[12px]"
+                                style={{ background: '#F2EBE5', border: '1px solid rgba(140,106,100,0.15)' }}
+                            >
+                                <span className="text-[13px] text-muted flex-shrink-0">•</span>
+                                <input
+                                    value={item}
+                                    onChange={(e) => {
+                                        const updated = [...form.preAppointmentInfo];
+                                        updated[i] = e.target.value;
+                                        set('preAppointmentInfo')(updated);
+                                    }}
+                                    placeholder="e.g. Bring a leather jacket"
+                                    className="flex-1 bg-transparent text-[14px] text-ink focus:outline-none placeholder:text-faded"
+                                    style={{ fontFamily: 'inherit', border: 'none' }}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const updated = form.preAppointmentInfo.filter((_, idx) => idx !== i);
+                                    set('preAppointmentInfo')(updated);
+                                }}
+                                className="flex-shrink-0 w-8 h-8 flex items-center justify-center focus:outline-none active:opacity-60"
+                            >
+                                <svg width="16" height="16" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                                </svg>
+                            </button>
+                        </div>
+                    ))}
+
+                    <button
+                        type="button"
+                        onClick={() => set('preAppointmentInfo')([...(form.preAppointmentInfo || []), ''])}
+                        className="w-full py-3 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-60 mt-1"
+                        style={{ border: '1.5px dashed rgba(140,106,100,0.4)', background: 'transparent', color: '#8C6A64' }}
+                    >
+                        + Add item
                     </button>
                 </Section>
 

@@ -174,10 +174,12 @@ function SavedCardPicker({ savedCards, selectedId, onSelect, onUseNew }) {
     );
 }
 
-function InnerForm({ service, provider, session, onSuccess, onError, submitLabel, renderFooter }) {
+function InnerForm({ service, provider, session, onSuccess, onError, submitLabel, renderFooter, onProcessingChange }) {
     const stripe = useStripe();
     const elements = useElements();
     const [processing, setProcessing] = useState(false);
+
+    useEffect(() => { onProcessingChange?.(processing); }, [processing, onProcessingChange]);
     const [cardError, setCardError] = useState(null);
     const [cardholderName, setCardholderName] = useState(
         session?.user?.user_metadata?.full_name || ''

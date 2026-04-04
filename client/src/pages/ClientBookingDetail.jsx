@@ -602,6 +602,29 @@ const ClientBookingDetail = () => {
                     )}
                 </div>
 
+                {/* Pre-appointment info */}
+                {booking.pre_appointment_info?.length > 0 && (
+                    <>
+                        <Divider />
+                        <div className="py-5">
+                            <Lbl className="block mb-3">Before Your Appointment</Lbl>
+                            <div
+                                className="rounded-[14px] px-4 py-4"
+                                style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.15)' }}
+                            >
+                                <div className="flex flex-col gap-2.5">
+                                    {booking.pre_appointment_info.filter(Boolean).map((item, i) => (
+                                        <div key={i} className="flex items-start gap-2.5">
+                                            <span className="text-[14px] flex-shrink-0 mt-px" style={{ color: '#C25E4A' }}>•</span>
+                                            <p className="text-[14px] text-ink leading-relaxed m-0">{item}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+
                 {/* Payment */}
                 {totalDollars && (
                     <>

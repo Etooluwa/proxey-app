@@ -763,11 +763,21 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt }) {
+async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt, preAppointmentInfo }) {
   if (!to) return;
 
   const resolvedProvider = providerName || "Your provider";
   const resolvedService = serviceName || "Service";
+
+  const mustKnowsHtml = preAppointmentInfo?.length
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF5E6;border-radius:14px;padding:16px 20px;margin-top:20px;border:1px solid rgba(194,94,74,0.15);">
+        <tr><td style="font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:12px;">Before your appointment</td></tr>
+        ${preAppointmentInfo.filter(Boolean).map(item => `
+        <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;padding-bottom:8px;">• ${item}</td></tr>
+        `).join('')}
+      </table>`
+    : '';
 
   return sendEmail({
     to,
@@ -783,6 +793,7 @@ async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, 
         <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
         <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(scheduledAt)}</td></tr>
       </table>
+      ${mustKnowsHtml}
       <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">You can view your appointment details anytime in Kliques.</p>
     `),
   });
@@ -1706,7 +1717,7 @@ app.post("/api/services", async (req, res) => {
 
   const {
     paymentType, depositType, depositValue, clientNotesEnabled,
-    isActive, photos,
+    isActive, photos, preAppointmentInfo,
   } = req.body || {};
 
   let providerId;
@@ -1731,7 +1742,10 @@ app.post("/api/services", async (req, res) => {
     deposit_type: depositType || null,
     deposit_value: depositValue != null ? depositValue : null,
     client_notes_enabled: clientNotesEnabled !== undefined ? clientNotesEnabled : true,
-    metadata: photos ? { photos } : undefined,
+    metadata: (photos || preAppointmentInfo) ? {
+      ...(photos ? { photos } : {}),
+      ...(preAppointmentInfo ? { preAppointmentInfo } : {}),
+    } : undefined,
   };
 
   try {
@@ -1855,7 +1869,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   const { id } = req.params;
   const {
     name, description, category, basePrice, duration, isActive,
-    paymentType, depositType, depositValue, clientNotesEnabled, photos,
+    paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
   } = req.body || {};
 
   try {
@@ -1874,7 +1888,16 @@ app.put("/api/provider/services/:id", async (req, res) => {
     if (depositType !== undefined)          updates.deposit_type = depositType;
     if (depositValue !== undefined)         updates.deposit_value = depositValue;
     if (clientNotesEnabled !== undefined)   updates.client_notes_enabled = clientNotesEnabled;
-    if (photos !== undefined)               updates.metadata = { photos };
+    if (photos !== undefined || preAppointmentInfo !== undefined) {
+      // Fetch existing metadata to merge (avoid overwriting unrelated fields)
+      const { data: existing } = await supabase.from("services").select("metadata").eq("id", id).single();
+      const existingMeta = existing?.metadata || {};
+      updates.metadata = {
+        ...existingMeta,
+        ...(photos !== undefined ? { photos } : {}),
+        ...(preAppointmentInfo !== undefined ? { preAppointmentInfo } : {}),
+      };
+    }
 
     const { data, error } = await supabase
       .from("services")
@@ -2262,7 +2285,7 @@ app.get("/api/bookings/:id", async (req, res) => {
     if (booking.service_id) {
       const { data } = await supabase
         .from("services")
-        .select("name, description, duration_minutes")
+        .select("name, description, duration_minutes, metadata")
         .eq("id", booking.service_id)
         .maybeSingle();
       serviceInfo = data || null;
@@ -2331,6 +2354,7 @@ app.get("/api/bookings/:id", async (req, res) => {
       service_name: serviceInfo?.name || booking.service_name || "Service",
       service_description: serviceInfo?.description || booking.service_description || null,
       duration_minutes: serviceInfo?.duration_minutes || booking.duration_minutes || booking.duration || null,
+      pre_appointment_info: serviceInfo?.metadata?.preAppointmentInfo || null,
       intake_responses: intakeResponses,
       client_message: booking.metadata?.client_message || null,
       session_notes: booking.session_notes || null,
@@ -2725,11 +2749,17 @@ app.post("/api/bookings", async (req, res) => {
           }).catch(() => {});
           const provInfo = await getProviderEmailInfo(data.provider_id);
           const { email: clientEmail } = await getClientNotifPrefs(data.client_id);
+          let autoAcceptSvcMeta = null;
+          if (data.service_id) {
+            const { data: svcRow } = await supabase.from("services").select("metadata").eq("id", data.service_id).maybeSingle();
+            autoAcceptSvcMeta = svcRow?.metadata || null;
+          }
           await sendClientBookingConfirmedEmail({
             to: clientEmail,
             providerName: provInfo.name || data.provider_name,
             serviceName: data.service_name,
             scheduledAt: data.scheduled_at,
+            preAppointmentInfo: autoAcceptSvcMeta?.preAppointmentInfo || null,
           }).catch(() => {});
         }
         return res.status(201).json({ booking: data });
@@ -10524,7 +10554,7 @@ app.post("/api/bookings/create", async (req, res) => {
     const { data: bookingService } = serviceId
       ? await supabase
         .from("services")
-        .select("name")
+        .select("name, metadata")
         .eq("id", serviceId)
         .maybeSingle()
       : { data: null };
@@ -10562,6 +10592,7 @@ app.post("/api/bookings/create", async (req, res) => {
         providerName: providerEmailInfo.name,
         serviceName: bookingService?.name || null,
         scheduledAt,
+        preAppointmentInfo: bookingService?.metadata?.preAppointmentInfo || null,
       }).catch(() => {});
     }
 
@@ -10634,15 +10665,17 @@ app.post("/api/bookings/request-time", async (req, res) => {
     let serviceName = null;
     let servicePrice = null;
     let serviceDuration = 60;
+    let servicePreAppointmentInfo = null;
     if (service_id) {
       const { data: svc } = await supabase
         .from("services")
-        .select("name, base_price, duration")
+        .select("name, base_price, duration, metadata")
         .eq("id", service_id)
         .maybeSingle();
       serviceName = svc?.name || null;
       servicePrice = svc?.base_price || null;
       serviceDuration = parseInt(svc?.duration, 10) || 60;
+      servicePreAppointmentInfo = svc?.metadata?.preAppointmentInfo || null;
     }
 
     const hasConflict = await hasProviderBookingConflict({
@@ -10789,6 +10822,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
         providerName: providerEmailInfo.name || providerName,
         serviceName,
         scheduledAt,
+        preAppointmentInfo: servicePreAppointmentInfo,
       }).catch(() => {});
     }
 
@@ -10858,92 +10892,18 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
 
       const { email: clientEmail } = await getClientNotifPrefs(booking.client_id);
       const providerInfo = await getProviderEmailInfo(requestingUserId);
+      let acceptSvcMeta = null;
+      if (booking.service_id) {
+        const { data: svcMeta } = await supabase.from("services").select("metadata").eq("id", booking.service_id).maybeSingle();
+        acceptSvcMeta = svcMeta?.metadata || null;
+      }
       if (clientEmail) {
-        sendEmail({
+        await sendClientBookingConfirmedEmail({
           to: clientEmail,
-          subject: `Your booking is confirmed — ${fmtDate(booking.scheduled_at)}`,
-          html: `<!DOCTYPE html>
-<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Booking Confirmed - Kliques</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        table { border-collapse: collapse !important; }
-        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; }
-        .hero-card { background-color: #FBE4D5 !important; border-radius: 24px !important; }
-        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
-        .data-table { background-color: #F3ECE7 !important; border-radius: 16px !important; }
-        @media screen and (max-width: 480px) {
-            .mobile-padding { padding: 20px !important; }
-            .logo-img { height: 80px !important; }
-            .h1-mobile { font-size: 24px !important; }
-        }
-    </style>
-</head>
-<body style="background-color: #FBF7F2; margin: 0; padding: 0;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FBF7F2;">
-        <tr>
-            <td align="center" style="padding: 40px 16px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 640px;">
-                    <tr>
-                        <td align="center" style="padding-bottom: 24px;">
-                            <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="hero-card mobile-padding" style="padding: 32px;">
-                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                <tr>
-                                    <td align="center">
-                                        <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
-                                            <tr>
-                                                <td align="center" valign="middle" width="72" height="72" style="width: 72px; height: 72px; background-color: #331D19; border-radius: 36px; text-align: center;">
-                                                    <img src="https://img.icons8.com/ios-glyphs/60/ffffff/checkmark--v1.png" width="32" height="32" alt="✓" style="width: 32px; height: 32px; display: block; margin: 20px auto;" />
-                                                </td>
-                                            </tr>
-                                        </table>
-                                        <h1 class="h1-mobile" style="font-size: 28px; font-weight: 600; color: #331D19; margin: 0 0 12px 0; letter-spacing: -0.02em;">Booking confirmed</h1>
-                                        <p style="color: #8E7A75; font-size: 15px; line-height: 1.6; margin: 0;">Your booking has been confirmed. We'll see you there!</p>
-                                    </td>
-                                </tr>
-                                <tr><td height="40"></td></tr>
-                                <tr>
-                                    <td align="left" class="data-table" style="padding: 32px;">
-                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Provider</td></tr>
-                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${providerInfo.name || providerLabel || 'Your provider'}</td></tr>
-                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Service</td></tr>
-                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${sessionLabel}</td></tr>
-                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Date &amp; Time</td></tr>
-                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19;">${fmtDate(booking.scheduled_at)}</td></tr>
-                                        </table>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align="center" style="padding: 40px 0 24px 0;">
-                                        <a href="https://mykliques.com/app" class="cta-button">View my kliques →</a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align="center" style="padding-bottom: 40px;">
-                                        <p style="color: #331D19; font-weight: 500; font-size: 15px; margin: 0;">- The Kliques Team</p>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`,
+          providerName: providerInfo.name || providerLabel,
+          serviceName: sessionLabel,
+          scheduledAt: booking.scheduled_at,
+          preAppointmentInfo: acceptSvcMeta?.preAppointmentInfo || null,
         }).catch(() => {});
       }
     }

@@ -312,11 +312,11 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
 
     const handleMarkAllRead = () => markAllAsRead();
 
-    const handleViewAll = () => setSearchParams({ all: '1' });
+    const handleViewAll = () => setSearchParams({ all: '1' }, { replace: true });
 
     const handleBack = () => {
         if (showAll) {
-            setSearchParams({});
+            setSearchParams({}, { replace: true });
         } else {
             navigate(-1);
         }

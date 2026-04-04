@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { fetchProviderProfile } from '../../data/provider';
+import { useNotifications } from '../../contexts/NotificationContext';
 import Header from '../../components/ui/Header';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
@@ -84,6 +85,7 @@ const ProviderProfile = () => {
     const { onMenu, isDesktop } = useOutletContext() || {};
     const navigate = useNavigate();
     const { logout } = useSession();
+    const { unreadCount } = useNotifications();
 
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
@@ -182,7 +184,7 @@ const ProviderProfile = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            <Header onMenu={onMenu} showAvatar initials={initials} avatarSrc={avatarSrc} onNotif={() => navigate('/provider/notifications')} />
+            <Header onMenu={onMenu} showAvatar initials={initials} avatarSrc={avatarSrc} onNotif={() => navigate('/provider/notifications')} notifCount={unreadCount} />
 
             {/* ── Hero card ── */}
             <div className="px-4 pt-2 pb-1">
