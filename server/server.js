@@ -640,23 +640,24 @@ async function getProviderEmailInfo(providerId) {
     .eq('user_id', providerId)
     .maybeSingle();
 
-  if (providerRow?.email) {
-    return {
-      email: providerRow.email,
-      name: providerRow.business_name || providerRow.name || null,
-    };
-  }
-
   const { data: profileRow } = await supabase
     .from('provider_profiles')
     .select('email, name, business_name')
     .eq('provider_id', providerId)
     .maybeSingle();
 
-  return {
-    email: profileRow?.email || providerRow?.email || null,
-    name: providerRow?.business_name || providerRow?.name || profileRow?.business_name || profileRow?.name || null,
-  };
+  const name = providerRow?.business_name || providerRow?.name || profileRow?.business_name || profileRow?.name || null;
+  const profileEmail = providerRow?.email || profileRow?.email || null;
+
+  if (profileEmail) return { email: profileEmail, name };
+
+  // Fall back to auth.users if no email in profile tables
+  try {
+    const { data: authUser } = await supabase.auth.admin.getUserById(providerId);
+    return { email: authUser?.user?.email || null, name };
+  } catch {
+    return { email: null, name };
+  }
 }
 
 // ─── Email templates ──────────────────────────────────────────────────────────
