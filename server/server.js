@@ -2646,7 +2646,7 @@ app.post("/api/bookings", async (req, res) => {
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td align="center" style="padding-bottom: 24px;">
-                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" height="110" style="height: 110px; width: auto; display: block;" class="logo-img">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
                                     </td>
                                 </tr>
                                 <tr>
@@ -3471,7 +3471,7 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td align="center" style="padding-bottom: 24px;">
-                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" height="110" style="height: 110px; width: auto; display: block;" class="logo-img">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
                                     </td>
                                 </tr>
                                 <tr>
@@ -3571,7 +3571,7 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td align="center" style="padding-bottom: 24px;">
-                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" height="110" style="height: 110px; width: auto; display: block;" class="logo-img">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
                                     </td>
                                 </tr>
                                 <tr>
@@ -10863,7 +10863,7 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 640px;">
                     <tr>
                         <td align="center" style="padding-bottom: 24px;">
-                            <img src="https://mykliques.com/logo512.png" alt="Kliques" width="100" class="logo-img" style="height: 100px; display: block;" />
+                            <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;" />
                         </td>
                     </tr>
                     <tr>
@@ -10871,9 +10871,13 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td align="center">
-                                        <div style="width: 72px; height: 72px; background-color: #331D19; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 24px;">
-                                            <span style="color: white; font-size: 32px;">✓</span>
-                                        </div>
+                                        <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+                                            <tr>
+                                                <td align="center" valign="middle" width="72" height="72" style="width: 72px; height: 72px; background-color: #331D19; border-radius: 36px; text-align: center;">
+                                                    <img src="https://img.icons8.com/ios-glyphs/60/ffffff/checkmark--v1.png" width="32" height="32" alt="✓" style="width: 32px; height: 32px; display: block; margin: 20px auto;" />
+                                                </td>
+                                            </tr>
+                                        </table>
                                         <h1 class="h1-mobile" style="font-size: 28px; font-weight: 600; color: #331D19; margin: 0 0 12px 0; letter-spacing: -0.02em;">Booking confirmed</h1>
                                         <p style="color: #8E7A75; font-size: 15px; line-height: 1.6; margin: 0;">Your booking has been confirmed. We'll see you there!</p>
                                     </td>
