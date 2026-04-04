@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
-import { request } from '../data/apiClient';
+import { request, API_BASE } from '../data/apiClient';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -72,7 +72,7 @@ const ClientInvoices = () => {
     const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
-            const res = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+            const res = await fetch(`${API_BASE}/invoices/${invoice.id}/pdf`, {
                 headers: { 'x-user-id': session?.user?.id },
             });
             if (!res.ok) throw new Error('Failed');
