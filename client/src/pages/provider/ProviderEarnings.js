@@ -28,7 +28,12 @@ const F = "'Sora',system-ui,sans-serif";
 
 function fmtMoney(val) {
     if (!val && val !== 0) return '$0';
-    return `$${Number(val).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    const amount = Number(val) || 0;
+    const hasCents = Math.round(amount * 100) % 100 !== 0;
+    return `$${amount.toLocaleString('en-US', {
+        minimumFractionDigits: hasCents ? 2 : 0,
+        maximumFractionDigits: hasCents ? 2 : 0,
+    })}`;
 }
 
 const MONTH_NAMES = [
@@ -116,10 +121,15 @@ const ProviderEarnings = () => {
                 return { name: SHORT_MONTHS[idx], income: 0, isCurrent: idx === currentMonthIdx };
             });
         }
-        return earnings.monthlyData.slice(-6).map((d, i, arr) => ({
-            ...d,
-            isCurrent: i === arr.length - 1,
-        }));
+        const monthsToShow = Math.min(6, currentMonthIdx + 1);
+        const startIdx = Math.max(0, currentMonthIdx - monthsToShow + 1);
+
+        return earnings.monthlyData
+            .slice(startIdx, currentMonthIdx + 1)
+            .map((d, i, arr) => ({
+                ...d,
+                isCurrent: i === arr.length - 1,
+            }));
     }, [earnings, currentMonthIdx]);
 
     const totalThisMonth = earnings?.totalEarningsThisMonth || 0;

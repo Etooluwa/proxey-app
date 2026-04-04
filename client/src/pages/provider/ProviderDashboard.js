@@ -91,7 +91,12 @@ function fmtDuration(mins) {
 
 function fmtEarnings(cents) {
     if (!cents) return '$0';
-    return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    const dollars = cents / 100;
+    const hasCents = Math.round(cents) % 100 !== 0;
+    return `$${dollars.toLocaleString('en-US', {
+        minimumFractionDigits: hasCents ? 2 : 0,
+        maximumFractionDigits: hasCents ? 2 : 0,
+    })}`;
 }
 
 function getDashboardStatus(appt) {

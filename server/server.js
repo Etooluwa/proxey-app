@@ -3660,7 +3660,9 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
 });
 
 app.get("/api/provider/earnings", async (req, res) => {
-  const providerId = getProviderId(req);
+  const providerIdentity = await getProviderIdentity(getProviderId(req));
+  const providerAuthId = providerIdentity.authId || getProviderId(req);
+  const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerAuthId];
 
   // Default response structure
   const defaultEarnings = {
@@ -3688,14 +3690,15 @@ app.get("/api/provider/earnings", async (req, res) => {
   try {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const currentYear = now.getFullYear();
 
     // Fetch all completed bookings for this provider
     const { data: bookings, error } = await supabase
       .from("bookings")
       .select("*")
-      .eq("provider_id", providerId)
+      .in("provider_id", providerIds)
       .order("scheduled_at", { ascending: false });
 
     if (error) {
@@ -3704,40 +3707,29 @@ app.get("/api/provider/earnings", async (req, res) => {
     }
 
     const allBookings = bookings || [];
-
-    const getEarningDate = (booking) => new Date(booking.completed_at || booking.scheduled_at || booking.created_at);
-    const getNetBookingAmountCents = (booking) => {
-      // Under the current fee model, the client pays the platform fee on top of
-      // the service price. booking.price stores the service price in cents —
-      // that is the full amount the provider earns.
-      return Math.round(Number(booking.price) || 0);
-    };
+    const completedBookings = allBookings.filter((booking) => booking.status === "completed");
+    const completedPaidBookings = completedBookings.filter((booking) => booking.payment_status === "paid");
 
     // Calculate available balance (completed + paid) as provider net earnings
-    const completedPaid = allBookings.filter(b =>
-      b.status === 'completed' && b.payment_status === 'paid'
-    );
-    const availableBalance = completedPaid.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
+    const availableBalance = completedPaidBookings.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0);
 
     // Calculate pending clearance (completed but payout/payment not cleared) as provider net earnings
-    const completedPendingPayment = allBookings.filter(b =>
-      b.status === 'completed' && b.payment_status !== 'paid'
-    );
-    const pendingClearance = completedPendingPayment.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
+    const completedPendingPayment = completedBookings.filter((b) => b.payment_status !== "paid");
+    const pendingClearance = completedPendingPayment.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0);
 
     // Calculate this month's earnings by completion date
-    const thisMonthBookings = allBookings.filter(b => {
-      const bookingDate = getEarningDate(b);
-      return b.status === 'completed' && bookingDate >= currentMonthStart;
+    const thisMonthBookings = completedPaidBookings.filter((b) => {
+      const bookingDate = getBookingEarningDate(b);
+      return bookingDate && bookingDate >= currentMonthStart && bookingDate < nextMonthStart;
     });
-    const totalEarningsThisMonth = thisMonthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
+    const totalEarningsThisMonth = thisMonthBookings.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0);
 
     // Calculate last month's earnings for trend by completion date
-    const lastMonthBookings = allBookings.filter(b => {
-      const bookingDate = getEarningDate(b);
-      return b.status === 'completed' && bookingDate >= lastMonthStart && bookingDate <= lastMonthEnd;
+    const lastMonthBookings = completedPaidBookings.filter((b) => {
+      const bookingDate = getBookingEarningDate(b);
+      return bookingDate && bookingDate >= lastMonthStart && bookingDate < currentMonthStart;
     });
-    const totalEarningsLastMonth = lastMonthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0);
+    const totalEarningsLastMonth = lastMonthBookings.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0);
 
     // Calculate monthly trend percentage
     const monthlyTrend = totalEarningsLastMonth > 0
@@ -3752,14 +3744,14 @@ app.get("/api/provider/earnings", async (req, res) => {
       const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
-      const dayBookings = allBookings.filter(b => {
-        const bookingDate = getEarningDate(b);
-        return b.status === 'completed' && bookingDate >= dayStart && bookingDate < dayEnd;
+      const dayBookings = completedPaidBookings.filter((b) => {
+        const bookingDate = getBookingEarningDate(b);
+        return bookingDate && bookingDate >= dayStart && bookingDate < dayEnd;
       });
 
       weeklyData.push({
         name: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        value: dayBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0) / 100
+        value: dayBookings.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0) / 100
       });
     }
 
@@ -3768,14 +3760,14 @@ app.get("/api/provider/earnings", async (req, res) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     for (let m = 0; m < 12; m++) {
       const monthStart = new Date(now.getFullYear(), m, 1);
-      const monthEnd = new Date(now.getFullYear(), m + 1, 0);
+      const monthEndExclusive = new Date(now.getFullYear(), m + 1, 1);
 
-      const monthBookings = allBookings.filter(b => {
-        const bookingDate = getEarningDate(b);
-        return b.status === 'completed' && bookingDate >= monthStart && bookingDate <= monthEnd;
+      const monthBookings = completedPaidBookings.filter((b) => {
+        const bookingDate = getBookingEarningDate(b);
+        return bookingDate && bookingDate >= monthStart && bookingDate < monthEndExclusive;
       });
 
-      const income = monthBookings.reduce((sum, b) => sum + getNetBookingAmountCents(b), 0) / 100;
+      const income = monthBookings.reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0) / 100;
       const jobCount = monthBookings.length;
       const grossIncome = monthBookings.reduce((sum, b) => sum + (b.price || 0), 0) / 100;
       const expense = Math.max(Math.round(grossIncome - income), 0);
@@ -3790,27 +3782,34 @@ app.get("/api/provider/earnings", async (req, res) => {
 
     // Build service breakdown for current month
     const breakdownMap = {};
-    thisMonthBookings.forEach(b => {
+    thisMonthBookings.forEach((b) => {
       const key = b.service_name || "Other";
       if (!breakdownMap[key]) breakdownMap[key] = { name: key, sessions: 0, revenue: 0 };
       breakdownMap[key].sessions += 1;
-      breakdownMap[key].revenue += getNetBookingAmountCents(b);
+      breakdownMap[key].revenue += getProviderNetBookingAmountCents(b);
     });
     const breakdown = Object.values(breakdownMap)
       .map(item => ({ ...item, revenue: item.revenue / 100 }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    // Generate transactions list from bookings
-    const transactions = allBookings.slice(0, 20).map(b => {
-      const bookingDate = getEarningDate(b);
+    // Generate transactions list from completed bookings only, sorted by earning date.
+    const transactions = [...completedBookings]
+      .sort((a, b) => {
+        const aDate = getBookingEarningDate(a)?.getTime() || 0;
+        const bDate = getBookingEarningDate(b)?.getTime() || 0;
+        return bDate - aDate;
+      })
+      .slice(0, 20)
+      .map(b => {
+      const bookingDate = getBookingEarningDate(b);
       const isCompleted = b.status === 'completed';
       const isPaid = b.payment_status === 'paid';
 
       return {
         id: b.id,
-        date: bookingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        date: (bookingDate || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         description: `Payment from ${b.client_name || 'Client'} - ${b.service_name || 'Service'}`,
-        amount: getNetBookingAmountCents(b) / 100,
+        amount: getProviderNetBookingAmountCents(b) / 100,
         type: 'INCOME',
         status: isPaid ? 'COMPLETED' : (isCompleted ? 'PENDING' : b.status.toUpperCase())
       };
@@ -3838,12 +3837,13 @@ app.get("/api/provider/earnings", async (req, res) => {
       },
       nextPayoutDate: nextMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       stats: {
-        totalJobs: allBookings.filter(b => b.status === 'completed').length,
+        totalJobs: completedBookings.length,
         thisMonthJobs: thisMonthBookings.length,
         averageJobValue: thisMonthBookings.length > 0
           ? Math.round(totalEarningsThisMonth / thisMonthBookings.length / 100)
           : 0
-      }
+      },
+      year: currentYear,
     };
 
     return res.status(200).json({ earnings });
@@ -3966,7 +3966,7 @@ app.get("/api/provider/dashboard", async (req, res) => {
     weekEnd.setDate(weekStart.getDate() + 7);
     const weekEndKey = getLocalDateKey(weekEnd);
 
-    const [todayRes, weekRes] = await Promise.all([
+    const [todayRes, weekEarningsRes, weekClientsRes] = await Promise.all([
       supabase
         .from("bookings")
         .select("id, client_id, client_name, service_name, scheduled_at, duration, status")
@@ -3977,7 +3977,13 @@ app.get("/api/provider/dashboard", async (req, res) => {
         .order("scheduled_at", { ascending: true }),
       supabase
         .from("bookings")
-        .select("client_id, price, status, scheduled_at")
+        .select("client_id, price, status, payment_status, scheduled_at, completed_at")
+        .in("provider_id", providerIds)
+        .eq("status", "completed")
+        .eq("payment_status", "paid"),
+      supabase
+        .from("bookings")
+        .select("client_id, scheduled_at")
         .in("provider_id", providerIds)
         .gte("scheduled_at", `${weekStartKey}T00:00:00`)
         .lt("scheduled_at", `${weekEndKey}T00:00:00`),
@@ -3994,14 +4000,18 @@ app.get("/api/provider/dashboard", async (req, res) => {
         status: b.status,
       }));
 
-    const weekBookings = weekRes.data || [];
+    const weekEarningBookings = weekEarningsRes.data || [];
+    const weekClientBookings = weekClientsRes.data || [];
 
-    const weeklyEarnings = weekBookings
-      .filter((b) => b.status === "completed" || b.status === "confirmed")
-      .reduce((sum, b) => sum + (b.price || 0), 0);
+    const weeklyEarnings = weekEarningBookings
+      .filter((b) => {
+        const earningDateKey = getLocalDateKey(b.completed_at || b.scheduled_at);
+        return earningDateKey >= weekStartKey && earningDateKey < weekEndKey;
+      })
+      .reduce((sum, b) => sum + getProviderNetBookingAmountCents(b), 0);
 
     // New clients = client_ids that appear for the first time this week
-    const weekClientIds = new Set(weekBookings.map((b) => b.client_id).filter(Boolean));
+    const weekClientIds = new Set(weekClientBookings.map((b) => b.client_id).filter(Boolean));
     let newClientsThisWeek = 0;
     if (weekClientIds.size > 0) {
       const { data: priorBookings } = await supabase
@@ -5615,6 +5625,26 @@ function getLocalDateKey(value = new Date()) {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function parseLocalBookingDate(value) {
+  if (!value) return null;
+  const localValue = String(value)
+    .trim()
+    .replace(" ", "T")
+    .replace(/(Z|[+-]\d{2}:\d{2})$/, "");
+  const parsed = new Date(localValue);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getBookingEarningDate(booking) {
+  return parseLocalBookingDate(booking?.completed_at || booking?.scheduled_at || booking?.created_at);
+}
+
+function getProviderNetBookingAmountCents(booking) {
+  // booking.price stores the provider's service price in cents. The platform
+  // fee is charged to the client on top, so provider earnings use price as-is.
+  return Math.round(Number(booking?.price) || 0);
 }
 
 function getProviderBookingTab(booking, todayKey = getLocalDateKey()) {
