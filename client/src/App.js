@@ -66,6 +66,7 @@ import ProviderBookingSettings from './pages/provider/ProviderBookingSettings';
 import HelpSupport from './pages/provider/HelpSupport';
 import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
 import ProviderGroupEditor from './pages/provider/ProviderGroupEditor';
+import ProviderInsights from './pages/provider/ProviderInsights';
 import ClientPersonalDetails from './pages/ClientPersonalDetails';
 import ClientPaymentMethods from './pages/ClientPaymentMethods';
 import ClientNotifSettings from './pages/ClientNotifSettings';
@@ -251,6 +252,8 @@ function App() {
                       {/* My kliques (client list) */}
                       <Route path="clients" element={<ProviderClients />} />
                       <Route path="clients/:clientId" element={<ProviderClientTimeline />} />
+                      {/* Client Insights */}
+                      <Route path="insights" element={<ProviderInsights />} />
                       {/* Services */}
                       <Route path="services" element={<ProviderServices />} />
                       <Route path="services/groups/new" element={<ProviderNewServiceGroup />} />

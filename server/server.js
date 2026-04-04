@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import PDFDocument from "pdfkit";
 import https from "node:https";
+import * as XLSX from "xlsx";
 
 dotenv.config();
 
@@ -6070,6 +6071,236 @@ app.get("/api/provider/clients/:clientId", async (req, res) => {
 app.get("/api/providers/:id/clients/:clientId/timeline", async (req, res) => {
   return handleProviderClientTimeline(req, res, req.params.id, req.params.clientId);
 });
+
+// ─── Client Insights ─────────────────────────────────────────────────────────
+
+async function buildClientInsights(providerAuthId, { status, service, period, search, sort, order, page, limit }) {
+  if (!supabase) throw new Error("Supabase not configured.");
+
+  // Resolve provider numeric id from auth id
+  const { data: pvRow, error: pvErr } = await supabase
+    .from("providers")
+    .select("id")
+    .eq("user_id", providerAuthId)
+    .single();
+  if (pvErr || !pvRow) throw Object.assign(new Error("Provider not found"), { status: 404 });
+  const numericProviderId = pvRow.id;
+
+  // Determine date cutoff for "period" filter
+  const now = new Date();
+  let periodCutoff = null;
+  if (period === "7d") periodCutoff = new Date(now - 7 * 86400000).toISOString();
+  else if (period === "30d") periodCutoff = new Date(now - 30 * 86400000).toISOString();
+  else if (period === "90d") periodCutoff = new Date(now - 90 * 86400000).toISOString();
+
+  // Fetch all bookings for this provider (status filter done in SQL for speed)
+  let bQuery = supabase
+    .from("bookings")
+    .select("id, client_id, service_id, price, status, scheduled_at, services(name)")
+    .eq("provider_id", numericProviderId)
+    .in("status", ["completed", "confirmed", "pending", "accepted"]);
+
+  if (periodCutoff) bQuery = bQuery.gte("scheduled_at", periodCutoff);
+
+  const { data: bookings, error: bErr } = await bQuery;
+  if (bErr) throw bErr;
+
+  // Fetch all connected clients for this provider
+  const { data: pcRows, error: pcErr } = await supabase
+    .from("provider_clients")
+    .select("client_id, connected_at")
+    .eq("provider_id", numericProviderId);
+  if (pcErr) throw pcErr;
+
+  // Fetch client profiles
+  const clientIds = [...new Set(pcRows.map((r) => r.client_id))];
+  if (clientIds.length === 0) {
+    return { stats: buildStats([], []), clients: [], total: 0 };
+  }
+
+  const { data: profiles, error: prErr } = await supabase
+    .from("client_profiles")
+    .select("user_id, name, email, avatar")
+    .in("user_id", clientIds);
+  if (prErr) throw prErr;
+
+  const profileMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p]));
+  const connectedMap = Object.fromEntries(pcRows.map((r) => [r.client_id, r.connected_at]));
+
+  // Aggregate per client
+  const thirty = 30 * 86400000;
+  const ninety = 90 * 86400000;
+  const fourteen = 14 * 86400000;
+  const nowMs = now.getTime();
+
+  const clientMap = {};
+  for (const b of bookings) {
+    if (!b.client_id) continue;
+    if (!clientMap[b.client_id]) {
+      clientMap[b.client_id] = {
+        client_id: b.client_id,
+        visits: 0,
+        total_spent: 0,
+        last_visit: null,
+        service_counts: {},
+      };
+    }
+    const c = clientMap[b.client_id];
+    c.visits += 1;
+    c.total_spent += Number(b.price) || 0;
+    const bDate = b.scheduled_at;
+    if (!c.last_visit || bDate > c.last_visit) c.last_visit = bDate;
+    const svcName = b.services?.name || "Unknown";
+    c.service_counts[svcName] = (c.service_counts[svcName] || 0) + 1;
+
+    // Service filter check — tag booking's service
+    c._last_service_id = b.service_id;
+    if (service && String(b.service_id) === String(service)) c._matches_service = true;
+  }
+
+  // Also include connected clients with no bookings in this period
+  for (const cid of clientIds) {
+    if (!clientMap[cid]) {
+      clientMap[cid] = { client_id: cid, visits: 0, total_spent: 0, last_visit: null, service_counts: {}, _matches_service: !service };
+    }
+  }
+
+  // Build client rows
+  let rows = Object.values(clientMap).map((c) => {
+    const profile = profileMap[c.client_id] || {};
+    const connected = connectedMap[c.client_id];
+    const connectedMs = connected ? new Date(connected).getTime() : nowMs;
+    const lastVisitMs = c.last_visit ? new Date(c.last_visit).getTime() : null;
+    const daysSinceVisit = lastVisitMs ? (nowMs - lastVisitMs) / 86400000 : null;
+    const daysSinceConnected = (nowMs - connectedMs) / 86400000;
+
+    // Status logic
+    let clientStatus;
+    if (daysSinceConnected <= 14 && c.visits === 0) clientStatus = "new";
+    else if (daysSinceVisit === null || daysSinceVisit > 90) clientStatus = "inactive";
+    else if (daysSinceVisit > 30) clientStatus = "at-risk";
+    else clientStatus = "active";
+
+    const top_service = Object.entries(c.service_counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+    return {
+      client_id: c.client_id,
+      name: profile.name || "Unknown",
+      email: profile.email || null,
+      avatar: profile.avatar || null,
+      visits: c.visits,
+      total_spent: c.total_spent,
+      last_visit: c.last_visit,
+      top_service,
+      connected_at: connected || null,
+      status: clientStatus,
+      _matches_service: c._matches_service,
+    };
+  });
+
+  // Compute stats before filtering
+  const stats = buildStats(rows, bookings);
+
+  // Apply filters
+  if (status && status !== "all") rows = rows.filter((r) => r.status === status);
+  if (service) rows = rows.filter((r) => r._matches_service);
+  if (search) {
+    const q = search.toLowerCase();
+    rows = rows.filter((r) => r.name.toLowerCase().includes(q) || (r.email && r.email.toLowerCase().includes(q)));
+  }
+
+  // Sort
+  const sortKey = sort || "visits";
+  const dir = order === "asc" ? 1 : -1;
+  rows.sort((a, b) => {
+    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+    if (sortKey === "last_visit") {
+      const aMs = a.last_visit ? new Date(a.last_visit).getTime() : 0;
+      const bMs = b.last_visit ? new Date(b.last_visit).getTime() : 0;
+      return dir * (aMs - bMs);
+    }
+    if (sortKey === "total_spent") return dir * (a.total_spent - b.total_spent);
+    if (sortKey === "connected_at") {
+      const aMs = a.connected_at ? new Date(a.connected_at).getTime() : 0;
+      const bMs = b.connected_at ? new Date(b.connected_at).getTime() : 0;
+      return dir * (aMs - bMs);
+    }
+    return dir * (a.visits - b.visits);
+  });
+
+  const total = rows.length;
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(limit) || 20));
+  const paginated = rows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
+
+  // Strip internal fields
+  const clean = paginated.map(({ _matches_service, ...r }) => r);
+  return { stats, clients: clean, total, page: pageNum, limit: pageSize };
+}
+
+function buildStats(rows, bookings) {
+  const now = Date.now();
+  const totalClients = rows.length;
+  const activeClients = rows.filter((r) => r.status === "active").length;
+  const newThisMonth = rows.filter((r) => {
+    if (!r.connected_at) return false;
+    return now - new Date(r.connected_at).getTime() < 30 * 86400000;
+  }).length;
+  const avgVisits = totalClients > 0 ? (rows.reduce((s, r) => s + r.visits, 0) / totalClients).toFixed(1) : "0.0";
+  // Retention: clients with >1 booking / clients with any booking
+  const withBookings = rows.filter((r) => r.visits > 0).length;
+  const returning = rows.filter((r) => r.visits > 1).length;
+  const retentionRate = withBookings > 0 ? Math.round((returning / withBookings) * 100) : 0;
+
+  return { total_clients: totalClients, active_clients: activeClients, new_this_month: newThisMonth, avg_visits: parseFloat(avgVisits), retention_rate: retentionRate };
+}
+
+app.get("/api/provider/clients/insights", async (req, res) => {
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  try {
+    const result = await buildClientInsights(providerId, req.query);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
+    console.error("[provider/clients/insights]", err);
+    return res.status(500).json({ error: "Failed to load client insights." });
+  }
+});
+
+app.get("/api/provider/clients/insights/export", async (req, res) => {
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  try {
+    const { clients } = await buildClientInsights(providerId, { ...req.query, page: 1, limit: 10000 });
+
+    const rows = clients.map((c) => ({
+      Name: c.name,
+      Email: c.email || "",
+      Status: c.status,
+      Visits: c.visits,
+      "Total Spent ($)": (c.total_spent / 100).toFixed(2),
+      "Last Visit": c.last_visit ? new Date(c.last_visit).toLocaleDateString() : "—",
+      "Top Service": c.top_service || "—",
+      "Connected Since": c.connected_at ? new Date(c.connected_at).toLocaleDateString() : "—",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Client Insights");
+
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=client-insights.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return res.status(200).send(buf);
+  } catch (err) {
+    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
+    console.error("[provider/clients/insights/export]", err);
+    return res.status(500).json({ error: "Failed to export." });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.post("/api/provider/clients/:clientId/conversation", async (req, res) => {
   if (!supabase) {
