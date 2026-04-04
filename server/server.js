@@ -6077,27 +6077,18 @@ app.get("/api/providers/:id/clients/:clientId/timeline", async (req, res) => {
 async function buildClientInsights(providerAuthId, { status, service, period, search, sort, order, page, limit }) {
   if (!supabase) throw new Error("Supabase not configured.");
 
-  // Resolve provider numeric id from auth id
-  const { data: pvRow, error: pvErr } = await supabase
-    .from("providers")
-    .select("id")
-    .eq("user_id", providerAuthId)
-    .single();
-  if (pvErr || !pvRow) throw Object.assign(new Error("Provider not found"), { status: 404 });
-  const numericProviderId = pvRow.id;
-
-  // Determine date cutoff for "period" filter
+  // bookings.provider_id and provider_clients.provider_id both store the auth user UUID directly
   const now = new Date();
   let periodCutoff = null;
   if (period === "7d") periodCutoff = new Date(now - 7 * 86400000).toISOString();
   else if (period === "30d") periodCutoff = new Date(now - 30 * 86400000).toISOString();
   else if (period === "90d") periodCutoff = new Date(now - 90 * 86400000).toISOString();
 
-  // Fetch all bookings for this provider (status filter done in SQL for speed)
+  // Fetch all non-cancelled bookings for this provider
   let bQuery = supabase
     .from("bookings")
     .select("id, client_id, service_id, price, status, scheduled_at, services(name)")
-    .eq("provider_id", numericProviderId)
+    .eq("provider_id", providerAuthId)
     .in("status", ["completed", "confirmed", "pending", "accepted"]);
 
   if (periodCutoff) bQuery = bQuery.gte("scheduled_at", periodCutoff);
@@ -6109,66 +6100,59 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
   const { data: pcRows, error: pcErr } = await supabase
     .from("provider_clients")
     .select("client_id, connected_at")
-    .eq("provider_id", numericProviderId);
+    .eq("provider_id", providerAuthId);
   if (pcErr) throw pcErr;
 
-  // Fetch client profiles
-  const clientIds = [...new Set(pcRows.map((r) => r.client_id))];
-  if (clientIds.length === 0) {
+  // Union: clients from bookings + clients from provider_clients
+  const bookingClientIds = [...new Set((bookings || []).map((b) => b.client_id).filter(Boolean))];
+  const connectedClientIds = [...new Set((pcRows || []).map((r) => r.client_id).filter(Boolean))];
+  const allClientIds = [...new Set([...bookingClientIds, ...connectedClientIds])];
+
+  if (allClientIds.length === 0) {
     return { stats: buildStats([], []), clients: [], total: 0 };
   }
 
+  // client_profiles.user_id is text — cast client UUIDs to text for the IN filter
   const { data: profiles, error: prErr } = await supabase
     .from("client_profiles")
     .select("user_id, name, email, avatar")
-    .in("user_id", clientIds);
+    .in("user_id", allClientIds.map(String));
   if (prErr) throw prErr;
 
-  const profileMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p]));
-  const connectedMap = Object.fromEntries(pcRows.map((r) => [r.client_id, r.connected_at]));
+  const profileMap = Object.fromEntries((profiles || []).map((p) => [String(p.user_id), p]));
+  const connectedMap = Object.fromEntries((pcRows || []).map((r) => [String(r.client_id), r.connected_at]));
 
-  // Aggregate per client
-  const thirty = 30 * 86400000;
-  const ninety = 90 * 86400000;
-  const fourteen = 14 * 86400000;
   const nowMs = now.getTime();
 
   const clientMap = {};
-  for (const b of bookings) {
+  for (const b of (bookings || [])) {
     if (!b.client_id) continue;
-    if (!clientMap[b.client_id]) {
-      clientMap[b.client_id] = {
-        client_id: b.client_id,
-        visits: 0,
-        total_spent: 0,
-        last_visit: null,
-        service_counts: {},
-      };
+    const key = String(b.client_id);
+    if (!clientMap[key]) {
+      clientMap[key] = { client_id: key, visits: 0, total_spent: 0, last_visit: null, service_counts: {} };
     }
-    const c = clientMap[b.client_id];
+    const c = clientMap[key];
     c.visits += 1;
     c.total_spent += Number(b.price) || 0;
     const bDate = b.scheduled_at;
     if (!c.last_visit || bDate > c.last_visit) c.last_visit = bDate;
     const svcName = b.services?.name || "Unknown";
     c.service_counts[svcName] = (c.service_counts[svcName] || 0) + 1;
-
-    // Service filter check — tag booking's service
-    c._last_service_id = b.service_id;
     if (service && String(b.service_id) === String(service)) c._matches_service = true;
   }
 
-  // Also include connected clients with no bookings in this period
-  for (const cid of clientIds) {
-    if (!clientMap[cid]) {
-      clientMap[cid] = { client_id: cid, visits: 0, total_spent: 0, last_visit: null, service_counts: {}, _matches_service: !service };
+  // Ensure all connected clients appear even if no bookings in the period
+  for (const cid of allClientIds) {
+    const key = String(cid);
+    if (!clientMap[key]) {
+      clientMap[key] = { client_id: key, visits: 0, total_spent: 0, last_visit: null, service_counts: {}, _matches_service: !service };
     }
   }
 
   // Build client rows
   let rows = Object.values(clientMap).map((c) => {
-    const profile = profileMap[c.client_id] || {};
-    const connected = connectedMap[c.client_id];
+    const profile = profileMap[String(c.client_id)] || {};
+    const connected = connectedMap[String(c.client_id)];
     const connectedMs = connected ? new Date(connected).getTime() : nowMs;
     const lastVisitMs = c.last_visit ? new Date(c.last_visit).getTime() : null;
     const daysSinceVisit = lastVisitMs ? (nowMs - lastVisitMs) / 86400000 : null;
