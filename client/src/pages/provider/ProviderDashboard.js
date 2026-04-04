@@ -527,18 +527,18 @@ const ProviderDashboard = () => {
                     <ProviderStripeReadinessBanner compact />
                 </div>
                 <Divider />
-                <div className="flex gap-6 pt-5 pb-5 relative">
+                <div className="flex pt-5 pb-5 relative">
                     <div className="absolute inset-y-5 left-1/2 w-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
-                    <div className="flex-1">
+                    <div style={{ width: '50%', paddingRight: 20 }}>
                         <Lbl className="block mb-2">Weekly Earnings</Lbl>
-                        <div className="flex items-end gap-1">
-                            <ArrowIcon size={28} color={earningsColor} />
-                            <span className="text-[52px] font-semibold tracking-[-0.05em] leading-none" style={{ color: earningsColor }}>
+                        <div className="flex items-end gap-1 overflow-hidden">
+                            <ArrowIcon size={28} color={earningsColor} className="flex-shrink-0" />
+                            <span className="font-semibold tracking-[-0.05em] leading-none truncate" style={{ color: earningsColor, fontSize: 'clamp(28px, 7vw, 52px)' }}>
                                 {fmtEarnings(weeklyEarnings)}
                             </span>
                         </div>
                     </div>
-                    <div className="flex-1 flex flex-col items-end">
+                    <div style={{ width: '50%', paddingLeft: 20 }} className="flex flex-col items-end">
                         <Lbl className="block mb-2">New Clients</Lbl>
                         <span className="text-[52px] font-semibold tracking-[-0.05em] leading-none" style={{ color: clientsColor }}>
                             {newClients}
