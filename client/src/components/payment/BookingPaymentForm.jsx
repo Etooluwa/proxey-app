@@ -231,6 +231,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
         if (usingNewCard && (!stripe || !elements)) return;
         setProcessing(true);
         setCardError(null);
+        let succeeded = false;
         try {
             // ── Path A: client has a saved card selected ──────────────────────
             if (!usingNewCard && selectedSavedId) {
@@ -239,6 +240,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
 
                 if (paymentType === 'save_card') {
                     // No charge — just return the saved pm so the booking records it
+                    succeeded = true;
                     onSuccess({
                         payment_type: 'save_card',
                         stripe_payment_method_id: selectedSavedId,
@@ -257,6 +259,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     }),
                 });
                 console.log('[PaymentForm] /charge response:', data);
+                succeeded = true;
                 onSuccess({
                     payment_type: paymentType,
                     stripe_payment_intent_id: data.chargeId,
@@ -282,6 +285,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     },
                 });
                 if (error) { setCardError(error.message); return; }
+                succeeded = true;
                 onSuccess({
                     payment_type: 'save_card',
                     stripe_setup_intent_id: setupIntent.id,
@@ -307,6 +311,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     },
                 });
                 if (error) { setCardError(error.message); return; }
+                succeeded = true;
                 onSuccess({
                     payment_type: paymentType,
                     stripe_payment_intent_id: paymentIntent.id,
@@ -322,7 +327,9 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
             setCardError(msg);
             onError?.(msg);
         } finally {
-            setProcessing(false);
+            // Only reset processing on failure — on success the parent takes over
+            // and resetting here would cause the pay button to briefly re-appear
+            if (!succeeded) setProcessing(false);
         }
     };
 

@@ -32,7 +32,7 @@ const GRADIENT =
   "linear-gradient(180deg,#D45400 0%,#E87020 40%,#F09050 65%,#F5C4A0 82%,#FBF7F2 100%)";
 
 // sessionStorage keys
-const SS_PREFIX = "kliques.pub_booking.";
+const SS_PREFIX = "kliques.pub_booking.v2.";
 const SS = {
   provider:      SS_PREFIX + "provider",
   services:      SS_PREFIX + "services",
@@ -867,6 +867,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
   async function handlePay() {
     setSubmitting(true);
     setError("");
+    let succeeded = false;
     try {
       let pmId = selectedPm?.id;
 
@@ -890,6 +891,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
         }),
       });
 
+      succeeded = true;
       const result = { bookingId, service, provider, slot, dep, isNewUser: false };
       ssSet(SS.bookingResult, result);
       ssClear();
@@ -897,7 +899,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
     } catch (err) {
       setError(normalizePaymentErrorMessage(err));
     } finally {
-      setSubmitting(false);
+      if (!succeeded) setSubmitting(false);
     }
   }
 
