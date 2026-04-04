@@ -6122,21 +6122,19 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
 
   // bookings.provider_id and provider_clients.provider_id both store the auth user UUID directly
   const now = new Date();
+  const nowMs = now.getTime();
   let periodCutoff = null;
   if (period === "7d") periodCutoff = new Date(now - 7 * 86400000).toISOString();
   else if (period === "30d") periodCutoff = new Date(now - 30 * 86400000).toISOString();
   else if (period === "90d") periodCutoff = new Date(now - 90 * 86400000).toISOString();
 
-  // Fetch all non-cancelled bookings for this provider
-  let bQuery = supabase
+  // Fetch all non-cancelled bookings for this provider. Period filtering is applied
+  // after aggregation so lifecycle status and last-visit stay based on full history.
+  const { data: bookings, error: bErr } = await supabase
     .from("bookings")
     .select("id, client_id, service_id, price, status, scheduled_at, services(name)")
     .eq("provider_id", providerAuthId)
     .in("status", ["completed", "confirmed", "pending", "accepted"]);
-
-  if (periodCutoff) bQuery = bQuery.gte("scheduled_at", periodCutoff);
-
-  const { data: bookings, error: bErr } = await bQuery;
   if (bErr) throw bErr;
 
   // Fetch all connected clients for this provider
@@ -6165,30 +6163,69 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
   const profileMap = Object.fromEntries((profiles || []).map((p) => [String(p.user_id), p]));
   const connectedMap = Object.fromEntries((pcRows || []).map((r) => [String(r.client_id), r.connected_at]));
 
-  const nowMs = now.getTime();
-
   const clientMap = {};
   for (const b of (bookings || [])) {
     if (!b.client_id) continue;
     const key = String(b.client_id);
     if (!clientMap[key]) {
-      clientMap[key] = { client_id: key, visits: 0, total_spent: 0, last_visit: null, service_counts: {} };
+      clientMap[key] = {
+        client_id: key,
+        visits: 0,
+        total_spent: 0,
+        last_visit: null,
+        last_booking_at: null,
+        service_counts: {},
+        period_visits: 0,
+        period_total_spent: 0,
+        period_service_counts: {},
+        _matches_service: !service,
+        _period_activity: !periodCutoff,
+      };
     }
     const c = clientMap[key];
+    const bDate = b.scheduled_at;
+    const svcName = b.services?.name || "Unknown";
+    const bookingIsInPeriod = !periodCutoff || (bDate && bDate >= periodCutoff);
+
+    if (!c.last_booking_at || (bDate && bDate > c.last_booking_at)) c.last_booking_at = bDate;
+    if (service && String(b.service_id) === String(service)) c._matches_service = true;
+    if (bookingIsInPeriod) c._period_activity = true;
+
+    if (String(b.status || "").toLowerCase() !== "completed") continue;
+
     c.visits += 1;
     c.total_spent += Number(b.price) || 0;
-    const bDate = b.scheduled_at;
-    if (!c.last_visit || bDate > c.last_visit) c.last_visit = bDate;
-    const svcName = b.services?.name || "Unknown";
+    if (bDate && (!c.last_visit || bDate > c.last_visit)) c.last_visit = bDate;
     c.service_counts[svcName] = (c.service_counts[svcName] || 0) + 1;
-    if (service && String(b.service_id) === String(service)) c._matches_service = true;
+
+    if (bookingIsInPeriod) {
+      c.period_visits += 1;
+      c.period_total_spent += Number(b.price) || 0;
+      c.period_service_counts[svcName] = (c.period_service_counts[svcName] || 0) + 1;
+    }
   }
 
   // Ensure all connected clients appear even if no bookings in the period
   for (const cid of allClientIds) {
     const key = String(cid);
     if (!clientMap[key]) {
-      clientMap[key] = { client_id: key, visits: 0, total_spent: 0, last_visit: null, service_counts: {}, _matches_service: !service };
+      const connectedAt = connectedMap[key] || null;
+      clientMap[key] = {
+        client_id: key,
+        visits: 0,
+        total_spent: 0,
+        last_visit: null,
+        last_booking_at: null,
+        service_counts: {},
+        period_visits: 0,
+        period_total_spent: 0,
+        period_service_counts: {},
+        _matches_service: !service,
+        _period_activity: !periodCutoff || (connectedAt && connectedAt >= periodCutoff),
+      };
+    } else if (periodCutoff && !clientMap[key]._period_activity) {
+      const connectedAt = connectedMap[key] || null;
+      if (connectedAt && connectedAt >= periodCutoff) clientMap[key]._period_activity = true;
     }
   }
 
@@ -6198,30 +6235,36 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
     const connected = connectedMap[String(c.client_id)];
     const connectedMs = connected ? new Date(connected).getTime() : nowMs;
     const lastVisitMs = c.last_visit ? new Date(c.last_visit).getTime() : null;
+    const lastBookingMs = c.last_booking_at ? new Date(c.last_booking_at).getTime() : null;
     const daysSinceVisit = lastVisitMs ? (nowMs - lastVisitMs) / 86400000 : null;
     const daysSinceConnected = (nowMs - connectedMs) / 86400000;
 
     // Status logic
     let clientStatus;
     if (daysSinceConnected <= 14 && c.visits === 0) clientStatus = "new";
+    else if (lastBookingMs && (nowMs - lastBookingMs) / 86400000 <= 30) clientStatus = "active";
     else if (daysSinceVisit === null || daysSinceVisit > 90) clientStatus = "inactive";
     else if (daysSinceVisit > 30) clientStatus = "at-risk";
     else clientStatus = "active";
 
-    const top_service = Object.entries(c.service_counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const serviceCounts = periodCutoff ? c.period_service_counts : c.service_counts;
+    const top_service = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+      || Object.entries(c.service_counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+      || null;
 
     return {
       client_id: c.client_id,
       name: profile.name || "Unknown",
       email: profile.email || null,
       avatar: profile.avatar || null,
-      visits: c.visits,
-      total_spent: c.total_spent,
+      visits: periodCutoff ? c.period_visits : c.visits,
+      total_spent: periodCutoff ? c.period_total_spent : c.total_spent,
       last_visit: c.last_visit,
       top_service,
       connected_at: connected || null,
       status: clientStatus,
       _matches_service: c._matches_service,
+      _period_activity: c._period_activity,
     };
   });
 
@@ -6231,6 +6274,7 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
   // Apply filters
   if (status && status !== "all") rows = rows.filter((r) => r.status === status);
   if (service) rows = rows.filter((r) => r._matches_service);
+  if (periodCutoff) rows = rows.filter((r) => r._period_activity);
   if (search) {
     const q = search.toLowerCase();
     rows = rows.filter((r) => r.name.toLowerCase().includes(q) || (r.email && r.email.toLowerCase().includes(q)));
@@ -6261,7 +6305,7 @@ async function buildClientInsights(providerAuthId, { status, service, period, se
   const paginated = rows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
 
   // Strip internal fields
-  const clean = paginated.map(({ _matches_service, ...r }) => r);
+  const clean = paginated.map(({ _matches_service, _period_activity, ...r }) => r);
   return { stats, clients: clean, total, page: pageNum, limit: pageSize };
 }
 

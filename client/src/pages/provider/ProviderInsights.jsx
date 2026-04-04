@@ -370,9 +370,9 @@ const ProviderInsights = () => {
                 marginBottom: 24,
                 padding: isDesktop ? 0 : '0 20px',
             }}>
-                <StatCard label="Total Clients" value={loading ? '—' : stats.total_clients ?? 0} sub="All time" />
                 <StatCard label="Active Clients" value={loading ? '—' : stats.active_clients ?? 0} sub="Booked in last 30 days" subUp={true} />
                 <StatCard label="New This Month" value={loading ? '—' : stats.new_this_month ?? 0} sub="Joined in last 30 days" />
+                <StatCard label="Avg. Visits / Client" value={loading ? '—' : (stats.avg_visits ?? 0).toFixed(1)} sub="Across all clients" />
                 <StatCard label="Retention Rate" value={loading ? '—' : `${stats.retention_rate ?? 0}%`} sub="Clients who rebooked" subUp={(stats.retention_rate ?? 0) >= 70} />
             </div>
 
