@@ -12,7 +12,7 @@
  *   PATCH /api/provider/jobs/:id/notes     → { job }
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { request } from '../../data/apiClient';
 import { useMessages } from '../../contexts/MessageContext';
 import BackBtn from '../../components/ui/BackBtn';
@@ -430,6 +430,7 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
 const ProviderAppointmentDetail = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { isDesktop } = useOutletContext() || {};
     const { getOrCreateConversation, setCurrentConversation, loadMessages } = useMessages();
 
     const [job, setJob] = useState(null);
@@ -1022,11 +1023,13 @@ const ProviderAppointmentDetail = () => {
                 <div
                     className="fixed bottom-0 left-0 right-0 flex flex-col px-5 py-3"
                     style={{
+                        left: isDesktop ? 260 : 0,
                         background: '#FBF7F2',
                         borderTop: '1px solid rgba(140,106,100,0.15)',
                         paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                     }}
                 >
+                    <div className="w-full mx-auto" style={{ maxWidth: isDesktop ? 760 : 'none' }}>
                     {showChargeFailureBanner && (
                         <div
                             className="w-full mb-3 rounded-[16px] px-4 py-3"
@@ -1070,16 +1073,28 @@ const ProviderAppointmentDetail = () => {
                         <div className="flex gap-3 w-full">
                             <button
                                 onClick={() => { setActionError(null); setShowCancelModal(true); }}
-                                className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
-                                style={{ border: '1px solid rgba(176,64,64,0.35)', background: 'transparent', color: '#B04040' }}
+                                className="py-3.5 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                                style={{
+                                    width: isDesktop ? 180 : '40%',
+                                    minWidth: 120,
+                                    border: '1px solid rgba(176,64,64,0.35)',
+                                    background: 'transparent',
+                                    color: '#B04040',
+                                }}
                             >
                                 Decline
                             </button>
                             <button
                                 onClick={handleAccept}
                                 disabled={accepting}
-                                className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                                style={{ background: '#3D231E', border: 'none', opacity: accepting ? 0.7 : 1 }}
+                                className="py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                                style={{
+                                    flex: 1,
+                                    maxWidth: isDesktop ? 320 : 'none',
+                                    background: '#3D231E',
+                                    border: 'none',
+                                    opacity: accepting ? 0.7 : 1,
+                                }}
                             >
                                 {accepting && (
                                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
@@ -1096,14 +1111,19 @@ const ProviderAppointmentDetail = () => {
                                 onClick={handleMarkComplete}
                                 disabled={completing}
                                 className="w-full py-3.5 rounded-[12px] text-[14px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 mb-2"
-                                style={{ background: '#3D231E', border: 'none', opacity: completing ? 0.7 : 1 }}
+                                style={{
+                                    maxWidth: isDesktop ? 360 : 'none',
+                                    background: '#3D231E',
+                                    border: 'none',
+                                    opacity: completing ? 0.7 : 1,
+                                }}
                             >
                                 {completing && (
                                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
                                 )}
                                 {completing ? 'Completing…' : 'Mark Complete'}
                             </button>
-                            <div className="flex gap-2 w-full">
+                            <div className="flex gap-2 w-full" style={{ maxWidth: isDesktop ? 520 : 'none' }}>
                                 <button
                                     onClick={handleMessage}
                                     className="flex-1 py-3 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
@@ -1128,6 +1148,7 @@ const ProviderAppointmentDetail = () => {
                             </div>
                         </>
                     )}
+                    </div>
                 </div>
             )}
 
