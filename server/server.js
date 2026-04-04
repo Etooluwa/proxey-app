@@ -1494,6 +1494,7 @@ app.get("/api/provider/:providerId/services", async (req, res) => {
           payment_type: s.payment_type || 'full',
           deposit_type: s.deposit_type || null,
           deposit_value: s.deposit_value != null ? s.deposit_value : null,
+          metadata: s.metadata || null,
         }));
         return res.status(200).json({ services });
       }

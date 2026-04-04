@@ -867,6 +867,21 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                     </div>
                 </div>
 
+                {/* Pre-appointment info */}
+                {service?.metadata?.preAppointmentInfo?.filter(Boolean).length > 0 && (
+                    <div className="mb-5 rounded-[14px] px-4 py-4" style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.15)' }}>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] m-0 mb-2.5" style={{ color: '#C25E4A' }}>Before your appointment</p>
+                        <div className="flex flex-col gap-2">
+                            {service.metadata.preAppointmentInfo.filter(Boolean).map((item, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                    <span className="text-[14px] flex-shrink-0 mt-px" style={{ color: '#C25E4A' }}>•</span>
+                                    <p className="text-[14px] text-ink leading-relaxed m-0">{item}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {error && (
                     <div className="px-4 py-3 rounded-[12px] bg-dangerBg mb-4">
                         <p className="text-[13px] text-accent m-0">{error}</p>
