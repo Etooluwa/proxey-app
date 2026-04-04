@@ -316,8 +316,89 @@ async function createClientNotification(userId, notification) {
   }
 }
 
+// ─── PDF buffer helper — builds invoice PDF in memory ────────────────────────
+function generateInvoicePdfBuffer(invoice) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'LETTER', margin: 60 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const INK = '#3D231E', MUTED = '#8C6A64', FADED = '#B0948F', ACCENT = '#C25E4A', LINE = '#D4C0BA';
+      const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      const fmtM = (cents) => { const v = cents != null ? (cents >= 100 ? cents / 100 : cents) : 0; return `$${(+v).toFixed(2)}`; };
+      const RIGHT_X = 540;
+      const businessName = invoice.business_name || 'Provider';
+
+      let y = 60;
+      doc.font('Helvetica-Bold').fontSize(20).fillColor(INK).text(businessName, 60, y); y += 28;
+      if (invoice.business_address) { doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(invoice.business_address, 60, y); y += 15; }
+      if (invoice.business_email)   { doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(invoice.business_email, 60, y); y += 15; }
+      if (invoice.business_phone)   { doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(invoice.business_phone, 60, y); y += 15; }
+
+      const paidLabel = invoice.status === 'paid' ? 'PAID' : (invoice.status || 'PENDING').toUpperCase();
+      const badgeColor = invoice.status === 'paid' ? '#5A8A5E' : ACCENT;
+      doc.rect(RIGHT_X - 54, 60, 54, 22).fillAndStroke(badgeColor, badgeColor);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFFFFF').text(paidLabel, RIGHT_X - 54, 66, { width: 54, align: 'center' });
+
+      y = Math.max(y + 12, 130);
+      doc.moveTo(60, y).lineTo(RIGHT_X, y).strokeColor(LINE).lineWidth(0.75).stroke(); y += 12;
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text(`Invoice #${invoice.invoice_number || invoice.id}`, 60, y);
+      doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(`Date: ${fmtD(invoice.issued_at)}`, 0, y, { align: 'right' }); y += 24;
+      doc.moveTo(60, y).lineTo(RIGHT_X, y).strokeColor(LINE).lineWidth(0.75).stroke();
+
+      y += 16;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(FADED).text('BILLED TO', 60, y, { characterSpacing: 1 }); y += 16;
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text(invoice.client_name || 'Client', 60, y); y += 15;
+      if (invoice.client_email) { doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(invoice.client_email, 60, y); y += 14; }
+      y += 8;
+      doc.moveTo(60, y).lineTo(RIGHT_X, y).strokeColor(LINE).lineWidth(0.75).stroke();
+
+      y += 16;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(FADED).text('SERVICE DETAILS', 60, y, { characterSpacing: 1 }); y += 16;
+      doc.font('Helvetica-Bold').fontSize(12).fillColor(INK).text(invoice.service_name || 'Service', 60, y); y += 17;
+      if (invoice.service_description) {
+        doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(invoice.service_description, 60, y, { width: 380, lineGap: 2 });
+        y += doc.heightOfString(invoice.service_description, { width: 380 }) + 8;
+      }
+      const parts = [];
+      if (invoice.date_of_service) parts.push(`Date: ${fmtD(invoice.date_of_service)}`);
+      if (invoice.duration) parts.push(`Duration: ${invoice.duration}`);
+      if (parts.length) { doc.font('Helvetica').fontSize(10).fillColor(MUTED).text(parts.join('  ·  '), 60, y); y += 16; }
+      y += 8;
+      doc.moveTo(60, y).lineTo(RIGHT_X, y).strokeColor(LINE).lineWidth(0.75).stroke();
+
+      y += 16;
+      const li = (label, amount, bold = false) => {
+        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(11).fillColor(bold ? INK : MUTED).text(label, 60, y);
+        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(11).fillColor(bold ? INK : MUTED).text(amount, 0, y, { align: 'right' });
+        y += 20;
+      };
+      li('Subtotal', fmtM(invoice.subtotal));
+      if (invoice.deposit_amount > 0) { li('Deposit paid', `−${fmtM(invoice.deposit_amount)}`); li('Remaining charged', fmtM(invoice.remaining_amount)); }
+      y += 4;
+      doc.moveTo(60, y).lineTo(RIGHT_X, y).strokeColor(LINE).lineWidth(0.75).stroke(); y += 12;
+      li('Total', fmtM(invoice.total), true);
+
+      y += 8;
+      doc.font('Helvetica').fontSize(10).fillColor(invoice.status === 'paid' ? '#5A8A5E' : ACCENT)
+        .text(invoice.status === 'paid' ? `Payment received via Stripe · ${fmtD(invoice.issued_at)}` : 'Payment pending', 60, y);
+
+      doc.moveTo(60, 720).lineTo(RIGHT_X, 720).strokeColor(LINE).lineWidth(0.5).stroke();
+      doc.font('Helvetica').fontSize(9).fillColor(FADED)
+        .text(`Invoice generated by ${businessName} · Powered by Kliques`, 60, 730, { align: 'center', width: RIGHT_X - 60 });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 // ─── Email helper (Resend REST API via built-in https) ───────────────────────
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, attachments }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn(`[sendEmail] Skipped "${subject || "email"}" because RESEND_API_KEY is not configured.`);
@@ -328,12 +409,14 @@ async function sendEmail({ to, subject, html }) {
     return;
   }
   return new Promise((resolve) => {
-    const body = JSON.stringify({
+    const payload = {
       from: 'Kliques <noreply@mykliques.com>',
       to: [to],
       subject,
       html,
-    });
+    };
+    if (attachments?.length) payload.attachments = attachments;
+    const body = JSON.stringify(payload);
     const req = https.request({
       hostname: 'api.resend.com',
       path: '/emails',
@@ -11174,9 +11257,32 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         if (prefs?.email_invoices !== false && clientEmail && invoiceNumber) {
           const totalStr = `$${(totalCents / 100).toFixed(2)}`;
           const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
+
+          // Generate PDF attachment if we have an invoice record
+          let attachments;
+          if (invoiceId) {
+            try {
+              const { data: invoiceRow } = await supabase
+                .from('provider_invoices')
+                .select('*')
+                .eq('id', invoiceId)
+                .single();
+              if (invoiceRow) {
+                const pdfBuffer = await generateInvoicePdfBuffer(invoiceRow);
+                attachments = [{
+                  filename: `invoice-${invoiceNumber}.pdf`,
+                  content: pdfBuffer.toString('base64'),
+                }];
+              }
+            } catch (pdfErr) {
+              console.warn('[bookings/complete] PDF attachment generation failed:', pdfErr.message);
+            }
+          }
+
           await sendEmail({
             to: clientEmail,
             subject: `Invoice #${invoiceNumber} — ${serviceName}`,
+            attachments,
             html: `
               <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
                 <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
@@ -11184,7 +11290,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
                 </div>
                 <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
                   <p style="margin:0 0 8px">Hi ${clientName || "there"},</p>
-                  <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}.</p>
+                  <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}. Your invoice PDF is attached.</p>
                   <table style="width:100%;border-collapse:collapse">
                     <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
                     <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
