@@ -6064,6 +6064,49 @@ app.get("/api/providers/:id/clients", async (req, res) => {
   return handleProviderClients(req, res, req.params.id);
 });
 
+// insights routes MUST be before :clientId to avoid param shadowing
+app.get("/api/provider/clients/insights", async (req, res) => {
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  try {
+    const result = await buildClientInsights(providerId, req.query);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
+    console.error("[provider/clients/insights]", err);
+    return res.status(500).json({ error: "Failed to load client insights." });
+  }
+});
+
+app.get("/api/provider/clients/insights/export", async (req, res) => {
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  try {
+    const { clients } = await buildClientInsights(providerId, { ...req.query, page: 1, limit: 10000 });
+    const rows = clients.map((c) => ({
+      Name: c.name,
+      Email: c.email || "",
+      Status: c.status,
+      Visits: c.visits,
+      "Total Spent ($)": (c.total_spent / 100).toFixed(2),
+      "Last Visit": c.last_visit ? new Date(c.last_visit).toLocaleDateString() : "—",
+      "Top Service": c.top_service || "—",
+      "Connected Since": c.connected_at ? new Date(c.connected_at).toLocaleDateString() : "—",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Client Insights");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=client-insights.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return res.status(200).send(buf);
+  } catch (err) {
+    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
+    console.error("[provider/clients/insights/export]", err);
+    return res.status(500).json({ error: "Failed to export." });
+  }
+});
+
 app.get("/api/provider/clients/:clientId", async (req, res) => {
   return handleProviderClientTimeline(req, res, getUserId(req), req.params.clientId);
 });
@@ -6238,51 +6281,6 @@ function buildStats(rows, bookings) {
 
   return { total_clients: totalClients, active_clients: activeClients, new_this_month: newThisMonth, avg_visits: parseFloat(avgVisits), retention_rate: retentionRate };
 }
-
-app.get("/api/provider/clients/insights", async (req, res) => {
-  const providerId = getUserId(req);
-  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
-  try {
-    const result = await buildClientInsights(providerId, req.query);
-    return res.status(200).json(result);
-  } catch (err) {
-    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
-    console.error("[provider/clients/insights]", err);
-    return res.status(500).json({ error: "Failed to load client insights." });
-  }
-});
-
-app.get("/api/provider/clients/insights/export", async (req, res) => {
-  const providerId = getUserId(req);
-  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
-  try {
-    const { clients } = await buildClientInsights(providerId, { ...req.query, page: 1, limit: 10000 });
-
-    const rows = clients.map((c) => ({
-      Name: c.name,
-      Email: c.email || "",
-      Status: c.status,
-      Visits: c.visits,
-      "Total Spent ($)": (c.total_spent / 100).toFixed(2),
-      "Last Visit": c.last_visit ? new Date(c.last_visit).toLocaleDateString() : "—",
-      "Top Service": c.top_service || "—",
-      "Connected Since": c.connected_at ? new Date(c.connected_at).toLocaleDateString() : "—",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Client Insights");
-
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Disposition", "attachment; filename=client-insights.xlsx");
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    return res.status(200).send(buf);
-  } catch (err) {
-    if (err?.status === 404) return res.status(404).json({ error: "Provider not found." });
-    console.error("[provider/clients/insights/export]", err);
-    return res.status(500).json({ error: "Failed to export." });
-  }
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 
