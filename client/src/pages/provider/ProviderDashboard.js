@@ -325,6 +325,16 @@ const ProviderDashboard = () => {
     // Mobile-only color
     const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
     const clientsColor  = isEmpty ? '#B0948F' : '#C25E4A';
+    const weeklyEarningsLabel = fmtEarnings(weeklyEarnings);
+    const statValueFontSize = weeklyEarningsLabel.length > 6
+        ? 'clamp(28px, 7vw, 40px)'
+        : 'clamp(40px, 11vw, 52px)';
+    const statValueStyle = {
+        fontSize: statValueFontSize,
+        fontWeight: 600,
+        letterSpacing: '-0.05em',
+        lineHeight: 1,
+    };
 
     const openDrawer = (appt) => {
         setDrawerAppt({
@@ -533,14 +543,14 @@ const ProviderDashboard = () => {
                         <Lbl className="block mb-2">Weekly Earnings</Lbl>
                         <div className="flex items-end gap-1 overflow-hidden">
                             <ArrowIcon size={28} color={earningsColor} className="flex-shrink-0" />
-                            <span className="font-semibold tracking-[-0.05em] leading-none truncate" style={{ color: earningsColor, fontSize: 'clamp(28px, 7vw, 52px)' }}>
-                                {fmtEarnings(weeklyEarnings)}
+                            <span className="truncate" style={{ ...statValueStyle, color: earningsColor }}>
+                                {weeklyEarningsLabel}
                             </span>
                         </div>
                     </div>
                     <div style={{ width: '50%', paddingLeft: 20 }} className="flex flex-col items-end">
                         <Lbl className="block mb-2">New Clients</Lbl>
-                        <span className="text-[52px] font-semibold tracking-[-0.05em] leading-none" style={{ color: clientsColor }}>
+                        <span style={{ ...statValueStyle, color: clientsColor }}>
                             {newClients}
                         </span>
                     </div>
