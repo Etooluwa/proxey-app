@@ -10742,7 +10742,7 @@ app.post("/api/bookings/request-time", async (req, res) => {
 
     await createProviderNotification(provider_id, {
       type: providerBookingRules.autoAccept ? "new_booking" : "booking_request",
-      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New time request",
+      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New booking request",
       body: notifBody,
       booking_id: booking.id,
       data: {
