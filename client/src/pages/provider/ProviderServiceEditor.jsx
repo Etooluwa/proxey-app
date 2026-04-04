@@ -777,13 +777,14 @@ const ProviderServiceEditor = () => {
 
             {/* ── Sticky bottom bar ── */}
             <div
-                className="fixed bottom-0 left-0 right-0 px-5 py-3"
+                className="fixed bottom-0 left-0 right-0 py-3"
                 style={{
                     background: '#FBF7F2',
                     borderTop: '1px solid rgba(140,106,100,0.15)',
                     paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
                 }}
             >
+                <div className="mx-auto px-5" style={{ maxWidth: 640 }}>
                 {/* Delete row — only for existing services */}
                 {!isNew && (
                     <button
@@ -796,11 +797,11 @@ const ProviderServiceEditor = () => {
                         {deleting ? 'Deleting…' : 'Delete Service'}
                     </button>
                 )}
-                <div className="flex gap-3">
+                <div className="flex gap-3 justify-end">
                 <button
                     type="button"
                     onClick={() => navigate('/provider/services')}
-                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
+                    className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
                     style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
                 >
                     Cancel
@@ -809,7 +810,7 @@ const ProviderServiceEditor = () => {
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                    className="py-3.5 px-8 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
                     style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1 }}
                 >
                     {saving && (
@@ -827,6 +828,7 @@ const ProviderServiceEditor = () => {
                         {saving ? (savingStatus || 'Saving…') : 'Save Service'}
                     </span>
                 </button>
+                </div>
                 </div>
             </div>
 
