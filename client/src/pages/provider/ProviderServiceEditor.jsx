@@ -652,6 +652,9 @@ const ProviderServiceEditor = () => {
                 {/* ─ Intake questions ─ */}
                 <Section>
                     <SectionLabel>Intake questions</SectionLabel>
+                    <p className="text-[13px] text-muted m-0 mb-4 leading-relaxed">
+                        Ask clients questions when they book. Their answers will be visible to you on the appointment.
+                    </p>
 
                     {questions.map((q, qi) => (
                         <QuestionCard
