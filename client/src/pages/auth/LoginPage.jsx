@@ -14,7 +14,7 @@
  * Desktop: split layout — form (left, flex:1) + image panel (right, 50%)
  * Mobile: form only, full width
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
@@ -478,21 +478,51 @@ function MagicSentScreen({ email, onResend, onSignInWithPassword }) {
     );
 }
 
+// ─── Preload all images on mount ─────────────────────────────────────────────────
+const ALL_SRCS = Object.values(IMG);
+
 // ─── Right image panel ───────────────────────────────────────────────────────────
 function ImagePanel({ screen }) {
+    const key = imgKey(screen);
+    const src = IMG[key];
+    const caption = TX[key];
+
+    const [displayedSrc, setDisplayedSrc] = useState(src);
+    const [displayedCaption, setDisplayedCaption] = useState(caption);
+    const [opacity, setOpacity] = useState(1);
+    const prevSrc = useRef(src);
+
+    // Preload all images once
+    useEffect(() => {
+        ALL_SRCS.forEach(s => { const img = new Image(); img.src = s; });
+    }, []);
+
+    // Crossfade when screen changes
+    useEffect(() => {
+        if (src === prevSrc.current) return;
+        prevSrc.current = src;
+        setOpacity(0);
+        const t = setTimeout(() => {
+            setDisplayedSrc(src);
+            setDisplayedCaption(caption);
+            setOpacity(1);
+        }, 500);
+        return () => clearTimeout(t);
+    }, [src, caption]);
+
     return (
         <div style={{ width: '55%', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
             <img
-                src="https://i.imgur.com/k577At5.jpg"
+                src={displayedSrc}
                 alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity 0.7s ease' }}
             />
             {/* Top + bottom gradient */}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 40%, transparent 70%, rgba(0,0,0,0.25) 100%)', pointerEvents: 'none' }} />
             {/* Caption */}
             <div style={{ position: 'absolute', top: 40, left: 44, right: 44, zIndex: 2 }}>
-                <p style={{ fontFamily: F, color: '#fff', fontSize: 14, fontWeight: 500, letterSpacing: '0.01em', margin: 0, lineHeight: 1.5, textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                    {TX[imgKey(screen)]}
+                <p style={{ fontFamily: F, color: '#fff', fontSize: 14, fontWeight: 500, letterSpacing: '0.01em', margin: 0, lineHeight: 1.5, textShadow: '0 1px 4px rgba(0,0,0,0.3)', opacity, transition: 'opacity 0.7s ease' }}>
+                    {displayedCaption}
                 </p>
             </div>
         </div>
