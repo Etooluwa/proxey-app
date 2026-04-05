@@ -623,7 +623,7 @@ export default function LoginPage() {
     );
 
     const formPanel = (
-        <div style={{ flex: 1, background: '#fff', display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? '100%' : '100dvh' }}>
+        <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? '100%' : '100dvh' }}>
             {showBack && <BackBtn onClick={goBack} />}
 
             {/* Logo — shown on all screens except role (which renders its own) */}
@@ -688,9 +688,9 @@ export default function LoginPage() {
         );
     }
 
-    // Mobile — plain white bg, no gradient card
+    // Mobile — gradient background matching marketing site
     return (
-        <div style={{ minHeight: '100dvh', background: '#fff', fontFamily: F }}>
+        <div style={{ minHeight: '100dvh', background: 'linear-gradient(160deg, #FCD4C4 0%, #FDE8DC 30%, #FDF5F0 65%, #FDFDFD 100%)', fontFamily: F }}>
             <style>{globalStyles}</style>
             <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>{formPanel}</div>
