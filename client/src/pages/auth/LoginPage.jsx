@@ -694,7 +694,6 @@ export default function LoginPage() {
                     width: '100%', maxWidth: 1100, height: 760, borderRadius: 32,
                     overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.12)',
                     display: 'flex', background: '#fff', position: 'relative', zIndex: 1,
-                    border: '1px solid rgba(255,255,255,0.6)',
                 }}>
                     {/* Left form panel — 45% */}
                     <div style={{ width: '45%', display: 'flex', flexDirection: 'column', background: '#fff', overflowY: 'auto' }}>
