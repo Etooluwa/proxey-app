@@ -1,5 +1,4 @@
-// React import not needed with modern JSX transform
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { API_BASE } from './data/apiClient';
 import { AuthProvider } from './auth/authContext';
@@ -11,81 +10,75 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRedirect from './routes/RoleRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Layouts
-import AppLayout from './components/layout/AppLayout';
-import ProviderLayout from './components/layout/ProviderLayout';
-import AdminShell from './components/layout/AdminShell';
+const AppLayout = lazy(() => import('./components/layout/AppLayout'));
+const ProviderLayout = lazy(() => import('./components/layout/ProviderLayout'));
+const AdminShell = lazy(() => import('./components/layout/AdminShell'));
 
-// ── Auth / onboarding ────────────────────────────────────────────────────────
-import LoginPage from './pages/auth/LoginPage';
-import AuthCallback from './pages/AuthCallback';
-import ClientOnboarding from './pages/ClientOnboarding';
-import ProviderOnboarding from './pages/ProviderOnboardingPage';
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const ClientOnboarding = lazy(() => import('./pages/ClientOnboarding'));
+const ProviderOnboarding = lazy(() => import('./pages/ProviderOnboardingPage'));
 
-// ── Public (no auth) ─────────────────────────────────────────────────────────
-import PublicBookingPage from './pages/PublicBookingPage';
-import InviteAcceptPage from './pages/InviteAcceptPage';
+const PublicBookingPage = lazy(() => import('./pages/PublicBookingPage'));
+const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
 
-// ── Client pages ─────────────────────────────────────────────────────────────
-import AppDashboard from './pages/AppDashboard';
-import RelationshipPage from './pages/RelationshipPage';
-import BookingFlowPage from './pages/BookingFlowPage';
-import ReviewPage from './pages/ReviewPage';
-import MessagesPage from './pages/MessagesPage';
-import ChatPage from './pages/ChatPage';
-import NotificationsPage from './pages/NotificationsPage';
-import AllNotificationsPage from './pages/AllNotificationsPage';
-import AccountPage from './pages/AccountPage';
-import ClientBookings from './pages/ClientBookings';
-import ClientBookingDetail from './pages/ClientBookingDetail';
-import ClientInvoices from './pages/ClientInvoices';
+const AppDashboard = lazy(() => import('./pages/AppDashboard'));
+const RelationshipPage = lazy(() => import('./pages/RelationshipPage'));
+const BookingFlowPage = lazy(() => import('./pages/BookingFlowPage'));
+const ReviewPage = lazy(() => import('./pages/ReviewPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const AllNotificationsPage = lazy(() => import('./pages/AllNotificationsPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
+const ClientBookings = lazy(() => import('./pages/ClientBookings'));
+const ClientBookingDetail = lazy(() => import('./pages/ClientBookingDetail'));
+const ClientInvoices = lazy(() => import('./pages/ClientInvoices'));
+const ClientPersonalDetails = lazy(() => import('./pages/ClientPersonalDetails'));
+const ClientPaymentMethods = lazy(() => import('./pages/ClientPaymentMethods'));
+const ClientNotifSettings = lazy(() => import('./pages/ClientNotifSettings'));
+const ClientPrivacySecurity = lazy(() => import('./pages/ClientPrivacySecurity'));
+const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
+const FAQPage = lazy(() => import('./pages/FAQPage'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 
-// ── Provider pages ───────────────────────────────────────────────────────────
-import ProviderDashboard from './pages/provider/ProviderDashboard';
-import ProviderAppointments from './pages/provider/ProviderAppointments';
-import ProviderAppointmentDetail from './pages/provider/ProviderAppointmentDetail';
-import ProviderClients from './pages/provider/ProviderClients';
-import ProviderClientTimeline from './pages/provider/ProviderClientTimeline';
-import ProviderServices from './pages/provider/ProviderServices';
-import ProviderServiceEditor from './pages/provider/ProviderServiceEditor';
-import ProviderSchedule from './pages/provider/ProviderSchedule';
-import AvailabilityPage from './pages/provider/AvailabilityPage';
-import BlockTimePage from './pages/provider/BlockTimePage';
-import ProviderMessages from './pages/provider/ProviderMessages';
-import ProviderEarnings from './pages/provider/ProviderEarnings';
-import ProviderNotifications from './pages/provider/ProviderNotifications';
-import ProviderAllNotifications from './pages/provider/ProviderAllNotifications';
-import ProviderProfile from './pages/provider/ProviderProfile';
-import ProviderPersonalDetails from './pages/provider/ProviderPersonalDetails';
-import ProviderBusinessDetails from './pages/provider/ProviderBusinessDetails';
-import ProviderPhotosPortfolio from './pages/provider/ProviderPhotosPortfolio';
-import ProviderPayoutsBilling from './pages/provider/ProviderPayoutsBilling';
-import ProviderWorkingHours from './pages/provider/ProviderWorkingHours';
-import ProviderNotifSettings from './pages/provider/ProviderNotifSettings';
-import ProviderBookingSettings from './pages/provider/ProviderBookingSettings';
-import HelpSupport from './pages/provider/HelpSupport';
-import ProviderNewServiceGroup from './pages/provider/ProviderNewServiceGroup';
-import ProviderGroupEditor from './pages/provider/ProviderGroupEditor';
-import ProviderInsights from './pages/provider/ProviderInsights';
-import ClientPersonalDetails from './pages/ClientPersonalDetails';
-import ClientPaymentMethods from './pages/ClientPaymentMethods';
-import ClientNotifSettings from './pages/ClientNotifSettings';
-import ClientPrivacySecurity from './pages/ClientPrivacySecurity';
-import DeleteAccountPage from './pages/DeleteAccountPage';
-import FAQPage from './pages/FAQPage';
-import TermsOfService from './pages/TermsOfService';
-import PrivacyPolicy from './pages/PrivacyPolicy';
+const ProviderDashboard = lazy(() => import('./pages/provider/ProviderDashboard'));
+const ProviderAppointments = lazy(() => import('./pages/provider/ProviderAppointments'));
+const ProviderAppointmentDetail = lazy(() => import('./pages/provider/ProviderAppointmentDetail'));
+const ProviderClients = lazy(() => import('./pages/provider/ProviderClients'));
+const ProviderClientTimeline = lazy(() => import('./pages/provider/ProviderClientTimeline'));
+const ProviderServices = lazy(() => import('./pages/provider/ProviderServices'));
+const ProviderServiceEditor = lazy(() => import('./pages/provider/ProviderServiceEditor'));
+const ProviderSchedule = lazy(() => import('./pages/provider/ProviderSchedule'));
+const AvailabilityPage = lazy(() => import('./pages/provider/AvailabilityPage'));
+const BlockTimePage = lazy(() => import('./pages/provider/BlockTimePage'));
+const ProviderMessages = lazy(() => import('./pages/provider/ProviderMessages'));
+const ProviderEarnings = lazy(() => import('./pages/provider/ProviderEarnings'));
+const ProviderNotifications = lazy(() => import('./pages/provider/ProviderNotifications'));
+const ProviderAllNotifications = lazy(() => import('./pages/provider/ProviderAllNotifications'));
+const ProviderProfile = lazy(() => import('./pages/provider/ProviderProfile'));
+const ProviderPersonalDetails = lazy(() => import('./pages/provider/ProviderPersonalDetails'));
+const ProviderBusinessDetails = lazy(() => import('./pages/provider/ProviderBusinessDetails'));
+const ProviderPhotosPortfolio = lazy(() => import('./pages/provider/ProviderPhotosPortfolio'));
+const ProviderPayoutsBilling = lazy(() => import('./pages/provider/ProviderPayoutsBilling'));
+const ProviderWorkingHours = lazy(() => import('./pages/provider/ProviderWorkingHours'));
+const ProviderNotifSettings = lazy(() => import('./pages/provider/ProviderNotifSettings'));
+const ProviderBookingSettings = lazy(() => import('./pages/provider/ProviderBookingSettings'));
+const HelpSupport = lazy(() => import('./pages/provider/HelpSupport'));
+const ProviderNewServiceGroup = lazy(() => import('./pages/provider/ProviderNewServiceGroup'));
+const ProviderGroupEditor = lazy(() => import('./pages/provider/ProviderGroupEditor'));
+const ProviderInsights = lazy(() => import('./pages/provider/ProviderInsights'));
 
-// ── Admin pages ──────────────────────────────────────────────────────────────
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminBookings from './pages/admin/AdminBookings';
-import AdminDisputes from './pages/admin/AdminDisputes';
-import AdminServices from './pages/admin/AdminServices';
-import AdminReviews from './pages/admin/AdminReviews';
-import AdminRevenue from './pages/admin/AdminRevenue';
-import AdminPromotions from './pages/admin/AdminPromotions';
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminBookings = lazy(() => import('./pages/admin/AdminBookings'));
+const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'));
+const AdminServices = lazy(() => import('./pages/admin/AdminServices'));
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
+const AdminRevenue = lazy(() => import('./pages/admin/AdminRevenue'));
+const AdminPromotions = lazy(() => import('./pages/admin/AdminPromotions'));
 
 function ScrollToTopOnRouteChange() {
   const location = useLocation();
@@ -118,9 +111,21 @@ function ScrollToTopOnRouteChange() {
   return null;
 }
 
+function RouteFallback() {
+  return (
+    <div className="page page--centered">
+      <span aria-live="polite">Loading…</span>
+    </div>
+  );
+}
+
 function App() {
   useEffect(() => {
-    fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+    const timeoutId = window.setTimeout(() => {
+      fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   return (
@@ -132,7 +137,8 @@ function App() {
             <NotificationProvider>
               <BookingProvider>
                 <MessageProvider>
-                  <Routes>
+                  <Suspense fallback={<RouteFallback />}>
+                    <Routes>
 
                     {/* ── Public routes (no auth) ──────────────────────────── */}
                     <Route path="/book/:handle" element={<PublicBookingPage />} />
@@ -318,7 +324,8 @@ function App() {
                     {/* ── Catch-all ────────────────────────────────────────── */}
                     <Route path="*" element={<Navigate to="/" replace />} />
 
-                  </Routes>
+                    </Routes>
+                  </Suspense>
                 </MessageProvider>
               </BookingProvider>
             </NotificationProvider>

@@ -27,6 +27,18 @@ const sanitizeNotification = (n) => ({
     is_read: n.is_read ?? n.read ?? false
 });
 
+function scheduleDeferredWork(work, delay = 800) {
+    if (typeof window === 'undefined') return () => {};
+
+    if (typeof window.requestIdleCallback === 'function') {
+        const id = window.requestIdleCallback(work, { timeout: delay + 700 });
+        return () => window.cancelIdleCallback?.(id);
+    }
+
+    const timeoutId = window.setTimeout(work, delay);
+    return () => window.clearTimeout(timeoutId);
+}
+
 export const NotificationProvider = ({ children }) => {
     const { session } = useSession();
     const [notifications, setNotifications] = useState([]);
@@ -69,7 +81,10 @@ export const NotificationProvider = ({ children }) => {
 
     // Initial load
     useEffect(() => {
-        refresh();
+        const cancel = scheduleDeferredWork(() => {
+            refresh();
+        });
+        return cancel;
     }, [refresh]);
 
     // Real-time subscription for new notifications

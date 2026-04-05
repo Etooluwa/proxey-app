@@ -76,6 +76,18 @@ function mergeUniqueMessages(messages = []) {
     ));
 }
 
+function scheduleDeferredWork(work, delay = 1200) {
+    if (typeof window === 'undefined') return () => {};
+
+    if (typeof window.requestIdleCallback === 'function') {
+        const id = window.requestIdleCallback(work, { timeout: delay + 800 });
+        return () => window.cancelIdleCallback?.(id);
+    }
+
+    const timeoutId = window.setTimeout(work, delay);
+    return () => window.clearTimeout(timeoutId);
+}
+
 export const MessageProvider = ({ children }) => {
     const { session, profile } = useSession();
     const userId = session?.user?.id;
@@ -212,7 +224,10 @@ export const MessageProvider = ({ children }) => {
 
     // Load conversations on mount
     useEffect(() => {
-        loadConversations();
+        const cancel = scheduleDeferredWork(() => {
+            loadConversations();
+        });
+        return cancel;
     }, [loadConversations]);
 
     // Create or get existing conversation
