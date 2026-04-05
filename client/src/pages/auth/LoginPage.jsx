@@ -183,42 +183,63 @@ function OptionCard({ icon, title, subtitle, onClick }) {
             onMouseLeave={() => setHov(false)}
             style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '22px 24px', borderRadius: 16,
-                border: `1px solid ${hov ? T.accent : T.line}`,
-                background: T.card, cursor: 'pointer', width: '100%', textAlign: 'left',
-                marginBottom: 12, transition: 'all .15s',
-                boxShadow: hov ? '0 4px 16px rgba(194,94,74,0.06)' : 'none',
-                transform: hov ? 'translateY(-1px)' : 'none',
-                fontFamily: F,
+                padding: '20px 20px', borderRadius: 16,
+                border: `1px solid ${hov ? 'rgba(251,146,60,0.5)' : '#E5E7EB'}`,
+                background: '#fff', cursor: 'pointer', width: '100%', textAlign: 'left',
+                marginBottom: 12, transition: 'all .2s', fontFamily: F,
+                boxShadow: hov ? '0 4px 20px rgba(251,146,60,0.12)' : 'none',
+                position: 'relative', overflow: 'hidden',
             }}
         >
-            <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+            {/* hover tint overlay */}
+            <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to right, rgba(255,237,213,0.6), transparent)',
+                opacity: hov ? 1 : 0, transition: 'opacity .2s', pointerEvents: 'none',
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, position: 'relative', zIndex: 1 }}>
+                <div style={{
+                    padding: 10, borderRadius: 12,
+                    color: hov ? '#EA580C' : '#9CA3AF',
+                    transition: 'color .2s', flexShrink: 0,
+                }}>
                     {icon}
-                    <span style={{ fontSize: 16, fontWeight: 500, color: T.ink }}>{title}</span>
                 </div>
-                <p style={{ fontSize: 13, color: T.muted, margin: 0, paddingLeft: 30 }}>{subtitle}</p>
+                <div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 4 }}>{title}</div>
+                    <div style={{ fontSize: 13, color: '#6B7280' }}>{subtitle}</div>
+                </div>
             </div>
-            <ArrowIcon />
+            <svg width="20" height="20" fill="none" stroke={hov ? '#F97316' : '#D1D5DB'} strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, position: 'relative', zIndex: 1, transition: 'stroke .2s' }}>
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
         </button>
     );
 }
 
 // ─── Screens ────────────────────────────────────────────────────────────────────
 
-function RoleScreen({ onSelectClient, onSelectProvider }) {
+function RoleScreen({ onSelectClient, onSelectProvider, isDesktop, klogoSrc }) {
     return (
         <div>
-            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', textAlign: 'center', margin: '0 0 6px' }}>Sign up or log in</h1>
-            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, textAlign: 'center', margin: '0 0 40px' }}>Choose how you use Kliques</p>
+            {/* Logo — shown in form panel on both desktop and mobile */}
+            <div style={{ marginBottom: 32 }}>
+                <img
+                    src={klogoSrc}
+                    alt="Kliques"
+                    style={{ height: isDesktop ? 56 : 48, width: 'auto', objectFit: 'contain', display: 'block' }}
+                />
+            </div>
+            <h1 style={{ fontFamily: F, fontSize: 30, fontWeight: 600, color: '#111827', letterSpacing: '-0.02em', margin: '0 0 8px' }}>Sign up or log in</h1>
+            <p style={{ fontFamily: F, fontSize: 15, color: '#6B7280', margin: '0 0 32px' }}>Choose how you use Kliques</p>
             <OptionCard
-                icon={<svg width="20" height="20" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                icon={<svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 title="Kliques for clients"
                 subtitle="Book and manage your appointments"
                 onClick={onSelectClient}
             />
             <OptionCard
-                icon={<svg width="20" height="20" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                icon={<svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 title="Kliques for professionals"
                 subtitle="Manage and grow your business"
                 onClick={onSelectProvider}
@@ -467,19 +488,25 @@ function ImagePanel({ screen }) {
     }
 
     return (
-        <div style={{ width: '50%', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ width: '55%', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
             <img
                 src={IMG[currentKey]}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity .4s' }}
             />
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 36px', background: 'linear-gradient(transparent,rgba(0,0,0,0.55))', zIndex: 2 }}>
-                <div style={{ marginBottom: 8 }}>
-                    <img src={klogo} alt="kliques" style={{ height: 22, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-                </div>
-                <p style={{ fontFamily: F, color: '#fff', fontSize: 13, lineHeight: 1.6, margin: 0, opacity: 0.9 }}>
+            {/* Top + bottom gradient for text readability */}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 40%, transparent 70%, rgba(0,0,0,0.25) 100%)', pointerEvents: 'none' }} />
+            {/* Quote at top-left */}
+            <div style={{ position: 'absolute', top: 40, left: 44, right: 44, zIndex: 2 }}>
+                <p style={{ fontFamily: F, color: '#fff', fontSize: 14, fontWeight: 500, letterSpacing: '0.01em', margin: 0, lineHeight: 1.5, textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
                     {TX[currentKey]}
                 </p>
+            </div>
+            {/* Carousel dots */}
+            <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8, zIndex: 2 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }} />
             </div>
         </div>
     );
@@ -539,6 +566,8 @@ export default function LoginPage() {
                     <RoleScreen
                         onSelectClient={() => { setFlowRole('client'); setScreen('client_login'); }}
                         onSelectProvider={() => { setFlowRole('provider'); setScreen('provider_login'); }}
+                        isDesktop={isDesktop}
+                        klogoSrc={klogo}
                     />
                 );
             case 'client_login':
@@ -594,22 +623,29 @@ export default function LoginPage() {
     );
 
     const formPanel = (
-        <div style={{ flex: 1, background: T.card, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? 640 : '100dvh' }}>
+        <div style={{ flex: 1, background: '#fff', display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? '100%' : '100dvh' }}>
             {showBack && <BackBtn onClick={goBack} />}
 
+            {/* Logo — shown on all screens except role (which renders its own) */}
+            {showBack && (
+                <div style={{ padding: isDesktop ? '40px 56px 0' : '40px 28px 0' }}>
+                    <img src={klogo} alt="Kliques" style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block' }} />
+                </div>
+            )}
+
             {/* Content area */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '48px 56px' : '48px 28px', maxWidth: 520, margin: '0 auto', width: '100%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '32px 56px 32px' : '32px 28px', maxWidth: 520, margin: '0 auto', width: '100%' }}>
                 {renderScreen()}
             </div>
 
             {/* Footer links */}
-            <div style={{ padding: '20px 56px 28px' }}>
-                <div style={{ display: 'flex', gap: 24, justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ padding: isDesktop ? '0 56px 28px' : '0 28px 28px' }}>
+                <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
                     {[
                         { label: 'English', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> },
                         { label: 'Help and support', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg> },
                     ].map(({ label, icon }) => (
-                        <a key={label} href="#" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <a key={label} href="#" style={{ fontFamily: F, fontSize: 13, color: '#6B7280', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
                             {icon}{label}
                         </a>
                     ))}
@@ -618,23 +654,33 @@ export default function LoginPage() {
         </div>
     );
 
+    const globalStyles = `
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+        * { box-sizing: border-box; }
+        button:active { transform: scale(0.98); }
+    `;
+
     if (isDesktop) {
         return (
-            <div style={{ minHeight: '100vh', background: T.base, fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                <style>{`
-                    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-                    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
-                    * { box-sizing: border-box; }
-                    button:active { transform: scale(0.98); }
-                `}</style>
+            <div style={{
+                minHeight: '100vh', fontFamily: F,
+                background: 'linear-gradient(135deg, #FCD4C4 0%, #FDF1EB 50%, #FDFDFD 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 32, position: 'relative', overflow: 'hidden',
+            }}>
+                <style>{globalStyles}</style>
+                {/* Soft glow blob */}
+                <div style={{ position: 'absolute', bottom: '-20%', left: '5%', width: '60%', height: '60%', background: '#FDBD9E', borderRadius: '50%', filter: 'blur(120px)', opacity: 0.35, pointerEvents: 'none' }} />
                 <div style={{
-                    width: '100%', maxWidth: 1100, minHeight: 640, borderRadius: 24,
-                    overflow: 'hidden', boxShadow: '0 20px 60px rgba(61,35,30,0.06)',
-                    display: 'flex', border: `1px solid ${T.line}`,
+                    width: '100%', maxWidth: 1100, height: 700, borderRadius: 32,
+                    overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.12)',
+                    display: 'flex', background: '#fff', position: 'relative', zIndex: 1,
+                    border: '1px solid rgba(255,255,255,0.6)',
                 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1, paddingBottom: 24 }}>
+                    {/* Left form panel — 45% */}
+                    <div style={{ width: '45%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
                         {formPanel}
-                        {legalLinks}
                     </div>
                     <ImagePanel screen={screen} />
                 </div>
@@ -642,14 +688,10 @@ export default function LoginPage() {
         );
     }
 
-    // Mobile
+    // Mobile — plain white bg, no gradient card
     return (
-        <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
-            <style>{`
-                @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
-                * { box-sizing: border-box; }
-            `}</style>
+        <div style={{ minHeight: '100dvh', background: '#fff', fontFamily: F }}>
+            <style>{globalStyles}</style>
             <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>{formPanel}</div>
                 <div style={{ padding: '0 24px 28px' }}>{legalLinks}</div>
