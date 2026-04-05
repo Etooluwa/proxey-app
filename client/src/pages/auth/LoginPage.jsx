@@ -14,7 +14,7 @@
  * Desktop: split layout — form (left, flex:1) + image panel (right, 50%)
  * Mobile: form only, full width
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
@@ -479,38 +479,78 @@ function MagicSentScreen({ email, onResend, onSignInWithPassword }) {
 }
 
 // ─── Right image panel ───────────────────────────────────────────────────────────
-function ImagePanel({ screen }) {
-    const key = imgKey(screen);
-    const [currentKey, setCurrentKey] = useState(key);
-    const [opacity, setOpacity] = useState(1);
-    const prevKey = useRef(key);
+const ALL_IMGS = [
+    { src: IMG.role,           caption: TX.role },
+    { src: IMG.client,         caption: TX.client },
+    { src: IMG.provider,       caption: TX.provider },
+    { src: IMG.magic,          caption: TX.magic },
+    { src: IMG.signup_client,  caption: TX.client },
+    { src: IMG.signup_provider,caption: TX.provider },
+];
 
-    if (prevKey.current !== key) {
-        prevKey.current = key;
+function ImagePanel({ screen }) {
+    const [idx, setIdx] = useState(0);
+    const [opacity, setOpacity] = useState(1);
+    const timerRef = useRef(null);
+
+    // Auto-advance every 4 seconds
+    useEffect(() => {
+        timerRef.current = setInterval(() => {
+            setOpacity(0);
+            setTimeout(() => {
+                setIdx(i => (i + 1) % ALL_IMGS.length);
+                setOpacity(1);
+            }, 350);
+        }, 4000);
+        return () => clearInterval(timerRef.current);
+    }, []);
+
+    const goTo = (i) => {
+        if (i === idx) return;
+        clearInterval(timerRef.current);
         setOpacity(0);
-        setTimeout(() => { setCurrentKey(key); setOpacity(1); }, 150);
-    }
+        setTimeout(() => { setIdx(i); setOpacity(1); }, 350);
+        // Restart auto-advance
+        timerRef.current = setInterval(() => {
+            setOpacity(0);
+            setTimeout(() => {
+                setIdx(prev => (prev + 1) % ALL_IMGS.length);
+                setOpacity(1);
+            }, 350);
+        }, 4000);
+    };
+
+    const current = ALL_IMGS[idx];
 
     return (
         <div style={{ width: '55%', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
             <img
-                src={IMG[currentKey]}
+                src={current.src}
                 alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity .4s' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity, transition: 'opacity .35s ease' }}
             />
-            {/* Top + bottom gradient for text readability */}
+            {/* Top + bottom gradient */}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 40%, transparent 70%, rgba(0,0,0,0.25) 100%)', pointerEvents: 'none' }} />
-            {/* Quote at top-left */}
+            {/* Caption */}
             <div style={{ position: 'absolute', top: 40, left: 44, right: 44, zIndex: 2 }}>
-                <p style={{ fontFamily: F, color: '#fff', fontSize: 14, fontWeight: 500, letterSpacing: '0.01em', margin: 0, lineHeight: 1.5, textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                    {TX[currentKey]}
+                <p style={{ fontFamily: F, color: '#fff', fontSize: 14, fontWeight: 500, letterSpacing: '0.01em', margin: 0, lineHeight: 1.5, textShadow: '0 1px 4px rgba(0,0,0,0.3)', opacity, transition: 'opacity .35s ease' }}>
+                    {current.caption}
                 </p>
             </div>
-            {/* Carousel dots */}
+            {/* Clickable dots */}
             <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8, zIndex: 2 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }} />
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }} />
+                {ALL_IMGS.map((_, i) => (
+                    <button
+                        key={i}
+                        onClick={() => goTo(i)}
+                        style={{
+                            width: i === idx ? 20 : 8, height: 8, borderRadius: 4,
+                            background: i === idx ? '#fff' : 'rgba(255,255,255,0.4)',
+                            border: 'none', padding: 0, cursor: 'pointer',
+                            transition: 'all .3s ease',
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );
