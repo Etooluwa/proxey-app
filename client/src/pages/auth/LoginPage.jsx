@@ -297,7 +297,7 @@ function LoginScreen({ role, onSignup, onMagicLink, onSuccess, onGoogleLogin }) 
                 <BtnOutlined onClick={onMagicLink}><BoltIcon /> Sign in without password</BtnOutlined>
                 <BtnOutlined onClick={onGoogleLogin}><GoogleIcon /> Continue with Google</BtnOutlined>
             </div>
-            <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
+            <div style={{ paddingTop: 24, textAlign: 'center' }}>
                 <button onClick={onSignup} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
                     Don't have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign up</span>
                 </button>
@@ -375,7 +375,7 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
             <BtnPrimary onClick={handleSubmit} disabled={submitting}>{submitting ? 'Creating account…' : 'Create Account'}</BtnPrimary>
             <Divider />
             <BtnOutlined onClick={() => onGoogleSignup(name)}><GoogleIcon /> Sign up with Google</BtnOutlined>
-            <div style={{ marginTop: 'auto', paddingTop: 24, textAlign: 'center' }}>
+            <div style={{ paddingTop: 24, textAlign: 'center' }}>
                 <button onClick={onLogin} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
                     Already have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign in</span>
                 </button>
