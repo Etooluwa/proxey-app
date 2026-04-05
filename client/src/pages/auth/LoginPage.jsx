@@ -31,10 +31,12 @@ const F = "'Sora',system-ui,sans-serif";
 
 // ─── Right-panel images & captions ─────────────────────────────────────────────
 const IMG = {
-    role: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=960&h=1200&fit=crop&crop=faces',
-    client: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=960&h=1200&fit=crop&crop=faces',
-    provider: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=960&h=1200&fit=crop&crop=faces',
-    magic: 'https://images.unsplash.com/photo-1516387938699-a93567ec168e?w=960&h=1200&fit=crop&crop=center',
+    role: 'https://i.imgur.com/k577At5.jpg',
+    client: 'https://i.imgur.com/mib845n.jpg',
+    provider: 'https://i.imgur.com/rYkxkQ0.jpg',
+    magic: 'https://i.imgur.com/d63jcdj.jpg',
+    signup_client: 'https://i.imgur.com/5AzkZIw.jpg',
+    signup_provider: 'https://i.imgur.com/AbS7lOm.jpg',
 };
 const TX = {
     role: 'Build relationships, not just bookings.',
@@ -44,8 +46,10 @@ const TX = {
 };
 
 function imgKey(screen) {
-    if (screen.startsWith('client')) return 'client';
-    if (screen.startsWith('provider')) return 'provider';
+    if (screen === 'client_signup') return 'signup_client';
+    if (screen === 'provider_signup') return 'signup_provider';
+    if (screen === 'client_login') return 'client';
+    if (screen === 'provider_login') return 'provider';
     if (screen === 'magic_link' || screen === 'magic_sent') return 'magic';
     return 'role';
 }
