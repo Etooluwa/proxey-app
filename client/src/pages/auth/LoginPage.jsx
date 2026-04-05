@@ -226,13 +226,21 @@ function OptionCard({ icon, title, subtitle, onClick }) {
 function RoleScreen({ onSelectClient, onSelectProvider, isDesktop, klogoSrc }) {
     return (
         <div>
-            {/* Logo — shown in form panel on both desktop and mobile */}
-            <div style={{ marginBottom: 16 }}>
-                <img
-                    src={klogoSrc}
-                    alt="Kliques"
-                    style={{ height: isDesktop ? 88 : 72, width: 'auto', objectFit: 'contain', display: 'block' }}
-                />
+            {/* Back button → landing page */}
+            <div style={{ marginBottom: 28 }}>
+                <a
+                    href="https://mykliques.com"
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                        fontFamily: F, fontSize: 13, fontWeight: 500, color: T.muted,
+                        textDecoration: 'none', transition: 'color .15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = T.ink}
+                    onMouseLeave={e => e.currentTarget.style.color = T.muted}
+                >
+                    <BackArrow />
+                    Back
+                </a>
             </div>
             <h1 style={{ fontFamily: F, fontSize: 30, fontWeight: 600, color: '#111827', letterSpacing: '-0.02em', margin: '0 0 8px' }}>Sign up or log in</h1>
             <p style={{ fontFamily: F, fontSize: 15, color: '#6B7280', margin: '0 0 32px' }}>Choose how you use Kliques</p>
