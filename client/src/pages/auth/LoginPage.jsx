@@ -227,7 +227,7 @@ function RoleScreen({ onSelectClient, onSelectProvider, isDesktop, klogoSrc }) {
                 <img
                     src={klogoSrc}
                     alt="Kliques"
-                    style={{ height: isDesktop ? 56 : 48, width: 'auto', objectFit: 'contain', display: 'block' }}
+                    style={{ height: isDesktop ? 88 : 72, width: 'auto', objectFit: 'contain', display: 'block' }}
                 />
             </div>
             <h1 style={{ fontFamily: F, fontSize: 30, fontWeight: 600, color: '#111827', letterSpacing: '-0.02em', margin: '0 0 8px' }}>Sign up or log in</h1>
