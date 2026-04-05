@@ -626,8 +626,8 @@ export default function LoginPage() {
         <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? '100%' : '100dvh' }}>
             {showBack && <BackBtn onClick={goBack} />}
 
-            {/* Logo — shown on all screens except role (which renders its own) */}
-            {showBack && (
+            {/* Logo — only shown on magic link / sent screens, not login or signup */}
+            {showBack && (screen === 'magic_link' || screen === 'magic_sent') && (
                 <div style={{ padding: isDesktop ? '32px 56px 0' : '32px 28px 0', marginTop: 40 }}>
                     <img src={klogo} alt="Kliques" style={{ height: isDesktop ? 64 : 56, width: 'auto', objectFit: 'contain', display: 'block' }} />
                 </div>
