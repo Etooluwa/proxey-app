@@ -634,7 +634,7 @@ export default function LoginPage() {
             )}
 
             {/* Content area */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '32px 56px 32px' : '32px 28px', maxWidth: 520, margin: '0 auto', width: '100%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '32px 56px 32px' : `${showBack ? '72px' : '32px'} 28px 32px`, maxWidth: 520, margin: '0 auto', width: '100%' }}>
                 {renderScreen()}
             </div>
 
