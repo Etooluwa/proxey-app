@@ -628,8 +628,8 @@ export default function LoginPage() {
 
             {/* Logo — shown on all screens except role (which renders its own) */}
             {showBack && (
-                <div style={{ padding: isDesktop ? '40px 56px 0' : '40px 28px 0' }}>
-                    <img src={klogo} alt="Kliques" style={{ height: 40, width: 'auto', objectFit: 'contain', display: 'block' }} />
+                <div style={{ padding: isDesktop ? '32px 56px 0' : '32px 28px 0', marginTop: 40 }}>
+                    <img src={klogo} alt="Kliques" style={{ height: isDesktop ? 64 : 56, width: 'auto', objectFit: 'contain', display: 'block' }} />
                 </div>
             )}
 
