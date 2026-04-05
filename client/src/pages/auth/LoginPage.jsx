@@ -223,7 +223,7 @@ function RoleScreen({ onSelectClient, onSelectProvider, isDesktop, klogoSrc }) {
     return (
         <div>
             {/* Logo — shown in form panel on both desktop and mobile */}
-            <div style={{ marginBottom: 32 }}>
+            <div style={{ marginBottom: 16 }}>
                 <img
                     src={klogoSrc}
                     alt="Kliques"
