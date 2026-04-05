@@ -272,24 +272,24 @@ function LoginScreen({ role, onSignup, onMagicLink, onSuccess, onGoogleLogin }) 
     const label = role === 'client' ? 'client' : 'provider';
     return (
         <div>
-            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 6px' }}>Welcome back</h1>
-            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 32px' }}>Sign in to your {label} account</p>
+            <h1 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 4px' }}>Welcome back</h1>
+            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 24px' }}>Sign in to your {label} account</p>
 
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 14 }}>
                 <Lbl>Email</Lbl>
                 <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoComplete="email" style={inputBase} />
             </div>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 6 }}>
                 <Lbl>Password</Lbl>
                 <PwInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" />
             </div>
-            <div style={{ textAlign: 'right', marginBottom: 24 }}>
+            <div style={{ textAlign: 'right', marginBottom: 20 }}>
                 <button onClick={onMagicLink} style={{ fontFamily: F, fontSize: 12, color: T.accent, fontWeight: 500, padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer' }}>
                     Forgot password?
                 </button>
             </div>
 
-            {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 12px' }}>{error}</p>}
+            {error && <p style={{ fontFamily: F, fontSize: 12, color: T.danger, margin: '0 0 10px' }}>{error}</p>}
 
             <BtnPrimary onClick={handleSubmit} disabled={submitting}>{submitting ? 'Signing in…' : 'Sign In'}</BtnPrimary>
             <Divider />
@@ -297,9 +297,9 @@ function LoginScreen({ role, onSignup, onMagicLink, onSuccess, onGoogleLogin }) 
                 <BtnOutlined onClick={onMagicLink}><BoltIcon /> Sign in without password</BtnOutlined>
                 <BtnOutlined onClick={onGoogleLogin}><GoogleIcon /> Continue with Google</BtnOutlined>
             </div>
-            <div style={{ paddingTop: 24, textAlign: 'center' }}>
-                <button onClick={onSignup} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
-                    Don't have an account? <span style={{ color: T.accent, fontWeight: 500 }}>Sign up</span>
+            <div style={{ paddingTop: 20, textAlign: 'center', borderTop: `1px solid ${T.line}`, marginTop: 20 }}>
+                <button onClick={onSignup} style={{ fontFamily: F, fontSize: 14, color: T.muted, padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}>
+                    Don't have an account? <span style={{ color: T.accent, fontWeight: 600 }}>Sign up</span>
                 </button>
             </div>
         </div>
@@ -673,13 +673,13 @@ export default function LoginPage() {
                 {/* Soft glow blob */}
                 <div style={{ position: 'absolute', bottom: '-20%', left: '5%', width: '60%', height: '60%', background: '#FDBD9E', borderRadius: '50%', filter: 'blur(120px)', opacity: 0.35, pointerEvents: 'none' }} />
                 <div style={{
-                    width: '100%', maxWidth: 1100, height: 700, borderRadius: 32,
+                    width: '100%', maxWidth: 1100, height: 760, borderRadius: 32,
                     overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.12)',
                     display: 'flex', background: '#fff', position: 'relative', zIndex: 1,
                     border: '1px solid rgba(255,255,255,0.6)',
                 }}>
                     {/* Left form panel — 45% */}
-                    <div style={{ width: '45%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+                    <div style={{ width: '45%', display: 'flex', flexDirection: 'column', background: '#fff', overflowY: 'auto' }}>
                         {formPanel}
                     </div>
                     <ImagePanel screen={screen} />
