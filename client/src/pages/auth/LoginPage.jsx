@@ -513,22 +513,23 @@ function ImagePanel({ screen }) {
 }
 
 // ─── Back button ─────────────────────────────────────────────────────────────────
-function BackBtn({ onClick }) {
+function BackBtn({ onClick, isDesktop }) {
     return (
-        <button
-            onClick={onClick}
-            style={{
-                position: 'absolute', top: 28, left: 28,
-                padding: 8, borderRadius: 10,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'none', border: 'none', cursor: 'pointer',
-                transition: 'background .15s', zIndex: 2,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = T.abg}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-        >
-            <BackArrow />
-        </button>
+        <div style={{ padding: isDesktop ? '28px 56px 0' : '28px 28px 0' }}>
+            <button
+                onClick={onClick}
+                style={{
+                    padding: 8, borderRadius: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    transition: 'background .15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = T.abg}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+                <BackArrow />
+            </button>
+        </div>
     );
 }
 
@@ -623,18 +624,18 @@ export default function LoginPage() {
     );
 
     const formPanel = (
-        <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', position: 'relative', minHeight: isDesktop ? '100%' : '100dvh' }}>
-            {showBack && <BackBtn onClick={goBack} />}
+        <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', minHeight: isDesktop ? '100%' : '100dvh' }}>
+            {showBack && <BackBtn onClick={goBack} isDesktop={isDesktop} />}
 
             {/* Logo — only shown on magic link / sent screens, not login or signup */}
             {showBack && (screen === 'magic_link' || screen === 'magic_sent') && (
-                <div style={{ padding: isDesktop ? '32px 56px 0' : '32px 28px 0', marginTop: 40 }}>
+                <div style={{ padding: isDesktop ? '16px 56px 0' : '16px 28px 0' }}>
                     <img src={klogo} alt="Kliques" style={{ height: isDesktop ? 64 : 56, width: 'auto', objectFit: 'contain', display: 'block' }} />
                 </div>
             )}
 
             {/* Content area */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '32px 56px 32px' : `${showBack ? '72px' : '32px'} 28px 32px`, maxWidth: 520, margin: '0 auto', width: '100%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isDesktop ? '32px 56px 32px' : '24px 28px 32px', maxWidth: 520, margin: '0 auto', width: '100%' }}>
                 {renderScreen()}
             </div>
 
