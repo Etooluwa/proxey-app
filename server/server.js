@@ -11758,13 +11758,24 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       try {
         const hasNote = !!(booking.session_notes || "").trim();
         const hasRec = !!(booking.session_recommendation || "").trim();
+        const { count: photoCount } = await supabase
+          .from("booking_photos")
+          .select("id", { count: "exact", head: true })
+          .eq("booking_id", bookingId);
+        const hasPhotos = (photoCount || 0) > 0;
+
+        const leftItems = [
+          hasNote && "a session note",
+          hasRec && "a recommendation",
+          hasPhotos && "photos",
+        ].filter(Boolean);
+
         let completionBody = `Your ${serviceName} with ${providerDisplayName} is complete.`;
-        if (hasNote && hasRec) {
-          completionBody += ` ${providerDisplayName} left a session note and a recommendation for you.`;
-        } else if (hasNote) {
-          completionBody += ` ${providerDisplayName} left a session note for you.`;
-        } else if (hasRec) {
-          completionBody += ` ${providerDisplayName} left a recommendation for you.`;
+        if (leftItems.length > 0) {
+          const joined = leftItems.length === 1
+            ? leftItems[0]
+            : leftItems.slice(0, -1).join(", ") + " and " + leftItems[leftItems.length - 1];
+          completionBody += ` ${providerDisplayName} left ${joined} for you.`;
         }
         completionBody += invoiceNumber
           ? " Your invoice is now available in the Invoices page."
@@ -11783,6 +11794,7 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
             show_review_prompt: true,
             has_session_note: hasNote,
             has_recommendation: hasRec,
+            has_photos: hasPhotos,
             invoice_id: invoiceId,
             invoice_number: invoiceNumber,
           },
