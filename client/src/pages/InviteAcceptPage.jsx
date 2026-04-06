@@ -242,13 +242,12 @@ function ScreenError({ reason, providerName }) {
 // ─── SCREEN: Landing ────────────────────────────────────────────────────────────
 function ScreenLanding({ provider, hasAccount, onPrimary, onSecondary }) {
     const displayName = provider?.business_name || provider?.name || 'Your Provider';
-    const firstName = displayName.split(' ')[0];
     const subtitle = [fmtCategory(provider?.category), provider?.city].filter(Boolean).join(' · ');
 
     const benefits = [
         {
             title: 'Book sessions directly',
-            desc: `Skip the back-and-forth. Book with ${firstName} in a few taps.`,
+            desc: `Skip the back-and-forth. Book with ${displayName} in a few taps.`,
             icon: <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/>,
         },
         {
@@ -509,8 +508,8 @@ function ScreenConnected({ provider, clientName }) {
     const subtitle = [fmtCategory(provider?.category), provider?.city].filter(Boolean).join(' · ');
 
     const items = [
-        `Browse ${displayName.split(' ')[0]}'s services and book a session`,
-        `Message ${displayName.split(' ')[0]} directly`,
+        `Browse ${displayName}'s services and book a session`,
+        `Message ${displayName} directly`,
         'See your relationship timeline grow',
     ];
 

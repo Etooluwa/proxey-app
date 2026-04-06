@@ -211,7 +211,6 @@ function StarRow({ rating, max = 5 }) {
 // ─── STEP 1: Provider Profile ───────────────────────────────────────────────────
 function Step1Profile({ provider, services, groups, reviews, selectedService, onSelectService, onContinue }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
-    const firstName = displayName.split(' ')[0];
     const category = provider?.category || (provider?.categories?.[0]) || '';
     const subtitle = [category, provider?.city].filter(Boolean).join(' · ');
 
@@ -308,7 +307,7 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
             <div className="content" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 120px' }}>
                 {noServices ? (
                     <div className="fade-2" style={{ padding: '32px 0', textAlign: 'center' }}>
-                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{firstName} hasn't added any services yet.</p>
+                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{displayName} hasn't added any services yet.</p>
                     </div>
                 ) : (
                     <div className="fade-2">
@@ -776,7 +775,6 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
 function Step5Confirm({ provider, service, selectedDate, selectedTime, handle }) {
     const navigate = useNavigate();
     const displayName = provider?.business_name || provider?.name || 'Provider';
-    const firstName = displayName.split(' ')[0];
 
     return (
         <div style={{ minHeight: '100dvh', background: T.base, fontFamily: F }}>
@@ -793,7 +791,7 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, handle })
                         Your booking request has been sent to {displayName}.
                     </p>
                     <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>
-                        {firstName} will review it and you'll get a notification once it's confirmed.
+                        {displayName} will review it and you'll get a notification once it's confirmed.
                     </p>
                 </div>
 
@@ -817,12 +815,12 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, handle })
                 {/* No payment note */}
                 <div style={{ background: T.successBg, borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', marginBottom: 28 }}>
                     <svg width="16" height="16" fill="none" stroke={T.success} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    <p style={{ fontFamily: F, fontSize: 13, color: T.success, margin: 0 }}>No payment required until {firstName} confirms.</p>
+                    <p style={{ fontFamily: F, fontSize: 13, color: T.success, margin: 0 }}>No payment required until {displayName} confirms.</p>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <BtnPrimary onClick={() => navigate('/app/bookings')}>Go to My Bookings</BtnPrimary>
-                    <BtnOutlined onClick={() => navigate(`/book/${handle}`)}>Back to {firstName}'s Profile</BtnOutlined>
+                    <BtnOutlined onClick={() => navigate(`/book/${handle}`)}>Back to {displayName}'s Profile</BtnOutlined>
                 </div>
             </div>
         </div>

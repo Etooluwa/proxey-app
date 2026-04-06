@@ -126,8 +126,6 @@ const ReviewStep = ({ booking, rating, onRate, reviewText, onTextChange, onConti
     const duration = booking?.duration_minutes;
     const date = booking?.scheduled_at;
     const charCount = reviewText?.length || 0;
-    const providerFirst = providerName.split(' ')[0];
-
     if (existingReview) {
         return (
             <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -186,7 +184,7 @@ const ReviewStep = ({ booking, rating, onRate, reviewText, onTextChange, onConti
                     <textarea
                         value={reviewText}
                         onChange={(e) => onTextChange(e.target.value.slice(0, 500))}
-                        placeholder={`What stood out? How did ${providerFirst} help you?`}
+                        placeholder={`What stood out? How did ${providerName} help you?`}
                         rows={4}
                         style={{
                             width: '100%', padding: '14px 16px', borderRadius: 12, boxSizing: 'border-box',
@@ -214,7 +212,6 @@ const ReviewStep = ({ booking, rating, onRate, reviewText, onTextChange, onConti
 // ─── Step 2: Add a Tip ───────────────────────────────────────────────────────
 const TipStep = ({ booking, tipType, onSelectTip, customTip, onCustomTip, onBack, onSubmit, submitting, submitError }) => {
     const providerName = booking?.provider_name || 'Provider';
-    const providerFirst = providerName.split(' ')[0];
     const serviceName = booking?.service_name || 'session';
     const priceInCents = booking?.price || 0;
     const baseDollars = priceInCents / 100;
@@ -252,7 +249,7 @@ const TipStep = ({ booking, tipType, onSelectTip, customTip, onCustomTip, onBack
             <div style={{ padding: '24px 0', textAlign: 'center' }}>
                 <p style={{ fontFamily: F, fontSize: 16, fontWeight: 400, margin: '0 0 6px', color: T.ink }}>Would you like to leave a tip?</p>
                 <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 24px' }}>
-                    Tips go directly to {providerFirst} — Kliques takes nothing.
+                    Tips go directly to {providerName} — Kliques takes nothing.
                 </p>
 
                 {/* Preset tip buttons */}
@@ -362,7 +359,7 @@ const TipStep = ({ booking, tipType, onSelectTip, customTip, onCustomTip, onBack
 const DoneStep = ({ rating, tipDollars, providerName, providerHandle, onBookAgain }) => {
     const navigate = useNavigate();
     const hasTip = tipDollars > 0;
-    const firstName = (providerName || 'Provider').split(' ')[0];
+    const displayName = providerName || 'Provider';
 
     return (
         <div style={{
@@ -396,7 +393,7 @@ const DoneStep = ({ rating, tipDollars, providerName, providerHandle, onBookAgai
 
             <h1 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px', color: T.ink }}>Thank you!</h1>
             <p style={{ fontFamily: F, fontSize: 15, color: T.muted, margin: '0 0 8px', lineHeight: 1.6, maxWidth: 300 }}>
-                Your review has been submitted{hasTip ? ` and your tip has been sent to ${firstName}.` : ` for ${providerName}.`}
+                Your review has been submitted{hasTip ? ` and your tip has been sent to ${displayName}.` : ` for ${providerName}.`}
             </p>
 
             {/* Stars display */}
@@ -425,7 +422,7 @@ const DoneStep = ({ rating, tipDollars, providerName, providerHandle, onBookAgai
                         onClick={onBookAgain}
                         style={{ width: '100%', padding: '13px', borderRadius: 12, background: 'transparent', border: `1px solid ${T.line}`, fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, cursor: 'pointer' }}
                     >
-                        Book Again with {firstName}
+                        Book Again with {displayName}
                     </button>
                 )}
             </div>
