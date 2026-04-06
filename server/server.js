@@ -1142,22 +1142,11 @@ async function verifyAuth(req, res, next) {
 app.use(verifyAuth);
 
 function getUserId(req) {
-  // Phase 1: prefer verified JWT identity, fall back to header for transition
-  // Phase 2 (TODO): remove header fallback and return null when no verified user
-  if (req.verifiedUserId) return req.verifiedUserId;
-  const headerId = req.headers["x-user-id"];
-  if (headerId && headerId !== "demo-user") {
-    // Log mismatch during transition so we can monitor
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[auth] Using unverified x-user-id header — JWT preferred:", headerId);
-    }
-    return headerId;
-  }
-  return null;
+  return req.verifiedUserId || null;
 }
 
 function getProviderId(req) {
-  return req.headers["x-provider-id"] || getUserId(req);
+  return getUserId(req);
 }
 
 // Require a verified or header-supplied user ID — returns 401 if neither present

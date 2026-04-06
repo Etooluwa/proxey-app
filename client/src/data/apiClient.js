@@ -41,8 +41,6 @@ async function resolveUserHeaders() {
 
   const headers = {};
   if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
-  // Keep x-user-id during Phase 1 transition so old server code still works
-  if (userId) headers["x-user-id"] = userId;
   return headers;
 }
 
