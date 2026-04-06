@@ -5,10 +5,10 @@ const ShareLinksSection = ({ handle = "" }) => {
   const [copied, setCopied] = useState(null);
   const [showQR, setShowQR] = useState(null);
 
-  const bookingUrl = `mykliques.com/book/${handle}`;
-  const inviteUrl = `mykliques.com/join/${handle}`;
-  const bookingFullUrl = `https://mykliques.com/book/${handle}`;
-  const inviteFullUrl = `https://mykliques.com/join/${handle}`;
+  const bookingUrl = `app.mykliques.com/book/${handle}`;
+  const inviteUrl = `app.mykliques.com/join/${handle}`;
+  const bookingFullUrl = `https://app.mykliques.com/book/${handle}`;
+  const inviteFullUrl = `https://app.mykliques.com/join/${handle}`;
 
   const copyLink = (type, url) => {
     navigator.clipboard.writeText(`https://${url}`).catch(() => {});

@@ -751,7 +751,7 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
           {/* URL preview */}
           {handle && (
             <p className="font-sora text-[13px] mt-2 m-0" style={{ color: MUTED }}>
-              mykliques.com/book/
+              app.mykliques.com/book/
               <span style={{ color: handleStatus === "available" ? SUCCESS_FG : handleStatus === "taken" || handleStatus === "invalid" ? DANGER : FG, fontWeight: 600 }}>
                 {handle}
               </span>

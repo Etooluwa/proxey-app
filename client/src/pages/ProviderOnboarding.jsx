@@ -644,7 +644,7 @@ const HandleStep = ({ handle, onHandle, handleStatus, stripeConnected, onStripe,
                         <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>
-                        mykliques.com/book/{handle} is available
+                        app.mykliques.com/book/{handle} is available
                     </p>
                 </>
             )}

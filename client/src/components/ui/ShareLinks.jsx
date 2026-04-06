@@ -148,10 +148,10 @@ const ShareLinks = ({ handle = '' }) => {
     const [copied, setCopied] = useState(null);
     const [showQR, setShowQR] = useState(null);
     const hasHandle = Boolean(handle);
-    const inviteUrl = hasHandle ? `mykliques.com/join/${handle}` : 'Choose your handle to unlock invite links';
-    const bookingUrl = hasHandle ? `mykliques.com/book/${handle}` : 'Choose your handle to unlock booking links';
-    const inviteFullUrl = hasHandle ? `https://mykliques.com/join/${handle}` : '';
-    const bookingFullUrl = hasHandle ? `https://mykliques.com/book/${handle}` : '';
+    const inviteUrl = hasHandle ? `app.mykliques.com/join/${handle}` : 'Choose your handle to unlock invite links';
+    const bookingUrl = hasHandle ? `app.mykliques.com/book/${handle}` : 'Choose your handle to unlock booking links';
+    const inviteFullUrl = hasHandle ? `https://app.mykliques.com/join/${handle}` : '';
+    const bookingFullUrl = hasHandle ? `https://app.mykliques.com/book/${handle}` : '';
 
     const handleCopy = (type, fullUrl) => {
         if (!fullUrl) return;
