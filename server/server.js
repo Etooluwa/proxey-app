@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import Stripe from "stripe";
@@ -46,6 +47,12 @@ const app = express();
 
 // Trust Render's proxy so rate limiting uses real client IPs
 app.set('trust proxy', 1);
+
+// ─── Security headers ─────────────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow media assets cross-origin
+  contentSecurityPolicy: false, // CSP handled by frontend (React)
+}));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 const generalLimiter = rateLimit({
@@ -2530,6 +2537,16 @@ app.delete("/api/bookings/:bookingId/photos/:photoId", async (req, res) => {
   }
 });
 
+// Allowed image MIME types for uploads
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+]);
+
+// Sanitize filename — strip path traversal and non-alphanumeric chars
+function sanitizeFilename(filename) {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_').slice(0, 100);
+}
+
 // POST /api/bookings/:id/photos/upload-url — get a signed Supabase Storage upload URL
 app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
@@ -2539,13 +2556,19 @@ app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
 
   if (!filename) return res.status(400).json({ error: "filename is required." });
 
+  // Validate content type — only images allowed
+  if (!contentType || !ALLOWED_IMAGE_TYPES.has(contentType.toLowerCase())) {
+    return res.status(400).json({ error: "Only image files are allowed (jpeg, png, webp, heic)." });
+  }
+
   try {
     const { data: booking } = await supabase
       .from("bookings").select("provider_id").eq("id", bookingId).single();
     if (!booking) return res.status(404).json({ error: "Booking not found." });
     if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
 
-    const filePath = `booking-photos/${bookingId}/${Date.now()}-${filename}`;
+    const safeName = sanitizeFilename(filename);
+    const filePath = `booking-photos/${bookingId}/${Date.now()}-${safeName}`;
     const { data, error } = await supabase.storage
       .from("kliques-media")
       .createSignedUploadUrl(filePath);
