@@ -5832,17 +5832,28 @@ app.get("/api/client/relationship/:providerId", async (req, res) => {
       return res.status(404).json({ error: "Relationship not found." });
     }
 
-    // Fetch all bookings between this client and provider, newest first
+    // Fetch all bookings between this client and provider
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
       .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, session_notes, session_recommendation, created_at, reviewed_at")
       .eq("client_id", userId)
       .eq("provider_id", providerId)
-      .order("scheduled_at", { ascending: false });
+      .order("scheduled_at", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (bookingsError) throw bookingsError;
 
-    const allBookings = bookings || [];
+    const FUTURE_STATUSES = new Set(["pending", "confirmed", "accepted"]);
+    const allBookings = (bookings || []).sort((a, b) => {
+      const aFuture = FUTURE_STATUSES.has(a.status);
+      const bFuture = FUTURE_STATUSES.has(b.status);
+      if (aFuture && !bFuture) return -1;
+      if (!aFuture && bFuture) return 1;
+      const aTime = new Date(a.scheduled_at || 0).getTime();
+      const bTime = new Date(b.scheduled_at || 0).getTime();
+      if (bTime !== aTime) return bTime - aTime;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
 
     // Aggregate stats
     const completedBookings = allBookings.filter((b) => b.status === "completed");
@@ -6246,7 +6257,19 @@ async function buildProviderClientTimeline(providerIdentifier, clientId) {
       type: "booking",
       source: booking.status === "cancelled" ? "booking_cancelled" : "booking",
     })),
-  ].sort((a, b) => new Date(b.scheduled_at || b.connected_at || 0) - new Date(a.scheduled_at || a.connected_at || 0));
+  ].sort((a, b) => {
+    const FUTURE_STATUSES = new Set(["pending", "confirmed", "accepted"]);
+    const aFuture = FUTURE_STATUSES.has(a.status);
+    const bFuture = FUTURE_STATUSES.has(b.status);
+    // Upcoming bookings always above past ones
+    if (aFuture && !bFuture) return -1;
+    if (!aFuture && bFuture) return 1;
+    // Within the same group sort by scheduled_at DESC, tiebreak by created_at DESC
+    const aTime = new Date(a.scheduled_at || a.connected_at || 0).getTime();
+    const bTime = new Date(b.scheduled_at || b.connected_at || 0).getTime();
+    if (bTime !== aTime) return bTime - aTime;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
 
   return {
     client: {
