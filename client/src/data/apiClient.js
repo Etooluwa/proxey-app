@@ -7,34 +7,43 @@ async function resolveUserHeaders() {
     return {};
   }
 
+  let accessToken = null;
   let userId = null;
 
-  try {
-    const rawSession = window.localStorage.getItem("proxey.auth.session");
-    if (rawSession) {
-      const parsed = JSON.parse(rawSession);
-      if (parsed?.user?.id) {
-        userId = parsed.user.id;
-      }
-    }
-  } catch (error) {
-    console.warn("[api] Unable to parse stored session", error);
-  }
-
-  // Fall back to the live Supabase session so API calls still identify the
-  // current user even if the local app session cache is stale or missing.
-  if (!userId && supabase?.auth?.getSession) {
+  // Primary: get the live Supabase session for a verified JWT
+  if (supabase?.auth?.getSession) {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      userId = session?.user?.id || null;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        userId = session.user?.id || null;
+      }
     } catch (error) {
       console.warn("[api] Unable to resolve Supabase session", error);
     }
   }
 
-  return userId ? { "x-user-id": userId } : {};
+  // Fallback: read from localStorage cache if live session unavailable
+  if (!accessToken) {
+    try {
+      const rawSession = window.localStorage.getItem("proxey.auth.session");
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        if (parsed?.access_token) {
+          accessToken = parsed.access_token;
+          userId = parsed.user?.id || null;
+        }
+      }
+    } catch (error) {
+      console.warn("[api] Unable to parse stored session", error);
+    }
+  }
+
+  const headers = {};
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  // Keep x-user-id during Phase 1 transition so old server code still works
+  if (userId) headers["x-user-id"] = userId;
+  return headers;
 }
 
 async function request(path, options = {}) {

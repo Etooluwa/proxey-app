@@ -1119,12 +1119,53 @@ const memoryStore = {
   ],
 };
 
+// ─── Auth middleware ──────────────────────────────────────────────────────────
+// Verifies the Supabase JWT from the Authorization header and sets req.verifiedUserId.
+// Falls back to x-user-id header during transition — will be removed in Phase 2.
+async function verifyAuth(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  if (authHeader?.startsWith("Bearer ") && supabase) {
+    const token = authHeader.slice(7);
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (!error && user?.id) {
+        req.verifiedUserId = user.id;
+        req.verifiedUserEmail = user.email;
+      }
+    } catch (e) {
+      // token verification failed — fall through to header fallback
+    }
+  }
+  next();
+}
+
+app.use(verifyAuth);
+
 function getUserId(req) {
-  return req.headers["x-user-id"] || "demo-user";
+  // Phase 1: prefer verified JWT identity, fall back to header for transition
+  // Phase 2 (TODO): remove header fallback and return null when no verified user
+  if (req.verifiedUserId) return req.verifiedUserId;
+  const headerId = req.headers["x-user-id"];
+  if (headerId && headerId !== "demo-user") {
+    // Log mismatch during transition so we can monitor
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[auth] Using unverified x-user-id header — JWT preferred:", headerId);
+    }
+    return headerId;
+  }
+  return null;
 }
 
 function getProviderId(req) {
   return req.headers["x-provider-id"] || getUserId(req);
+}
+
+// Require a verified or header-supplied user ID — returns 401 if neither present
+function requireAuth(req, res, next) {
+  if (!getUserId(req)) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+  next();
 }
 
 async function getProviderStripeConnectStatus(providerId, { requireReady = false } = {}) {
@@ -1376,8 +1417,9 @@ async function getOrCreateProviderClientConversation({ providerAuthId, clientId 
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
 function requireAdmin(req, res, next) {
-  const userId = getUserId(req);
-  if (!ADMIN_USER_IDS.includes(userId)) {
+  // Must have a verified JWT — header fallback is not accepted for admin routes
+  const userId = req.verifiedUserId;
+  if (!userId || !ADMIN_USER_IDS.includes(userId)) {
     return res.status(403).json({ error: "Admin access required." });
   }
   next();
