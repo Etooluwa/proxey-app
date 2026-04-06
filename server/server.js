@@ -1173,6 +1173,20 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Sanitize error messages before sending to client — prevents leaking internal details
+function safeErrorMessage(err) {
+  if (err?.type?.startsWith("Stripe") || err?.code) {
+    // Stripe errors — return user-friendly message based on decline code
+    const code = err.decline_code || err.code || "";
+    if (code.includes("card") || code === "insufficient_funds" || code === "card_declined")
+      return "Payment failed. Please check your card details and try again.";
+    if (code === "expired_card") return "Your card has expired.";
+    if (code === "incorrect_cvc") return "Incorrect card security code.";
+    return "Payment processing error. Please try again.";
+  }
+  return "An unexpected error occurred.";
+}
+
 async function getProviderStripeConnectStatus(providerId, { requireReady = false } = {}) {
   if (!providerId) {
     const error = new Error("providerId is required.");
@@ -2027,22 +2041,67 @@ app.get("/api/provider/services/:serviceId/questions", async (req, res) => {
   }
 });
 
+const VALID_QUESTION_TYPES = new Set(["select", "text", "checkbox", "multiselect"]);
+
+// Helper: verify the authenticated provider owns a service
+async function verifyServiceOwnership(userId, serviceId) {
+  const { data } = await supabase
+    .from("services")
+    .select("id")
+    .eq("id", serviceId)
+    .eq("provider_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
+// Helper: verify the authenticated provider owns a question (via its service)
+async function verifyQuestionOwnership(userId, questionId) {
+  const { data } = await supabase
+    .from("service_intake_questions")
+    .select("id, services!inner(provider_id)")
+    .eq("id", questionId)
+    .eq("services.provider_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
+// Helper: verify the authenticated provider owns an option (via question → service)
+async function verifyOptionOwnership(userId, optionId) {
+  const { data } = await supabase
+    .from("service_intake_options")
+    .select("id, service_intake_questions!inner(id, services!inner(provider_id))")
+    .eq("id", optionId)
+    .eq("service_intake_questions.services.provider_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
 // POST /api/provider/services/:serviceId/questions
 app.post("/api/provider/services/:serviceId/questions", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
   const { serviceId } = req.params;
   const { questionText, questionType = "select", sortOrder = 0 } = req.body || {};
 
-  if (!questionText) return res.status(400).json({ error: "questionText is required." });
+  if (!questionText?.trim() || questionText.length > 500)
+    return res.status(400).json({ error: "questionText is required and must be under 500 characters." });
+  if (!VALID_QUESTION_TYPES.has(questionType))
+    return res.status(400).json({ error: "Invalid question type." });
+  if (!Number.isInteger(Number(sortOrder)) || Number(sortOrder) < 0 || Number(sortOrder) > 10000)
+    return res.status(400).json({ error: "Invalid sort order." });
 
   try {
+    if (!(await verifyServiceOwnership(userId, serviceId)))
+      return res.status(403).json({ error: "Not authorized." });
+
     const { data, error } = await supabase
       .from("service_intake_questions")
       .insert({
         service_id: serviceId,
-        question_text: questionText,
+        question_text: questionText.trim(),
         question_type: questionType,
-        sort_order: sortOrder,
+        sort_order: Number(sortOrder),
       })
       .select()
       .single();
@@ -2058,15 +2117,32 @@ app.post("/api/provider/services/:serviceId/questions", async (req, res) => {
 // PATCH /api/provider/questions/:questionId
 app.patch("/api/provider/questions/:questionId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
   const { questionId } = req.params;
   const { questionText, questionType, sortOrder } = req.body || {};
 
   const updates = {};
-  if (questionText !== undefined)  updates.question_text = questionText;
-  if (questionType !== undefined)  updates.question_type = questionType;
-  if (sortOrder !== undefined)     updates.sort_order = sortOrder;
+  if (questionText !== undefined) {
+    if (!questionText.trim() || questionText.length > 500)
+      return res.status(400).json({ error: "Invalid questionText." });
+    updates.question_text = questionText.trim();
+  }
+  if (questionType !== undefined) {
+    if (!VALID_QUESTION_TYPES.has(questionType))
+      return res.status(400).json({ error: "Invalid question type." });
+    updates.question_type = questionType;
+  }
+  if (sortOrder !== undefined) {
+    if (!Number.isInteger(Number(sortOrder)) || Number(sortOrder) < 0)
+      return res.status(400).json({ error: "Invalid sort order." });
+    updates.sort_order = Number(sortOrder);
+  }
 
   try {
+    if (!(await verifyQuestionOwnership(userId, questionId)))
+      return res.status(403).json({ error: "Not authorized." });
+
     const { data, error } = await supabase
       .from("service_intake_questions")
       .update(updates)
@@ -2085,9 +2161,14 @@ app.patch("/api/provider/questions/:questionId", async (req, res) => {
 // DELETE /api/provider/questions/:questionId
 app.delete("/api/provider/questions/:questionId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
   const { questionId } = req.params;
 
   try {
+    if (!(await verifyQuestionOwnership(userId, questionId)))
+      return res.status(403).json({ error: "Not authorized." });
+
     const { error } = await supabase
       .from("service_intake_questions")
       .delete()
@@ -2106,15 +2187,21 @@ app.delete("/api/provider/questions/:questionId", async (req, res) => {
 // POST /api/provider/questions/:questionId/options
 app.post("/api/provider/questions/:questionId/options", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
   const { questionId } = req.params;
   const { optionText, sortOrder = 0 } = req.body || {};
 
-  if (!optionText) return res.status(400).json({ error: "optionText is required." });
+  if (!optionText?.trim() || optionText.length > 200)
+    return res.status(400).json({ error: "optionText is required and must be under 200 characters." });
 
   try {
+    if (!(await verifyQuestionOwnership(userId, questionId)))
+      return res.status(403).json({ error: "Not authorized." });
+
     const { data, error } = await supabase
       .from("service_intake_options")
-      .insert({ question_id: questionId, option_text: optionText, sort_order: sortOrder })
+      .insert({ question_id: questionId, option_text: optionText.trim(), sort_order: Number(sortOrder) || 0 })
       .select()
       .single();
 
@@ -2129,9 +2216,14 @@ app.post("/api/provider/questions/:questionId/options", async (req, res) => {
 // DELETE /api/provider/options/:optionId
 app.delete("/api/provider/options/:optionId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
   const { optionId } = req.params;
 
   try {
+    if (!(await verifyOptionOwnership(userId, optionId)))
+      return res.status(403).json({ error: "Not authorized." });
+
     const { error } = await supabase
       .from("service_intake_options")
       .delete()
@@ -4625,19 +4717,26 @@ app.post("/api/messages", async (req, res) => {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
 
-  const { threadId, senderId, receiverId, body } = req.body || {};
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
-  if (!senderId || !receiverId || !body) {
+  const { threadId, receiverId, body } = req.body || {};
+
+  if (!receiverId || !body) {
     return res.status(400).json({
-      error: "senderId, receiverId, and body are required.",
+      error: "receiverId and body are required.",
     });
   }
 
+  if (typeof body !== "string" || body.trim().length === 0 || body.length > 5000)
+    return res.status(400).json({ error: "Invalid message body." });
+
+  // sender_id is always the authenticated user — never trust client-supplied senderId
   const payload = {
     thread_id: threadId || crypto.randomUUID(),
-    sender_id: senderId,
+    sender_id: userId,
     receiver_id: receiverId,
-    body,
+    body: body.trim(),
   };
 
   try {
@@ -5179,6 +5278,10 @@ app.post("/api/promotions/validate", async (req, res) => {
 
   if (!promoCode || !providerId) {
     return res.status(400).json({ error: "promoCode and providerId are required." });
+  }
+
+  if (typeof promoCode !== "string" || promoCode.length > 50 || !/^[a-zA-Z0-9_-]+$/.test(promoCode.trim())) {
+    return res.status(400).json({ error: "Invalid promo code format." });
   }
 
   try {
@@ -6208,6 +6311,10 @@ app.get("/api/provider/clients/:clientId", async (req, res) => {
 });
 
 app.get("/api/providers/:id/clients/:clientId/timeline", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized." });
+  // Verify the authenticated user matches the provider ID in the URL
+  if (userId !== req.params.id) return res.status(403).json({ error: "Not authorized." });
   return handleProviderClientTimeline(req, res, req.params.id, req.params.clientId);
 });
 
@@ -7856,7 +7963,7 @@ app.post("/api/charge", async (req, res) => {
     });
   } catch (error) {
     console.error("Charge error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
 
