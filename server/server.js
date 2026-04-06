@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
@@ -42,6 +43,38 @@ const supabase =
     : null;
 
 const app = express();
+
+// Trust Render's proxy so rate limiting uses real client IPs
+app.set('trust proxy', 1);
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,       // 1 minute
+  max: 100,                   // 100 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 10,                    // 10 attempts per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again in 15 minutes.' },
+});
+
+const messageLimiter = rateLimit({
+  windowMs: 60 * 1000,       // 1 minute
+  max: 60,                    // 60 messages per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Sending too fast, please slow down.' },
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth/', authLimiter);
+app.use('/api/messages/', messageLimiter);
 
 // CORS configuration
 const allowedOrigins = [
