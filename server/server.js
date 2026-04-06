@@ -3564,13 +3564,73 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
     // Notify client
     const clientId = updatedJob.client_id;
     if (clientId) {
+      // Check for session notes, recommendation, and photos on the linked booking
+      let hasNotes = !!sessionNotes;
+      let hasRecommendation = false;
+      let hasPhotos = false;
+      if (job.booking_id) {
+        const { data: bookingDetail } = await supabase
+          .from("bookings")
+          .select("session_notes, session_recommendation")
+          .eq("id", job.booking_id)
+          .single();
+        if (bookingDetail) {
+          if (bookingDetail.session_notes) hasNotes = true;
+          if (bookingDetail.session_recommendation) hasRecommendation = true;
+        }
+        const { count: photoCount } = await supabase
+          .from("booking_photos")
+          .select("id", { count: "exact", head: true })
+          .eq("booking_id", job.booking_id);
+        if (photoCount > 0) hasPhotos = true;
+      }
+
+      const extras = [
+        hasNotes && "session notes",
+        hasRecommendation && "recommendations",
+        hasPhotos && "photos",
+      ].filter(Boolean);
+
+      const extraText = extras.length > 0
+        ? ` Your provider also left ${extras.join(" and ")} — view them in your booking details.`
+        : "";
+
       await createClientNotification(clientId, {
         type: "booking_completed",
         title: "Session Complete!",
-        body: `Your session for ${job.service_name || "your service"} is complete. Your invoice is now available in the Invoices page.`,
+        body: `Your session for ${job.service_name || "your service"} is complete. Your invoice is now available in the Invoices page.${extraText}`,
         booking_id: job.booking_id || jobId,
         data: { provider_id: providerId, status: "completed" },
       }).catch(() => {});
+
+      // Email client: session complete
+      const { email: clientCompletionEmail } = await getClientNotifPrefs(clientId);
+      const provCompletionInfo = await getProviderEmailInfo(providerId);
+      if (clientCompletionEmail) {
+        const extrasEmailList = extras.length > 0
+          ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF5E6;border-radius:14px;padding:16px 20px;margin-top:20px;border:1px solid rgba(194,94,74,0.15);">
+            <tr><td style="font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:8px;">Your provider left</td></tr>
+            ${extras.map(item => `<tr><td style="font-size:14px;color:#3D231E;line-height:1.6;padding-bottom:4px;">• ${item.charAt(0).toUpperCase() + item.slice(1)}</td></tr>`).join('')}
+            <tr><td style="font-size:13px;color:#8C6A64;padding-top:12px;">Open your booking details in Kliques to view.</td></tr>
+          </table>`
+          : '';
+        sendEmail({
+          to: clientCompletionEmail,
+          subject: `Your session is complete — ${job.service_name || "your service"}`,
+          html: emailBase(`
+            <h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;color:#331D19;">Session complete</h1>
+            <p style="margin:0 0 24px;color:#8C6A64;font-size:15px;line-height:1.6;">Your session with ${provCompletionInfo.name || "your provider"} has been marked as complete. Your invoice is now available in Kliques.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#F3ECE7;border-radius:16px;padding:20px 24px;">
+              <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Provider</td></tr>
+              <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:16px;">${provCompletionInfo.name || "Your provider"}</td></tr>
+              <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+              <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${job.service_name || "Service"}</td></tr>
+            </table>
+            ${extrasEmailList}
+            <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">View your invoice and booking details in <a href="https://app.mykliques.com/app" style="color:#C25E4A;text-decoration:none;">Kliques</a>.</p>
+          `),
+        }).catch(() => {});
+      }
     }
 
     return res.status(200).json({
@@ -3850,10 +3910,39 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
             }).catch(() => {});
           }
         } else if (clientId && status === 'completed') {
+          // Check for session notes, recommendation, and photos on the linked booking
+          let hasNotes2 = false;
+          let hasRecommendation2 = false;
+          let hasPhotos2 = false;
+          if (data.booking_id) {
+            const { data: bookingDetail2 } = await supabase
+              .from("bookings")
+              .select("session_notes, session_recommendation")
+              .eq("id", data.booking_id)
+              .single();
+            if (bookingDetail2) {
+              if (bookingDetail2.session_notes) hasNotes2 = true;
+              if (bookingDetail2.session_recommendation) hasRecommendation2 = true;
+            }
+            const { count: photoCount2 } = await supabase
+              .from("booking_photos")
+              .select("id", { count: "exact", head: true })
+              .eq("booking_id", data.booking_id);
+            if (photoCount2 > 0) hasPhotos2 = true;
+          }
+          const extras2 = [
+            hasNotes2 && "session notes",
+            hasRecommendation2 && "recommendations",
+            hasPhotos2 && "photos",
+          ].filter(Boolean);
+          const extraText2 = extras2.length > 0
+            ? ` Your provider also left ${extras2.join(" and ")} — view them in your booking details.`
+            : "";
+
           await createClientNotification(clientId, {
             type: 'booking_completed',
             title: 'Service Completed!',
-            body: `Your booking for ${data.service_name || 'your service'} has been marked as completed. Your invoice is now available in the Invoices page.`,
+            body: `Your booking for ${data.service_name || 'your service'} has been marked as completed. Your invoice is now available in the Invoices page.${extraText2}`,
             booking_id: data.id,
             data: {
               provider_id: data.provider_id,
