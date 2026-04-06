@@ -238,7 +238,7 @@ function ProviderCard({ provider, onClick }) {
             <div
                 style={{
                     display: 'flex',
-                    gap: 20,
+                    gap: 12,
                     flexShrink: 0,
                     alignItems: 'center',
                 }}
@@ -299,38 +299,36 @@ function ProviderCard({ provider, onClick }) {
                 </div>
             </div>
 
-            {status && (
-                <span
-                    style={{
-                        padding: '5px 12px',
-                        borderRadius: 9999,
-                        fontFamily: F,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: status.color,
-                        background: status.background,
-                        flexShrink: 0,
-                    }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
+                {status && (
+                    <span
+                        style={{
+                            padding: '5px 12px',
+                            borderRadius: 9999,
+                            fontFamily: F,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            color: status.color,
+                            background: status.background,
+                            flexShrink: 0,
+                        }}
+                    >
+                        {status.label}
+                    </span>
+                )}
+                <svg
+                    width="20"
+                    height="20"
+                    fill="none"
+                    stroke={T.faded}
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24"
+                    style={{ flexShrink: 0, display: 'block', transition: 'transform 0.2s ease' }}
+                    className="group-hover:translate-x-[3px]"
                 >
-                    {status.label}
-                </span>
-            )}
-
-            <svg
-                width="20"
-                height="20"
-                fill="none"
-                stroke={T.faded}
-                strokeWidth="1.5"
-                viewBox="0 0 24 24"
-                style={{
-                    flexShrink: 0,
-                    transition: 'transform 0.2s ease, color 0.2s ease',
-                }}
-                className="group-hover:translate-x-[3px]"
-            >
-                <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+                    <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
         </button>
     );
 }
