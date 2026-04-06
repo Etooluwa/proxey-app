@@ -107,6 +107,7 @@ export const NotificationProvider = ({ children }) => {
                     filter: `${filterField}=eq.${userId}`
                 },
                 (payload) => {
+                    if (!payload?.new) return;
                     console.log('[notifications] Real-time notification received:', payload);
                     const newNotification = sanitizeNotification(payload.new);
                     setNotifications((prev) => [newNotification, ...prev]);
@@ -122,6 +123,7 @@ export const NotificationProvider = ({ children }) => {
                     filter: `${filterField}=eq.${userId}`
                 },
                 (payload) => {
+                    if (!payload?.new) return;
                     console.log('[notifications] Real-time notification updated:', payload);
                     const updated = sanitizeNotification(payload.new);
                     setNotifications((prev) => {
