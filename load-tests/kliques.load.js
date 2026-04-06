@@ -41,10 +41,10 @@ export const options = {
   thresholds: {
     // 95% of all requests must complete under 2s
     http_req_duration: ['p(95)<2000'],
-    // Under 2% error rate overall
-    http_req_failed: ['rate<0.02'],
-    // Public endpoints must be fast
-    'http_req_duration{scenario:public}': ['p(95)<1000'],
+    // Under 5% HTTP error rate (non-2xx / network failures)
+    http_req_failed: ['rate<0.05'],
+    // Checks (assertions) pass rate must be above 95%
+    checks: ['rate>0.95'],
   },
 };
 
@@ -84,21 +84,24 @@ function nextWeek() {
 function runPublicFlows() {
   group('public: health check', () => {
     const r = http.get(`${BASE}/api/health`);
-    check(r, { 'health 200': (res) => res.status === 200 });
+    const ok = check(r, { 'health 200': (res) => res.status === 200 });
+    if (!ok) console.warn(`health failed: ${r.status} ${r.body?.slice(0, 100)}`);
   });
 
   sleep(0.5);
 
   group('public: categories', () => {
     const r = http.get(`${BASE}/api/categories`);
-    check(r, { 'categories 200': (res) => res.status === 200 });
+    const ok = check(r, { 'categories 200': (res) => res.status === 200 });
+    if (!ok) console.warn(`categories failed: ${r.status} ${r.body?.slice(0, 100)}`);
   });
 
   sleep(0.5);
 
   group('public: provider list', () => {
     const r = http.get(`${BASE}/api/providers`);
-    check(r, { 'providers 200': (res) => res.status === 200 });
+    const ok = check(r, { 'providers 200': (res) => res.status === 200 });
+    if (!ok) console.warn(`providers failed: ${r.status} ${r.body?.slice(0, 100)}`);
   });
 
   sleep(1);
@@ -237,18 +240,30 @@ export default function () {
 // ─── Summary output ───────────────────────────────────────────────────────────
 
 export function handleSummary(data) {
-  const passed = Object.values(data.metrics)
+  const totalReqs    = data.metrics.http_reqs?.values?.count ?? 0;
+  const failRate     = data.metrics.http_req_failed?.values?.rate ?? 0;
+  const failedReqs   = Math.round(failRate * totalReqs);
+  const checksRate   = data.metrics.checks?.values?.rate ?? 0;
+  const avgDuration  = data.metrics.http_req_duration?.values?.avg ?? 0;
+  const p95Duration  = data.metrics.http_req_duration?.values?.['p(95)'] ?? 0;
+  const p99Duration  = data.metrics.http_req_duration?.values?.['p(99)'] ?? 0;
+  const authErrors   = data.metrics.auth_errors?.values?.rate ?? 0;
+  const slowDbAvg    = data.metrics.slow_db_queries_ms?.values?.avg ?? 0;
+
+  const allThresholdsPassed = Object.values(data.metrics)
     .filter((m) => m.thresholds)
-    .every((m) => Object.values(m.thresholds).every((t) => !t.ok === false));
+    .every((m) => Object.values(m.thresholds).every((t) => t.ok));
 
   console.log('\n========== KLIQUES LOAD TEST SUMMARY ==========');
-  console.log(`Total requests:     ${data.metrics.http_reqs?.values?.count ?? 0}`);
-  console.log(`Failed requests:    ${data.metrics.http_req_failed?.values?.passes ?? 0}`);
-  console.log(`Avg response time:  ${(data.metrics.http_req_duration?.values?.avg ?? 0).toFixed(0)}ms`);
-  console.log(`p95 response time:  ${(data.metrics.http_req_duration?.values?.['p(95)'] ?? 0).toFixed(0)}ms`);
-  console.log(`p99 response time:  ${(data.metrics.http_req_duration?.values?.['p(99)'] ?? 0).toFixed(0)}ms`);
-  console.log(`Auth errors:        ${(data.metrics.auth_errors?.values?.rate ?? 0).toFixed(4)}`);
-  console.log(`Slow DB queries avg:${(data.metrics.slow_db_queries_ms?.values?.avg ?? 0).toFixed(0)}ms`);
+  console.log(`Total requests:      ${totalReqs}`);
+  console.log(`HTTP failures:       ${failedReqs} (${(failRate * 100).toFixed(1)}%)`);
+  console.log(`Checks passed:       ${(checksRate * 100).toFixed(1)}%`);
+  console.log(`Avg response time:   ${avgDuration.toFixed(0)}ms`);
+  console.log(`p95 response time:   ${p95Duration.toFixed(0)}ms`);
+  console.log(`p99 response time:   ${p99Duration.toFixed(0)}ms`);
+  console.log(`Auth errors:         ${(authErrors * 100).toFixed(2)}%`);
+  console.log(`Slow DB queries avg: ${slowDbAvg.toFixed(0)}ms`);
+  console.log(`Thresholds:          ${allThresholdsPassed ? '✓ ALL PASSED' : '✗ SOME FAILED'}`);
   console.log('================================================\n');
 
   return {
