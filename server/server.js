@@ -8,9 +8,31 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import PDFDocument from "pdfkit";
 import https from "node:https";
+import { pathToFileURL } from "node:url";
 import * as XLSX from "xlsx";
+import {
+  getVerifiedProviderId,
+  getVerifiedUserId,
+  isAdminUser,
+  resolveVerifiedUser,
+} from "./lib/auth.js";
+import {
+  assertBookingLeadTime,
+  normalizeProviderBookingRules,
+} from "./lib/bookingRules.js";
+import { createAcceptBookingHandler } from "./lib/acceptBookingHandler.js";
+import { createBookingHandler } from "./lib/createBookingHandler.js";
+import { createCancelBookingHandler } from "./lib/cancelBookingHandler.js";
+import { createChargedBookingHandler } from "./lib/createChargedBookingHandler.js";
+import { createCompleteBookingHandler } from "./lib/completeBookingHandler.js";
+import { createRequestTimeBookingHandler } from "./lib/createRequestTimeBookingHandler.js";
+import { createRescheduleBookingHandler } from "./lib/rescheduleBookingHandler.js";
+import { isAllowedImageContentType, sanitizeFilename } from "./lib/uploads.js";
 
 dotenv.config();
+
+const IS_DIRECT_RUN =
+  Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error(
@@ -241,34 +263,6 @@ async function getProviderBookingSettings(providerId) {
     .maybeSingle();
 
   return data?.booking_settings || {};
-}
-
-function extractLeadingHours(value, fallbackHours) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return fallbackHours;
-  const match = value.match(/(\d+(?:\.\d+)?)/);
-  return match ? Number(match[1]) : fallbackHours;
-}
-
-function normalizeProviderBookingRules(settings = {}) {
-  const minimumNoticeHours = extractLeadingHours(settings.minimum_notice, 2);
-  const cancellationWindowHours = extractLeadingHours(settings.cancellation_policy, 24);
-
-  return {
-    autoAccept: Boolean(settings.auto_accept),
-    minimumNoticeHours,
-    cancellationWindowHours,
-  };
-}
-
-function assertBookingLeadTime({ scheduledAt, minimumNoticeHours }) {
-  if (!scheduledAt || !minimumNoticeHours) return;
-  const scheduledTime = new Date(scheduledAt).getTime();
-  if (Number.isNaN(scheduledTime)) return;
-  const minAllowed = Date.now() + minimumNoticeHours * 60 * 60 * 1000;
-  if (scheduledTime < minAllowed) {
-    throw new Error(`Bookings must be made at least ${minimumNoticeHours} hours ahead.`);
-  }
 }
 
 function getProviderPushPrefKey(type) {
@@ -882,54 +876,56 @@ async function sendProviderNewBookingEmail({ to, clientName, serviceName, schedu
 
 // ─── Session reminder scheduler (runs every 5 min) ───────────────────────────
 // Sends an in-app reminder 3 hours before confirmed appointments.
-setInterval(async () => {
-  if (!supabase) return;
-  try {
-    const now = new Date();
-    const windowStart = new Date(now.getTime() + 2.75 * 60 * 60 * 1000); // 2h45m from now
-    const windowEnd   = new Date(now.getTime() + 3.25 * 60 * 60 * 1000); // 3h15m from now
+if (IS_DIRECT_RUN) {
+  setInterval(async () => {
+    if (!supabase) return;
+    try {
+      const now = new Date();
+      const windowStart = new Date(now.getTime() + 2.75 * 60 * 60 * 1000); // 2h45m from now
+      const windowEnd   = new Date(now.getTime() + 3.25 * 60 * 60 * 1000); // 3h15m from now
 
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('id, client_id, provider_id, scheduled_at, service_name, services(name)')
-      .eq('status', 'confirmed')
-      .gte('scheduled_at', windowStart.toISOString())
-      .lte('scheduled_at', windowEnd.toISOString());
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id, client_id, provider_id, scheduled_at, service_name, services(name)')
+        .eq('status', 'confirmed')
+        .gte('scheduled_at', windowStart.toISOString())
+        .lte('scheduled_at', windowEnd.toISOString());
 
-    if (!bookings?.length) return;
+      if (!bookings?.length) return;
 
-    for (const booking of bookings) {
-      // Check if reminder already sent for this booking
-      const { data: existingReminders } = await supabase
-        .from('client_notifications')
-        .select('id, data')
-        .eq('user_id', booking.client_id)
-        .eq('type', 'session_reminder');
-      const reminderAlreadySent = (existingReminders || []).some(
-        (row) => row?.data?.booking_id === booking.id
-      );
-      if (reminderAlreadySent) continue;
+      for (const booking of bookings) {
+        // Check if reminder already sent for this booking
+        const { data: existingReminders } = await supabase
+          .from('client_notifications')
+          .select('id, data')
+          .eq('user_id', booking.client_id)
+          .eq('type', 'session_reminder');
+        const reminderAlreadySent = (existingReminders || []).some(
+          (row) => row?.data?.booking_id === booking.id
+        );
+        if (reminderAlreadySent) continue;
 
-      const svcName = booking.services?.name || booking.service_name || 'your session';
-      const displayTime = new Date(booking.scheduled_at).toLocaleTimeString('en-US', {
-        hour: 'numeric', minute: '2-digit',
-      });
-      const displayDate = new Date(booking.scheduled_at).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric',
-      });
+        const svcName = booking.services?.name || booking.service_name || 'your session';
+        const displayTime = new Date(booking.scheduled_at).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit',
+        });
+        const displayDate = new Date(booking.scheduled_at).toLocaleDateString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric',
+        });
 
-      await createClientNotification(booking.client_id, {
-        type: 'session_reminder',
-        title: 'Session in 3 hours',
-        body: `Reminder: ${svcName} on ${displayDate} at ${displayTime}`,
-        booking_id: booking.id,
-        data: { provider_id: booking.provider_id, scheduled_at: booking.scheduled_at },
-      });
+        await createClientNotification(booking.client_id, {
+          type: 'session_reminder',
+          title: 'Session in 3 hours',
+          body: `Reminder: ${svcName} on ${displayDate} at ${displayTime}`,
+          booking_id: booking.id,
+          data: { provider_id: booking.provider_id, scheduled_at: booking.scheduled_at },
+        });
+      }
+    } catch (err) {
+      console.warn('[session-reminder] error:', err.message);
     }
-  } catch (err) {
-    console.warn('[session-reminder] error:', err.message);
-  }
-}, 5 * 60 * 1000);
+  }, 5 * 60 * 1000);
+}
 
 // ============================================
 
@@ -1137,20 +1133,15 @@ const memoryStore = {
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 // Verifies the Supabase JWT from the Authorization header and sets req.verifiedUserId.
-// Falls back to x-user-id header during transition — will be removed in Phase 2.
 async function verifyAuth(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  if (authHeader?.startsWith("Bearer ") && supabase) {
-    const token = authHeader.slice(7);
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (!error && user?.id) {
-        req.verifiedUserId = user.id;
-        req.verifiedUserEmail = user.email;
-      }
-    } catch (e) {
-      // token verification failed — fall through to header fallback
-    }
+  const verifiedUser = await resolveVerifiedUser({
+    authHeader: req.headers["authorization"],
+    supabase,
+  });
+
+  if (verifiedUser) {
+    req.verifiedUserId = verifiedUser.userId;
+    req.verifiedUserEmail = verifiedUser.email;
   }
   next();
 }
@@ -1158,11 +1149,11 @@ async function verifyAuth(req, res, next) {
 app.use(verifyAuth);
 
 function getUserId(req) {
-  return req.verifiedUserId || null;
+  return getVerifiedUserId(req);
 }
 
 function getProviderId(req) {
-  return getUserId(req);
+  return getVerifiedProviderId(req);
 }
 
 // Require a verified or header-supplied user ID — returns 401 if neither present
@@ -1436,9 +1427,8 @@ async function getOrCreateProviderClientConversation({ providerAuthId, clientId 
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
 function requireAdmin(req, res, next) {
-  // Must have a verified JWT — header fallback is not accepted for admin routes
-  const userId = req.verifiedUserId;
-  if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+  const userId = getVerifiedUserId(req);
+  if (!isAdminUser(userId, ADMIN_USER_IDS)) {
     return res.status(403).json({ error: "Admin access required." });
   }
   next();
@@ -2629,16 +2619,6 @@ app.delete("/api/bookings/:bookingId/photos/:photoId", async (req, res) => {
   }
 });
 
-// Allowed image MIME types for uploads
-const ALLOWED_IMAGE_TYPES = new Set([
-  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
-]);
-
-// Sanitize filename — strip path traversal and non-alphanumeric chars
-function sanitizeFilename(filename) {
-  return filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_').slice(0, 100);
-}
-
 // POST /api/bookings/:id/photos/upload-url — get a signed Supabase Storage upload URL
 app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
@@ -2649,7 +2629,7 @@ app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
   if (!filename) return res.status(400).json({ error: "filename is required." });
 
   // Validate content type — only images allowed
-  if (!contentType || !ALLOWED_IMAGE_TYPES.has(contentType.toLowerCase())) {
+  if (!isAllowedImageContentType(contentType)) {
     return res.status(400).json({ error: "Only image files are allowed (jpeg, png, webp, heic)." });
   }
 
@@ -2673,160 +2653,90 @@ app.post("/api/bookings/:id/photos/upload-url", async (req, res) => {
 });
 
 
-app.post("/api/bookings", async (req, res) => {
-  const userId = getUserId(req);
-  const {
-    serviceId,
-    providerId,
-    scheduledAt,
-    location,
-    notes,
-    status = "draft",
-    price,
-    originalPrice,
-    promotionId,
-    promoCode,
-    discountType,
-    discountValue,
-    discountAmount,
-    intakeResponses,  // [{ questionId, responseText }]
-  } = req.body || {};
-
-  if (!serviceId || !providerId || !scheduledAt) {
-    return res.status(400).json({
-      error: "serviceId, providerId, and scheduledAt are required.",
-    });
-  }
-
-  const now = new Date().toISOString();
-  let providerBookingRules = normalizeProviderBookingRules();
-
-  if (supabase) {
-    providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(providerId));
-  }
+async function createPersistedPublicBooking({ booking, metadata, intakeResponses, now }) {
+  if (!supabase) return null;
 
   try {
-    assertBookingLeadTime({
-      scheduledAt,
-      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
-    });
-  } catch (leadTimeErr) {
-    return res.status(400).json({ error: leadTimeErr.message });
-  }
-
-  const requestedStatus = status === "draft" ? "pending" : status;
-  const initialStatus = providerBookingRules.autoAccept ? "confirmed" : requestedStatus;
-
-  // Build metadata for promo/discount info
-  const metadata = {};
-  if (promotionId) {
-    metadata.promotion = {
-      id: promotionId,
-      promoCode,
-      discountType,
-      discountValue,
-      discountAmount,
-      originalPrice: originalPrice ?? null,
+    const insertData = {
+      id: booking.id,
+      client_id: booking.userId,
+      service_id: booking.serviceId,
+      provider_id: booking.providerId,
+      scheduled_at: booking.scheduledAt,
+      location: booking.location,
+      notes: booking.notes,
+      status: booking.status,
+      price: booking.price,
     };
-  }
 
-  const booking = {
-    id: crypto.randomUUID(),
-    userId,
-    serviceId,
-    providerId,
-    scheduledAt,
-    location: location || "",
-    notes: notes || "",
-    status: initialStatus,
-    createdAt: now,
-    updatedAt: now,
-    price: price ?? null,
-  };
+    if (Object.keys(metadata).length > 0) {
+      insertData.metadata = metadata;
+    }
 
-  if (supabase) {
-    try {
-      const insertData = {
-        id: booking.id,
-        client_id: booking.userId,
-        service_id: booking.serviceId,
-        provider_id: booking.providerId,
-        scheduled_at: booking.scheduledAt,
-        location: booking.location,
-        notes: booking.notes,
-        status: booking.status,
-        price: booking.price,
-      };
+    const { data, error } = await supabase
+      .from("bookings")
+      .insert(insertData)
+      .select()
+      .single();
 
-        if (Object.keys(metadata).length > 0) {
-          insertData.metadata = metadata;
-        }
+    if (error) {
+      console.warn("[supabase] Failed to create booking, using stub.", error);
+      return null;
+    }
 
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert(insertData)
-        .select()
-        .single();
+    await ensureProviderClientConnection({
+      providerId: data.provider_id,
+      clientId: data.client_id,
+      source: "booking",
+      connectedAt: data.created_at || now,
+    }).catch((err) => {
+      console.warn("[bookings] provider_clients upsert:", err.message);
+    });
 
-      if (error) {
-        console.warn("[supabase] Failed to create booking, using stub.", error);
-      } else {
-        await ensureProviderClientConnection({
-          providerId: data.provider_id,
-          clientId: data.client_id,
-          source: "booking",
-          connectedAt: data.created_at || now,
-        }).catch((err) => {
-          console.warn("[bookings] provider_clients upsert:", err.message);
-        });
+    if (Array.isArray(intakeResponses) && intakeResponses.length > 0) {
+      const rows = intakeResponses
+        .filter((r) => r.questionId && r.responseText !== undefined && r.responseText !== "")
+        .map((r) => ({
+          booking_id: data.id,
+          question_id: r.questionId,
+          response_text: String(r.responseText),
+        }));
+      if (rows.length > 0) {
+        await supabase.from("booking_intake_responses").insert(rows);
+      }
+    }
 
-        // Save intake responses if provided
-        if (Array.isArray(intakeResponses) && intakeResponses.length > 0) {
-          const rows = intakeResponses
-            .filter((r) => r.questionId && r.responseText !== undefined && r.responseText !== "")
-            .map((r) => ({
-              booking_id: data.id,
-              question_id: r.questionId,
-              response_text: String(r.responseText),
-            }));
-          if (rows.length > 0) {
-            await supabase.from("booking_intake_responses").insert(rows);
-          }
-        }
+    if (data.status === "pending" || data.status === "confirmed") {
+      const scheduledDate = new Date(data.scheduled_at).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
 
-        // Send notification to provider about new booking request
-        if (data.status === 'pending' || data.status === 'confirmed') {
-          const scheduledDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-          });
+      await createProviderNotification(data.provider_id, {
+        type: data.status === "confirmed" ? "new_booking" : "booking_request",
+        title: data.status === "confirmed" ? "New Booking" : "New Booking Request",
+        body: data.status === "confirmed"
+          ? `A booking was automatically accepted for ${scheduledDate}`
+          : `You have a new booking request for ${scheduledDate}`,
+        booking_id: data.id,
+        data: {
+          service_id: data.service_id,
+          scheduled_at: data.scheduled_at,
+          price: data.price,
+        },
+      });
 
-          await createProviderNotification(data.provider_id, {
-            type: data.status === "confirmed" ? 'new_booking' : 'booking_request',
-            title: data.status === "confirmed" ? 'New Booking' : 'New Booking Request',
-            body: data.status === "confirmed"
-              ? `A booking was automatically accepted for ${scheduledDate}`
-              : `You have a new booking request for ${scheduledDate}`,
-            booking_id: data.id,
-            data: {
-              service_id: data.service_id,
-              scheduled_at: data.scheduled_at,
-              price: data.price
-            }
-          });
-
-          // Email provider about new booking request
-          if (data.status === 'pending') {
-            const provInfo = await getProviderEmailInfo(data.provider_id);
-            const { name: clientName } = await getClientNotifPrefs(data.client_id);
-            if (provInfo.email) {
-              sendEmail({
-                to: provInfo.email,
-                subject: `New booking request — ${fmtDate(data.scheduled_at)}`,
-                html: `<!DOCTYPE html>
+      if (data.status === "pending") {
+        const provInfo = await getProviderEmailInfo(data.provider_id);
+        const { name: clientName } = await getClientNotifPrefs(data.client_id);
+        if (provInfo.email) {
+          sendEmail({
+            to: provInfo.email,
+            subject: `New booking request — ${fmtDate(data.scheduled_at)}`,
+            html: `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
@@ -2901,327 +2811,255 @@ app.post("/api/bookings", async (req, res) => {
     </table>
 </body>
 </html>`,
-              }).catch(() => {});
-            }
-          }
-          if (data.status === 'confirmed') {
-            const provInfo = await getProviderEmailInfo(data.provider_id);
-            const { name: clientName } = await getClientNotifPrefs(data.client_id);
-            await sendProviderNewBookingEmail({
-              to: provInfo.email,
-              clientName,
-              serviceName: data.service_name,
-              scheduledAt: data.scheduled_at,
-              autoAccepted: true,
-            }).catch(() => {});
-          }
-        }
-
-        if (data.status === "confirmed" && data.client_id) {
-          await createClientNotification(data.client_id, {
-            type: "accepted",
-            title: "Booking confirmed",
-            body: "Your booking was automatically confirmed.",
-            booking_id: data.id,
-            data: {
-              provider_id: data.provider_id,
-              booking_id: data.id,
-              scheduled_at: data.scheduled_at,
-              status: "confirmed",
-            },
-          }).catch(() => {});
-          await sendClientPushNotification(data.client_id, {
-            type: "accepted",
-            title: "Booking confirmed",
-            body: "Your appointment has been confirmed in Kliques.",
-            url: "/app/bookings",
-            tag: `booking-confirmed-${data.id}`,
-          }).catch(() => {});
-          const provInfo = await getProviderEmailInfo(data.provider_id);
-          const { email: clientEmail } = await getClientNotifPrefs(data.client_id);
-          let autoAcceptSvcMeta = null;
-          if (data.service_id) {
-            const { data: svcRow } = await supabase.from("services").select("metadata").eq("id", data.service_id).maybeSingle();
-            autoAcceptSvcMeta = svcRow?.metadata || null;
-          }
-          await sendClientBookingConfirmedEmail({
-            to: clientEmail,
-            providerName: provInfo.name || data.provider_name,
-            serviceName: data.service_name,
-            scheduledAt: data.scheduled_at,
-            preAppointmentInfo: autoAcceptSvcMeta?.preAppointmentInfo || null,
           }).catch(() => {});
         }
-        return res.status(201).json({ booking: data });
       }
-    } catch (error) {
-      console.warn("[supabase] Unexpected error creating booking", error);
+
+      if (data.status === "confirmed") {
+        const provInfo = await getProviderEmailInfo(data.provider_id);
+        const { name: clientName } = await getClientNotifPrefs(data.client_id);
+        await sendProviderNewBookingEmail({
+          to: provInfo.email,
+          clientName,
+          serviceName: data.service_name,
+          scheduledAt: data.scheduled_at,
+          autoAccepted: true,
+        }).catch(() => {});
+      }
     }
+
+    if (data.status === "confirmed" && data.client_id) {
+      await createClientNotification(data.client_id, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your booking was automatically confirmed.",
+        booking_id: data.id,
+        data: {
+          provider_id: data.provider_id,
+          booking_id: data.id,
+          scheduled_at: data.scheduled_at,
+          status: "confirmed",
+        },
+      }).catch(() => {});
+      await sendClientPushNotification(data.client_id, {
+        type: "accepted",
+        title: "Booking confirmed",
+        body: "Your appointment has been confirmed in Kliques.",
+        url: "/app/bookings",
+        tag: `booking-confirmed-${data.id}`,
+      }).catch(() => {});
+      const provInfo = await getProviderEmailInfo(data.provider_id);
+      const { email: clientEmail } = await getClientNotifPrefs(data.client_id);
+      let autoAcceptSvcMeta = null;
+      if (data.service_id) {
+        const { data: svcRow } = await supabase
+          .from("services")
+          .select("metadata")
+          .eq("id", data.service_id)
+          .maybeSingle();
+        autoAcceptSvcMeta = svcRow?.metadata || null;
+      }
+      await sendClientBookingConfirmedEmail({
+        to: clientEmail,
+        providerName: provInfo.name || data.provider_name,
+        serviceName: data.service_name,
+        scheduledAt: data.scheduled_at,
+        preAppointmentInfo: autoAcceptSvcMeta?.preAppointmentInfo || null,
+      }).catch(() => {});
+    }
+
+    return data;
+  } catch (error) {
+    console.warn("[supabase] Unexpected error creating booking", error);
+    return null;
   }
+}
 
-  memoryStore.bookings.push(booking);
-  res.status(201).json({ booking });
-});
+app.post("/api/bookings", createBookingHandler({
+  getUserId,
+  getProviderBookingRules: async (providerId) => {
+    if (!supabase) return normalizeProviderBookingRules();
+    return normalizeProviderBookingRules(await getProviderBookingSettings(providerId));
+  },
+  createPersistedBooking: createPersistedPublicBooking,
+  appendMemoryBooking: (booking) => {
+    memoryStore.bookings.push(booking);
+    return booking;
+  },
+}));
 
-app.patch("/api/bookings/:id/cancel", async (req, res) => {
-  const bookingId = req.params.id;
-  const userId = getUserId(req);
-  const { reason } = req.body || {};
+app.patch("/api/bookings/:id/cancel", createCancelBookingHandler({
+  getBookingId: (req) => req.params.id,
+  getUserId,
+  fetchBooking: async (bookingId) => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("bookings").select("*").eq("id", bookingId).single();
+    if (error) {
+      console.warn("[supabase] Failed to cancel booking, using stub.", error);
+      return null;
+    }
+    return data || null;
+  },
+  fetchProviderOwnerUserId: async (providerId) => {
+    if (!supabase) return null;
+    const { data: provRow } = await supabase.from("providers").select("user_id").eq("id", providerId).single();
+    return provRow?.user_id || null;
+  },
+  getProviderBookingRules: async (providerId) =>
+    normalizeProviderBookingRules(await getProviderBookingSettings(providerId)),
+  cancelBookingRecord: async ({ bookingId, cancelledAt }) => {
+    const { data: cancelledBooking, error: cancelErr } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled", cancelled_at: cancelledAt })
+      .eq("id", bookingId)
+      .select()
+      .single();
+    if (cancelErr) throw cancelErr;
+    return cancelledBooking;
+  },
+  afterCancel: async ({ booking: cancelledBooking, initiatedBy, reason }) => {
+    const scheduledDate = new Date(cancelledBooking.scheduled_at).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+    const reasonText = reason ? ` Reason: ${reason}` : '';
 
-  if (supabase) {
-    try {
-      // Allow both client and provider to cancel
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .eq("id", bookingId)
-        .single();
-
-      if (error) {
-        console.warn("[supabase] Failed to cancel booking, using stub.", error);
-      } else if (!data) {
-        return res.status(404).json({ error: "Booking not found." });
-      } else {
-        // Verify the caller is the client or the provider
-        const isClient = data.client_id === userId;
-        const isProvider = data.provider_id === userId;
-        if (!isClient && !isProvider) {
-          // Check if userId matches provider's user_id via providers table
-          const { data: provRow } = await supabase
-            .from("providers")
-            .select("user_id")
-            .eq("id", data.provider_id)
-            .single();
-          if (!provRow || provRow.user_id !== userId) {
-            return res.status(403).json({ error: "Not authorized to cancel this booking." });
-          }
-        }
-
-        // Cancellation window check (skip for providers cancelling)
-        if (isClient) {
-          const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(data.provider_id));
-          const scheduledTime = new Date(data.scheduled_at).getTime();
-          const cutoffTime = scheduledTime - providerBookingRules.cancellationWindowHours * 60 * 60 * 1000;
-          if (Number.isFinite(cutoffTime) && Date.now() > cutoffTime) {
-            return res.status(400).json({
-              error: `This booking can only be cancelled at least ${providerBookingRules.cancellationWindowHours} hours before the appointment.`,
-            });
-          }
-        }
-
-        const { data: cancelledBooking, error: cancelErr } = await supabase
-          .from("bookings")
-          .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-          .eq("id", bookingId)
-          .select()
-          .single();
-
-        if (cancelErr) throw cancelErr;
-
-        const scheduledDate = new Date(cancelledBooking.scheduled_at).toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-        });
-        const reasonText = reason ? ` Reason: ${reason}` : '';
-
-        if (isClient) {
-          // Client cancelled — notify provider
-          if (cancelledBooking.provider_id) {
-            const clientName = cancelledBooking.client_name || 'A client';
-            await createProviderNotification(cancelledBooking.provider_id, {
-              type: 'booking_cancelled',
-              title: 'Booking Cancelled',
-              body: `${clientName} cancelled their booking for ${scheduledDate}.${reasonText}`,
-              booking_id: cancelledBooking.id,
-              data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
-            }).catch(() => {});
-            const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
-            if (provInfo?.email) {
-              await sendEmail({
-                to: provInfo.email,
-                subject: 'Booking Cancelled',
-                html: `<p>Hi ${provInfo.name || 'there'},</p>
+    if (initiatedBy === "client") {
+      if (cancelledBooking.provider_id) {
+        const clientName = cancelledBooking.client_name || 'A client';
+        await createProviderNotification(cancelledBooking.provider_id, {
+          type: 'booking_cancelled',
+          title: 'Booking Cancelled',
+          body: `${clientName} cancelled their booking for ${scheduledDate}.${reasonText}`,
+          booking_id: cancelledBooking.id,
+          data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
+        }).catch(() => {});
+        const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
+        if (provInfo?.email) {
+          await sendEmail({
+            to: provInfo.email,
+            subject: 'Booking Cancelled',
+            html: `<p>Hi ${provInfo.name || 'there'},</p>
 <p>${clientName} has cancelled their booking scheduled for <strong>${scheduledDate}</strong>.</p>
 ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
 <p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated schedule.</p>`
-              }).catch(() => {});
-            }
-          }
-        } else {
-          // Provider cancelled — notify client
-          if (cancelledBooking.client_id) {
-            const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
-            const providerName = provInfo?.name || 'Your provider';
-            await createClientNotification(cancelledBooking.client_id, {
-              type: 'booking_cancelled',
-              title: 'Booking Cancelled',
-              body: `${providerName} has cancelled your booking for ${scheduledDate}.${reasonText}`,
-              booking_id: cancelledBooking.id,
-              data: { provider_id: cancelledBooking.provider_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
-            }).catch(() => {});
-            const { email: clientEmail, name: clientName } = await getClientNotifPrefs(cancelledBooking.client_id);
-            if (clientEmail) {
-              await sendEmail({
-                to: clientEmail,
-                subject: 'Booking Cancelled',
-                html: `<p>Hi ${clientName || 'there'},</p>
+          }).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (cancelledBooking.client_id) {
+      const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
+      const providerName = provInfo?.name || 'Your provider';
+      await createClientNotification(cancelledBooking.client_id, {
+        type: 'booking_cancelled',
+        title: 'Booking Cancelled',
+        body: `${providerName} has cancelled your booking for ${scheduledDate}.${reasonText}`,
+        booking_id: cancelledBooking.id,
+        data: { provider_id: cancelledBooking.provider_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
+      }).catch(() => {});
+      const { email: clientEmail, name: clientName } = await getClientNotifPrefs(cancelledBooking.client_id);
+      if (clientEmail) {
+        await sendEmail({
+          to: clientEmail,
+          subject: 'Booking Cancelled',
+          html: `<p>Hi ${clientName || 'there'},</p>
 <p>${providerName} has cancelled your booking scheduled for <strong>${scheduledDate}</strong>.</p>
 ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
 <p>Log in to <a href="https://mykliques.com">Kliques</a> to book another time.</p>`
-              }).catch(() => {});
-            }
-          }
-        }
-
-        return res.status(200).json({ booking: cancelledBooking });
+        }).catch(() => {});
       }
-    } catch (error) {
-      console.warn("[supabase] Unexpected error cancelling booking", error);
     }
-  }
+  },
+  findMemoryBooking: (bookingId, userId) =>
+    memoryStore.bookings.find((item) => item.id === bookingId && item.userId === userId) || null,
+}));
 
-  const booking = memoryStore.bookings.find(
-    (item) => item.id === bookingId && item.userId === userId
-  );
+app.patch("/api/bookings/:id/reschedule", createRescheduleBookingHandler({
+  getBookingId: (req) => req.params.id,
+  getUserId,
+  fetchBooking: async (bookingId) => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("bookings").select("*").eq("id", bookingId).single();
+    if (error || !data) return null;
+    return data;
+  },
+  fetchProviderOwnerUserId: async (providerId) => {
+    if (!supabase) return null;
+    const { data: provRow } = await supabase.from("providers").select("user_id").eq("id", providerId).single();
+    return provRow?.user_id || null;
+  },
+  hasConflict: hasProviderBookingConflict,
+  updateBookingSchedule: async ({ bookingId, scheduledAt }) => {
+    const { data: rescheduled, error: reschedErr } = await supabase
+      .from("bookings")
+      .update({ scheduled_at: scheduledAt, status: 'confirmed' })
+      .eq("id", bookingId)
+      .select()
+      .single();
+    if (reschedErr) throw reschedErr;
+    return rescheduled;
+  },
+  afterReschedule: async ({ previousBooking, booking: rescheduled, initiatedBy, reason, scheduledAt }) => {
+    const oldDate = new Date(previousBooking.scheduled_at).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+    const newDateLabel = new Date(scheduledAt).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+    const reasonText = reason ? ` Reason: ${reason}` : '';
 
-  if (!booking) {
-    return res.status(404).json({ error: "Booking not found." });
-  }
-
-  booking.status = "cancelled";
-  booking.updatedAt = new Date().toISOString();
-
-  res.status(200).json({ booking });
-});
-
-app.patch("/api/bookings/:id/reschedule", async (req, res) => {
-  const bookingId = req.params.id;
-  const userId = getUserId(req);
-  const { new_date, new_time, reason } = req.body || {};
-
-  if (!new_date || !new_time) {
-    return res.status(400).json({ error: "new_date and new_time are required." });
-  }
-
-  // Combine date and time into ISO string
-  const newScheduledAt = new Date(`${new_date}T${new_time}`).toISOString();
-  if (!newScheduledAt || newScheduledAt === 'Invalid Date') {
-    return res.status(400).json({ error: "Invalid date or time." });
-  }
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .eq("id", bookingId)
-        .single();
-
-      if (error || !data) {
-        return res.status(404).json({ error: "Booking not found." });
-      }
-
-      // Verify the caller is the client or the provider
-      const isClient = data.client_id === userId;
-      let isProvider = data.provider_id === userId;
-      if (!isClient && !isProvider) {
-        const { data: provRow } = await supabase
-          .from("providers")
-          .select("user_id")
-          .eq("id", data.provider_id)
-          .single();
-        if (provRow?.user_id === userId) isProvider = true;
-      }
-      if (!isClient && !isProvider) {
-        return res.status(403).json({ error: "Not authorized to reschedule this booking." });
-      }
-
-      const hasConflict = await hasProviderBookingConflict({
-        providerId: data.provider_id,
-        scheduledAt: newScheduledAt,
-        durationMinutes: data.duration || data.duration_minutes || 60,
-        excludeBookingId: bookingId,
-      });
-      if (hasConflict) {
-        return res.status(409).json({ error: "That time slot is no longer available." });
-      }
-
-      const { data: rescheduled, error: reschedErr } = await supabase
-        .from("bookings")
-        .update({ scheduled_at: newScheduledAt, status: 'confirmed' })
-        .eq("id", bookingId)
-        .select()
-        .single();
-
-      if (reschedErr) throw reschedErr;
-
-      const oldDate = new Date(data.scheduled_at).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-      });
-      const newDateLabel = new Date(newScheduledAt).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-      });
-      const reasonText = reason ? ` Reason: ${reason}` : '';
-
-      if (isClient) {
-        // Client rescheduled — notify provider
-        if (rescheduled.provider_id) {
-          const clientName = rescheduled.client_name || 'A client';
-          await createProviderNotification(rescheduled.provider_id, {
-            type: 'booking_rescheduled',
-            title: 'Booking Rescheduled',
-            body: `${clientName} rescheduled from ${oldDate} to ${newDateLabel}.${reasonText}`,
-            booking_id: rescheduled.id,
-            data: { client_id: rescheduled.client_id, scheduled_at: newScheduledAt, status: 'confirmed' }
-          }).catch(() => {});
-          const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
-          if (provInfo?.email) {
-            await sendEmail({
-              to: provInfo.email,
-              subject: 'Booking Rescheduled',
-              html: `<p>Hi ${provInfo.name || 'there'},</p>
+    if (initiatedBy === "client") {
+      if (rescheduled.provider_id) {
+        const clientName = rescheduled.client_name || 'A client';
+        await createProviderNotification(rescheduled.provider_id, {
+          type: 'booking_rescheduled',
+          title: 'Booking Rescheduled',
+          body: `${clientName} rescheduled from ${oldDate} to ${newDateLabel}.${reasonText}`,
+          booking_id: rescheduled.id,
+          data: { client_id: rescheduled.client_id, scheduled_at: scheduledAt, status: 'confirmed' }
+        }).catch(() => {});
+        const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
+        if (provInfo?.email) {
+          await sendEmail({
+            to: provInfo.email,
+            subject: 'Booking Rescheduled',
+            html: `<p>Hi ${provInfo.name || 'there'},</p>
 <p>${clientName} has rescheduled their booking.</p>
 <p><strong>From:</strong> ${oldDate}<br/><strong>To:</strong> ${newDateLabel}</p>
 ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
 <p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated schedule.</p>`
-            }).catch(() => {});
-          }
-        }
-      } else {
-        // Provider rescheduled — notify client
-        if (rescheduled.client_id) {
-          const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
-          const providerName = provInfo?.name || 'Your provider';
-          await createClientNotification(rescheduled.client_id, {
-            type: 'booking_rescheduled',
-            title: 'Booking Rescheduled',
-            body: `${providerName} rescheduled your booking from ${oldDate} to ${newDateLabel}.${reasonText}`,
-            booking_id: rescheduled.id,
-            data: { provider_id: rescheduled.provider_id, scheduled_at: newScheduledAt, status: 'confirmed' }
           }).catch(() => {});
-          const { email: clientEmail, name: clientName } = await getClientNotifPrefs(rescheduled.client_id);
-          if (clientEmail) {
-            await sendEmail({
-              to: clientEmail,
-              subject: 'Booking Rescheduled',
-              html: `<p>Hi ${clientName || 'there'},</p>
+        }
+      }
+      return;
+    }
+
+    if (rescheduled.client_id) {
+      const provInfo = await getProviderEmailInfo(rescheduled.provider_id);
+      const providerName = provInfo?.name || 'Your provider';
+      await createClientNotification(rescheduled.client_id, {
+        type: 'booking_rescheduled',
+        title: 'Booking Rescheduled',
+        body: `${providerName} rescheduled your booking from ${oldDate} to ${newDateLabel}.${reasonText}`,
+        booking_id: rescheduled.id,
+        data: { provider_id: rescheduled.provider_id, scheduled_at: scheduledAt, status: 'confirmed' }
+      }).catch(() => {});
+      const { email: clientEmail, name: clientName } = await getClientNotifPrefs(rescheduled.client_id);
+      if (clientEmail) {
+        await sendEmail({
+          to: clientEmail,
+          subject: 'Booking Rescheduled',
+          html: `<p>Hi ${clientName || 'there'},</p>
 <p>${providerName} has rescheduled your booking.</p>
 <p><strong>From:</strong> ${oldDate}<br/><strong>To:</strong> ${newDateLabel}</p>
 ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
 <p>Log in to <a href="https://mykliques.com">Kliques</a> to view your updated booking.</p>`
-            }).catch(() => {});
-          }
-        }
+        }).catch(() => {});
       }
-
-      return res.status(200).json({ booking: rescheduled });
-    } catch (error) {
-      console.warn("[supabase] Unexpected error rescheduling booking", error);
-      return res.status(500).json({ error: "Failed to reschedule booking." });
     }
-  }
-
-  res.status(200).json({ booking: { id: bookingId, scheduled_at: newScheduledAt } });
-});
+  },
+}));
 
 app.post("/api/payments/create-checkout", async (req, res) => {
   const { bookingId, successUrl, cancelUrl } = req.body || {};
@@ -10958,134 +10796,109 @@ app.delete("/api/payments/methods/:paymentMethodId", async (req, res) => {
 });
 
 // POST /api/bookings/create — create booking and charge via PaymentIntent
-app.post("/api/bookings/create", async (req, res) => {
-  const userId = getUserId(req);
-  const {
-    serviceId,
-    providerId,
-    scheduledAt,
-    notes,
-    price,           // total price in dollars
-    depositAmount,   // deposit in dollars (null if full)
-    paymentMethodId, // Stripe PM id
-    saveCard,        // boolean
-  } = req.body || {};
-
-  if (!serviceId || !providerId || !scheduledAt) {
-    return res.status(400).json({ error: "serviceId, providerId, and scheduledAt are required." });
-  }
-
-  const providerBookingRules = normalizeProviderBookingRules(
-    supabase ? await getProviderBookingSettings(providerId) : {}
-  );
-
-  try {
-    assertBookingLeadTime({
-      scheduledAt,
-      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
-    });
-  } catch (leadTimeErr) {
-    return res.status(400).json({ error: leadTimeErr.message });
-  }
-
-  const chargeAmount = depositAmount != null ? depositAmount : price;
-  const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
-  let providerStripe = null;
-  let serviceDuration = 60;
-
-  if (supabase && serviceId) {
+app.post("/api/bookings/create", createChargedBookingHandler({
+  getUserId,
+  getProviderBookingRules: async (providerId) =>
+    normalizeProviderBookingRules(
+      supabase ? await getProviderBookingSettings(providerId) : {}
+    ),
+  getServiceDuration: async (serviceId) => {
+    if (!supabase || !serviceId) return 60;
     const { data: serviceRow } = await supabase
       .from("services")
       .select("duration")
       .eq("id", serviceId)
       .maybeSingle();
-    serviceDuration = parseInt(serviceRow?.duration, 10) || 60;
-  }
-
-  if (amountCents > 0) {
-    try {
-      providerStripe = await getProviderStripeConnectStatus(providerId, { requireReady: true });
-    } catch (providerStripeError) {
-      return res.status(providerStripeError.statusCode || 500).json({
-        error: providerStripeError.message || "Provider payout account is not ready yet.",
-      });
-    }
-  }
-
-  try {
-    const hasConflict = await hasProviderBookingConflict({
-      providerId,
-      scheduledAt,
-      durationMinutes: serviceDuration,
-    });
-    if (hasConflict) {
-      return res.status(409).json({ error: "That time slot is no longer available." });
-    }
-
-    let bookingId = crypto.randomUUID();
-
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert({
-          id: bookingId,
-          client_id: userId,
-          service_id: serviceId,
-          provider_id: providerId,
-          scheduled_at: scheduledAt,
-          duration: serviceDuration,
-          notes: notes || "",
-          status: providerBookingRules.autoAccept ? "confirmed" : "pending",
-          price: price ?? null,
-          currency: PLATFORM_CURRENCY.toUpperCase(),
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      bookingId = data.id;
-    }
-
-    // Charge the payment method if amount > 0
-    let paymentIntentId = null;
-    if (amountCents > 0 && paymentMethodId) {
-      // Get or create customer
-      const customers = await stripe.customers.list({ limit: 100 });
-      let customerId;
-      const existing = customers.data.find((c) => c.metadata?.userId === userId);
-      if (existing) {
-        customerId = existing.id;
-      } else {
-        const customer = await stripe.customers.create({ metadata: { userId } });
-        customerId = customer.id;
-      }
-
-      const intent = await stripe.paymentIntents.create({
-        amount: amountCents,
-        currency: PLATFORM_CURRENCY,
-        customer: customerId,
-        payment_method: paymentMethodId,
-        confirm: true,
-        off_session: false,
-        metadata: { bookingId, providerId, userId },
-        ...(saveCard ? { setup_future_usage: "off_session" } : {}),
-        ...(providerStripe ? buildConnectTransferParams(amountCents, providerStripe.accountId) : {}),
-      });
-      paymentIntentId = intent.id;
-    }
-
+    return parseInt(serviceRow?.duration, 10) || 60;
+  },
+  getProviderStripe: async (providerId) =>
+    getProviderStripeConnectStatus(providerId, { requireReady: true }),
+  hasConflict: hasProviderBookingConflict,
+  createBookingRecord: async ({
+    bookingId,
+    userId,
+    serviceId,
+    providerId,
+    scheduledAt,
+    serviceDuration,
+    notes,
+    price,
+    autoAccept,
+    platformCurrency,
+  }) => {
+    if (!supabase) return bookingId;
+    const { data, error } = await supabase
+      .from("bookings")
+      .insert({
+        id: bookingId,
+        client_id: userId,
+        service_id: serviceId,
+        provider_id: providerId,
+        scheduled_at: scheduledAt,
+        duration: serviceDuration,
+        notes: notes || "",
+        status: autoAccept ? "confirmed" : "pending",
+        price: price ?? null,
+        currency: platformCurrency.toUpperCase(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data.id;
+  },
+  getOrCreateCustomerId: async (userId) => {
+    const customers = await stripe.customers.list({ limit: 100 });
+    const existing = customers.data.find((c) => c.metadata?.userId === userId);
+    if (existing) return existing.id;
+    const customer = await stripe.customers.create({ metadata: { userId } });
+    return customer.id;
+  },
+  createPaymentIntent: async ({
+    amountCents,
+    customerId,
+    paymentMethodId,
+    bookingId,
+    providerId,
+    userId,
+    saveCard,
+    providerStripe,
+    platformCurrency,
+  }) =>
+    stripe.paymentIntents.create({
+      amount: amountCents,
+      currency: platformCurrency,
+      customer: customerId,
+      payment_method: paymentMethodId,
+      confirm: true,
+      off_session: false,
+      metadata: { bookingId, providerId, userId },
+      ...(saveCard ? { setup_future_usage: "off_session" } : {}),
+      ...(providerStripe
+        ? buildConnectTransferParams(amountCents, providerStripe.accountId)
+        : {}),
+    }),
+  afterBookingCreated: async ({
+    bookingId,
+    userId,
+    serviceId,
+    providerId,
+    scheduledAt,
+    autoAccept,
+  }) => {
     if (supabase && userId) {
       await ensureProviderClientConnection({
         providerId,
         clientId: userId,
         source: "booking",
-      }).catch((err) => console.warn("[bookings/create] provider_clients upsert:", err.message));
+      }).catch((err) =>
+        console.warn("[bookings/create] provider_clients upsert:", err.message)
+      );
     }
 
-    // Notify provider
     await createProviderNotification(providerId, {
       type: "new_booking",
-      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New booking request",
-      body: providerBookingRules.autoAccept
+      title: autoAccept ? "New booking confirmed" : "New booking request",
+      body: autoAccept
         ? "A booking through your public link was automatically accepted."
         : "A client just booked through your public link.",
       data: { booking_id: bookingId },
@@ -11096,23 +10909,24 @@ app.post("/api/bookings/create", async (req, res) => {
     const { name: bookingClientName, email: bookingClientEmail } = userId
       ? await getClientNotifPrefs(userId)
       : { name: "A client", email: null };
-    const { data: bookingService } = serviceId
-      ? await supabase
-        .from("services")
-        .select("name, metadata")
-        .eq("id", serviceId)
-        .maybeSingle()
-      : { data: null };
+    const { data: bookingService } =
+      serviceId && supabase
+        ? await supabase
+            .from("services")
+            .select("name, metadata")
+            .eq("id", serviceId)
+            .maybeSingle()
+        : { data: null };
 
     await sendProviderNewBookingEmail({
       to: providerEmailInfo.email,
       clientName: bookingClientName,
       serviceName: bookingService?.name || null,
       scheduledAt,
-      autoAccepted: providerBookingRules.autoAccept,
+      autoAccepted: autoAccept,
     }).catch(() => {});
 
-    if (providerBookingRules.autoAccept && userId) {
+    if (autoAccept && userId) {
       await createClientNotification(userId, {
         type: "accepted",
         title: "Booking confirmed",
@@ -11140,13 +10954,9 @@ app.post("/api/bookings/create", async (req, res) => {
         preAppointmentInfo: bookingService?.metadata?.preAppointmentInfo || null,
       }).catch(() => {});
     }
-
-    res.json({ ok: true, bookingId, paymentIntentId });
-  } catch (err) {
-    console.error("[bookings/create]", err);
-    res.status(500).json({ error: err.message || "Failed to create booking." });
-  }
-});
+  },
+  platformCurrency: PLATFORM_CURRENCY,
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOKING COMPLETION & DECLINE
@@ -11182,145 +10992,133 @@ async function generateInvoiceNumber(supabase, providerId, providerName) {
 
 // POST /api/bookings/request-time
 // Client requests a specific date/time with a provider (no payment upfront)
-app.post("/api/bookings/request-time", async (req, res) => {
-  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
-
-  const clientId = getUserId(req);
-  const {
-    provider_id, service_id, requested_date, requested_time, message,
-    payment_type, stripe_setup_intent_id, stripe_payment_method_id,
-    stripe_payment_intent_id, deposit_paid_cents,
-  } = req.body || {};
-
-  if (!provider_id || !requested_date || !requested_time) {
-    return res.status(400).json({ error: "provider_id, requested_date, and requested_time are required." });
-  }
-
-  try {
-    // Build scheduled_at from date + time
-    const scheduledAt = `${requested_date}T${requested_time}:00`;
-    const providerBookingRules = normalizeProviderBookingRules(await getProviderBookingSettings(provider_id));
-
-    assertBookingLeadTime({
-      scheduledAt,
-      minimumNoticeHours: providerBookingRules.minimumNoticeHours,
-    });
-
-    // Fetch service info for the notification body
-    let serviceName = null;
-    let servicePrice = null;
-    let serviceDuration = 60;
-    let servicePreAppointmentInfo = null;
-    if (service_id) {
-      const { data: svc } = await supabase
-        .from("services")
-        .select("name, base_price, duration, metadata")
-        .eq("id", service_id)
-        .maybeSingle();
-      serviceName = svc?.name || null;
-      servicePrice = svc?.base_price || null;
-      serviceDuration = parseInt(svc?.duration, 10) || 60;
-      servicePreAppointmentInfo = svc?.metadata?.preAppointmentInfo || null;
+app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
+  getUserId,
+  getProviderBookingRules: async (providerId) =>
+    normalizeProviderBookingRules(await getProviderBookingSettings(providerId)),
+  getServiceInfo: async (serviceId) => {
+    if (!serviceId) {
+      return {
+        serviceName: null,
+        servicePrice: null,
+        serviceDuration: 60,
+        servicePreAppointmentInfo: null,
+      };
     }
-
-    const hasConflict = await hasProviderBookingConflict({
-      providerId: provider_id,
-      scheduledAt,
-      durationMinutes: serviceDuration,
-    });
-    if (hasConflict) {
-      return res.status(409).json({ error: "That time slot is no longer available." });
-    }
-
-    if (payment_type && payment_type !== "none" && Number(servicePrice) > 0) {
-      try {
-        await getProviderStripeConnectStatus(provider_id, { requireReady: true });
-      } catch (providerStripeError) {
-        return res.status(providerStripeError.statusCode || 400).json({
-          error: providerStripeError.message || "Provider has not connected Stripe yet.",
-        });
-      }
-    }
-
-    // Fetch provider name to store on booking
+    const { data: svc } = await supabase
+      .from("services")
+      .select("name, base_price, duration, metadata")
+      .eq("id", serviceId)
+      .maybeSingle();
+    return {
+      serviceName: svc?.name || null,
+      servicePrice: svc?.base_price || null,
+      serviceDuration: parseInt(svc?.duration, 10) || 60,
+      servicePreAppointmentInfo: svc?.metadata?.preAppointmentInfo || null,
+    };
+  },
+  hasConflict: hasProviderBookingConflict,
+  ensureProviderPaymentReady: async (providerId) =>
+    getProviderStripeConnectStatus(providerId, { requireReady: true }),
+  getProviderName: async (providerId) => {
     const { data: providerRow } = await supabase
       .from("providers")
       .select("name, business_name")
-      .eq("user_id", provider_id)
+      .eq("user_id", providerId)
       .maybeSingle();
-    const providerName = providerRow?.business_name || providerRow?.name || null;
-
-    // Fetch client name for notification
+    return providerRow?.business_name || providerRow?.name || null;
+  },
+  getClientName: async (clientId) => {
     const { data: clientProfile } = await supabase
       .from("client_profiles")
       .select("name")
       .eq("user_id", clientId)
       .maybeSingle();
-    const clientName = clientProfile?.name || "A client";
-
-    // Format display date for notification
-    const displayDate = new Date(scheduledAt).toLocaleDateString("en-US", {
-      weekday: "short", month: "short", day: "numeric",
-    });
-    const displayTime = new Date(scheduledAt).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
-
-    // Determine payment_status based on payment_type
-    let resolvedPaymentStatus = "unpaid";
-    if (payment_type === "save_card" && stripe_payment_method_id) resolvedPaymentStatus = "card_saved";
-    else if (payment_type === "deposit" && deposit_paid_cents > 0) resolvedPaymentStatus = "deposit_paid";
-    else if (payment_type === "full" && stripe_payment_intent_id) resolvedPaymentStatus = "paid";
-
-    // Create booking with status='pending', payment_status resolved
+    return clientProfile?.name || "A client";
+  },
+  createBookingRecord: async ({
+    clientId,
+    clientName,
+    providerId,
+    providerName,
+    serviceId,
+    serviceName,
+    scheduledAt,
+    serviceDuration,
+    autoAccept,
+    paymentStatus,
+    paymentType,
+    stripeSetupIntentId,
+    stripePaymentMethodId,
+    depositPaidCents,
+    servicePrice,
+    message,
+    requestedDate,
+    requestedTime,
+    stripePaymentIntentId,
+  }) => {
     const { data: booking, error: insertErr } = await supabase
       .from("bookings")
       .insert({
         client_id: clientId,
         client_name: clientName !== "A client" ? clientName : null,
-        provider_id,
+        provider_id: providerId,
         provider_name: providerName,
-        service_id: service_id || null,
+        service_id: serviceId || null,
         service_name: serviceName || "Session",
         scheduled_at: scheduledAt,
         duration: serviceDuration,
-        status: providerBookingRules.autoAccept ? "confirmed" : "pending",
-        payment_status: resolvedPaymentStatus,
-        payment_type: payment_type || "none",
-        stripe_setup_intent_id: stripe_setup_intent_id || null,
-        stripe_payment_method_id: stripe_payment_method_id || null,
-        deposit_paid_cents: deposit_paid_cents || 0,
+        status: autoAccept ? "confirmed" : "pending",
+        payment_status: paymentStatus,
+        payment_type: paymentType || "none",
+        stripe_setup_intent_id: stripeSetupIntentId || null,
+        stripe_payment_method_id: stripePaymentMethodId || null,
+        deposit_paid_cents: depositPaidCents || 0,
         price: servicePrice,
         metadata: {
           type: "time_request",
           client_message: message || null,
-          requested_date,
-          requested_time,
-          stripe_payment_intent_id: stripe_payment_intent_id || null,
+          requested_date: requestedDate,
+          requested_time: requestedTime,
+          stripe_payment_intent_id: stripePaymentIntentId || null,
         },
       })
       .select()
       .single();
-
     if (insertErr) throw insertErr;
-
+    return booking;
+  },
+  afterBookingCreated: async ({
+    booking,
+    clientId,
+    clientName,
+    providerId,
+    providerName,
+    serviceName,
+    scheduledAt,
+    displayDate,
+    displayTime,
+    message,
+    autoAccept,
+    servicePreAppointmentInfo,
+    now,
+  }) => {
     await ensureProviderClientConnection({
-      providerId: provider_id,
+      providerId,
       clientId,
       source: "booking",
-      connectedAt: booking.created_at || new Date().toISOString(),
+      connectedAt: booking.created_at || now,
     }).catch((err) => {
       console.warn("[bookings/request-time] provider_clients upsert:", err.message);
     });
 
-    // Notify provider
     const notifBody = serviceName
       ? `${clientName} requested ${serviceName} on ${displayDate} at ${displayTime}`
       : `${clientName} requested a session on ${displayDate} at ${displayTime}`;
 
-    await createProviderNotification(provider_id, {
-      type: providerBookingRules.autoAccept ? "new_booking" : "booking_request",
-      title: providerBookingRules.autoAccept ? "New booking confirmed" : "New booking request",
+    await createProviderNotification(providerId, {
+      type: autoAccept ? "new_booking" : "booking_request",
+      title: autoAccept ? "New booking confirmed" : "New booking request",
       body: notifBody,
       booking_id: booking.id,
       data: {
@@ -11332,24 +11130,24 @@ app.post("/api/bookings/request-time", async (req, res) => {
       },
     }).catch(() => {});
 
-    const providerEmailInfo = await getProviderEmailInfo(provider_id);
+    const providerEmailInfo = await getProviderEmailInfo(providerId);
     const { email: clientEmail } = await getClientNotifPrefs(clientId);
     await sendProviderNewBookingEmail({
       to: providerEmailInfo.email,
       clientName,
       serviceName,
       scheduledAt,
-      autoAccepted: providerBookingRules.autoAccept,
+      autoAccepted: autoAccept,
     }).catch(() => {});
 
-    if (providerBookingRules.autoAccept) {
+    if (autoAccept) {
       await createClientNotification(clientId, {
         type: "accepted",
         title: "Booking confirmed",
         body: "Your booking was automatically confirmed.",
         booking_id: booking.id,
         data: {
-          provider_id,
+          provider_id: providerId,
           booking_id: booking.id,
           scheduled_at: scheduledAt,
           status: "confirmed",
@@ -11370,44 +11168,36 @@ app.post("/api/bookings/request-time", async (req, res) => {
         preAppointmentInfo: servicePreAppointmentInfo,
       }).catch(() => {});
     }
-
-    return res.status(201).json({ booking });
-  } catch (err) {
-    console.error("[bookings/request-time]", err);
-    return res.status(500).json({ error: "Failed to create time request." });
-  }
-});
+  },
+}));
 
 // POST /api/bookings/:id/accept
 // Provider accepts a pending booking — client is notified to proceed to payment
-app.post("/api/bookings/:id/accept", async (req, res) => {
-  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
-
-  const bookingId = req.params.id;
-  const requestingUserId = getUserId(req);
-
-  try {
+app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
+  getBookingId: (req) => req.params.id,
+  getUserId,
+  fetchBooking: async (bookingId) => {
+    if (!supabase) return null;
     const { data: booking, error: fetchErr } = await supabase
       .from("bookings")
       .select("id, status, provider_id, provider_name, client_id, service_id, service_name, scheduled_at, price, metadata")
       .eq("id", bookingId)
       .single();
-
-    if (fetchErr || !booking) return res.status(404).json({ error: "Booking not found." });
-    if (booking.provider_id !== requestingUserId) {
-      return res.status(403).json({ error: "Not authorized to accept this booking." });
-    }
-    if (booking.status === "confirmed") return res.status(409).json({ error: "Already accepted." });
-
+    if (fetchErr) return null;
+    return booking || null;
+  },
+  updateAcceptedBooking: async ({ bookingId, updatedAt }) => {
     const { data: updatedBooking, error: updateErr } = await supabase
       .from("bookings")
-      .update({ status: "confirmed", updated_at: new Date().toISOString() })
+      .update({ status: "confirmed", updated_at: updatedAt })
       .eq("id", bookingId)
       .select("*")
       .single();
-
     if (updateErr) throw updateErr;
-
+    return updatedBooking;
+  },
+  afterAccept: async ({ booking, requestingUserId }) => {
+    const bookingId = booking.id;
     const displayDate = new Date(booking.scheduled_at).toLocaleDateString("en-US", {
       weekday: "short", month: "short", day: "numeric",
     });
@@ -11439,7 +11229,11 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
       const providerInfo = await getProviderEmailInfo(requestingUserId);
       let acceptSvcMeta = null;
       if (booking.service_id) {
-        const { data: svcMeta } = await supabase.from("services").select("metadata").eq("id", booking.service_id).maybeSingle();
+        const { data: svcMeta } = await supabase
+          .from("services")
+          .select("metadata")
+          .eq("id", booking.service_id)
+          .maybeSingle();
         acceptSvcMeta = svcMeta?.metadata || null;
       }
       if (clientEmail) {
@@ -11452,198 +11246,135 @@ app.post("/api/bookings/:id/accept", async (req, res) => {
         }).catch(() => {});
       }
     }
-
-    return res.status(200).json({ booking: updatedBooking });
-  } catch (err) {
-    console.error("[bookings/:id/accept]", err);
-    return res.status(500).json({ error: "Failed to accept booking." });
-  }
-});
+  },
+}));
 
 // POST /api/bookings/:id/complete
-app.post("/api/bookings/:id/complete", async (req, res) => {
-  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
-
-  const bookingId = req.params.id;
-  const requestingUserId = getUserId(req);
-
-  try {
-    // 1. Fetch booking
+app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
+  getBookingId: (req) => req.params.id,
+  getUserId,
+  fetchBooking: async (bookingId) => {
+    if (!supabase) return null;
     const { data: booking, error: bookingErr } = await supabase
       .from("bookings")
       .select("*")
       .eq("id", bookingId)
       .single();
+    if (bookingErr) return null;
+    return booking || null;
+  },
+  getServiceInfo: async (serviceId) => {
+    if (!serviceId) return null;
+    const { data: serviceData } = await supabase
+      .from("services")
+      .select("name, description, duration")
+      .eq("id", serviceId)
+      .maybeSingle();
+    return serviceData || null;
+  },
+  markPaymentFailed: async ({ bookingId, now }) => {
+    await supabase
+      .from("bookings")
+      .update({ payment_status: "payment_failed", updated_at: now })
+      .eq("id", bookingId);
+  },
+  notifyProviderChargeResult: async ({ booking, ...rest }) =>
+    notifyProviderCompletionChargeResult(booking, rest),
+  notifyClientPaymentFailed: async ({ booking, bookingId, stripeErr }) => {
+    if (!booking.client_id) return;
+    const notifServiceName = booking.service_name || "your service";
+    const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(
+      () => ({})
+    );
+    const provName = providerInfo?.name || booking.provider_name || "Your provider";
 
-    if (bookingErr || !booking) return res.status(404).json({ error: "Booking not found." });
-    if (booking.status === "completed") return res.status(409).json({ error: "Already completed." });
+    await createClientNotification(booking.client_id, {
+      type: "payment_failed",
+      title: "Payment unsuccessful",
+      body: `Your payment for ${notifServiceName} with ${provName} couldn't be processed. Please update your payment method to complete your booking.`,
+      booking_id: bookingId,
+      data: { booking_id: bookingId, provider_id: booking.provider_id },
+    }).catch(() => {});
 
-    // Verify requesting user is the provider for this booking
-    if (booking.provider_id !== requestingUserId) {
-      return res.status(403).json({ error: "Not authorized to complete this booking." });
+    const { email: clientEmail, name: clientName } = await getClientNotifPrefs(
+      booking.client_id
+    ).catch(() => ({}));
+    if (clientEmail) {
+      sendEmail({
+        to: clientEmail,
+        subject: `Action required — payment failed for ${notifServiceName}`,
+        html: `
+          <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+            <div style="background:#FDEDEA;padding:28px 24px;border-radius:16px 16px 0 0;text-align:center">
+              <div style="width:56px;height:56px;background:#B04040;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px">
+                <span style="color:white;font-size:24px">✕</span>
+              </div>
+              <h1 style="margin:0;font-size:22px;font-weight:700;color:#8F2E2E">Payment unsuccessful</h1>
+            </div>
+            <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+              <p style="margin:0 0 12px">Hi ${clientName || "there"},</p>
+              <p style="margin:0 0 20px;color:#8C6A64">Your payment for <strong>${notifServiceName}</strong> with <strong>${provName}</strong> couldn't be processed. Your provider has marked the session as complete but the charge was unsuccessful.</p>
+              <div style="background:#FDEDEA;border-radius:12px;padding:16px;margin-bottom:20px;border-left:3px solid #B04040">
+                <p style="margin:0;font-size:13px;color:#8F2E2E;font-weight:600">Reason: ${stripeErr.message || "Card declined"}</p>
+              </div>
+              <p style="margin:0 0 20px;color:#8C6A64">Please open your booking in the Kliques app to retry payment with the same card or a new one.</p>
+              <div style="text-align:center;margin-bottom:24px">
+                <a href="https://mykliques.com/app/bookings/${bookingId}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">Retry payment →</a>
+              </div>
+              <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+            </div>
+          </div>`,
+      }).catch(() => {});
     }
-
-    let serviceInfo = null;
-    if (booking.service_id) {
-      const { data: serviceData } = await supabase
-        .from("services")
-        .select("name, description, duration")
-        .eq("id", booking.service_id)
-        .maybeSingle();
-      serviceInfo = serviceData || null;
+  },
+  getProviderStripeAccountId: async (providerId) => {
+    const { data: provRow } = await supabase
+      .from("providers")
+      .select("stripe_account_id")
+      .eq("user_id", providerId)
+      .maybeSingle();
+    return provRow?.stripe_account_id || null;
+  },
+  getClientStripeCustomerId: async (clientId) => {
+    const { data: cp } = await supabase
+      .from("client_profiles")
+      .select("stripe_customer_id")
+      .eq("user_id", clientId)
+      .maybeSingle();
+    return cp?.stripe_customer_id || null;
+  },
+  chargeCompletion: async ({
+    booking,
+    serviceChargeCents,
+    totalRemainingCharge,
+    stripeAccountId,
+    customerId,
+  }) => {
+    const piParams = {
+      amount: totalRemainingCharge,
+      currency: PLATFORM_CURRENCY,
+      customer: customerId || undefined,
+      payment_method: booking.stripe_payment_method_id,
+      confirm: true,
+      off_session: true,
+      metadata: {
+        booking_id: booking.id,
+        type:
+          booking.payment_type === "save_card"
+            ? "save_card_completion_charge"
+            : "deposit_remaining",
+        serviceCents: serviceChargeCents,
+      },
+    };
+    if (stripeAccountId) {
+      piParams.transfer_data = { destination: stripeAccountId };
+      piParams.application_fee_amount = Math.round(
+        serviceChargeCents * BOOKING_PLATFORM_FEE_RATE
+      );
     }
-
-    const now = new Date().toISOString();
-
-    // 4. Charge any completion-time balance via Stripe when applicable
-    // booking.price is stored in cents (base_price from services table is always cents)
-    const depositPaidCents = booking.deposit_paid_cents || 0;
-    const totalCents = Math.round(Number(booking.price) || 0); // always cents
-    const remainingCents = Math.max(totalCents - depositPaidCents, 0);
-    let chargedOnCompletionCents = 0;
-    let paymentStatusAfterCompletion = booking.payment_status || "unpaid";
-    let completionChargeIntentId = null;
-    const requiresCompletionCharge =
-      (booking.payment_type === "deposit" && depositPaidCents > 0 && remainingCents > 0) ||
-      (booking.payment_type === "save_card" && totalCents > 0);
-
-    if (requiresCompletionCharge && !booking.stripe_payment_method_id) {
-      await supabase
-        .from("bookings")
-        .update({ payment_status: "payment_failed", updated_at: now })
-        .eq("id", bookingId);
-
-      await notifyProviderCompletionChargeResult(booking, {
-        paymentStatus: "payment_failed",
-        serviceName: serviceInfo?.name || booking.service_name,
-        clientName: booking.client_name,
-        failureReason: "No saved payment method was found for this booking.",
-      });
-
-      return res.status(400).json({
-        error: "Charge failed, so this booking was not marked complete. No saved payment method was found for this booking.",
-      });
-    }
-
-    if (requiresCompletionCharge) {
-      try {
-        // Fetch provider Stripe account for Connect routing
-        const { data: provRow } = await supabase
-          .from("providers")
-          .select("stripe_account_id")
-          .eq("user_id", booking.provider_id)
-          .maybeSingle();
-        const stripeAccountId = provRow?.stripe_account_id;
-
-        // Find or use Stripe customer from client_profiles
-        const { data: cp } = await supabase
-          .from("client_profiles")
-          .select("stripe_customer_id")
-          .eq("user_id", booking.client_id)
-          .maybeSingle();
-        const customerId = cp?.stripe_customer_id;
-
-        const serviceChargeCents = booking.payment_type === "save_card" ? totalCents : remainingCents;
-
-        // Client pays service charge + platform fee on top; provider receives service charge in full
-        const platformFeeRemaining = Math.round(serviceChargeCents * PLATFORM_FEE_RATE);
-        const totalRemainingCharge = serviceChargeCents + platformFeeRemaining;
-
-        const piParams = {
-          amount: totalRemainingCharge,
-          currency: PLATFORM_CURRENCY,
-          customer: customerId || undefined,
-          payment_method: booking.stripe_payment_method_id,
-          confirm: true,
-          off_session: true,
-          metadata: {
-            booking_id: bookingId,
-            type: booking.payment_type === "save_card" ? "save_card_completion_charge" : "deposit_remaining",
-            serviceCents: serviceChargeCents,
-          },
-        };
-        if (stripeAccountId) {
-          piParams.transfer_data = { destination: stripeAccountId };
-          piParams.application_fee_amount = platformFeeRemaining;
-        }
-
-        const completionChargeIntent = await stripe.paymentIntents.create(piParams);
-        completionChargeIntentId = completionChargeIntent?.id || null;
-        paymentStatusAfterCompletion = "paid";
-        chargedOnCompletionCents = serviceChargeCents;
-      } catch (stripeErr) {
-        console.warn("[bookings/complete] Stripe completion charge failed:", stripeErr.message);
-
-        await supabase
-          .from("bookings")
-          .update({ payment_status: "payment_failed", updated_at: now })
-          .eq("id", bookingId);
-
-        await notifyProviderCompletionChargeResult(booking, {
-          paymentStatus: "payment_failed",
-          serviceName: serviceInfo?.name || booking.service_name,
-          clientName: booking.client_name,
-          failureReason: stripeErr.message || "Payment could not be processed.",
-        });
-
-        // Notify client that their payment failed and they need to retry
-        if (booking.client_id) {
-          const notifServiceName = booking.service_name || 'your service';
-          const providerInfo = await getProviderEmailInfo(booking.provider_id).catch(() => ({}));
-          const provName = providerInfo?.name || booking.provider_name || "Your provider";
-
-          await createClientNotification(booking.client_id, {
-            type: "payment_failed",
-            title: "Payment unsuccessful",
-            body: `Your payment for ${notifServiceName} with ${provName} couldn't be processed. Please update your payment method to complete your booking.`,
-            booking_id: bookingId,
-            data: { booking_id: bookingId, provider_id: booking.provider_id },
-          }).catch(() => {});
-
-          // Email the client
-          const { email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id).catch(() => ({}));
-          if (clientEmail) {
-            sendEmail({
-              to: clientEmail,
-              subject: `Action required — payment failed for ${notifServiceName}`,
-              html: `
-                <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
-                  <div style="background:#FDEDEA;padding:28px 24px;border-radius:16px 16px 0 0;text-align:center">
-                    <div style="width:56px;height:56px;background:#B04040;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px">
-                      <span style="color:white;font-size:24px">✕</span>
-                    </div>
-                    <h1 style="margin:0;font-size:22px;font-weight:700;color:#8F2E2E">Payment unsuccessful</h1>
-                  </div>
-                  <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
-                    <p style="margin:0 0 12px">Hi ${clientName || 'there'},</p>
-                    <p style="margin:0 0 20px;color:#8C6A64">Your payment for <strong>${notifServiceName}</strong> with <strong>${provName}</strong> couldn't be processed. Your provider has marked the session as complete but the charge was unsuccessful.</p>
-                    <div style="background:#FDEDEA;border-radius:12px;padding:16px;margin-bottom:20px;border-left:3px solid #B04040">
-                      <p style="margin:0;font-size:13px;color:#8F2E2E;font-weight:600">Reason: ${stripeErr.message || 'Card declined'}</p>
-                    </div>
-                    <p style="margin:0 0 20px;color:#8C6A64">Please open your booking in the Kliques app to retry payment with the same card or a new one.</p>
-                    <div style="text-align:center;margin-bottom:24px">
-                      <a href="https://mykliques.com/app/bookings/${bookingId}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">Retry payment →</a>
-                    </div>
-                    <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
-                  </div>
-                </div>`,
-            }).catch(() => {});
-          }
-        }
-
-        const statusCode = stripeErr.type === "StripeCardError" ? 402 : 500;
-        return res.status(statusCode).json({
-          error: stripeErr.message || "Charge failed, so this booking was not marked complete.",
-        });
-      }
-    } else if (
-      booking.payment_type === "full" ||
-      (booking.payment_type === "deposit" && remainingCents === 0 && depositPaidCents > 0)
-    ) {
-      paymentStatusAfterCompletion = "paid";
-    }
-
-    // 2 + 3. Mark booking completed only after any required Stripe charge succeeds
+    return stripe.paymentIntents.create(piParams);
+  },
+  markCompleted: async ({ bookingId, now, paymentStatusAfterCompletion }) => {
     const { error: updateErr } = await supabase
       .from("bookings")
       .update({
@@ -11654,54 +11385,63 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
       })
       .eq("id", bookingId);
     if (updateErr) throw updateErr;
-
-    if (requiresCompletionCharge) {
-      await notifyProviderCompletionChargeResult(booking, {
-        paymentStatus: "paid",
-        serviceName: serviceInfo?.name || booking.service_name,
-        clientName: booking.client_name,
-        chargedAmountCents: chargedOnCompletionCents,
-      });
-    }
-
-    // 5 + 6. Calculate fee and create provider_earnings record.
-    // With Option 1 pricing: client pays service + 10% fee. Provider receives full service price.
-    // gross_amount = what client paid for the service portion (totalCents)
-    // platform_fee = 10% added on top (paid by client, kept by platform)
-    // net_amount = full service price (provider receives this in full)
-    const grossDollars = +(totalCents / 100).toFixed(2);
-    const platformFeeDollars = +(grossDollars * BOOKING_PLATFORM_FEE_RATE).toFixed(2);
-    const netAmount = grossDollars; // provider receives full service price
-
+  },
+  createEarningsRecord: async ({
+    booking,
+    bookingId,
+    now,
+    grossAmountCents,
+    platformFeeCents,
+    netAmountCents,
+  }) => {
     const { error: earningsErr } = await supabase.from("provider_earnings").insert({
       provider_id: booking.provider_id,
       booking_id: bookingId,
-      gross_amount: Math.round(grossDollars * 100),
-      platform_fee: Math.round(platformFeeDollars * 100),
-      net_amount: Math.round(netAmount * 100),
+      gross_amount: grossAmountCents,
+      platform_fee: platformFeeCents,
+      net_amount: netAmountCents,
       payout_status: "pending",
       created_at: now,
     });
-    if (earningsErr) console.warn("[bookings/complete] provider_earnings insert:", earningsErr.message);
-
+    if (earningsErr)
+      console.warn("[bookings/complete] provider_earnings insert:", earningsErr.message);
+  },
+  createInvoice: async ({
+    booking,
+    bookingId,
+    now,
+    serviceInfo,
+    totalCents,
+    remainingCents,
+    depositPaidCents,
+  }) => {
     let invoiceNumber = null;
     let invoiceId = null;
     const serviceName = serviceInfo?.name || booking.service_name || "Service";
-    const serviceDesc = serviceInfo?.description || booking.service_description || null;
-    const durationMins = serviceInfo?.duration || booking.duration_minutes || booking.duration || null;
-    const { name: fallbackProviderName } = await getProviderEmailInfo(booking.provider_id).catch(() => ({}));
-    let providerDisplayName = fallbackProviderName || booking.provider_name || "Provider";
+    const serviceDesc =
+      serviceInfo?.description || booking.service_description || null;
+    const durationMins =
+      serviceInfo?.duration || booking.duration_minutes || booking.duration || null;
+    const { name: fallbackProviderName } = await getProviderEmailInfo(
+      booking.provider_id
+    ).catch(() => ({}));
+    let providerDisplayName =
+      fallbackProviderName || booking.provider_name || "Provider";
 
     try {
-      // 7. Generate invoice
       const { data: providerProfile } = await supabase
         .from("provider_profiles")
         .select("business_name, name, address, email, phone, bio")
         .eq("provider_id", booking.provider_id)
         .maybeSingle();
 
-      providerDisplayName = providerProfile?.business_name || providerProfile?.name || providerDisplayName;
-      invoiceNumber = await generateInvoiceNumber(supabase, booking.provider_id, providerDisplayName);
+      providerDisplayName =
+        providerProfile?.business_name || providerProfile?.name || providerDisplayName;
+      invoiceNumber = await generateInvoiceNumber(
+        supabase,
+        booking.provider_id,
+        providerDisplayName
+      );
 
       const { data: clientProfile } = await supabase
         .from("client_profiles")
@@ -11743,141 +11483,153 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
         .select()
         .single();
 
-      if (invoiceErr) {
-        console.warn("[bookings/complete] invoice insert error:", invoiceErr.message);
-      } else {
+      if (!invoiceErr) {
         invoiceId = invoice?.id || null;
+      } else {
+        console.warn("[bookings/complete] invoice insert error:", invoiceErr.message);
       }
-
     } catch (postCompleteErr) {
-      console.warn("[bookings/complete] post-completion follow-up failed:", postCompleteErr.message);
+      console.warn(
+        "[bookings/complete] post-completion follow-up failed:",
+        postCompleteErr.message
+      );
     }
 
-    // 8. Notify client independently of invoice generation.
-    if (booking.client_id) {
-      try {
-        const hasNote = !!(booking.session_notes || "").trim();
-        const hasRec = !!(booking.session_recommendation || "").trim();
-        const { count: photoCount } = await supabase
-          .from("booking_photos")
-          .select("id", { count: "exact", head: true })
-          .eq("booking_id", bookingId);
-        const hasPhotos = (photoCount || 0) > 0;
+    return { invoiceNumber, invoiceId };
+  },
+  notifyClientCompletion: async ({
+    booking,
+    bookingId,
+    serviceInfo,
+    invoiceNumber,
+    invoiceId,
+    totalCents,
+  }) => {
+    if (!booking.client_id) return;
+    const serviceName = serviceInfo?.name || booking.service_name || "Service";
+    const { name: fallbackProviderName } = await getProviderEmailInfo(
+      booking.provider_id
+    ).catch(() => ({}));
+    const providerDisplayName =
+      fallbackProviderName || booking.provider_name || "Provider";
 
-        const leftItems = [
-          hasNote && "a session note",
-          hasRec && "a recommendation",
-          hasPhotos && "photos",
-        ].filter(Boolean);
+    try {
+      const hasNote = !!(booking.session_notes || "").trim();
+      const hasRec = !!(booking.session_recommendation || "").trim();
+      const { count: photoCount } = await supabase
+        .from("booking_photos")
+        .select("id", { count: "exact", head: true })
+        .eq("booking_id", bookingId);
+      const hasPhotos = (photoCount || 0) > 0;
 
-        let completionBody = `Your ${serviceName} with ${providerDisplayName} is complete.`;
-        if (leftItems.length > 0) {
-          const joined = leftItems.length === 1
+      const leftItems = [
+        hasNote && "a session note",
+        hasRec && "a recommendation",
+        hasPhotos && "photos",
+      ].filter(Boolean);
+
+      let completionBody = `Your ${serviceName} with ${providerDisplayName} is complete.`;
+      if (leftItems.length > 0) {
+        const joined =
+          leftItems.length === 1
             ? leftItems[0]
-            : leftItems.slice(0, -1).join(", ") + " and " + leftItems[leftItems.length - 1];
-          completionBody += ` ${providerDisplayName} left ${joined} for you.`;
-        }
-        completionBody += invoiceNumber
-          ? " Your invoice is now available in the Invoices page."
-          : " Open the booking to view session details.";
-
-        await createClientNotification(booking.client_id, {
-          type: "session_complete",
-          title: "Session complete",
-          body: completionBody,
-          booking_id: bookingId,
-          data: {
-            provider_id: booking.provider_id,
-            provider_name: providerDisplayName,
-            service_name: serviceName,
-            booking_date: booking.scheduled_at,
-            show_review_prompt: true,
-            has_session_note: hasNote,
-            has_recommendation: hasRec,
-            has_photos: hasPhotos,
-            invoice_id: invoiceId,
-            invoice_number: invoiceNumber,
-          },
-        });
-      } catch (notifErr) {
-        console.warn("[bookings/complete] client notification failed:", notifErr.message);
+            : leftItems.slice(0, -1).join(", ") +
+              " and " +
+              leftItems[leftItems.length - 1];
+        completionBody += ` ${providerDisplayName} left ${joined} for you.`;
       }
+      completionBody += invoiceNumber
+        ? " Your invoice is now available in the Invoices page."
+        : " Open the booking to view session details.";
 
-      try {
-        const { prefs, email: clientEmail, name: clientName } = await getClientNotifPrefs(booking.client_id);
-        if (prefs?.email_invoices !== false && clientEmail && invoiceNumber) {
-          const totalStr = `$${(totalCents / 100).toFixed(2)}`;
-          const depositStr = depositPaidCents > 0 ? `$${(depositPaidCents / 100).toFixed(2)}` : null;
-
-          // Generate PDF attachment if we have an invoice record
-          let attachments;
-          if (invoiceId) {
-            try {
-              const { data: invoiceRow } = await supabase
-                .from('provider_invoices')
-                .select('*')
-                .eq('id', invoiceId)
-                .single();
-              if (invoiceRow) {
-                const pdfBuffer = await generateInvoicePdfBuffer(invoiceRow);
-                attachments = [{
-                  filename: `invoice-${invoiceNumber}.pdf`,
-                  content: pdfBuffer.toString('base64'),
-                }];
-              }
-            } catch (pdfErr) {
-              console.warn('[bookings/complete] PDF attachment generation failed:', pdfErr.message);
-            }
-          }
-
-          await sendEmail({
-            to: clientEmail,
-            subject: `Invoice #${invoiceNumber} — ${serviceName}`,
-            attachments,
-            html: `
-              <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
-                <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
-                  <h1 style="margin:0;font-size:22px;font-weight:700">Invoice #${invoiceNumber}</h1>
-                </div>
-                <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
-                  <p style="margin:0 0 8px">Hi ${clientName || "there"},</p>
-                  <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}. Your invoice PDF is attached.</p>
-                  <table style="width:100%;border-collapse:collapse">
-                    <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
-                    <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
-                    ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ""}
-                    <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
-                  </table>
-                  <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
-                </div>
-              </div>`,
-          });
-        }
-      } catch (emailErr) {
-        console.warn("[bookings/complete] client invoice email failed:", emailErr.message);
-      }
+      await createClientNotification(booking.client_id, {
+        type: "session_complete",
+        title: "Session complete",
+        body: completionBody,
+        booking_id: bookingId,
+        data: {
+          provider_id: booking.provider_id,
+          provider_name: providerDisplayName,
+          service_name: serviceName,
+          booking_date: booking.scheduled_at,
+          show_review_prompt: true,
+          has_session_note: hasNote,
+          has_recommendation: hasRec,
+          has_photos: hasPhotos,
+          invoice_id: invoiceId,
+          invoice_number: invoiceNumber,
+        },
+      });
+    } catch (notifErr) {
+      console.warn("[bookings/complete] client notification failed:", notifErr.message);
     }
 
-    // 9. Return summary
-    return res.status(200).json({
-      ok: true,
-      payout: {
-        grossAmount: grossDollars,
-        depositCollected: +(depositPaidCents / 100).toFixed(2),
-        remainingCharged: +(chargedOnCompletionCents / 100).toFixed(2),
-        platformFee: platformFeeDollars,
-        netAmount,
-        paymentStatus: paymentStatusAfterCompletion,
-        paymentIntentId: completionChargeIntentId,
-      },
-      invoice_number: invoiceNumber,
-      invoice_id: invoiceId,
-    });
-  } catch (err) {
-    console.error("[bookings/:id/complete]", err);
-    return res.status(500).json({ error: "Failed to complete booking." });
-  }
-});
+    try {
+      const { prefs, email: clientEmail, name: clientName } =
+        await getClientNotifPrefs(booking.client_id);
+      if (prefs?.email_invoices !== false && clientEmail && invoiceNumber) {
+        const totalStr = `$${(totalCents / 100).toFixed(2)}`;
+        const depositPaidCents = booking.deposit_paid_cents || 0;
+        const depositStr =
+          depositPaidCents > 0
+            ? `$${(depositPaidCents / 100).toFixed(2)}`
+            : null;
+
+        let attachments;
+        if (invoiceId) {
+          try {
+            const { data: invoiceRow } = await supabase
+              .from("provider_invoices")
+              .select("*")
+              .eq("id", invoiceId)
+              .single();
+            if (invoiceRow) {
+              const pdfBuffer = await generateInvoicePdfBuffer(invoiceRow);
+              attachments = [
+                {
+                  filename: `invoice-${invoiceNumber}.pdf`,
+                  content: pdfBuffer.toString("base64"),
+                },
+              ];
+            }
+          } catch (pdfErr) {
+            console.warn(
+              "[bookings/complete] PDF attachment generation failed:",
+              pdfErr.message
+            );
+          }
+        }
+
+        await sendEmail({
+          to: clientEmail,
+          subject: `Invoice #${invoiceNumber} — ${serviceName}`,
+          attachments,
+          html: `
+            <div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;color:#3D231E">
+              <div style="background:#FDDCC6;padding:32px 24px;border-radius:16px 16px 0 0;text-align:center">
+                <h1 style="margin:0;font-size:22px;font-weight:700">Invoice #${invoiceNumber}</h1>
+              </div>
+              <div style="background:#FBF7F2;padding:24px;border-radius:0 0 16px 16px">
+                <p style="margin:0 0 8px">Hi ${clientName || "there"},</p>
+                <p style="margin:0 0 20px;color:#8C6A64">Here is your invoice from ${providerDisplayName}. Your invoice PDF is attached.</p>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Service</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${serviceName}</td></tr>
+                  <tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Provider</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right;font-weight:600">${providerDisplayName}</td></tr>
+                  ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ""}
+                  <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
+                </table>
+                <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
+              </div>
+            </div>`,
+        });
+      }
+    } catch (emailErr) {
+      console.warn("[bookings/complete] client invoice email failed:", emailErr.message);
+    }
+  },
+  getNowIso: () => new Date().toISOString(),
+  platformFeeRate: BOOKING_PLATFORM_FEE_RATE,
+}));
 
 // POST /api/bookings/:id/charge-card
 // Provider charges the saved card for a save_card booking
@@ -12836,5 +12588,9 @@ app.put("/api/clients/:id/notification-preferences", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+export { app };
+
+if (IS_DIRECT_RUN) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
+}
