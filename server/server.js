@@ -8698,13 +8698,25 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       }
     }
 
-    // Remove past slots if date is today
-    const today = new Date().toISOString().slice(0, 10);
-    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
-    const filtered = date === today
+    // Remove past slots if date is today (or in the past).
+    // The client sends ?date=YYYY-MM-DD in local time. We compare each slot
+    // against the current UTC time expressed as minutes-since-midnight on that
+    // same calendar date, so the filter works regardless of server timezone.
+    const nowUtc = new Date();
+    const todayUtc = nowUtc.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
+
+    // Build a Date representing midnight of the requested date in UTC
+    const requestedMidnightUtc = new Date(date + "T00:00:00Z");
+    // Current offset from midnight of the requested date, in minutes
+    const minutesSinceMidnightUtc = Math.floor((nowUtc - requestedMidnightUtc) / 60000);
+
+    // Filter out slots that have already passed (with a 15-min buffer so clients
+    // don't see slots they can't actually book in time)
+    const BUFFER_MINS = 15;
+    const filtered = (date <= todayUtc)
       ? slots.filter((s) => {
           const [h, m] = s.split(":").map(Number);
-          return h * 60 + m > nowMins + 30;
+          return h * 60 + m > minutesSinceMidnightUtc + BUFFER_MINS;
         })
       : slots;
 
