@@ -28,7 +28,7 @@ const NotifBell = ({ count, onClick }) => (
         </svg>
 
         {!!count && (
-            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-pill bg-accent text-white text-[10px] font-semibold leading-4 flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-white text-[10px] font-semibold leading-none" style={{ background: '#C25E4A' }}>
                 {count > 99 ? '99+' : count}
             </span>
         )}
