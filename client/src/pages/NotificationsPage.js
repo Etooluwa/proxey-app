@@ -317,6 +317,7 @@ const NotifItem = ({ n, onMarkRead, onLeaveReview, onOpenBooking }) => {
                         {/* Leave a review pill (session_complete) */}
                         {showReview && bid && (
                             <div
+                                onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); onLeaveReview(bid); }}
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: 6,
                                     padding: '6px 14px', borderRadius: 9999,
