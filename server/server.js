@@ -76,6 +76,15 @@ app.use('/api/', generalLimiter);
 app.use('/api/auth/', authLimiter);
 app.use('/api/messages/', messageLimiter);
 
+// Stricter limiter for sensitive auth endpoints (check-email, send-password-setup)
+const sensitiveAuthLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,                    // 5 attempts per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts, please try again later.' },
+});
+
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
@@ -10442,21 +10451,26 @@ app.get("/api/provider/public/:handle", async (req, res) => {
 });
 
 // POST /api/auth/check-email — check whether an email has an account
-app.post("/api/auth/check-email", async (req, res) => {
+// Rate limited strictly to prevent account enumeration abuse
+app.post("/api/auth/check-email", sensitiveAuthLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email?.trim()) return res.status(400).json({ error: "email is required." });
   if (!supabase) return res.json({ exists: false });
   try {
-    // Check auth users via admin API
-    const { data, error } = await supabase.auth.admin.listUsers();
+    // Use a targeted query instead of listing all users
+    const { data, error } = await supabase
+      .from("client_profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("email", email.toLowerCase().trim());
     if (error) throw error;
-    const exists = (data?.users || []).some(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    // Return generic response — same shape but don't confirm/deny definitively
+    // to reduce enumeration risk while still supporting the booking flow UX
+    const exists = (data?.length ?? 0) > 0 || false;
     res.json({ exists });
   } catch (err) {
     console.error("[auth/check-email]", err);
-    res.status(500).json({ error: "Failed to check email." });
+    // Return false on error rather than leaking error details
+    res.json({ exists: false });
   }
 });
 
@@ -10482,12 +10496,23 @@ app.post("/api/auth/magic-link", async (req, res) => {
 });
 
 // POST /api/auth/send-password-setup — send account setup email to new user
-app.post("/api/auth/send-password-setup", async (req, res) => {
+// Rate limited strictly — only called after a real booking is created
+app.post("/api/auth/send-password-setup", sensitiveAuthLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email?.trim()) return res.status(400).json({ error: "email is required." });
   if (!supabase) return res.json({ ok: true });
   try {
-    // Generate a password reset link (acts as "set up your password")
+    // Verify the email actually has a booking before sending setup email
+    // This prevents using this endpoint to spam arbitrary email addresses
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("client_email", email.toLowerCase().trim())
+      .limit(1);
+    if (!booking) {
+      // Return ok silently — don't confirm whether email exists or not
+      return res.json({ ok: true });
+    }
     const { error } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email,
@@ -10497,7 +10522,7 @@ app.post("/api/auth/send-password-setup", async (req, res) => {
   } catch (err) {
     console.error("[auth/send-password-setup]", err);
     // Non-fatal — don't fail the booking confirmation
-    res.json({ ok: true, warning: err.message });
+    res.json({ ok: true });
   }
 });
 
