@@ -51,7 +51,8 @@ function fmtDuration(mins) {
 
 function fmtPrice(cents) {
     if (!cents && cents !== 0) return null;
-    return `$${Math.round(cents / 100)}`;
+    const dollars = cents / 100;
+    return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
 }
 
 const Shimmer = ({ className }) => (
