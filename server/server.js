@@ -10152,19 +10152,16 @@ app.post("/api/auth/signup", async (req, res) => {
     //    user_id from the OTP response may not exist yet — use email as lookup key
     //    and rely on the auth trigger or a second upsert when the session lands.
     //    We store what we can now, keyed by email, and finish in AuthCallback.
-    const pendingKey = `kliques.pending_profile.${email.toLowerCase()}`;
     // Store as a transient lookup via a separate upsert attempt using admin API
+    // Use targeted getUserByEmail instead of listUsers() to avoid fetching all users
     try {
-      const { data: users } = await supabase.auth.admin.listUsers();
-      const authUser = (users?.users || []).find(
-        (u) => u.email?.toLowerCase() === email.toLowerCase()
-      );
-      if (authUser?.id) {
+      const { data: userData } = await supabase.auth.admin.getUserByEmail(email.toLowerCase().trim());
+      if (userData?.user?.id) {
         await supabase
           .from("client_profiles")
           .upsert(
             {
-              user_id: authUser.id,
+              user_id: userData.user.id,
               name: name.trim(),
               email: email.trim().toLowerCase(),
               phone: phone.trim(),
@@ -10527,12 +10524,11 @@ app.post("/api/auth/send-password-setup", sensitiveAuthLimiter, async (req, res)
   try {
     // Verify the email actually has a booking before sending setup email
     // This prevents using this endpoint to spam arbitrary email addresses
-    const { data: booking } = await supabase
+    const { count } = await supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })
-      .eq("client_email", email.toLowerCase().trim())
-      .limit(1);
-    if (!booking) {
+      .eq("client_email", email.toLowerCase().trim());
+    if (!count || count === 0) {
       // Return ok silently — don't confirm whether email exists or not
       return res.json({ ok: true });
     }
