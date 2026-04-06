@@ -227,9 +227,15 @@ export default function NotificationDropdown() {
                 <BellIcon />
                 {unreadCount > 0 && (
                     <div style={{
-                        position: 'absolute', top: '6px', right: '6px',
-                        width: '8px', height: '8px', borderRadius: '50%', background: T.accent,
-                    }} />
+                        position: 'absolute', top: '2px', right: '2px',
+                        minWidth: '18px', height: '18px', borderRadius: '9999px',
+                        background: T.accent, color: '#fff',
+                        fontFamily: F, fontSize: '10px', fontWeight: 600,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '0 4px', lineHeight: 1,
+                    }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                    </div>
                 )}
             </button>
 
