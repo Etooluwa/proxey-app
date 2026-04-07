@@ -10828,6 +10828,15 @@ app.post("/api/bookings/create", createChargedBookingHandler({
       .maybeSingle();
     return parseInt(serviceRow?.duration, 10) || 60;
   },
+  getServiceName: async (serviceId) => {
+    if (!supabase || !serviceId) return null;
+    const { data: serviceRow } = await supabase
+      .from("services")
+      .select("name")
+      .eq("id", serviceId)
+      .maybeSingle();
+    return serviceRow?.name || null;
+  },
   getProviderStripe: async (providerId) =>
     getProviderStripeConnectStatus(providerId, { requireReady: true }),
   hasConflict: hasProviderBookingConflict,
@@ -10835,6 +10844,7 @@ app.post("/api/bookings/create", createChargedBookingHandler({
     bookingId,
     userId,
     serviceId,
+    serviceName,
     providerId,
     scheduledAt,
     serviceDuration,
@@ -10850,6 +10860,7 @@ app.post("/api/bookings/create", createChargedBookingHandler({
         id: bookingId,
         client_id: userId,
         service_id: serviceId,
+        service_name: serviceName || "Service",
         provider_id: providerId,
         scheduled_at: scheduledAt,
         duration: serviceDuration,

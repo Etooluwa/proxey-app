@@ -9,6 +9,7 @@ export function createChargedBookingHandler({
   getUserId,
   getProviderBookingRules = async () => normalizeProviderBookingRules(),
   getServiceDuration = async () => 60,
+  getServiceName = async () => null,
   getProviderStripe = async () => null,
   hasConflict = async () => false,
   createBookingRecord = async ({ bookingId }) => bookingId,
@@ -54,7 +55,10 @@ export function createChargedBookingHandler({
     const chargeAmount = depositAmount != null ? depositAmount : price;
     const amountCents = Math.round((parseFloat(chargeAmount) || 0) * 100);
     let providerStripe = null;
-    const serviceDuration = await getServiceDuration(serviceId);
+    const [serviceDuration, serviceName] = await Promise.all([
+      getServiceDuration(serviceId),
+      getServiceName(serviceId),
+    ]);
 
     if (amountCents > 0) {
       try {
@@ -84,6 +88,7 @@ export function createChargedBookingHandler({
         bookingId: generateBookingId(),
         userId,
         serviceId,
+        serviceName,
         providerId,
         scheduledAt,
         serviceDuration,
