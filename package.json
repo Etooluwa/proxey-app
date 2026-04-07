@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "loadtest:health": "k6 run loadtests/health.js",
+    "loadtest:auth": "k6 run loadtests/authenticated-dashboard.js",
+    "loadtest:booking": "k6 run loadtests/booking-create.js",
+    "loadtest:availability": "k6 run loadtests/availability.js"
   },
   "keywords": [],
   "author": "",

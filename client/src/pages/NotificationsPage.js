@@ -314,22 +314,6 @@ const NotifItem = ({ n, onMarkRead, onLeaveReview, onOpenBooking }) => {
 
                     {/* Action pills row */}
                     <div className="flex items-center gap-3">
-                        {/* Leave a review pill (session_complete) */}
-                        {showReview && bid && (
-                            <div
-                                onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); onLeaveReview(bid); }}
-                                style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                                    padding: '6px 14px', borderRadius: 9999,
-                                    background: '#FDDCC6', cursor: 'pointer',
-                                }}
-                            >
-                                <svg width="12" height="12" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
-                                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: '#C25E4A', fontFamily: "'Sora',system-ui,sans-serif" }}>Leave a review</span>
-                            </div>
-                        )}
 
                         {/* Retry payment pill (payment_failed) */}
                         {type === 'payment_failed' && bid && (

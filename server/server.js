@@ -4856,9 +4856,11 @@ app.post("/api/reviews", async (req, res) => {
   const payload = {
     booking_id: bookingId,
     provider_id: providerId,
-    client_id: userId,   // reviews table uses client_id (not user_id)
+    client_id: userId,
     rating,
     comment: comment || "",
+    service_id: booking.service_id || null,
+    service_name: booking.service_name || null,
     created_at: now,
   };
 
@@ -4879,48 +4881,67 @@ app.post("/api/reviews", async (req, res) => {
       .catch((err) => console.warn("[reviews] reviewed_at update failed:", err.message));
 
     // Handle tip if provided
-    let tipResult = null;
     let tipError = null;
     const tipAmountCents = tip_amount ? Math.round(tip_amount) : 0;
 
     if (tipAmountCents > 0) {
       try {
-        // Record tip as a provider_earnings entry (platform fee = 0 on tips)
-        const { data: tipRecord } = await supabase
-          .from("provider_earnings")
-          .insert({
-            provider_id: providerId,
-            booking_id: bookingId,
-            type: "tip",
-            gross_amount: tipAmountCents,
-            platform_fee: 0,
-            net_amount: tipAmountCents,
-            payout_status: "pending",
-            created_at: now,
-          })
-          .select()
-          .single();
-        tipResult = tipRecord;
+        // Charge tip via Stripe — look up customer + payment method from original payment intent
+        let stripeCharged = false;
+        const originalPiId = booking.metadata?.stripe_payment_intent_id || booking.payment_intent_id;
+        if (stripe && originalPiId) {
+          const originalPi = await stripe.paymentIntents.retrieve(originalPiId);
+          const customerId = originalPi?.customer;
+          const paymentMethodId = originalPi?.payment_method;
 
-        // Charge tip via Stripe if payment info available
-        if (stripe && booking.metadata?.payment_method_id && booking.metadata?.customer_id) {
-          const tipIntent = await stripe.paymentIntents.create({
-            amount: tipAmountCents,
-            currency: PLATFORM_CURRENCY,
-            customer: booking.metadata.customer_id,
-            payment_method: booking.metadata.payment_method_id,
-            confirm: true,
-            off_session: true,
-            description: `Tip for booking ${bookingId}`,
-            metadata: { booking_id: bookingId, provider_id: providerId, type: "tip" },
-          });
-          if (tipRecord) {
-            await supabase
-              .from("provider_earnings")
-              .update({ stripe_payment_intent_id: tipIntent.id })
-              .eq("id", tipRecord.id)
-              .catch(() => {});
+          if (customerId && paymentMethodId) {
+            await stripe.paymentIntents.create({
+              amount: tipAmountCents,
+              currency: PLATFORM_CURRENCY,
+              customer: customerId,
+              payment_method: paymentMethodId,
+              confirm: true,
+              off_session: true,
+              description: `Tip for booking ${bookingId}`,
+              metadata: { booking_id: bookingId, provider_id: providerId, type: "tip" },
+            });
+            stripeCharged = true;
           }
+        }
+
+        // Record tip in provider_earnings — increment totals
+        const { data: existing } = await supabase
+          .from("provider_earnings")
+          .select("provider_id, total_earned, pending_payout, transactions")
+          .eq("provider_id", providerId)
+          .maybeSingle();
+
+        const tipTransaction = {
+          type: "tip",
+          booking_id: bookingId,
+          amount: tipAmountCents,
+          stripe_charged: stripeCharged,
+          created_at: now,
+        };
+
+        if (existing) {
+          await supabase
+            .from("provider_earnings")
+            .update({
+              total_earned: (existing.total_earned || 0) + tipAmountCents,
+              pending_payout: (existing.pending_payout || 0) + tipAmountCents,
+              transactions: [...(existing.transactions || []), tipTransaction],
+            })
+            .eq("provider_id", providerId);
+        } else {
+          await supabase
+            .from("provider_earnings")
+            .insert({
+              provider_id: providerId,
+              total_earned: tipAmountCents,
+              pending_payout: tipAmountCents,
+              transactions: [tipTransaction],
+            });
         }
       } catch (tipErr) {
         console.error("[reviews] Tip failed:", tipErr);
