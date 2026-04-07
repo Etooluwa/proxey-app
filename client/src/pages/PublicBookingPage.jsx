@@ -163,7 +163,15 @@ const BtnOutlined = ({ onClick, children, style = {} }) => (
 );
 
 const BackBtn = ({ onClick }) => (
-    <button type="button" onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+    <button
+        type="button"
+        onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick?.(e);
+        }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
+    >
         <svg width="22" height="22" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24">
             <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
