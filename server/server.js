@@ -1820,7 +1820,7 @@ app.post("/api/services", async (req, res) => {
 
   const {
     paymentType, depositType, depositValue, clientNotesEnabled,
-    isActive, photos, preAppointmentInfo,
+    isActive, photos, preAppointmentInfo, pricingType, minHours, maxHours,
   } = req.body || {};
 
   let providerId;
@@ -1831,13 +1831,22 @@ app.post("/api/services", async (req, res) => {
     return res.status(400).json({ error: "Provider record not found for this user." });
   }
 
+  const metadataFields = {};
+  if (photos) metadataFields.photos = photos;
+  if (preAppointmentInfo) metadataFields.preAppointmentInfo = preAppointmentInfo;
+  if (pricingType) metadataFields.pricingType = pricingType;
+  if (pricingType === 'per_hour') {
+    metadataFields.minHours = minHours ?? 1;
+    metadataFields.maxHours = maxHours ?? 8;
+  }
+
   const payload = {
     id: id || crypto.randomUUID(),
     name,
     description: description || "",
     category,
     base_price: Math.round((parseFloat(basePrice) || 0) * 100), // store cents
-    unit: unit || "visit",
+    unit: pricingType === 'per_hour' ? 'hour' : (unit || "visit"),
     duration: duration || 60,
     provider_id: providerId,
     is_active: isActive !== undefined ? isActive : true,
@@ -1845,10 +1854,7 @@ app.post("/api/services", async (req, res) => {
     deposit_type: depositType || null,
     deposit_value: depositValue != null ? depositValue : null,
     client_notes_enabled: clientNotesEnabled !== undefined ? clientNotesEnabled : true,
-    metadata: (photos || preAppointmentInfo) ? {
-      ...(photos ? { photos } : {}),
-      ...(preAppointmentInfo ? { preAppointmentInfo } : {}),
-    } : undefined,
+    metadata: Object.keys(metadataFields).length > 0 ? metadataFields : undefined,
   };
 
   try {
@@ -1973,6 +1979,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   const {
     name, description, category, basePrice, duration, isActive,
     paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
+    pricingType, minHours, maxHours,
   } = req.body || {};
 
   try {
@@ -1984,21 +1991,23 @@ app.put("/api/provider/services/:id", async (req, res) => {
     if (name !== undefined)                 updates.name = name;
     if (description !== undefined)          updates.description = description;
     if (category !== undefined)             updates.category = category;
-    if (basePrice !== undefined)            updates.base_price = Math.round((parseFloat(basePrice) || 0) * 100); // store cents
+    if (basePrice !== undefined)            updates.base_price = Math.round((parseFloat(basePrice) || 0) * 100);
     if (duration !== undefined)             updates.duration = duration;
     if (isActive !== undefined)             updates.is_active = isActive;
     if (paymentType !== undefined)          updates.payment_type = paymentType;
     if (depositType !== undefined)          updates.deposit_type = depositType;
     if (depositValue !== undefined)         updates.deposit_value = depositValue;
     if (clientNotesEnabled !== undefined)   updates.client_notes_enabled = clientNotesEnabled;
-    if (photos !== undefined || preAppointmentInfo !== undefined) {
-      // Fetch existing metadata to merge (avoid overwriting unrelated fields)
+    if (pricingType !== undefined)          updates.unit = pricingType === 'per_hour' ? 'hour' : 'visit';
+    if (photos !== undefined || preAppointmentInfo !== undefined || pricingType !== undefined) {
       const { data: existing } = await supabase.from("services").select("metadata").eq("id", id).single();
       const existingMeta = existing?.metadata || {};
       updates.metadata = {
         ...existingMeta,
         ...(photos !== undefined ? { photos } : {}),
         ...(preAppointmentInfo !== undefined ? { preAppointmentInfo } : {}),
+        ...(pricingType !== undefined ? { pricingType } : {}),
+        ...(pricingType === 'per_hour' ? { minHours: minHours ?? existingMeta.minHours ?? 1, maxHours: maxHours ?? existingMeta.maxHours ?? 8 } : { minHours: null, maxHours: null }),
       };
     }
 
@@ -10483,7 +10492,7 @@ app.get("/api/provider/public/:handle", async (req, res) => {
     const [servicesRes, groupsRes, reviewsRes, clientCountRes] = await Promise.all([
       supabase
         .from("services")
-        .select("id, name, duration, base_price, payment_type, deposit_type, deposit_value, description, group_id, metadata")
+        .select("id, name, duration, base_price, unit, payment_type, deposit_type, deposit_value, description, group_id, metadata")
         .eq("provider_id", provider.user_id)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),

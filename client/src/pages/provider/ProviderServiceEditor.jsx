@@ -188,8 +188,11 @@ const QuestionCard = ({ q, qi, onTextChange, onAddOption, onRemoveOption, onRemo
 
 const EMPTY_FORM = {
     name: '',
+    pricingType: 'fixed', // 'fixed' | 'per_hour'
     durationHr: 1,
     durationMin: 0,
+    minHours: 1,
+    maxHours: 8,
     description: '',
     price: '',
     payType: 'full',
@@ -231,10 +234,14 @@ const ProviderServiceEditor = () => {
             const svc = data.service;
             if (svc) {
                 const totalMins = svc.duration || 60;
+                const pricingType = svc.metadata?.pricingType || 'fixed';
                 setForm({
                     name:               svc.name || '',
+                    pricingType,
                     durationHr:         Math.floor(totalMins / 60),
                     durationMin:        totalMins % 60,
+                    minHours:           svc.metadata?.minHours ?? 1,
+                    maxHours:           svc.metadata?.maxHours ?? 8,
                     description:        svc.description || '',
                     price:              svc.base_price != null ? String(svc.base_price / 100) : '',
                     payType:            svc.payment_type || 'full',
@@ -318,7 +325,7 @@ const ProviderServiceEditor = () => {
         if (!form.name.trim()) errs.name = 'Required';
         if (!form.price || Number(form.price) <= 0) errs.price = 'Must be greater than 0';
         const totalMins = Number(form.durationHr) * 60 + Number(form.durationMin);
-        if (totalMins <= 0) errs.duration = 'Must be greater than 0';
+        if (form.pricingType !== 'per_hour' && totalMins <= 0) errs.duration = 'Must be greater than 0';
         setErrors(errs);
         if (Object.keys(errs).length > 0) return;
 
@@ -332,13 +339,16 @@ const ProviderServiceEditor = () => {
                 description:        form.description,
                 category:           'General',
                 basePrice:          Number(form.price),
-                duration:           totalMins,
+                duration:           form.pricingType === 'per_hour' ? Number(form.minHours) * 60 : totalMins,
                 isActive:           form.is_active,
                 paymentType:        form.payType,
                 depositType:        form.payType === 'deposit' ? form.depositType : null,
                 depositValue:       form.payType === 'deposit' ? Number(form.depositValue) : null,
                 clientNotesEnabled: form.clientNotesEnabled,
                 preAppointmentInfo: form.preAppointmentInfo,
+                pricingType:        form.pricingType,
+                minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
+                maxHours:           form.pricingType === 'per_hour' ? Number(form.maxHours) : null,
             };
 
             let serviceId = id;
@@ -478,26 +488,28 @@ const ProviderServiceEditor = () => {
                         <FieldError msg={errors.name} />
                     </div>
 
-                    <div className="mb-4">
-                        <FieldLabel required>Duration</FieldLabel>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number" min={0}
-                                value={form.durationHr}
-                                onChange={set('durationHr')}
-                                style={{ ...inputBase, width: 64, textAlign: 'center', padding: '13px 8px' }}
-                            />
-                            <span className="text-[15px] text-muted">hr</span>
-                            <input
-                                type="number" min={0} max={59}
-                                value={form.durationMin}
-                                onChange={set('durationMin')}
-                                style={{ ...inputBase, width: 64, textAlign: 'center', padding: '13px 8px' }}
-                            />
-                            <span className="text-[15px] text-muted">min</span>
+                    {form.pricingType !== 'per_hour' && (
+                        <div className="mb-4">
+                            <FieldLabel required>Duration</FieldLabel>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number" min={0}
+                                    value={form.durationHr}
+                                    onChange={set('durationHr')}
+                                    style={{ ...inputBase, width: 64, textAlign: 'center', padding: '13px 8px' }}
+                                />
+                                <span className="text-[15px] text-muted">hr</span>
+                                <input
+                                    type="number" min={0} max={59}
+                                    value={form.durationMin}
+                                    onChange={set('durationMin')}
+                                    style={{ ...inputBase, width: 64, textAlign: 'center', padding: '13px 8px' }}
+                                />
+                                <span className="text-[15px] text-muted">min</span>
+                            </div>
+                            <FieldError msg={errors.duration} />
                         </div>
-                        <FieldError msg={errors.duration} />
-                    </div>
+                    )}
 
                     <div className="mb-4">
                         <FieldLabel>Description</FieldLabel>
@@ -532,7 +544,19 @@ const ProviderServiceEditor = () => {
                     <SectionLabel>Pricing</SectionLabel>
 
                     <div className="mb-4">
-                        <FieldLabel required>Price</FieldLabel>
+                        <FieldLabel>Pricing type</FieldLabel>
+                        <Segment
+                            options={[
+                                { id: 'fixed', label: 'Fixed Price' },
+                                { id: 'per_hour', label: 'Per Hour' },
+                            ]}
+                            value={form.pricingType}
+                            onChange={set('pricingType')}
+                        />
+                    </div>
+
+                    <div className="mb-4">
+                        <FieldLabel required>{form.pricingType === 'per_hour' ? 'Price per hour' : 'Price'}</FieldLabel>
                         <div className="relative">
                             <span
                                 className="absolute text-[15px] text-muted pointer-events-none"
@@ -545,9 +569,45 @@ const ProviderServiceEditor = () => {
                                 placeholder="0"
                                 style={{ ...inputBase, paddingLeft: 30, ...(errors.price ? inputError : {}) }}
                             />
+                            {form.pricingType === 'per_hour' && (
+                                <span
+                                    className="absolute text-[13px] text-muted pointer-events-none"
+                                    style={{ right: 16, top: '50%', transform: 'translateY(-50%)' }}
+                                >/hr</span>
+                            )}
                         </div>
                         <FieldError msg={errors.price} />
                     </div>
+
+                    {form.pricingType === 'per_hour' && (
+                        <div className="mb-4">
+                            <FieldLabel>Booking hours range</FieldLabel>
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <p className="text-[11px] text-muted uppercase tracking-wider mb-1.5">Min hours</p>
+                                    <input
+                                        type="number" min={1}
+                                        value={form.minHours}
+                                        onChange={set('minHours')}
+                                        style={{ ...inputBase, textAlign: 'center' }}
+                                    />
+                                </div>
+                                <span className="text-muted text-[15px] mt-5">–</span>
+                                <div className="flex-1">
+                                    <p className="text-[11px] text-muted uppercase tracking-wider mb-1.5">Max hours</p>
+                                    <input
+                                        type="number" min={1}
+                                        value={form.maxHours}
+                                        onChange={set('maxHours')}
+                                        style={{ ...inputBase, textAlign: 'center' }}
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-[12px] text-muted mt-2">
+                                Clients can book between {form.minHours}–{form.maxHours} hours. Total cost is calculated at booking.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="mb-3">
                         <FieldLabel>Payment collection</FieldLabel>

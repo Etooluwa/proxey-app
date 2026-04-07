@@ -219,9 +219,18 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
                                                 {svc.name}
                                             </p>
                                             <p className="text-[13px] text-muted m-0">
-                                                {svc.duration ? fmtDuration(svc.duration) : null}
-                                                {svc.duration && svc.base_price ? ' · ' : ''}
-                                                {svc.base_price ? `${fmtPrice(svc.base_price)} ${svc.unit || ''}`.trim() : 'POA'}
+                                                {svc.metadata?.pricingType === 'per_hour' || svc.unit === 'hour' ? (
+                                                    <>
+                                                        {svc.metadata?.minHours ?? 1}–{svc.metadata?.maxHours ?? 8} hours
+                                                        {svc.base_price ? ` · ${fmtPrice(svc.base_price)}/hr` : ''}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {svc.duration ? fmtDuration(svc.duration) : null}
+                                                        {svc.duration && svc.base_price ? ' · ' : ''}
+                                                        {svc.base_price ? fmtPrice(svc.base_price) : 'POA'}
+                                                    </>
+                                                )}
                                             </p>
                                             {svc.description ? (
                                                 <p className="text-[12px] text-faded m-0 mt-1 leading-relaxed line-clamp-2">
@@ -271,6 +280,11 @@ const StepDetail = ({ service, onContinue, onBack }) => {
     const [selectedIdx, setSelectedIdx] = useState(null);
     const [showFull, setShowFull] = useState(false);
 
+    const isPerHour = service?.metadata?.pricingType === 'per_hour' || service?.unit === 'hour';
+    const minHours = service?.metadata?.minHours ?? 1;
+    const maxHours = service?.metadata?.maxHours ?? 8;
+    const [selectedHours, setSelectedHours] = useState(minHours);
+
     const options = useMemo(() => {
         if (Array.isArray(service?.options) && service.options.length > 0) return service.options;
         return [{
@@ -285,7 +299,24 @@ const StepDetail = ({ service, onContinue, onBack }) => {
     const TRUNC = 120;
     const displayDesc = !showFull && desc.length > TRUNC ? desc.slice(0, TRUNC) + '…' : desc;
 
+    const hourlyRate = service?.base_price || 0;
+    const totalPrice = isPerHour ? hourlyRate * selectedHours : null;
+
     const handleContinue = () => {
+        if (isPerHour) {
+            onContinue({
+                selectedOption: {
+                    label: `${selectedHours}h session`,
+                    duration: selectedHours * 60,
+                    price: totalPrice,
+                    unit: '',
+                    hours: selectedHours,
+                },
+                price: totalPrice,
+                hours: selectedHours,
+            });
+            return;
+        }
         if (selectedIdx === null) return;
         const opt = options[selectedIdx];
         onContinue({ selectedOption: opt, price: opt?.price ?? service?.base_price ?? service?.basePrice ?? null });
@@ -328,45 +359,90 @@ const StepDetail = ({ service, onContinue, onBack }) => {
                         </p>
                     )}
 
-                    {options.map((opt, i) => {
-                        const isSel = selectedIdx === i;
-                        return (
-                            <button
-                                key={i}
-                                onClick={() => setSelectedIdx(i)}
-                                className="w-full flex items-start gap-3.5 rounded-[14px] mb-3 p-4 text-left transition-colors"
-                                style={{
-                                    background: isSel ? 'rgba(194,94,74,0.06)' : '#FFFFFF',
-                                    border: isSel ? '1.5px solid #C25E4A' : '1.5px solid rgba(140,106,100,0.2)',
-                                }}
-                            >
-                                {/* Radio */}
-                                <div
-                                    className="flex items-center justify-center flex-shrink-0 mt-0.5"
-                                    style={{
-                                        width: 20, height: 20, borderRadius: '50%',
-                                        background: isSel ? '#C25E4A' : 'transparent',
-                                        border: isSel ? 'none' : '1.5px solid rgba(140,106,100,0.4)',
-                                    }}
-                                >
-                                    {isSel && <div className="w-2 h-2 rounded-full bg-white" />}
+                    {isPerHour ? (
+                        <>
+                            {/* Per-hour: hours stepper */}
+                            <div className="rounded-[16px] p-5 mb-4" style={{ background: '#FFFFFF', border: '1.5px solid rgba(140,106,100,0.2)' }}>
+                                <p className="text-[13px] text-muted m-0 mb-4">{fmtPrice(hourlyRate)}/hr · Select how many hours</p>
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => setSelectedHours((h) => Math.max(minHours, h - 1))}
+                                        disabled={selectedHours <= minHours}
+                                        className="w-11 h-11 rounded-full flex items-center justify-center focus:outline-none transition-colors"
+                                        style={{ background: selectedHours <= minHours ? '#F2EBE5' : '#3D231E', border: 'none' }}
+                                    >
+                                        <svg width="16" height="16" fill="none" stroke={selectedHours <= minHours ? '#B0948F' : '#fff'} strokeWidth="2.5" viewBox="0 0 24 24">
+                                            <path d="M5 12h14" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
+                                    <div className="text-center">
+                                        <p className="text-[36px] font-semibold text-ink m-0 tracking-[-0.03em]">{selectedHours}</p>
+                                        <p className="text-[13px] text-muted m-0">{selectedHours === 1 ? 'hour' : 'hours'}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedHours((h) => Math.min(maxHours, h + 1))}
+                                        disabled={selectedHours >= maxHours}
+                                        className="w-11 h-11 rounded-full flex items-center justify-center focus:outline-none transition-colors"
+                                        style={{ background: selectedHours >= maxHours ? '#F2EBE5' : '#3D231E', border: 'none' }}
+                                    >
+                                        <svg width="16" height="16" fill="none" stroke={selectedHours >= maxHours ? '#B0948F' : '#fff'} strokeWidth="2.5" viewBox="0 0 24 24">
+                                            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <div>
-                                    <p className="text-[15px] font-semibold text-ink m-0 mb-0.5">{opt.label}</p>
-                                    {opt.duration && <p className="text-[13px] text-muted m-0 mb-0.5">{fmtDuration(opt.duration)}</p>}
-                                    {opt.price != null && (
-                                        <p className="text-[15px] font-semibold text-ink m-0">
-                                            {fmtPrice(opt.price)}{opt.unit ? ` ${opt.unit}` : ''}
-                                        </p>
-                                    )}
-                                </div>
-                            </button>
-                        );
-                    })}
+                            </div>
 
-                    <PrimaryBtn onClick={handleContinue} disabled={selectedIdx === null}>
-                        Continue
-                    </PrimaryBtn>
+                            {/* Total price callout */}
+                            <div className="flex items-center justify-between px-4 py-3 rounded-[12px] mb-4" style={{ background: '#FFF5E6' }}>
+                                <span className="text-[13px] text-muted">Total</span>
+                                <span className="text-[20px] font-semibold text-ink tracking-[-0.02em]">{fmtPrice(totalPrice)}</span>
+                            </div>
+
+                            <PrimaryBtn onClick={handleContinue}>
+                                Continue · {fmtPrice(totalPrice)}
+                            </PrimaryBtn>
+                        </>
+                    ) : (
+                        <>
+                            {options.map((opt, i) => {
+                                const isSel = selectedIdx === i;
+                                return (
+                                    <button
+                                        key={i}
+                                        onClick={() => setSelectedIdx(i)}
+                                        className="w-full flex items-start gap-3.5 rounded-[14px] mb-3 p-4 text-left transition-colors"
+                                        style={{
+                                            background: isSel ? 'rgba(194,94,74,0.06)' : '#FFFFFF',
+                                            border: isSel ? '1.5px solid #C25E4A' : '1.5px solid rgba(140,106,100,0.2)',
+                                        }}
+                                    >
+                                        <div
+                                            className="flex items-center justify-center flex-shrink-0 mt-0.5"
+                                            style={{
+                                                width: 20, height: 20, borderRadius: '50%',
+                                                background: isSel ? '#C25E4A' : 'transparent',
+                                                border: isSel ? 'none' : '1.5px solid rgba(140,106,100,0.4)',
+                                            }}
+                                        >
+                                            {isSel && <div className="w-2 h-2 rounded-full bg-white" />}
+                                        </div>
+                                        <div>
+                                            <p className="text-[15px] font-semibold text-ink m-0 mb-0.5">{opt.label}</p>
+                                            {opt.duration && <p className="text-[13px] text-muted m-0 mb-0.5">{fmtDuration(opt.duration)}</p>}
+                                            {opt.price != null && (
+                                                <p className="text-[15px] font-semibold text-ink m-0">
+                                                    {fmtPrice(opt.price)}{opt.unit ? ` ${opt.unit}` : ''}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                            <PrimaryBtn onClick={handleContinue} disabled={selectedIdx === null}>
+                                Continue
+                            </PrimaryBtn>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
