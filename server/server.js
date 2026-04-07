@@ -5545,7 +5545,7 @@ app.patch("/api/client/notification-preferences", async (req, res) => {
 // GET /api/client/kliques — all providers this client is connected to
 // Source of truth: provider_clients table (includes invite-only connections)
 // Booking data merged in for visit count + last visit.
-app.get("/api/client/kliques", async (req, res) => {
+app.get("/api/client/kliques", requireAuth, async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }

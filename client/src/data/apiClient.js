@@ -29,8 +29,9 @@ async function resolveUserHeaders() {
       const rawSession = window.localStorage.getItem("proxey.auth.session");
       if (rawSession) {
         const parsed = JSON.parse(rawSession);
-        if (parsed?.access_token) {
-          accessToken = parsed.access_token;
+        const storedAccessToken = parsed?.access_token || parsed?.accessToken || null;
+        if (storedAccessToken) {
+          accessToken = storedAccessToken;
           userId = parsed.user?.id || null;
         }
       }
