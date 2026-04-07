@@ -85,7 +85,7 @@ const Lbl = ({ children, style = {} }) => (
 );
 
 const BtnPrimary = ({ onClick, disabled, children, style = {} }) => (
-    <button onClick={onClick} disabled={disabled} style={{
+    <button type="button" onClick={onClick} disabled={disabled} style={{
         width: '100%', padding: 16, borderRadius: 12, border: 'none',
         background: disabled ? T.faded : T.ink, color: '#fff',
         fontFamily: F, fontSize: 14, fontWeight: 500,
@@ -98,7 +98,7 @@ const BtnPrimary = ({ onClick, disabled, children, style = {} }) => (
 );
 
 const BtnOutlined = ({ onClick, children, style = {} }) => (
-    <button onClick={onClick} style={{
+    <button type="button" onClick={onClick} style={{
         width: '100%', padding: 14, borderRadius: 12,
         border: `1px solid ${T.line}`, background: 'transparent',
         fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink,
@@ -110,7 +110,7 @@ const BtnOutlined = ({ onClick, children, style = {} }) => (
 );
 
 const BackBtn = ({ onClick }) => (
-    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+    <button type="button" onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
         <svg width="22" height="22" fill="none" stroke={T.ink} strokeWidth="2" viewBox="0 0 24 24">
             <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
