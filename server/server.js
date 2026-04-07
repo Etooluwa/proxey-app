@@ -2419,7 +2419,7 @@ app.post("/api/providers/profile", async (req, res) => {
   }
 });
 
-app.get("/api/bookings/me", async (req, res) => {
+app.get("/api/bookings/me", requireAuth, async (req, res) => {
   const userId = getUserId(req);
 
   if (supabase) {
@@ -6474,7 +6474,7 @@ app.post("/api/provider/clients/:clientId/conversation", async (req, res) => {
   }
 });
 
-app.get("/api/client/notifications", async (req, res) => {
+app.get("/api/client/notifications", requireAuth, async (req, res) => {
   if (!supabase) {
     return res.status(500).json({ error: "Supabase client is not configured." });
   }
