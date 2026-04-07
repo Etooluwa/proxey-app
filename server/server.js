@@ -77,12 +77,26 @@ app.use(helmet({
 }));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
+const LOADTEST_BYPASS_HEADER = "x-loadtest-bypass";
+const RATE_LIMIT_BYPASS_ENABLED =
+  process.env.NODE_ENV !== "production" &&
+  process.env.ENABLE_LOADTEST_RATE_LIMIT_BYPASS === "true" &&
+  Boolean(process.env.LOADTEST_BYPASS_KEY);
+
+function shouldBypassRateLimit(req) {
+  if (!RATE_LIMIT_BYPASS_ENABLED) return false;
+
+  const providedKey = req.get(LOADTEST_BYPASS_HEADER);
+  return providedKey === process.env.LOADTEST_BYPASS_KEY;
+}
+
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,       // 1 minute
-  max: 100,                   // 100 requests per minute per IP
+  max: 300,                   // 300 requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
+  skip: shouldBypassRateLimit,
 });
 
 const authLimiter = rateLimit({
@@ -91,6 +105,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts, please try again in 15 minutes.' },
+  skip: shouldBypassRateLimit,
 });
 
 const messageLimiter = rateLimit({
@@ -99,6 +114,7 @@ const messageLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Sending too fast, please slow down.' },
+  skip: shouldBypassRateLimit,
 });
 
 app.use('/api/', generalLimiter);
@@ -112,6 +128,7 @@ const sensitiveAuthLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts, please try again later.' },
+  skip: shouldBypassRateLimit,
 });
 
 // CORS configuration
