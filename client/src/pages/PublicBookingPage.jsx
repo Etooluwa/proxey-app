@@ -302,11 +302,6 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
                 .svc-card.selected .svc-check{background:#C25E4A;border-color:#C25E4A}
             `}</style>
 
-            {/* Top nav */}
-            <div className="fade-1" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: 720, margin: '0 auto' }}>
-                <img src={klogo} alt="kliques" style={{ height: 56, width: 'auto' }} />
-            </div>
-
             {/* Hero */}
             <div className="fade-1" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px' }}>
                 <div style={{ background: T.hero, borderRadius: 24, padding: '40px 36px 36px', position: 'relative', overflow: 'hidden', marginBottom: 28 }}>
@@ -437,9 +432,22 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
                 )}
 
                 {/* Powered by */}
-                <div className="fade-4" style={{ textAlign: 'center', padding: '32px 0 16px' }}>
-                    <span style={{ fontFamily: F, fontSize: 11, color: T.faded }}>Powered by </span>
-                    <img src={klogo} alt="kliques" style={{ height: 14, width: 'auto' }} />
+                <div
+                    className="fade-4"
+                    style={{
+                        padding: '32px 0 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                    }}
+                >
+                    <span style={{ fontFamily: F, fontSize: 11, color: T.faded, lineHeight: 1 }}>Powered by</span>
+                    <img
+                        src={klogo}
+                        alt="kliques"
+                        style={{ height: 'clamp(18px, 2vw, 26px)', width: 'auto', display: 'block' }}
+                    />
                 </div>
             </div>
 
