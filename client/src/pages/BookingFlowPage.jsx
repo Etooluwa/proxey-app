@@ -860,6 +860,8 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                 provider_id: providerId,
                 requested_date: scheduledDate,
                 requested_time: scheduledTime,
+                requested_duration_minutes: selectedOption?.duration ?? service?.duration ?? null,
+                requested_price_cents: effectivePrice,
                 message: clientNote || undefined,
                 ...pmtData,
             };

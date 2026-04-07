@@ -37,6 +37,34 @@ const fmtDur = (mins) => {
   return m ? `${h}h ${m}m` : `${h}h`;
 };
 
+const isPerHourService = (service) =>
+  service?.metadata?.pricingType === 'per_hour' || service?.unit === 'hour';
+
+const getMinHours = (service) => Math.max(Number(service?.metadata?.minHours ?? 1) || 1, 1);
+
+const getMaxHours = (service) => {
+  const minHours = getMinHours(service);
+  return Math.max(Number(service?.metadata?.maxHours ?? minHours) || minHours, minHours);
+};
+
+const fmtServiceSummary = (service) => {
+  if (!service) return { duration: '', price: '' };
+  if (isPerHourService(service)) {
+    const minHours = getMinHours(service);
+    const maxHours = getMaxHours(service);
+    return {
+      duration: minHours === maxHours
+        ? `${minHours} ${minHours === 1 ? 'hour' : 'hours'}`
+        : `${minHours}–${maxHours} hours`,
+      price: service.base_price != null ? `${fmtPrice(service.base_price)}/hr` : '',
+    };
+  }
+  return {
+    duration: service.duration_minutes ? fmtDur(service.duration_minutes) : '',
+    price: service.base_price != null ? fmtPrice(service.base_price) : '',
+  };
+};
+
 // ── Divider ────────────────────────────────────────────────────────────────────
 function Divider() {
   return <div style={{ height: '1px', background: T.line }} />;
@@ -71,6 +99,7 @@ function ServiceGroup({ name, services, selected, onToggle }) {
       <Divider />
       {services.map(s => {
         const isSelected = selected.includes(s.id);
+        const summary = fmtServiceSummary(s);
         return (
           <div key={s.id}>
             <button
@@ -87,11 +116,11 @@ function ServiceGroup({ name, services, selected, onToggle }) {
                   <p style={{ fontFamily: F, fontSize: '13px', color: T.muted, margin: '0 0 8px', lineHeight: 1.55 }}>{s.description}</p>
                 )}
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  {s.duration_minutes && (
-                    <Lbl color={T.faded} style={{ fontSize: '10px', margin: 0 }}>{fmtDur(s.duration_minutes)}</Lbl>
+                  {summary.duration && (
+                    <Lbl color={T.faded} style={{ fontSize: '10px', margin: 0 }}>{summary.duration}</Lbl>
                   )}
-                  {s.base_price != null && (
-                    <span style={{ fontFamily: F, fontSize: '14px', fontWeight: 500, color: T.ink }}>{fmtPrice(s.base_price)}</span>
+                  {summary.price && (
+                    <span style={{ fontFamily: F, fontSize: '14px', fontWeight: 500, color: T.ink }}>{summary.price}</span>
                   )}
                 </div>
               </div>

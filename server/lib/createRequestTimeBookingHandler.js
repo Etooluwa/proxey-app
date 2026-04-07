@@ -11,6 +11,9 @@ export function createRequestTimeBookingHandler({
     servicePrice: null,
     serviceDuration: 60,
     servicePreAppointmentInfo: null,
+    pricingType: "fixed",
+    minHours: null,
+    maxHours: null,
   }),
   hasConflict = async () => false,
   ensureProviderPaymentReady = async () => {},
@@ -30,6 +33,8 @@ export function createRequestTimeBookingHandler({
       requested_time,
       message,
       payment_type,
+      requested_duration_minutes,
+      requested_price_cents,
       stripe_setup_intent_id,
       stripe_payment_method_id,
       stripe_payment_intent_id,
@@ -59,12 +64,57 @@ export function createRequestTimeBookingHandler({
         servicePrice = null,
         serviceDuration = 60,
         servicePreAppointmentInfo = null,
+        pricingType = "fixed",
+        minHours = null,
+        maxHours = null,
       } = (await getServiceInfo(service_id)) || {};
+
+      let resolvedServiceDuration = serviceDuration;
+      let resolvedServicePrice = servicePrice;
+
+      if (pricingType === "per_hour") {
+        const requestedDurationMinutes = parseInt(requested_duration_minutes, 10);
+        const requestedPriceCents = parseInt(requested_price_cents, 10);
+        const normalizedMinHours = Math.max(parseInt(minHours, 10) || 1, 1);
+        const normalizedMaxHours = Math.max(
+          parseInt(maxHours, 10) || normalizedMinHours,
+          normalizedMinHours
+        );
+        const minimumDurationMinutes = normalizedMinHours * 60;
+        const maximumDurationMinutes = normalizedMaxHours * 60;
+
+        if (
+          !Number.isFinite(requestedDurationMinutes) ||
+          requestedDurationMinutes < minimumDurationMinutes ||
+          requestedDurationMinutes > maximumDurationMinutes ||
+          requestedDurationMinutes % 60 !== 0
+        ) {
+          return res.status(400).json({
+            error: `Hourly bookings must be between ${normalizedMinHours} and ${normalizedMaxHours} hours.`,
+          });
+        }
+
+        const hourlyRateCents = parseInt(servicePrice, 10) || 0;
+        const requestedHours = requestedDurationMinutes / 60;
+        const expectedPriceCents = hourlyRateCents * requestedHours;
+
+        if (
+          !Number.isFinite(requestedPriceCents) ||
+          requestedPriceCents !== expectedPriceCents
+        ) {
+          return res.status(400).json({
+            error: "Hourly booking total does not match the selected duration.",
+          });
+        }
+
+        resolvedServiceDuration = requestedDurationMinutes;
+        resolvedServicePrice = requestedPriceCents;
+      }
 
       const conflict = await hasConflict({
         providerId: provider_id,
         scheduledAt,
-        durationMinutes: serviceDuration,
+        durationMinutes: resolvedServiceDuration,
       });
       if (conflict) {
         return res
@@ -113,7 +163,7 @@ export function createRequestTimeBookingHandler({
         serviceId: service_id || null,
         serviceName: serviceName || "Session",
         scheduledAt,
-        serviceDuration,
+        serviceDuration: resolvedServiceDuration,
         autoAccept: providerBookingRules.autoAccept,
         paymentStatus: resolvedPaymentStatus,
         paymentType: payment_type || "none",
@@ -121,7 +171,7 @@ export function createRequestTimeBookingHandler({
         stripePaymentMethodId: stripe_payment_method_id || null,
         stripePaymentIntentId: stripe_payment_intent_id || null,
         depositPaidCents: deposit_paid_cents || 0,
-        servicePrice,
+        servicePrice: resolvedServicePrice,
         message: message || null,
         requestedDate: requested_date,
         requestedTime: requested_time,

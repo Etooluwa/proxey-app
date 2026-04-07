@@ -39,6 +39,25 @@ function fmtDuration(mins) {
     return m ? `${h}h ${m}m` : `${h}h`;
 }
 
+function isPerHourService(service) {
+    return service?.metadata?.pricingType === 'per_hour' || service?.unit === 'hour';
+}
+
+function fmtServiceMeta(service) {
+    if (!service) return '—';
+    const price = fmtPrice(service.base_price || service.basePrice);
+    if (isPerHourService(service)) {
+        const minHours = Math.max(Number(service?.metadata?.minHours ?? 1) || 1, 1);
+        const maxHours = Math.max(Number(service?.metadata?.maxHours ?? minHours) || minHours, minHours);
+        const hoursLabel = minHours === maxHours
+            ? `${minHours} ${minHours === 1 ? 'hour' : 'hours'}`
+            : `${minHours}–${maxHours} hours`;
+        return [hoursLabel, price ? `${price}/hr` : null].filter(Boolean).join(' · ') || '—';
+    }
+    const duration = fmtDuration(service.duration);
+    return [duration, price].filter(Boolean).join(' · ') || '—';
+}
+
 function buildGrouped(services, groups) {
     // Map group_id → group
     const groupMap = {};
@@ -97,12 +116,9 @@ const EmptyServices = ({ onAdd }) => (
 // ─── Service row ──────────────────────────────────────────────────────────────
 
 const ServiceRow = ({ svc, onClick, isLast }) => {
-    const duration = fmtDuration(svc.duration);
-    const price = fmtPrice(svc.base_price || svc.basePrice);
     const booked = svc.bookings_this_month || 0;
     const isDraft = svc.is_active === false;
-
-    const meta = [duration, price].filter(Boolean).join(' · ');
+    const meta = fmtServiceMeta(svc);
 
     return (
         <>

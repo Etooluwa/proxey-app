@@ -11061,6 +11061,9 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         servicePrice: null,
         serviceDuration: 60,
         servicePreAppointmentInfo: null,
+        pricingType: "fixed",
+        minHours: null,
+        maxHours: null,
       };
     }
     const { data: svc } = await supabase
@@ -11073,6 +11076,9 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
       servicePrice: svc?.base_price || null,
       serviceDuration: parseInt(svc?.duration, 10) || 60,
       servicePreAppointmentInfo: svc?.metadata?.preAppointmentInfo || null,
+      pricingType: svc?.metadata?.pricingType || "fixed",
+      minHours: svc?.metadata?.minHours ?? null,
+      maxHours: svc?.metadata?.maxHours ?? null,
     };
   },
   hasConflict: hasProviderBookingConflict,

@@ -77,6 +77,59 @@ function dateToStr(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function isPerHourService(service) {
+    return service?.metadata?.pricingType === 'per_hour' || service?.unit === 'hour';
+}
+
+function getServiceMinHours(service) {
+    return Math.max(Number(service?.metadata?.minHours ?? 1) || 1, 1);
+}
+
+function getServiceMaxHours(service) {
+    const minHours = getServiceMinHours(service);
+    return Math.max(Number(service?.metadata?.maxHours ?? minHours) || minHours, minHours);
+}
+
+function getSelectedServiceHours(service, selectedHours) {
+    if (!isPerHourService(service)) return null;
+    return Math.min(
+        Math.max(Number(selectedHours) || getServiceMinHours(service), getServiceMinHours(service)),
+        getServiceMaxHours(service)
+    );
+}
+
+function getSelectedServiceDuration(service, selectedHours) {
+    if (!service) return 0;
+    if (isPerHourService(service)) return getSelectedServiceHours(service, selectedHours) * 60;
+    return Number(service?.duration) || 60;
+}
+
+function getSelectedServicePrice(service, selectedHours) {
+    if (!service) return 0;
+    const basePrice = Number(service?.base_price ?? 0) || 0;
+    if (isPerHourService(service)) return basePrice * getSelectedServiceHours(service, selectedHours);
+    return basePrice;
+}
+
+function fmtServiceDurationSummary(service, selectedHours = null) {
+    if (!service) return '';
+    if (isPerHourService(service)) {
+        if (selectedHours) {
+            return `${selectedHours} ${selectedHours === 1 ? 'hour' : 'hours'}`;
+        }
+        return `${getServiceMinHours(service)}–${getServiceMaxHours(service)} hours`;
+    }
+    return fmtDuration(service?.duration);
+}
+
+function fmtServicePriceSummary(service, selectedHours = null) {
+    if (!service) return '';
+    if (isPerHourService(service)) {
+        return `${fmtPrice(service?.base_price)}/hr`;
+    }
+    return fmtPrice(getSelectedServicePrice(service, selectedHours));
+}
+
 // ─── Shared primitives ─────────────────────────────────────────────────────────
 const Lbl = ({ children, style = {} }) => (
     <span style={{ fontFamily: F, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', color: T.muted, display: 'block', ...style }}>
@@ -209,7 +262,7 @@ function StarRow({ rating, max = 5 }) {
 }
 
 // ─── STEP 1: Provider Profile ───────────────────────────────────────────────────
-function Step1Profile({ provider, services, groups, reviews, selectedService, onSelectService, onContinue }) {
+function Step1Profile({ provider, services, groups, reviews, selectedService, selectedHours, onSelectService, onContinue }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
     const category = provider?.category || (provider?.categories?.[0]) || '';
     const subtitle = [category, provider?.city].filter(Boolean).join(' · ');
@@ -327,12 +380,12 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
                                         >
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
                                                 <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{svc.name}</span>
-                                                {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtPrice(svc.base_price)}</span>}
+                                                {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtServicePriceSummary(svc, selected ? selectedHours : null)}</span>}
                                             </div>
-                                            {svc.duration && (
+                                            {(svc.duration || isPerHourService(svc)) && (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                                                     <svg width="12" height="12" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                                    <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtDuration(svc.duration)}</span>
+                                                    <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtServiceDurationSummary(svc, selected ? selectedHours : null)}</span>
                                                 </div>
                                             )}
                                             {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0 }}>{svc.description}</p>}
@@ -387,7 +440,7 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, on
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px 24px', background: `linear-gradient(transparent, ${T.base} 20%)`, zIndex: 10 }}>
                     <div style={{ maxWidth: 672, margin: '0 auto' }}>
                         <BtnPrimary onClick={onContinue} disabled={!selectedService} style={{ padding: 18, borderRadius: 14, fontSize: 15 }}>
-                            {selectedService ? `Continue with ${selectedService.name} · ${fmtPrice(selectedService.base_price)}` : 'Select a service to continue'}
+                            {selectedService ? `Continue with ${selectedService.name} · ${fmtServicePriceSummary(selectedService, selectedHours)}` : 'Select a service to continue'}
                         </BtnPrimary>
                     </div>
                 </div>
@@ -425,7 +478,7 @@ const StickyFooter = ({ children }) => (
 );
 
 // ─── STEP 2: Date & Time ────────────────────────────────────────────────────────
-function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSelect, onTimeSelect, onBack, onContinue }) {
+function Step2DateTime({ provider, service, selectedDate, selectedTime, selectedHours, onHoursChange, onDateSelect, onTimeSelect, onBack, onContinue }) {
     const [weekOffset, setWeekOffset] = useState(0);
     const [slots, setSlots] = useState([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
@@ -446,11 +499,11 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSe
     useEffect(() => {
         if (!selectedDate || !provider?.id) return;
         setLoadingSlots(true); setNoSlots(false);
-        request(`/public/provider/${provider.id}/slots?date=${selectedDate}&duration=${service?.duration || 60}&buffer=${provider.buffer_minutes || 0}`)
+        request(`/public/provider/${provider.id}/slots?date=${selectedDate}&duration=${getSelectedServiceDuration(service, selectedHours) || 60}&buffer=${provider.buffer_minutes || 0}`)
             .then(data => { setSlots(data.slots || []); setNoSlots(!data.slots?.length); })
             .catch(() => { setSlots([]); setNoSlots(true); })
             .finally(() => setLoadingSlots(false));
-    }, [selectedDate, provider?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selectedDate, provider?.id, service, selectedHours]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleWeekChange = (dir) => { setWeekOffset(o => o + dir); onDateSelect(null); onTimeSelect(null); setSlots([]); };
     const displayName = provider?.business_name || provider?.name || 'Provider';
@@ -467,6 +520,41 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, onDateSe
                         {displayName} accepts bookings up to <strong>{bookingWindow} weeks</strong> ahead
                     </p>
                 </div>
+
+                {isPerHourService(service) && (
+                    <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: '18px 20px', marginBottom: 24 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>How many hours?</span>
+                            <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{fmtServicePriceSummary(service, selectedHours)}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <button
+                                type="button"
+                                onClick={() => onHoursChange(Math.max(getServiceMinHours(service), selectedHours - 1))}
+                                disabled={selectedHours <= getServiceMinHours(service)}
+                                style={{ width: 42, height: 42, borderRadius: '50%', border: 'none', background: selectedHours <= getServiceMinHours(service) ? T.abg : T.ink, cursor: selectedHours <= getServiceMinHours(service) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <svg width="16" height="16" fill="none" stroke={selectedHours <= getServiceMinHours(service) ? T.faded : '#fff'} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14" strokeLinecap="round" /></svg>
+                            </button>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontFamily: F, fontSize: 30, fontWeight: 600, color: T.ink, lineHeight: 1 }}>{selectedHours}</div>
+                                <div style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{selectedHours === 1 ? 'hour' : 'hours'}</div>
+                                <div style={{ fontFamily: F, fontSize: 12, color: T.accent, marginTop: 4 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))} total</div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => onHoursChange(Math.min(getServiceMaxHours(service), selectedHours + 1))}
+                                disabled={selectedHours >= getServiceMaxHours(service)}
+                                style={{ width: 42, height: 42, borderRadius: '50%', border: 'none', background: selectedHours >= getServiceMaxHours(service) ? T.abg : T.ink, cursor: selectedHours >= getServiceMaxHours(service) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <svg width="16" height="16" fill="none" stroke={selectedHours >= getServiceMaxHours(service) ? T.faded : '#fff'} strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                            </button>
+                        </div>
+                        <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '12px 0 0' }}>
+                            Book between {getServiceMinHours(service)} and {getServiceMaxHours(service)} hours.
+                        </p>
+                    </div>
+                )}
 
                 {/* Week navigation */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -600,7 +688,7 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
 }
 
 // ─── STEP 3.5: Auth Gate ────────────────────────────────────────────────────────
-function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onBack }) {
+function Step35Auth({ provider, service, selectedDate, selectedTime, selectedHours, onAuth, onBack }) {
     const [mode, setMode] = useState('signup');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -643,10 +731,10 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
                 <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: '18px 22px', marginBottom: 24 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: 0 }}>{service?.name}</p>
-                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(service?.base_price)}</p>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{isPerHourService(service) ? `${fmtPrice(getSelectedServicePrice(service, selectedHours))} total` : fmtPrice(service?.base_price)}</p>
                     </div>
                     <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{fmtDate(selectedDate)}{selectedDate && selectedTime ? ' · ' : ''}{fmtTime(selectedTime)}</p>
-                    {service?.duration && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '4px 0 0' }}>{fmtDuration(service.duration)}</p>}
+                    {(service?.duration || isPerHourService(service)) && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '4px 0 0' }}>{fmtServiceDurationSummary(service, selectedHours)}</p>}
                 </div>
 
                 {mode === 'signup' && (
@@ -693,7 +781,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, onAuth, onB
 }
 
 // ─── STEP 4: Review & Request ───────────────────────────────────────────────────
-function Step4Review({ provider, service, selectedDate, selectedTime, onBack, onSubmit, submitting }) {
+function Step4Review({ provider, service, selectedDate, selectedTime, selectedHours, onBack, onSubmit, submitting }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
     const category = provider?.category || (provider?.categories?.[0]) || '';
     const paymentType = service?.payment_type;
@@ -706,7 +794,7 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
 
     const rows = [
         { label: 'Service', value: service?.name },
-        { label: 'Duration', value: fmtDuration(service?.duration) },
+        { label: 'Duration', value: fmtServiceDurationSummary(service, selectedHours) },
         { label: 'Date', value: fmtDate(selectedDate) },
         { label: 'Time', value: fmtTime(selectedTime) },
     ].filter(r => r.value);
@@ -740,7 +828,7 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
                     ))}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderTop: `1px solid ${T.line}`, background: T.abg }}>
                         <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Total</span>
-                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.accent }}>{fmtPrice(service?.base_price)}</span>
+                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.accent }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))}</span>
                     </div>
                 </div>
 
@@ -772,7 +860,7 @@ function Step4Review({ provider, service, selectedDate, selectedTime, onBack, on
 }
 
 // ─── STEP 5: Confirmation ───────────────────────────────────────────────────────
-function Step5Confirm({ provider, service, selectedDate, selectedTime, handle }) {
+function Step5Confirm({ provider, service, selectedDate, selectedTime, selectedHours, handle }) {
     const navigate = useNavigate();
     const displayName = provider?.business_name || provider?.name || 'Provider';
 
@@ -801,9 +889,9 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, handle })
                         <div>
                             <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>{service?.name}</p>
                             <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 2px' }}>{fmtDate(selectedDate)} · {fmtTime(selectedTime)}</p>
-                            {service?.duration && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: 0 }}>{fmtDuration(service.duration)}</p>}
+                            {(service?.duration || isPerHourService(service)) && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: 0 }}>{fmtServiceDurationSummary(service, selectedHours)}</p>}
                         </div>
-                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(service?.base_price)}</p>
+                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))}</p>
                     </div>
                     <HRule />
                     <div style={{ paddingTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: T.callout, borderRadius: 20 }}>
@@ -893,6 +981,7 @@ export default function PublicBookingPage() {
 
     // Selections
     const [selectedService, setSelectedService] = useState(null);
+    const [selectedHours, setSelectedHours] = useState(1);
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState(null);
     const [intakeAnswers, setIntakeAnswers] = useState({});
@@ -945,6 +1034,18 @@ export default function PublicBookingPage() {
         setStep(2);
     }, [searchParams, services, step]);
 
+    useEffect(() => {
+        if (!selectedService) {
+            setSelectedHours(1);
+            return;
+        }
+        if (isPerHourService(selectedService)) {
+            setSelectedHours(getServiceMinHours(selectedService));
+            return;
+        }
+        setSelectedHours(1);
+    }, [selectedService]);
+
     // Connect to provider (provider_clients) after auth
     const ensureConnected = useCallback(async (providerId) => {
         if (!session) return;
@@ -975,6 +1076,8 @@ export default function PublicBookingPage() {
                 service_id: selectedService.id,
                 requested_date: selectedDate,
                 requested_time: selectedTime,
+                requested_duration_minutes: getSelectedServiceDuration(selectedService, selectedHours),
+                requested_price_cents: getSelectedServicePrice(selectedService, selectedHours),
                 message: intakeFreeform || null,
                 ...(pmtData || {}),
             };
@@ -1008,6 +1111,7 @@ export default function PublicBookingPage() {
             groups={groups}
             reviews={reviews}
             selectedService={selectedService}
+            selectedHours={selectedHours}
             onSelectService={setSelectedService}
             onContinue={() => setStep(2)}
         />
@@ -1019,8 +1123,10 @@ export default function PublicBookingPage() {
             service={selectedService}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
+            selectedHours={selectedHours}
             onDateSelect={setSelectedDate}
             onTimeSelect={setSelectedTime}
+            onHoursChange={setSelectedHours}
             onBack={() => setStep(1)}
             onContinue={() => setStep(3)}
         />
@@ -1054,6 +1160,7 @@ export default function PublicBookingPage() {
             service={selectedService}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
+            selectedHours={selectedHours}
             onAuth={() => setStep(4)}
             onBack={() => setStep(hasIntake ? 3 : 2)}
         />
@@ -1065,6 +1172,7 @@ export default function PublicBookingPage() {
             service={selectedService}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
+            selectedHours={selectedHours}
             onBack={() => session ? setStep(hasIntake ? 3 : 2) : setStep(35)}
             onSubmit={() => {
                 const pt = selectedService?.payment_type;
@@ -1080,7 +1188,11 @@ export default function PublicBookingPage() {
 
     if (step === 45) return (
         <Step45Payment
-            service={selectedService}
+            service={{
+                ...selectedService,
+                base_price: getSelectedServicePrice(selectedService, selectedHours),
+                duration: getSelectedServiceDuration(selectedService, selectedHours),
+            }}
             provider={provider}
             session={session}
             onBack={() => setStep(4)}
@@ -1097,6 +1209,7 @@ export default function PublicBookingPage() {
             service={selectedService}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
+            selectedHours={selectedHours}
             handle={handle}
         />
     );

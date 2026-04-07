@@ -33,6 +33,9 @@ function buildApp(overrides = {}) {
       servicePrice: 8500,
       serviceDuration: 60,
       servicePreAppointmentInfo: "Wash first",
+      pricingType: "fixed",
+      minHours: null,
+      maxHours: null,
     }),
     hasConflict: async (payload) => {
       calls.hasConflict.push(payload);
@@ -190,4 +193,42 @@ test("POST /api/bookings/request-time auto-confirms when provider rules enable a
   assert.equal(response.status, 201);
   assert.equal(response.json.booking.status, "confirmed");
   assert.equal(response.json.booking.payment_status, "paid");
+});
+
+test("POST /api/bookings/request-time honors hourly duration and price overrides", async () => {
+  const { app, calls } = buildApp({
+    getServiceInfo: async () => ({
+      serviceName: "Vocal Coaching",
+      servicePrice: 2000,
+      serviceDuration: 60,
+      servicePreAppointmentInfo: null,
+      pricingType: "per_hour",
+      minHours: 1,
+      maxHours: 4,
+    }),
+  });
+
+  const response = await invokeExpressApp(app, {
+    method: "POST",
+    url: "/api/bookings/request-time",
+    body: {
+      provider_id: "provider-1",
+      service_id: "service-1",
+      requested_date: "2026-04-06",
+      requested_time: "13:30",
+      requested_duration_minutes: 180,
+      requested_price_cents: 6000,
+      payment_type: "full",
+      stripe_payment_intent_id: "pi_123",
+    },
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(calls.hasConflict[0], {
+    providerId: "provider-1",
+    scheduledAt: "2026-04-06T13:30:00",
+    durationMinutes: 180,
+  });
+  assert.equal(calls.createBookingRecord[0].serviceDuration, 180);
+  assert.equal(calls.createBookingRecord[0].servicePrice, 6000);
 });
