@@ -10412,12 +10412,13 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     // Upsert provider row
     const updates = {
       user_id: providerId,
+      name: businessName || "Provider",   // NOT NULL — required for insert
       is_profile_complete: true,
       onboarding_completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     if (category)            updates.category = category;
-    if (businessName)        updates.business_name = businessName;
+    if (businessName)        { updates.business_name = businessName; updates.name = businessName; }
     if (city)                updates.city = city;
     if (bio)                 updates.bio = bio;
     if (handle)              updates.handle = handle;
