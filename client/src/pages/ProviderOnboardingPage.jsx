@@ -66,22 +66,13 @@ const DAYS = [
   { key: "sunday",    label: "Sun" },
 ];
 
-const DURATIONS = [
-  { value: 15,  label: "15 min" },
-  { value: 30,  label: "30 min" },
-  { value: 45,  label: "45 min" },
-  { value: 60,  label: "1 hr" },
-  { value: 90,  label: "1 hr 30 min" },
-  { value: 120, label: "2 hr" },
-];
-
 const DEFAULT_AVAILABILITY = DAYS.reduce((acc, d) => {
   const isWeekend = d.key === "saturday" || d.key === "sunday";
   acc[d.key] = { enabled: !isWeekend, from: "9:00 AM", to: "5:00 PM" };
   return acc;
 }, {});
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 // ─── Shared micro-components ──────────────────────────────────────────────────
 function Lbl({ children, color = t.muted, style = {} }) {
@@ -151,13 +142,13 @@ function StepWelcome({ onStart }) {
       </div>
 
       <div style={{ padding: "28px 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        {["Category", "Profile & Photo", "Services & Pricing", "Availability", "Handle & Payouts"].map((s, i) => (
+        {["Category", "Profile & Photo", "Availability", "Handle & Payouts"].map((s, i) => (
           <div key={s}>
             <div style={{ display: "flex", gap: "14px", padding: "14px 0", alignItems: "center" }}>
               <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontSize: "12px", fontWeight: 500, color: t.muted, flexShrink: 0 }}>{i + 1}</div>
               <p style={{ fontFamily: f, fontSize: "15px", fontWeight: 400, color: t.ink, margin: 0 }}>{s}</p>
             </div>
-            {i < 4 && <Divider />}
+            {i < 3 && <Divider />}
           </div>
         ))}
 
@@ -177,7 +168,7 @@ function StepCategory({ selected, customCat, onSelect, onCustomCat }) {
       <div style={{ padding: "32px 24px 16px" }} />
       <StepBar current={0} />
       <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <Lbl style={{ marginBottom: "6px" }}>Step 1 of 5</Lbl>
+        <Lbl style={{ marginBottom: "6px" }}>Step 1 of 4</Lbl>
         <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>What do you do?</h1>
         <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 24px", lineHeight: 1.6 }}>Pick the category that best describes your work.</p>
 
@@ -243,7 +234,7 @@ function StepProfile({ data, onChange }) {
       <div style={{ padding: "32px 24px 16px" }} />
       <StepBar current={1} />
       <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <Lbl style={{ marginBottom: "6px" }}>Step 2 of 5</Lbl>
+        <Lbl style={{ marginBottom: "6px" }}>Step 2 of 4</Lbl>
         <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Your profile.</h1>
         <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>This is what clients see when they find you.</p>
 
@@ -307,179 +298,14 @@ function StepProfile({ data, onChange }) {
   );
 }
 
-// ─── Service modal ────────────────────────────────────────────────────────────
-const EMPTY_SERVICE = { name: "", duration: 60, price: "", paymentType: "full", depositType: "percent", depositValue: "" };
-
-function ServiceModal({ initial, onSave, onClose }) {
-  const [svc, setSvc] = useState(initial || EMPTY_SERVICE);
-  const set = (k, v) => setSvc((p) => ({ ...p, [k]: v }));
-  const canSave = svc.name.trim() && svc.price && parseFloat(svc.price) > 0;
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.45)", fontFamily: f }}>
-      <div style={{ position: "absolute", inset: 0 }} onClick={onClose} />
-      <div style={{ position: "relative", background: "#fff", borderRadius: "20px 20px 0 0", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 0" }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: t.line }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 8px" }}>
-          <h2 style={{ fontFamily: f, fontSize: "20px", fontWeight: 500, color: t.ink, margin: 0 }}>{initial ? "Edit service" : "Add service"}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-            <svg width="22" height="22" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
-          </button>
-        </div>
-
-        <div style={{ overflowY: "auto", padding: "0 20px 32px" }}>
-          <div style={{ marginBottom: "16px" }}>
-            <Lbl style={{ marginBottom: "8px" }}>Service name</Lbl>
-            <input value={svc.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g., Vocal Lesson"
-              style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }} />
-          </div>
-
-          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
-            <div style={{ flex: 1 }}>
-              <Lbl style={{ marginBottom: "8px" }}>Duration</Lbl>
-              <div style={{ position: "relative" }}>
-                <select value={svc.duration} onChange={(e) => set("duration", Number(e.target.value))}
-                  style={{ width: "100%", padding: "14px 36px 14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none", boxSizing: "border-box" }}>
-                  {DURATIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-                <svg style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="16" height="16" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <Lbl style={{ marginBottom: "8px" }}>Price ($)</Lbl>
-              <input type="number" value={svc.price} onChange={(e) => set("price", e.target.value)} placeholder="85" min="0"
-                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }} />
-            </div>
-          </div>
-
-          <Lbl style={{ marginBottom: "12px" }}>Payment model</Lbl>
-          {[
-            { id: "full", label: "Full payment at booking" },
-            { id: "deposit_fixed", label: "Fixed deposit amount" },
-            { id: "deposit_percent", label: "Percentage deposit" },
-          ].map((opt) => {
-            const isActive = svc.paymentType === opt.id;
-            return (
-              <div key={opt.id} onClick={() => set("paymentType", opt.id)}
-                style={{ marginBottom: "10px", borderRadius: "12px", padding: "14px 16px", cursor: "pointer", border: isActive ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: isActive ? t.hero : "transparent" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{ width: 18, height: 18, borderRadius: "50%", background: isActive ? t.accent : "transparent", border: isActive ? "none" : `2px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {isActive && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
-                  </div>
-                  <span style={{ fontFamily: f, fontSize: "14px", fontWeight: isActive ? 500 : 400, color: isActive ? t.accent : t.ink }}>{opt.label}</span>
-                </div>
-                {isActive && (opt.id === "deposit_fixed" || opt.id === "deposit_percent") && (
-                  <div style={{ marginTop: 12, marginLeft: 30 }}>
-                    <input type="number" value={svc.depositValue} onChange={(e) => set("depositValue", e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      placeholder={opt.id === "deposit_fixed" ? "e.g., 25" : "e.g., 30"}
-                      min="0" max={opt.id === "deposit_percent" ? "100" : undefined}
-                      style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: "#fff", boxSizing: "border-box" }} />
-                    <p style={{ fontFamily: f, fontSize: "12px", color: t.faded, margin: "4px 0 0" }}>
-                      {opt.id === "deposit_fixed" ? "Fixed deposit amount in $" : "Percentage of total price"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <PrimaryBtn onClick={() => canSave && onSave(svc)} disabled={!canSave}>
-            {initial ? "Save changes" : "Add service"}
-          </PrimaryBtn>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 3 — Services ────────────────────────────────────────────────────────
-function StepServices({ services, onAdd, onEdit, onDelete }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingIdx, setEditingIdx] = useState(null);
-
-  const fmtDuration = (m) => {
-    if (m < 60) return `${m} min`;
-    const h = Math.floor(m / 60), r = m % 60;
-    return r ? `${h} hr ${r} min` : `${h} hr`;
-  };
-  const payLabel = (s) => {
-    if (s.paymentType === "deposit_fixed") return `$${s.depositValue} deposit`;
-    if (s.paymentType === "deposit_percent") return `${s.depositValue}% deposit`;
-    return "Full at booking";
-  };
-
+// ─── Step 3 — Availability ────────────────────────────────────────────────────
+function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
   return (
     <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "32px 24px 16px" }} />
       <StepBar current={2} />
       <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <Lbl style={{ marginBottom: "6px" }}>Step 3 of 5</Lbl>
-        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Your services.</h1>
-        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Add at least one service. You can always add more later.</p>
-
-        <Divider />
-        {services.map((svc, i) => (
-          <div key={i}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 0" }}>
-              <div>
-                <p style={{ fontFamily: f, fontSize: "16px", fontWeight: 400, color: t.ink, margin: "0 0 3px" }}>{svc.name}</p>
-                <p style={{ fontFamily: f, fontSize: "13px", color: t.muted, margin: 0 }}>{fmtDuration(svc.duration)} · ${parseFloat(svc.price).toFixed(0)} · {payLabel(svc)}</p>
-              </div>
-              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                <button onClick={() => { setEditingIdx(i); setModalOpen(true); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                  <svg width="16" height="16" fill="none" stroke={t.faded} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </button>
-                <button onClick={() => onDelete(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                  <svg width="16" height="16" fill="none" stroke={t.danger} strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" strokeLinecap="round" strokeLinejoin="round" /><path d="M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </button>
-              </div>
-            </div>
-            <Divider />
-          </div>
-        ))}
-
-        <button
-          onClick={() => { setEditingIdx(null); setModalOpen(true); }}
-          style={{ width: "100%", padding: "16px", borderRadius: "14px", border: `1px dashed ${t.line}`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: "16px 0" }}
-        >
-          <svg width="14" height="14" fill="none" stroke={t.accent} strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
-          <span style={{ fontFamily: f, fontSize: "13px", color: t.accent, fontWeight: 500 }}>Add Service</span>
-        </button>
-
-        {services.length === 0 && (
-          <p style={{ fontFamily: f, fontSize: "13px", color: t.faded, textAlign: "center", margin: "0 0 12px" }}>Add at least one service to continue.</p>
-        )}
-
-        <div style={{ paddingBottom: "100px" }} />
-      </div>
-
-      {modalOpen && (
-        <ServiceModal
-          initial={editingIdx !== null ? services[editingIdx] : null}
-          onSave={(svc) => {
-            if (editingIdx !== null) onEdit(editingIdx, svc);
-            else onAdd(svc);
-            setModalOpen(false);
-            setEditingIdx(null);
-          }}
-          onClose={() => { setModalOpen(false); setEditingIdx(null); }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Step 4 — Availability ────────────────────────────────────────────────────
-function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
-  return (
-    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "32px 24px 16px" }} />
-      <StepBar current={3} />
-      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <Lbl style={{ marginBottom: "6px" }}>Step 4 of 5</Lbl>
+        <Lbl style={{ marginBottom: "6px" }}>Step 3 of 4</Lbl>
         <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Availability.</h1>
         <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Set your weekly schedule. You can always adjust this later.</p>
 
@@ -562,9 +388,9 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
   return (
     <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "32px 24px 16px" }} />
-      <StepBar current={4} />
+      <StepBar current={3} />
       <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-        <Lbl style={{ marginBottom: "6px" }}>Step 5 of 5</Lbl>
+        <Lbl style={{ marginBottom: "6px" }}>Step 4 of 4</Lbl>
         <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Almost there.</h1>
         <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Choose your public handle and connect your payout method.</p>
 
@@ -644,12 +470,10 @@ function ProviderOnboardingPage() {
   // Step 2
   const [profile, setProfile]     = useState({ businessName: "", city: "", bio: "", photoFile: null, photoPreview: null });
   // Step 3
-  const [services, setServices]   = useState([]);
-  // Step 4
   const [availability, setAvailability] = useState(DEFAULT_AVAILABILITY);
   const [bufferMins, setBufferMins]     = useState(0);
   const [bookingWindow, setBookingWindow] = useState(4);
-  // Step 5
+  // Step 4
   const [handle, setHandle]             = useState("");
   const [handleStatus, setHandleStatus] = useState(null);
   const [stripeConnected, setStripeConnected] = useState(false);
@@ -667,7 +491,6 @@ function ProviderOnboardingPage() {
           if (draft.category)     setCategory(draft.category);
           if (draft.customCat)    setCustomCat(draft.customCat);
           if (draft.profile)      setProfile((p) => ({ ...p, ...draft.profile, photoFile: null }));
-          if (draft.services)     setServices(draft.services);
           if (draft.availability) setAvailability(draft.availability);
           if (draft.bufferMins   != null) setBufferMins(draft.bufferMins);
           if (draft.bookingWindow != null) setBookingWindow(draft.bookingWindow);
@@ -688,7 +511,7 @@ function ProviderOnboardingPage() {
     const params = new URLSearchParams(location.search);
     if (params.get("stripe") === "done") {
       setStripeConnected(true);
-      setStep(5);
+      setStep(4);
       toast.push({ title: "Stripe connected!", variant: "success" });
     }
   }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -704,12 +527,12 @@ function ProviderOnboardingPage() {
         body: JSON.stringify({
           step, category, customCat,
           profile: { ...profile, photoFile: null, photoPreview: null },
-          services, availability, bufferMins, bookingWindow, handle, stripeConnected,
+          availability, bufferMins, bookingWindow, handle, stripeConnected,
         }),
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(saveTimer.current);
-  }, [step, category, customCat, profile, services, availability, bufferMins, bookingWindow, handle, stripeConnected, draftLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, category, customCat, profile, availability, bufferMins, bookingWindow, handle, stripeConnected, draftLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const updateAvailability = (dayKey, field, value) =>
@@ -734,7 +557,7 @@ function ProviderOnboardingPage() {
       const data = await request("/provider/stripe/connect", {
         method: "POST",
         body: JSON.stringify({
-          refreshUrl: `${window.location.origin}/provider/onboarding?step=5`,
+          refreshUrl: `${window.location.origin}/provider/onboarding?step=4`,
           returnUrl:  `${window.location.origin}/provider/onboarding?stripe=done`,
         }),
       });
@@ -748,14 +571,13 @@ function ProviderOnboardingPage() {
   const canContinue = () => {
     if (step === 1) return !!category && (category !== "Other" || customCat.trim().length > 0);
     if (step === 2) return profile.businessName.trim() && profile.city.trim() && profile.bio.trim();
-    if (step === 3) return services.length > 0;
-    if (step === 4) return true;
-    if (step === 5) return handleStatus === "available";
+    if (step === 3) return true;
+    if (step === 4) return handleStatus === "available";
     return false;
   };
 
   const handleContinue = async () => {
-    if (step < 5) { setStep((s) => s + 1); return; }
+    if (step < 4) { setStep((s) => s + 1); return; }
     setSubmitting(true);
     try {
       await request("/provider/onboarding/complete", {
@@ -765,7 +587,7 @@ function ProviderOnboardingPage() {
           businessName: profile.businessName,
           city: profile.city,
           bio: profile.bio,
-          handle, services, availability,
+          handle, availability,
           bufferMinutes: bufferMins,
           bookingWindowWeeks: bookingWindow,
         }),
@@ -808,7 +630,7 @@ function ProviderOnboardingPage() {
     );
   }
 
-  // ── Steps 1–5 ─────────────────────────────────────────────────────────────
+  // ── Steps 1–4 ─────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -829,14 +651,6 @@ function ProviderOnboardingPage() {
             <StepProfile data={profile} onChange={setProfileField} />
           )}
           {step === 3 && (
-            <StepServices
-              services={services}
-              onAdd={(svc) => setServices((prev) => [...prev, svc])}
-              onEdit={(idx, svc) => setServices((prev) => prev.map((s, i) => i === idx ? svc : s))}
-              onDelete={(idx) => setServices((prev) => prev.filter((_, i) => i !== idx))}
-            />
-          )}
-          {step === 4 && (
             <StepAvailability
               availability={availability}
               onChange={updateAvailability}
@@ -846,7 +660,7 @@ function ProviderOnboardingPage() {
               onBookingWindow={setBookingWindow}
             />
           )}
-          {step === 5 && (
+          {step === 4 && (
             <StepGoLive
               handle={handle}
               onHandle={(v) => { setHandle(v); setHandleStatus(null); }}
@@ -862,9 +676,9 @@ function ProviderOnboardingPage() {
         {/* Sticky bottom bar */}
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 24px 32px", background: t.base, borderTop: `1px solid ${t.line}`, zIndex: 10 }}>
           <PrimaryBtn onClick={handleContinue} disabled={!canContinue()} loading={submitting}>
-            {step === 5 ? "Launch My Page" : "Continue"}
+            {step === 4 ? "Launch My Page" : "Continue"}
           </PrimaryBtn>
-          {step === 4 && (
+          {step === 3 && (
             <button
               onClick={handleContinue}
               style={{ width: "100%", marginTop: "12px", background: "none", border: "none", cursor: "pointer", fontFamily: f, fontSize: "14px", color: t.muted }}
