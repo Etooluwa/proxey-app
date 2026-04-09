@@ -33,14 +33,19 @@ const CATEGORIES = [
   "Tattoo & Piercing","Tailoring & Alterations","Event Planning","Other",
 ];
 
-const TIME_OPTIONS = [
-  "6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM",
-  "9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
-  "12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM",
-  "3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM",
-  "6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM",
-  "9:00 PM","9:30 PM","10:00 PM",
-];
+const TIME_OPTIONS = (() => {
+  const slots = [];
+  for (let h = 6; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      const ampm = h < 12 ? "AM" : "PM";
+      const minStr = m === 0 ? "00" : String(m);
+      slots.push(`${hour12}:${minStr} ${ampm}`);
+    }
+  }
+  slots.push("12:00 AM"); // midnight
+  return slots;
+})();
 
 const BUFFER_OPTIONS = [
   { value: 0,  label: "None" },
