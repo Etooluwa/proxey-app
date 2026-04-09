@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import { request } from "../data/apiClient";
+import { useCitySearch } from "../hooks/useCitySearch";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const t = {
@@ -226,6 +227,9 @@ function StepCategory({ selected, customCat, onSelect, onCustomCat }) {
 function StepProfile({ data, onChange }) {
   const fileInputRef = useRef(null);
   const bioMax = 160;
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const { suggestions: citySuggestions, loading: cityLoading } = useCitySearch(data.city);
+  const cityBorderActive = showCitySuggestions && (citySuggestions.length > 0 || cityLoading);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -274,14 +278,41 @@ function StepProfile({ data, onChange }) {
           />
         </div>
 
-        <div style={{ marginBottom: "20px" }}>
+        <div style={{ marginBottom: "20px", position: "relative" }}>
           <Lbl style={{ marginBottom: "8px" }}>City</Lbl>
-          <input
-            value={data.city}
-            onChange={(e) => onChange("city", e.target.value)}
-            placeholder="e.g., Ottawa, ON"
-            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
-          />
+          <div style={{ position: "relative" }}>
+            <input
+              value={data.city}
+              onChange={(e) => { onChange("city", e.target.value); setShowCitySuggestions(true); }}
+              onFocus={() => data.city.length > 0 && setShowCitySuggestions(true)}
+              onBlur={() => setTimeout(() => setShowCitySuggestions(false), 150)}
+              placeholder="Start typing your city…"
+              autoComplete="off"
+              style={{ width: "100%", padding: "14px 16px", paddingRight: "36px", borderRadius: "12px", border: `1px solid ${cityBorderActive ? t.accent : t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
+            />
+            {data.city.length > 0 && (
+              <button onClick={() => { onChange("city", ""); setShowCitySuggestions(false); }}
+                style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex" }}>
+                <svg width="16" height="16" fill="none" stroke={t.faded} strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+              </button>
+            )}
+          </div>
+          {showCitySuggestions && data.city.trim().length >= 2 && (cityLoading || citySuggestions.length > 0) && (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: "4px", background: t.card, borderRadius: "12px", border: `1px solid ${t.line}`, boxShadow: "0 8px 24px rgba(61,35,30,0.08)", zIndex: 20, overflow: "hidden", maxHeight: "220px", overflowY: "auto" }}>
+              {cityLoading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "14px 16px", fontFamily: f, fontSize: "13px", color: t.muted }}>
+                  <div style={{ width: 12, height: 12, borderRadius: "50%", border: `2px solid ${t.line}`, borderTopColor: t.accent, animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+                  Searching…
+                </div>
+              ) : citySuggestions.map((c) => (
+                <button key={c} onMouseDown={() => { onChange("city", c); setShowCitySuggestions(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", background: "none", border: "none", borderBottom: `1px solid ${t.line}`, cursor: "pointer", width: "100%", textAlign: "left", fontFamily: f }}>
+                  <svg width="14" height="14" fill="none" stroke={t.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <span style={{ fontFamily: f, fontSize: "14px", color: t.ink }}>{c}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: "20px" }}>
