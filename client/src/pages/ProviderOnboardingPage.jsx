@@ -68,7 +68,7 @@ const DAYS = [
 
 const DEFAULT_AVAILABILITY = DAYS.reduce((acc, d) => {
   const isWeekend = d.key === "saturday" || d.key === "sunday";
-  acc[d.key] = { enabled: !isWeekend, from: "9:00 AM", to: "5:00 PM" };
+  acc[d.key] = { enabled: !isWeekend, slots: [] };
   return acc;
 }, {});
 
@@ -300,6 +300,22 @@ function StepProfile({ data, onChange }) {
 
 // ─── Step 3 — Availability ────────────────────────────────────────────────────
 function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
+  const [expandedDay, setExpandedDay] = useState(null);
+  const [customWindow, setCustomWindow] = useState("");
+  const isCustomActive = !WINDOW_OPTIONS.find((w) => w.value === bookingWindow);
+
+  const toggleSlot = (dayKey, slot) => {
+    const current = availability[dayKey].slots || [];
+    const next = current.includes(slot) ? current.filter((s) => s !== slot) : [...current, slot].sort((a, b) => TIME_OPTIONS.indexOf(a) - TIME_OPTIONS.indexOf(b));
+    onChange(dayKey, "slots", next);
+  };
+
+  const handleCustomWindow = (val) => {
+    setCustomWindow(val);
+    const num = parseInt(val, 10);
+    if (num > 0) onBookingWindow(num);
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "32px 24px 16px" }} />
@@ -307,17 +323,25 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
       <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
         <Lbl style={{ marginBottom: "6px" }}>Step 3 of 4</Lbl>
         <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Availability.</h1>
-        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Set your weekly schedule. You can always adjust this later.</p>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 20px", lineHeight: 1.6 }}>Choose which days you work and tap the time slots you're available.</p>
 
         <Divider />
         {DAYS.map((day) => {
           const d = availability[day.key];
+          const isOpen = expandedDay === day.key;
+          const slotCount = (d.slots || []).length;
           return (
             <div key={day.key}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0" }}>
+              {/* Day header row */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                   <button
-                    onClick={() => onChange(day.key, "enabled", !d.enabled)}
+                    onClick={() => {
+                      const enabling = !d.enabled;
+                      onChange(day.key, "enabled", enabling);
+                      if (enabling) setExpandedDay(day.key);
+                      else if (expandedDay === day.key) setExpandedDay(null);
+                    }}
                     style={{ width: "22px", height: "22px", borderRadius: "6px", border: d.enabled ? "none" : `1.5px solid ${t.line}`, background: d.enabled ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
                   >
                     {d.enabled && <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>}
@@ -325,34 +349,55 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
                   <span style={{ fontFamily: f, fontSize: "15px", fontWeight: 400, color: d.enabled ? t.ink : t.faded }}>{day.label}</span>
                 </div>
                 {d.enabled ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <div style={{ position: "relative" }}>
-                      <select value={d.from} onChange={(e) => onChange(day.key, "from", e.target.value)}
-                        style={{ padding: "6px 28px 6px 10px", borderRadius: "8px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "12px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none" }}>
-                        {TIME_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                      <svg style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="12" height="12" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" /></svg>
-                    </div>
-                    <span style={{ fontFamily: f, fontSize: "12px", color: t.muted }}>–</span>
-                    <div style={{ position: "relative" }}>
-                      <select value={d.to} onChange={(e) => onChange(day.key, "to", e.target.value)}
-                        style={{ padding: "6px 28px 6px 10px", borderRadius: "8px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "12px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none" }}>
-                        {TIME_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                      <svg style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="12" height="12" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" /></svg>
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => setExpandedDay(isOpen ? null : day.key)}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  >
+                    <span style={{ fontFamily: f, fontSize: "12px", color: slotCount > 0 ? t.accent : t.faded }}>
+                      {slotCount > 0 ? `${slotCount} slot${slotCount > 1 ? "s" : ""}` : "Pick times"}
+                    </span>
+                    <svg width="14" height="14" fill="none" stroke={t.faded} strokeWidth="2" viewBox="0 0 24 24" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                 ) : (
                   <span style={{ fontFamily: f, fontSize: "13px", color: t.faded }}>Off</span>
                 )}
               </div>
+
+              {/* Time slot picker — expands when day is enabled & open */}
+              {d.enabled && isOpen && (
+                <div style={{ paddingBottom: "16px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {TIME_OPTIONS.map((slot) => {
+                      const active = (d.slots || []).includes(slot);
+                      return (
+                        <button
+                          key={slot}
+                          onClick={() => toggleSlot(day.key, slot)}
+                          style={{
+                            padding: "8px 12px", borderRadius: "8px",
+                            border: active ? `2px solid ${t.accent}` : `1px solid ${t.line}`,
+                            background: active ? t.hero : "transparent",
+                            fontFamily: f, fontSize: "12px", fontWeight: active ? 500 : 400,
+                            color: active ? t.accent : t.ink, cursor: "pointer",
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <Divider />
             </div>
           );
         })}
 
         <Lbl style={{ margin: "20px 0 12px" }}>Buffer Between Sessions</Lbl>
-        <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
           {BUFFER_OPTIONS.map((b) => {
             const active = buffer === b.value;
             return (
@@ -365,19 +410,39 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
         </div>
 
         <Lbl style={{ marginBottom: "12px" }}>Booking Window</Lbl>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "20px" }}>
+        <p style={{ fontFamily: f, fontSize: "13px", color: t.muted, margin: "0 0 12px" }}>How far ahead can clients book?</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
           {WINDOW_OPTIONS.map((w) => {
-            const active = bookingWindow === w.value;
+            const active = bookingWindow === w.value && !isCustomActive;
             return (
-              <button key={w.value} onClick={() => onBookingWindow(w.value)}
+              <button key={w.value} onClick={() => { onBookingWindow(w.value); setCustomWindow(""); }}
                 style={{ padding: "10px 16px", borderRadius: "10px", border: active ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: active ? t.hero : "transparent", fontFamily: f, fontSize: "12px", fontWeight: active ? 500 : 400, color: active ? t.accent : t.ink, cursor: "pointer" }}>
                 {w.label}
               </button>
             );
           })}
+          <button
+            onClick={() => { setCustomWindow(isCustomActive ? customWindow : ""); if (!isCustomActive) onBookingWindow(0); }}
+            style={{ padding: "10px 16px", borderRadius: "10px", border: isCustomActive ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: isCustomActive ? t.hero : "transparent", fontFamily: f, fontSize: "12px", fontWeight: isCustomActive ? 500 : 400, color: isCustomActive ? t.accent : t.ink, cursor: "pointer" }}>
+            Custom
+          </button>
         </div>
+        {isCustomActive && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <input
+              type="number"
+              value={customWindow}
+              onChange={(e) => handleCustomWindow(e.target.value)}
+              placeholder="e.g., 6"
+              min="1"
+              max="52"
+              style={{ width: "80px", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${t.accent}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, textAlign: "center" }}
+            />
+            <span style={{ fontFamily: f, fontSize: "14px", color: t.muted }}>weeks ahead</span>
+          </div>
+        )}
 
-        <div style={{ paddingBottom: "100px" }} />
+        <div style={{ paddingBottom: "160px" }} />
       </div>
     </div>
   );
