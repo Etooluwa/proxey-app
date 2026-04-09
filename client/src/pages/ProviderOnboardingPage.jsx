@@ -3,41 +3,34 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import { request } from "../data/apiClient";
-import Card from "../components/ui/Card";
-import Footer from "../components/ui/Footer";
-import Logo from "../components/ui/Logo";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
-const ACCENT      = "#C25E4A";
-const ACCENT_LIGHT = "#FFF0E6";
-const BG          = "#FBF7F2";
-const FG          = "#3D231E";
-const MUTED       = "#6B7280";
-const DIVIDER     = "rgba(140,106,100,0.2)";
-const SUCCESS_BG  = "#F0FDF4";
-const SUCCESS_FG  = "#15803D";
-const DANGER      = "#EF4444";
+const t = {
+  base:     "#FBF7F2",
+  ink:      "#3D231E",
+  muted:    "#8C6A64",
+  faded:    "#B0948F",
+  accent:   "#C25E4A",
+  hero:     "#FDDCC6",
+  avatarBg: "#F2EBE5",
+  line:     "rgba(140,106,100,0.2)",
+  success:  "#5A8A5E",
+  successBg:"#EBF2EC",
+  card:     "#FFFFFF",
+  dangerBg: "#FDEDEA",
+  danger:   "#C0392B",
+};
+const f = "'Sora',system-ui,sans-serif";
+const topoSvg = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M100 50 Q 200 -50 300 50 T 500 50' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M200 350 Q 250 250 350 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: "barber",         emoji: "✂️",  label: "Barber" },
-  { id: "nails",          emoji: "💅",  label: "Nails" },
-  { id: "vocal_coach",    emoji: "🎤",  label: "Vocal Coach" },
-  { id: "wellness",       emoji: "🧘",  label: "Wellness" },
-  { id: "personal_trainer", emoji: "💪", label: "Personal Trainer" },
-  { id: "cleaning",       emoji: "🧹",  label: "Cleaning" },
-  { id: "auto",           emoji: "🚗",  label: "Auto" },
-  { id: "other",          emoji: "⭐",  label: "Other" },
-];
-
-// ─── Duration options ─────────────────────────────────────────────────────────
-const DURATIONS = [
-  { value: 15,  label: "15 min" },
-  { value: 30,  label: "30 min" },
-  { value: 45,  label: "45 min" },
-  { value: 60,  label: "1 hr" },
-  { value: 90,  label: "1 hr 30 min" },
-  { value: 120, label: "2 hr" },
+  "Barber & Haircuts","Hair Styling & Braiding","Nails & Manicure","Makeup & Aesthetics",
+  "Lashes & Brows","Vocal Coaching","Music Lessons","Personal Training",
+  "Yoga & Pilates","Wellness & Massage","Mental Health & Therapy","Nutrition & Dietetics",
+  "Life Coaching","Tutoring & Education","Photography","Videography",
+  "Cleaning Services","Home Maintenance","Auto Detailing","Pet Grooming & Care",
+  "Tattoo & Piercing","Tailoring & Alterations","Event Planning","Other",
 ];
 
 const TIME_OPTIONS = [
@@ -73,148 +66,161 @@ const DAYS = [
   { key: "sunday",    label: "Sun" },
 ];
 
+const DURATIONS = [
+  { value: 15,  label: "15 min" },
+  { value: 30,  label: "30 min" },
+  { value: 45,  label: "45 min" },
+  { value: 60,  label: "1 hr" },
+  { value: 90,  label: "1 hr 30 min" },
+  { value: 120, label: "2 hr" },
+];
+
 const DEFAULT_AVAILABILITY = DAYS.reduce((acc, d) => {
   const isWeekend = d.key === "saturday" || d.key === "sunday";
   acc[d.key] = { enabled: !isWeekend, from: "9:00 AM", to: "5:00 PM" };
   return acc;
 }, {});
 
-const STEP_TITLES = ["Category", "Profile", "Services", "Availability", "Go Live"];
 const TOTAL_STEPS = 5;
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-function StepBar({ step }) {
+// ─── Shared micro-components ──────────────────────────────────────────────────
+function Lbl({ children, color = t.muted, style = {} }) {
   return (
-    <div className="flex gap-1.5 px-5 pt-4 pb-2">
+    <span style={{ fontFamily: f, fontSize: "11px", fontWeight: 500, color, letterSpacing: "0.05em", textTransform: "uppercase", display: "block", ...style }}>
+      {children}
+    </span>
+  );
+}
+
+function Divider() {
+  return <div style={{ height: "1px", background: t.line }} />;
+}
+
+function BackBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex" }}>
+      <svg width="24" height="24" fill="none" stroke={t.ink} strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+function StepBar({ current }) {
+  return (
+    <div style={{ display: "flex", gap: "4px", padding: "0 24px", marginBottom: "28px" }}>
       {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-full transition-all"
-          style={{
-            height: 4,
-            background: i < step ? ACCENT : DIVIDER,
-          }}
-        />
+        <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= current ? t.accent : t.avatarBg }} />
       ))}
     </div>
   );
 }
 
-// ─── Reusable inline label + field ───────────────────────────────────────────
-function Field({ label, children }) {
-  return (
-    <div className="mb-4">
-      <p className="font-sora text-[13px] font-semibold text-foreground mb-1.5 m-0"
-         style={{ color: MUTED }}>
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-function TextInput({ value, onChange, placeholder, maxLength, type = "text", onBlur, ...rest }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      onBlur={onBlur}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      className="w-full font-sora text-[15px] focus:outline-none"
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: `1px solid ${DIVIDER}`,
-        background: "#fff",
-        color: FG,
-      }}
-      {...rest}
-    />
-  );
-}
-
-function NativeSelect({ value, onChange, children }) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={onChange}
-        className="w-full font-sora text-[15px] focus:outline-none appearance-none"
-        style={{
-          padding: "12px 40px 12px 14px",
-          borderRadius: 12,
-          border: `1px solid ${DIVIDER}`,
-          background: "#fff",
-          color: FG,
-        }}
-      >
-        {children}
-      </select>
-      <svg className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-           width="18" height="18" fill="none" stroke={MUTED} strokeWidth="2" viewBox="0 0 24 24">
-        <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-}
-
-// ─── Continue button ──────────────────────────────────────────────────────────
-function ContinueBtn({ onClick, disabled, loading, label = "Continue" }) {
+function PrimaryBtn({ onClick, disabled, loading, children }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
       style={{
-        background: disabled || loading ? "#B0B0B0" : FG,
+        width: "100%", padding: "16px", borderRadius: "12px", border: "none",
+        background: disabled || loading ? t.faded : t.ink,
+        color: "#fff", fontFamily: f, fontSize: "14px", fontWeight: 500,
         cursor: disabled || loading ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
       }}
     >
       {loading && (
-        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+        <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
       )}
-      {label}
+      {children}
     </button>
   );
 }
 
-// ─── Step 1 — Category ────────────────────────────────────────────────────────
-function StepCategory({ selected, onChange }) {
+// ─── Step 0 — Welcome splash ──────────────────────────────────────────────────
+function StepWelcome({ onStart }) {
   return (
-    <div className="px-4 pt-2 pb-4">
-      <h2 className="font-sora text-[26px] font-bold text-foreground m-0 mb-1" style={{ color: FG }}>
-        What do you offer?
-      </h2>
-      <p className="font-sora text-[15px] m-0 mb-6" style={{ color: MUTED }}>
-        Choose the category that best describes your services.
-      </p>
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ background: t.hero, margin: "16px", borderRadius: "28px", padding: "40px 28px", position: "relative", overflow: "hidden", minHeight: "300px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: topoSvg, backgroundSize: "cover", opacity: 0.12, pointerEvents: "none" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <Lbl color={t.accent} style={{ fontSize: "13px", fontWeight: 600, marginBottom: "16px" }}>Kliques for Providers</Lbl>
+          <h1 style={{ fontFamily: f, fontSize: "32px", fontWeight: 400, letterSpacing: "-0.03em", lineHeight: 1.15, color: t.ink, margin: "0 0 10px" }}>Build your<br />practice here.</h1>
+          <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: 0, lineHeight: 1.6 }}>Set up your profile, services, and start getting booked in minutes.</p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {CATEGORIES.map((cat) => {
-          const isSel = selected === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => onChange(cat.id)}
-              className="flex flex-col items-center py-5 rounded-card font-sora focus:outline-none active:scale-[0.97] transition-transform"
-              style={{
-                background: isSel ? ACCENT_LIGHT : "#fff",
-                border: isSel ? `2px solid ${ACCENT}` : `1px solid ${DIVIDER}`,
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              }}
-            >
-              <span style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }}>{cat.emoji}</span>
-              <span
-                className="font-sora text-[14px] font-semibold"
-                style={{ color: isSel ? ACCENT : FG }}
+      <div style={{ padding: "28px 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        {["Category", "Profile & Photo", "Services & Pricing", "Availability", "Handle & Payouts"].map((s, i) => (
+          <div key={s}>
+            <div style={{ display: "flex", gap: "14px", padding: "14px 0", alignItems: "center" }}>
+              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontSize: "12px", fontWeight: 500, color: t.muted, flexShrink: 0 }}>{i + 1}</div>
+              <p style={{ fontFamily: f, fontSize: "15px", fontWeight: 400, color: t.ink, margin: 0 }}>{s}</p>
+            </div>
+            {i < 4 && <Divider />}
+          </div>
+        ))}
+
+        <div style={{ marginTop: "auto", paddingTop: "20px" }}>
+          <PrimaryBtn onClick={onStart}>Get Started</PrimaryBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 1 — Category ────────────────────────────────────────────────────────
+function StepCategory({ selected, customCat, onSelect, onCustomCat }) {
+  const canContinue = selected && (selected !== "Other" || customCat.trim().length > 0);
+  return (
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "32px 24px 16px" }} />
+      <StepBar current={0} />
+      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Lbl style={{ marginBottom: "6px" }}>Step 1 of 5</Lbl>
+        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>What do you do?</h1>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 24px", lineHeight: 1.6 }}>Pick the category that best describes your work.</p>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+          {CATEGORIES.map((c) => {
+            const active = selected === c;
+            return (
+              <button
+                key={c}
+                onClick={() => { onSelect(c); if (c !== "Other") onCustomCat(""); }}
+                style={{
+                  padding: "10px 16px", borderRadius: "9999px",
+                  border: active ? `2px solid ${t.accent}` : `1px solid ${t.line}`,
+                  background: active ? t.hero : "transparent",
+                  fontFamily: f, fontSize: "13px", fontWeight: active ? 500 : 400,
+                  color: active ? t.accent : t.ink, cursor: "pointer",
+                }}
               >
-                {cat.label}
-              </span>
-            </button>
-          );
-        })}
+                {c}
+              </button>
+            );
+          })}
+        </div>
+
+        {selected === "Other" && (
+          <div style={{ marginBottom: "16px" }}>
+            <Lbl style={{ marginBottom: "8px" }}>Tell us what you do</Lbl>
+            <input
+              value={customCat}
+              onChange={(e) => onCustomCat(e.target.value)}
+              placeholder="e.g., Dog Training, Interior Design, DJ Services..."
+              style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${customCat.length > 0 ? t.accent : t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
+            />
+            <p style={{ fontFamily: f, fontSize: "12px", color: t.faded, margin: "6px 0 0" }}>We'll create a custom category for you.</p>
+          </div>
+        )}
+
+        <div style={{ marginTop: "auto", padding: "20px 0 100px" }} />
+      </div>
+
+      {/* Sticky footer */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 24px 32px", background: t.base, borderTop: `1px solid ${t.line}` }}>
+        <PrimaryBtn disabled={!canContinue}>Continue</PrimaryBtn>
       </div>
     </div>
   );
@@ -225,254 +231,154 @@ function StepProfile({ data, onChange }) {
   const fileInputRef = useRef(null);
   const bioMax = 160;
 
-  const handlePhotoClick = () => fileInputRef.current?.click();
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
     onChange("photoFile", file);
-    onChange("photoPreview", previewUrl);
+    onChange("photoPreview", URL.createObjectURL(file));
   };
 
   return (
-    <div className="px-4 pt-2 pb-4">
-      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
-        Your profile
-      </h2>
-      <p className="font-sora text-[15px] m-0 mb-6" style={{ color: MUTED }}>
-        This is what clients will see when they find you.
-      </p>
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "32px 24px 16px" }} />
+      <StepBar current={1} />
+      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Lbl style={{ marginBottom: "6px" }}>Step 2 of 5</Lbl>
+        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Your profile.</h1>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>This is what clients see when they find you.</p>
 
-      {/* Photo upload */}
-      <div className="flex flex-col items-center mb-6">
-        <button
-          onClick={handlePhotoClick}
-          className="relative focus:outline-none"
-          style={{ width: 96, height: 96 }}
-          aria-label="Upload photo"
-        >
-          <div
-            className="w-full h-full rounded-full overflow-hidden flex items-center justify-center"
-            style={{
-              background: data.photoPreview ? "transparent" : ACCENT_LIGHT,
-              border: `2px dashed ${data.photoPreview ? "transparent" : ACCENT}`,
-            }}
+        {/* Photo upload */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{ width: "88px", height: "88px", borderRadius: "50%", background: data.photoPreview ? "transparent" : t.avatarBg, border: `2px dashed ${data.photoPreview ? "transparent" : t.line}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}
           >
             {data.photoPreview ? (
-              <img
-                src={data.photoPreview}
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
+              <img src={data.photoPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <svg width="28" height="28" fill="none" stroke={ACCENT} strokeWidth="1.8" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="13" r="4" />
+              <svg width="28" height="28" fill="none" stroke={t.faded} strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="13" r="4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
-          </div>
-          {/* Edit badge */}
-          <div
-            className="absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center"
-            style={{ background: ACCENT }}
-          >
-            <svg width="13" height="13" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        </button>
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-        <p className="font-sora text-[13px] mt-2 m-0" style={{ color: MUTED }}>
-          {data.photoPreview ? "Tap to change photo" : "Tap to add photo"}
-        </p>
-      </div>
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+          <p style={{ fontFamily: f, fontSize: "12px", color: t.accent, margin: "8px 0 0", fontWeight: 500, cursor: "pointer" }} onClick={() => fileInputRef.current?.click()}>
+            {data.photoPreview ? "Change photo" : "Upload photo"}
+          </p>
+        </div>
 
-      <Card>
-        <Field label="Business / Display Name">
-          <TextInput
+        <div style={{ marginBottom: "20px" }}>
+          <Lbl style={{ marginBottom: "8px" }}>Business / Display Name</Lbl>
+          <input
             value={data.businessName}
             onChange={(e) => onChange("businessName", e.target.value)}
             placeholder="e.g., Anny Wong Vocal Studio"
+            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
           />
-        </Field>
+        </div>
 
-        <Field label="City">
-          <TextInput
+        <div style={{ marginBottom: "20px" }}>
+          <Lbl style={{ marginBottom: "8px" }}>City</Lbl>
+          <input
             value={data.city}
             onChange={(e) => onChange("city", e.target.value)}
-            placeholder="e.g., Toronto"
+            placeholder="e.g., Ottawa, ON"
+            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
           />
-        </Field>
+        </div>
 
-        <Field label={`Short Bio (${data.bio.length}/${bioMax})`}>
+        <div style={{ marginBottom: "20px" }}>
+          <Lbl style={{ marginBottom: "8px" }}>Short Bio</Lbl>
           <textarea
             value={data.bio}
             onChange={(e) => onChange("bio", e.target.value)}
             maxLength={bioMax}
-            placeholder="Tell clients a little about yourself and your experience…"
-            rows={4}
-            className="w-full font-sora text-[15px] focus:outline-none resize-none"
-            style={{
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: `1px solid ${DIVIDER}`,
-              background: "#fff",
-              color: FG,
-              lineHeight: 1.55,
-            }}
+            placeholder="Tell clients what you do and what makes your approach unique..."
+            rows={3}
+            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "13px", color: t.ink, outline: "none", resize: "vertical", background: t.avatarBg, boxSizing: "border-box" }}
           />
-        </Field>
-      </Card>
+          <p style={{ fontFamily: f, fontSize: "11px", color: t.faded, margin: "6px 0 0", textAlign: "right" }}>{data.bio.length} / {bioMax}</p>
+        </div>
+
+        <div style={{ paddingBottom: "100px" }} />
+      </div>
     </div>
   );
 }
 
 // ─── Service modal ────────────────────────────────────────────────────────────
-const EMPTY_SERVICE = {
-  name: "", duration: 60, price: "", paymentType: "full",
-  depositType: "percent", depositValue: "",
-};
+const EMPTY_SERVICE = { name: "", duration: 60, price: "", paymentType: "full", depositType: "percent", depositValue: "" };
 
 function ServiceModal({ initial, onSave, onClose }) {
   const [svc, setSvc] = useState(initial || EMPTY_SERVICE);
   const set = (k, v) => setSvc((p) => ({ ...p, [k]: v }));
-
   const canSave = svc.name.trim() && svc.price && parseFloat(svc.price) > 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end font-sora"
-      style={{ background: "rgba(0,0,0,0.45)" }}
-    >
-      <div
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        className="relative flex flex-col"
-        style={{
-          background: "#fff",
-          borderRadius: "20px 20px 0 0",
-          maxHeight: "90vh",
-          overflow: "hidden",
-        }}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-2.5 flex-shrink-0">
-          <div className="w-10 h-1 rounded-full" style={{ background: DIVIDER }} />
+    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.45)", fontFamily: f }}>
+      <div style={{ position: "absolute", inset: 0 }} onClick={onClose} />
+      <div style={{ position: "relative", background: "#fff", borderRadius: "20px 20px 0 0", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 0" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: t.line }} />
         </div>
-        {/* Header */}
-        <div className="flex justify-between items-center px-5 pt-3 pb-2 flex-shrink-0">
-          <h2 className="font-sora text-[20px] font-bold m-0" style={{ color: FG }}>
-            {initial ? "Edit service" : "Add service"}
-          </h2>
-          <button onClick={onClose} className="focus:outline-none -m-1 p-1">
-            <svg width="22" height="22" fill="none" stroke={MUTED} strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-            </svg>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 8px" }}>
+          <h2 style={{ fontFamily: f, fontSize: "20px", fontWeight: 500, color: t.ink, margin: 0 }}>{initial ? "Edit service" : "Add service"}</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+            <svg width="22" height="22" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto px-5 pb-8">
-          <Field label="Service name">
-            <TextInput
-              value={svc.name}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g., Vocal Lesson"
-            />
-          </Field>
+        <div style={{ overflowY: "auto", padding: "0 20px 32px" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <Lbl style={{ marginBottom: "8px" }}>Service name</Lbl>
+            <input value={svc.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g., Vocal Lesson"
+              style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }} />
+          </div>
 
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1">
-              <p className="font-sora text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Duration</p>
-              <NativeSelect value={svc.duration} onChange={(e) => set("duration", Number(e.target.value))}>
-                {DURATIONS.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </NativeSelect>
+          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ flex: 1 }}>
+              <Lbl style={{ marginBottom: "8px" }}>Duration</Lbl>
+              <div style={{ position: "relative" }}>
+                <select value={svc.duration} onChange={(e) => set("duration", Number(e.target.value))}
+                  style={{ width: "100%", padding: "14px 36px 14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none", boxSizing: "border-box" }}>
+                  {DURATIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+                <svg style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="16" height="16" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="font-sora text-[13px] font-semibold mb-1.5 m-0" style={{ color: MUTED }}>Price ($)</p>
-              <TextInput
-                type="number"
-                value={svc.price}
-                onChange={(e) => set("price", e.target.value)}
-                placeholder="85"
-                min="0"
-              />
+            <div style={{ flex: 1 }}>
+              <Lbl style={{ marginBottom: "8px" }}>Price ($)</Lbl>
+              <input type="number" value={svc.price} onChange={(e) => set("price", e.target.value)} placeholder="85" min="0"
+                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }} />
             </div>
           </div>
 
-          {/* Payment model */}
-          <p className="font-sora text-[13px] font-semibold mb-3 m-0" style={{ color: MUTED }}>
-            Payment model
-          </p>
+          <Lbl style={{ marginBottom: "12px" }}>Payment model</Lbl>
           {[
-            { id: "full",    label: "Full payment at booking",      desc: null },
-            { id: "deposit_fixed",   label: "Fixed deposit amount", desc: "deposit_fixed" },
-            { id: "deposit_percent", label: "Percentage deposit",   desc: "deposit_percent" },
+            { id: "full", label: "Full payment at booking" },
+            { id: "deposit_fixed", label: "Fixed deposit amount" },
+            { id: "deposit_percent", label: "Percentage deposit" },
           ].map((opt) => {
             const isActive = svc.paymentType === opt.id;
             return (
-              <div
-                key={opt.id}
-                onClick={() => set("paymentType", opt.id)}
-                className="mb-3 rounded-card p-4 cursor-pointer transition-all"
-                style={{
-                  border: isActive ? `2px solid ${ACCENT}` : `1px solid ${DIVIDER}`,
-                  background: isActive ? ACCENT_LIGHT : "#fff",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex items-center justify-center flex-shrink-0"
-                    style={{
-                      width: 20, height: 20, borderRadius: "50%",
-                      background: isActive ? ACCENT : "transparent",
-                      border: isActive ? "none" : `2px solid ${DIVIDER}`,
-                    }}
-                  >
-                    {isActive && <div className="w-2 h-2 rounded-full bg-white" />}
+              <div key={opt.id} onClick={() => set("paymentType", opt.id)}
+                style={{ marginBottom: "10px", borderRadius: "12px", padding: "14px 16px", cursor: "pointer", border: isActive ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: isActive ? t.hero : "transparent" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: 18, height: 18, borderRadius: "50%", background: isActive ? t.accent : "transparent", border: isActive ? "none" : `2px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {isActive && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
                   </div>
-                  <span
-                    className="font-sora text-[15px] font-semibold"
-                    style={{ color: isActive ? ACCENT : FG }}
-                  >
-                    {opt.label}
-                  </span>
+                  <span style={{ fontFamily: f, fontSize: "14px", fontWeight: isActive ? 500 : 400, color: isActive ? t.accent : t.ink }}>{opt.label}</span>
                 </div>
-
-                {isActive && opt.id === "deposit_fixed" && (
-                  <div className="mt-3 ml-8">
-                    <TextInput
-                      type="number"
-                      value={svc.depositValue}
-                      onChange={(e) => set("depositValue", e.target.value)}
-                      placeholder="e.g., 25"
-                      min="0"
+                {isActive && (opt.id === "deposit_fixed" || opt.id === "deposit_percent") && (
+                  <div style={{ marginTop: 12, marginLeft: 30 }}>
+                    <input type="number" value={svc.depositValue} onChange={(e) => set("depositValue", e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                    />
-                    <p className="font-sora text-[12px] mt-1 m-0" style={{ color: MUTED }}>
-                      Fixed deposit amount in $
-                    </p>
-                  </div>
-                )}
-                {isActive && opt.id === "deposit_percent" && (
-                  <div className="mt-3 ml-8">
-                    <TextInput
-                      type="number"
-                      value={svc.depositValue}
-                      onChange={(e) => set("depositValue", e.target.value)}
-                      placeholder="e.g., 30"
-                      min="0"
-                      max="100"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <p className="font-sora text-[12px] mt-1 m-0" style={{ color: MUTED }}>
-                      Percentage of total price
+                      placeholder={opt.id === "deposit_fixed" ? "e.g., 25" : "e.g., 30"}
+                      min="0" max={opt.id === "deposit_percent" ? "100" : undefined}
+                      style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: "#fff", boxSizing: "border-box" }} />
+                    <p style={{ fontFamily: f, fontSize: "12px", color: t.faded, margin: "4px 0 0" }}>
+                      {opt.id === "deposit_fixed" ? "Fixed deposit amount in $" : "Percentage of total price"}
                     </p>
                   </div>
                 )}
@@ -480,14 +386,9 @@ function ServiceModal({ initial, onSave, onClose }) {
             );
           })}
 
-          <button
-            onClick={() => canSave && onSave(svc)}
-            disabled={!canSave}
-            className="w-full py-4 rounded-card font-sora text-[16px] font-bold text-white mt-2 focus:outline-none active:scale-[0.98] transition-transform"
-            style={{ background: canSave ? FG : "#B0B0B0", cursor: canSave ? "pointer" : "not-allowed" }}
-          >
+          <PrimaryBtn onClick={() => canSave && onSave(svc)} disabled={!canSave}>
             {initial ? "Save changes" : "Add service"}
-          </button>
+          </PrimaryBtn>
         </div>
       </div>
     </div>
@@ -499,92 +400,61 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIdx, setEditingIdx] = useState(null);
 
-  const fmtPrice = (p) => `$${parseFloat(p).toFixed(0)}`;
   const fmtDuration = (m) => {
     if (m < 60) return `${m} min`;
     const h = Math.floor(m / 60), r = m % 60;
     return r ? `${h} hr ${r} min` : `${h} hr`;
   };
   const payLabel = (s) => {
-    if (s.paymentType === "deposit_fixed")   return `$${s.depositValue} deposit`;
+    if (s.paymentType === "deposit_fixed") return `$${s.depositValue} deposit`;
     if (s.paymentType === "deposit_percent") return `${s.depositValue}% deposit`;
     return "Full at booking";
   };
 
   return (
-    <div className="px-4 pt-2 pb-4">
-      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
-        Your services
-      </h2>
-      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
-        Add the services you offer. You can edit these any time.
-      </p>
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "32px 24px 16px" }} />
+      <StepBar current={2} />
+      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Lbl style={{ marginBottom: "6px" }}>Step 3 of 5</Lbl>
+        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Your services.</h1>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Add at least one service. You can always add more later.</p>
 
-      {/* Service cards */}
-      {services.map((svc, i) => (
-        <Card key={i} className="mb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="font-sora text-[16px] font-semibold m-0 mb-0.5 truncate" style={{ color: FG }}>
-                {svc.name}
-              </p>
-              <p className="font-sora text-[13px] m-0" style={{ color: MUTED }}>
-                {fmtDuration(svc.duration)} · {fmtPrice(svc.price)} · {payLabel(svc)}
-              </p>
+        <Divider />
+        {services.map((svc, i) => (
+          <div key={i}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 0" }}>
+              <div>
+                <p style={{ fontFamily: f, fontSize: "16px", fontWeight: 400, color: t.ink, margin: "0 0 3px" }}>{svc.name}</p>
+                <p style={{ fontFamily: f, fontSize: "13px", color: t.muted, margin: 0 }}>{fmtDuration(svc.duration)} · ${parseFloat(svc.price).toFixed(0)} · {payLabel(svc)}</p>
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                <button onClick={() => { setEditingIdx(i); setModalOpen(true); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                  <svg width="16" height="16" fill="none" stroke={t.faded} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+                <button onClick={() => onDelete(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                  <svg width="16" height="16" fill="none" stroke={t.danger} strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" strokeLinecap="round" strokeLinejoin="round" /><path d="M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button
-                onClick={() => { setEditingIdx(i); setModalOpen(true); }}
-                className="focus:outline-none"
-                style={{ padding: 6 }}
-                aria-label="Edit"
-              >
-                <svg width="18" height="18" fill="none" stroke={MUTED} strokeWidth="1.8" viewBox="0 0 24 24">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <button
-                onClick={() => onDelete(i)}
-                className="focus:outline-none"
-                style={{ padding: 6 }}
-                aria-label="Delete"
-              >
-                <svg width="18" height="18" fill="none" stroke={DANGER} strokeWidth="1.8" viewBox="0 0 24 24">
-                  <polyline points="3 6 5 6 21 6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
+            <Divider />
           </div>
-        </Card>
-      ))}
+        ))}
 
-      {/* Add service dashed button */}
-      <button
-        onClick={() => { setEditingIdx(null); setModalOpen(true); }}
-        className="w-full flex items-center justify-center gap-2 font-sora text-[15px] font-semibold focus:outline-none active:scale-[0.98] transition-transform"
-        style={{
-          padding: "14px",
-          borderRadius: 14,
-          border: `1.5px dashed ${ACCENT}`,
-          background: ACCENT_LIGHT,
-          color: ACCENT,
-          cursor: "pointer",
-        }}
-      >
-        <svg width="18" height="18" fill="none" stroke={ACCENT} strokeWidth="2.2" viewBox="0 0 24 24">
-          <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Add a service
-      </button>
+        <button
+          onClick={() => { setEditingIdx(null); setModalOpen(true); }}
+          style={{ width: "100%", padding: "16px", borderRadius: "14px", border: `1px dashed ${t.line}`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: "16px 0" }}
+        >
+          <svg width="14" height="14" fill="none" stroke={t.accent} strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+          <span style={{ fontFamily: f, fontSize: "13px", color: t.accent, fontWeight: 500 }}>Add Service</span>
+        </button>
 
-      {services.length === 0 && (
-        <p className="font-sora text-[13px] text-center mt-3 m-0" style={{ color: MUTED }}>
-          Add at least one service to continue.
-        </p>
-      )}
+        {services.length === 0 && (
+          <p style={{ fontFamily: f, fontSize: "13px", color: t.faded, textAlign: "center", margin: "0 0 12px" }}>Add at least one service to continue.</p>
+        )}
+
+        <div style={{ paddingBottom: "100px" }} />
+      </div>
 
       {modalOpen && (
         <ServiceModal
@@ -605,267 +475,197 @@ function StepServices({ services, onAdd, onEdit, onDelete }) {
 // ─── Step 4 — Availability ────────────────────────────────────────────────────
 function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWindow, onBookingWindow }) {
   return (
-    <div className="px-4 pt-2 pb-4">
-      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
-        Your availability
-      </h2>
-      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
-        Set your working hours. You can always update this later.
-      </p>
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "32px 24px 16px" }} />
+      <StepBar current={3} />
+      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Lbl style={{ marginBottom: "6px" }}>Step 4 of 5</Lbl>
+        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Availability.</h1>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Set your weekly schedule. You can always adjust this later.</p>
 
-      <Card className="mb-3">
-        {DAYS.map((day, idx) => {
+        <Divider />
+        {DAYS.map((day) => {
           const d = availability[day.key];
           return (
             <div key={day.key}>
-              {idx > 0 && <div style={{ height: 1, background: DIVIDER, margin: "0 -16px" }} />}
-              <div className="py-3">
-                {/* Day row */}
-                <div className="flex items-center justify-between mb-0">
-                  <span
-                    className="font-sora text-[15px] font-semibold"
-                    style={{ color: d.enabled ? FG : MUTED }}
-                  >
-                    {day.label}
-                  </span>
-                  {/* Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                   <button
                     onClick={() => onChange(day.key, "enabled", !d.enabled)}
-                    className="focus:outline-none flex-shrink-0 relative"
-                    style={{
-                      width: 44, height: 26, borderRadius: 13,
-                      background: d.enabled ? ACCENT : DIVIDER,
-                      transition: "background 0.2s",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                    aria-label={`Toggle ${day.label}`}
+                    style={{ width: "22px", height: "22px", borderRadius: "6px", border: d.enabled ? "none" : `1.5px solid ${t.line}`, background: d.enabled ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
                   >
-                    <span
-                      className="absolute top-[3px] rounded-full bg-white"
-                      style={{
-                        width: 20, height: 20,
-                        left: d.enabled ? 21 : 3,
-                        transition: "left 0.2s",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                      }}
-                    />
+                    {d.enabled && <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </button>
+                  <span style={{ fontFamily: f, fontSize: "15px", fontWeight: 400, color: d.enabled ? t.ink : t.faded }}>{day.label}</span>
                 </div>
-
-                {/* Time pickers */}
-                {d.enabled && (
-                  <div className="flex items-center gap-2 mt-2.5">
-                    <NativeSelect
-                      value={d.from}
-                      onChange={(e) => onChange(day.key, "from", e.target.value)}
-                    >
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </NativeSelect>
-                    <span className="font-sora text-[13px]" style={{ color: MUTED, flexShrink: 0 }}>to</span>
-                    <NativeSelect
-                      value={d.to}
-                      onChange={(e) => onChange(day.key, "to", e.target.value)}
-                    >
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </NativeSelect>
+                {d.enabled ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ position: "relative" }}>
+                      <select value={d.from} onChange={(e) => onChange(day.key, "from", e.target.value)}
+                        style={{ padding: "6px 28px 6px 10px", borderRadius: "8px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "12px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none" }}>
+                        {TIME_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <svg style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="12" height="12" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" /></svg>
+                    </div>
+                    <span style={{ fontFamily: f, fontSize: "12px", color: t.muted }}>–</span>
+                    <div style={{ position: "relative" }}>
+                      <select value={d.to} onChange={(e) => onChange(day.key, "to", e.target.value)}
+                        style={{ padding: "6px 28px 6px 10px", borderRadius: "8px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "12px", color: t.ink, outline: "none", background: t.avatarBg, appearance: "none" }}>
+                        {TIME_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <svg style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="12" height="12" fill="none" stroke={t.muted} strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" strokeLinecap="round" /></svg>
+                    </div>
                   </div>
+                ) : (
+                  <span style={{ fontFamily: f, fontSize: "13px", color: t.faded }}>Off</span>
                 )}
               </div>
+              <Divider />
             </div>
           );
         })}
-      </Card>
 
-      <Card>
-        <Field label="Buffer between appointments">
-          <NativeSelect value={buffer} onChange={(e) => onBuffer(Number(e.target.value))}>
-            {BUFFER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Booking window">
-          <NativeSelect value={bookingWindow} onChange={(e) => onBookingWindow(Number(e.target.value))}>
-            {WINDOW_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-      </Card>
+        <Lbl style={{ margin: "20px 0 12px" }}>Buffer Between Sessions</Lbl>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+          {BUFFER_OPTIONS.map((b) => {
+            const active = buffer === b.value;
+            return (
+              <button key={b.value} onClick={() => onBuffer(b.value)}
+                style={{ flex: 1, padding: "10px 4px", borderRadius: "10px", border: active ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: active ? t.hero : "transparent", fontFamily: f, fontSize: "12px", fontWeight: active ? 500 : 400, color: active ? t.accent : t.ink, cursor: "pointer" }}>
+                {b.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <Lbl style={{ marginBottom: "12px" }}>Booking Window</Lbl>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "20px" }}>
+          {WINDOW_OPTIONS.map((w) => {
+            const active = bookingWindow === w.value;
+            return (
+              <button key={w.value} onClick={() => onBookingWindow(w.value)}
+                style={{ padding: "10px 16px", borderRadius: "10px", border: active ? `2px solid ${t.accent}` : `1px solid ${t.line}`, background: active ? t.hero : "transparent", fontFamily: f, fontSize: "12px", fontWeight: active ? 500 : 400, color: active ? t.accent : t.ink, cursor: "pointer" }}>
+                {w.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ paddingBottom: "100px" }} />
+      </div>
     </div>
   );
 }
 
 // ─── Step 5 — Handle + Stripe ─────────────────────────────────────────────────
 function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConnected, onStripeConnect, stripeLoading }) {
-  // handleStatus: null | "checking" | "available" | "taken" | "invalid"
-
   return (
-    <div className="px-4 pt-2 pb-4">
-      <h2 className="font-sora text-[26px] font-bold m-0 mb-1" style={{ color: FG }}>
-        Go live
-      </h2>
-      <p className="font-sora text-[15px] m-0 mb-5" style={{ color: MUTED }}>
-        Claim your booking link now. You can connect Stripe later before you start taking paid bookings.
-      </p>
+    <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "32px 24px 16px" }} />
+      <StepBar current={4} />
+      <div style={{ padding: "0 24px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Lbl style={{ marginBottom: "6px" }}>Step 5 of 5</Lbl>
+        <h1 style={{ fontFamily: f, fontSize: "28px", fontWeight: 400, letterSpacing: "-0.03em", color: t.ink, margin: "0 0 8px" }}>Almost there.</h1>
+        <p style={{ fontFamily: f, fontSize: "15px", color: t.muted, margin: "0 0 28px", lineHeight: 1.6 }}>Choose your public handle and connect your payout method.</p>
 
-      {/* Handle */}
-      <Card className="mb-4">
-        <Field label="Your public handle">
-          <div className="relative">
-            <TextInput
-              value={handle}
-              onChange={(e) => onHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              onBlur={onCheckHandle}
-              placeholder="e.g., anny-wong"
-            />
-            {/* Status icon */}
-            {handleStatus === "checking" && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin inline-block"
-                      style={{ borderColor: MUTED, borderTopColor: "transparent" }} />
-              </div>
-            )}
+        <Lbl style={{ marginBottom: "8px" }}>Your Handle</Lbl>
+        <input
+          value={handle}
+          onChange={(e) => onHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+          onBlur={onCheckHandle}
+          placeholder="e.g., anny-wong"
+          style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${handleStatus === "taken" || handleStatus === "invalid" ? t.danger : handleStatus === "available" ? t.success : t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box", marginBottom: "6px" }}
+        />
+
+        {handle && (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
             {handleStatus === "available" && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <svg width="20" height="20" fill="none" stroke={SUCCESS_FG} strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <svg width="14" height="14" fill="none" stroke={t.success} strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
             )}
-            {(handleStatus === "taken" || handleStatus === "invalid") && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <svg width="20" height="20" fill="none" stroke={DANGER} strokeWidth="2.2" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
-                </svg>
-              </div>
-            )}
-          </div>
-
-          {/* URL preview */}
-          {handle && (
-            <p className="font-sora text-[13px] mt-2 m-0" style={{ color: MUTED }}>
-              app.mykliques.com/book/
-              <span style={{ color: handleStatus === "available" ? SUCCESS_FG : handleStatus === "taken" || handleStatus === "invalid" ? DANGER : FG, fontWeight: 600 }}>
-                {handle}
-              </span>
-            </p>
-          )}
-
-          {handleStatus === "taken" && (
-            <p className="font-sora text-[13px] mt-1 m-0" style={{ color: DANGER }}>
-              That handle is already taken. Try another.
-            </p>
-          )}
-          {handleStatus === "invalid" && (
-            <p className="font-sora text-[13px] mt-1 m-0" style={{ color: DANGER }}>
-              Only lowercase letters, numbers, and hyphens allowed.
-            </p>
-          )}
-        </Field>
-      </Card>
-
-      {/* Stripe Connect */}
-      <Card>
-        <div className="flex items-start gap-3 mb-4">
-          <div
-            className="flex items-center justify-center flex-shrink-0 rounded-xl"
-            style={{ width: 44, height: 44, background: "#635BFF" }}
-          >
-            <svg width="22" height="22" viewBox="0 0 60 25" fill="white">
-              <path d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v3.32a8.33 8.33 0 0 1-4.56 1.1c-4.01 0-6.83-2.5-6.83-7.48 0-4.19 2.39-7.52 6.3-7.52 3.92 0 5.96 3.28 5.96 7.5 0 .4-.04 1.26-.06 1.48zm-5.92-5.62c-1.03 0-2.17.73-2.17 2.58h4.25c0-1.85-1.07-2.58-2.08-2.58zM40.95 20.3c-1.44 0-2.32-.6-2.9-1.04l-.02 4.63-4.12.87V5.57h3.76l.08 1.02a4.7 4.7 0 0 1 3.23-1.29c2.9 0 5.62 2.6 5.62 7.4 0 5.23-2.7 7.6-5.65 7.6zM40 8.95c-.95 0-1.54.34-1.97.81l.02 6.12c.4.44.98.78 1.95.78 1.52 0 2.54-1.65 2.54-3.87 0-2.15-1.04-3.84-2.54-3.84zM28.24 5.57h4.13v14.44h-4.13V5.57zm0-4.7L32.37 0v3.36l-4.13.88V.88zm-4.32 9.35v9.79H19.8V5.57h3.7l.12 1.22c1-1.77 3.07-1.41 3.62-1.22v3.79c-.52-.17-2.29-.43-3.32.86zm-8.55 4.72c0 2.43 2.6 1.68 3.12 1.46v3.36c-.55.3-1.54.54-2.89.54a4.15 4.15 0 0 1-4.27-4.24l.01-13.17 4.02-.86v3.54h3.14V9.1h-3.13v5.85zm-4.91.7c0 2.97-2.31 4.66-5.73 4.66a11.2 11.2 0 0 1-4.46-.93v-3.93c1.38.75 3.1 1.31 4.46 1.31.92 0 1.53-.24 1.53-1C6.26 13.77 0 14.51 0 9.95 0 7.04 2.28 5.3 5.62 5.3c1.36 0 2.72.2 4.09.75v3.88a9.23 9.23 0 0 0-4.1-1.06c-.86 0-1.44.25-1.44.93 0 1.85 6.29.97 6.29 5.88z" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-sora text-[16px] font-semibold m-0 mb-0.5" style={{ color: FG }}>
-              Connect with Stripe
-            </p>
-            <p className="font-sora text-[13px] m-0" style={{ color: MUTED }}>
-              Receive payouts directly to your bank account when you're ready to accept paid bookings.
+            <p style={{ fontFamily: f, fontSize: "13px", color: handleStatus === "available" ? t.success : handleStatus === "taken" || handleStatus === "invalid" ? t.danger : t.muted, margin: 0 }}>
+              {handleStatus === "available" && `mykliques.com/book/${handle} is available`}
+              {handleStatus === "taken" && "That handle is already taken. Try another."}
+              {handleStatus === "invalid" && "Only lowercase letters, numbers, and hyphens allowed."}
+              {handleStatus === "checking" && "Checking..."}
+              {!handleStatus && `mykliques.com/book/${handle}`}
             </p>
           </div>
+        )}
+
+        <Divider />
+
+        <div style={{ padding: "20px 0" }}>
+          <Lbl style={{ marginBottom: "8px" }}>Connect Payouts</Lbl>
+          <p style={{ fontFamily: f, fontSize: "14px", color: t.muted, margin: "0 0 16px", lineHeight: 1.5 }}>Connect your Stripe account so you can receive payments from clients securely.</p>
+
+          {stripeConnected ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", borderRadius: "12px", padding: "14px 16px", background: t.successBg }}>
+              <svg width="20" height="20" fill="none" stroke={t.success} strokeWidth="2.2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <span style={{ fontFamily: f, fontSize: "14px", fontWeight: 500, color: t.success }}>Stripe account connected</span>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={onStripeConnect}
+                disabled={stripeLoading}
+                style={{ width: "100%", padding: "16px", borderRadius: "12px", border: `1px solid ${t.line}`, background: t.card, fontFamily: f, fontSize: "14px", fontWeight: 500, color: t.ink, cursor: stripeLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+              >
+                {stripeLoading ? (
+                  <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(61,35,30,0.2)", borderTopColor: t.ink, display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z" fill="#635BFF"/></svg>
+                )}
+                {stripeLoading ? "Connecting…" : "Connect Stripe"}
+              </button>
+              <p style={{ fontFamily: f, fontSize: "12px", color: t.faded, margin: "12px 0 0" }}>Optional for now. You can finish payout setup later in Profile → Payouts &amp; Billing.</p>
+            </>
+          )}
         </div>
 
-        {stripeConnected ? (
-          <div
-            className="flex items-center gap-2.5 rounded-xl px-4 py-3"
-            style={{ background: SUCCESS_BG }}
-          >
-            <svg width="20" height="20" fill="none" stroke={SUCCESS_FG} strokeWidth="2.2" viewBox="0 0 24 24">
-              <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-sora text-[14px] font-semibold" style={{ color: SUCCESS_FG }}>
-              Stripe account connected
-            </span>
-          </div>
-        ) : (
-          <>
-            <button
-              onClick={onStripeConnect}
-              disabled={stripeLoading}
-              className="w-full py-3.5 rounded-xl font-sora text-[15px] font-bold text-white focus:outline-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
-              style={{ background: stripeLoading ? "#B0B0B0" : "#635BFF", cursor: stripeLoading ? "not-allowed" : "pointer" }}
-            >
-              {stripeLoading && (
-                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              )}
-              {stripeLoading ? "Connecting…" : "Connect Stripe"}
-            </button>
-            <p className="font-sora text-[12px] m-0 mt-3" style={{ color: MUTED }}>
-              Optional for now. You can finish payout setup later in Profile → Payouts &amp; Billing.
-            </p>
-          </>
-        )}
-      </Card>
+        <div style={{ paddingBottom: "120px" }} />
+      </div>
     </div>
   );
 }
 
 // ─── Parent: ProviderOnboardingPage ──────────────────────────────────────────
 function ProviderOnboardingPage() {
-  const navigate    = useNavigate();
-  const location    = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { session, updateProfile } = useSession();
-  const toast       = useToast();
+  const toast     = useToast();
 
-  // ── Form state (starts at defaults; overwritten once draft loads) ────────
-  const [draftLoading, setDraftLoading]   = useState(true);
-  const [step, setStep]                   = useState(1);
+  const [draftLoading, setDraftLoading] = useState(true);
+  const [step, setStep]                 = useState(0); // 0 = welcome splash
 
   // Step 1
-  const [category, setCategory]           = useState("");
+  const [category, setCategory]   = useState("");
+  const [customCat, setCustomCat] = useState("");
   // Step 2
-  const [profile, setProfile]             = useState({
-    businessName: "", city: "", bio: "", photoFile: null, photoPreview: null,
-  });
+  const [profile, setProfile]     = useState({ businessName: "", city: "", bio: "", photoFile: null, photoPreview: null });
   // Step 3
-  const [services, setServices]           = useState([]);
+  const [services, setServices]   = useState([]);
   // Step 4
-  const [availability, setAvailability]   = useState(DEFAULT_AVAILABILITY);
-  const [bufferMins, setBufferMins]       = useState(0);
+  const [availability, setAvailability] = useState(DEFAULT_AVAILABILITY);
+  const [bufferMins, setBufferMins]     = useState(0);
   const [bookingWindow, setBookingWindow] = useState(4);
   // Step 5
-  const [handle, setHandle]               = useState("");
-  const [handleStatus, setHandleStatus]   = useState(null); // null|checking|available|taken|invalid
+  const [handle, setHandle]             = useState("");
+  const [handleStatus, setHandleStatus] = useState(null);
   const [stripeConnected, setStripeConnected] = useState(false);
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const [submitting, setSubmitting]       = useState(false);
+  const [stripeLoading, setStripeLoading]     = useState(false);
+  const [submitting, setSubmitting]           = useState(false);
 
-  // ── Load draft from Supabase on mount ────────────────────────────────────
+  // ── Load draft ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
     async function loadDraft() {
       try {
         const { draft } = await request("/provider/onboarding/draft");
         if (draft) {
-          if (draft.step)         setStep(draft.step);
+          if (draft.step != null && draft.step > 0) setStep(draft.step);
           if (draft.category)     setCategory(draft.category);
+          if (draft.customCat)    setCustomCat(draft.customCat);
           if (draft.profile)      setProfile((p) => ({ ...p, ...draft.profile, photoFile: null }));
           if (draft.services)     setServices(draft.services);
           if (draft.availability) setAvailability(draft.availability);
@@ -875,7 +675,7 @@ function ProviderOnboardingPage() {
           if (draft.stripeConnected) setStripeConnected(draft.stripeConnected);
         }
       } catch {
-        // Non-critical — just start fresh
+        // non-critical
       } finally {
         setDraftLoading(false);
       }
@@ -883,7 +683,7 @@ function ProviderOnboardingPage() {
     loadDraft();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Handle Stripe return ─────────────────────────────────────────────────
+  // ── Stripe return ─────────────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("stripe") === "done") {
@@ -893,49 +693,32 @@ function ProviderOnboardingPage() {
     }
   }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Debounced draft save to Supabase ─────────────────────────────────────
-  // We use a ref-based debounce: 1.5 s after the last change fires the PUT.
+  // ── Debounced draft save ──────────────────────────────────────────────────
   const saveTimer = useRef(null);
   useEffect(() => {
-    if (draftLoading) return; // don't save while we're still loading
+    if (draftLoading || step === 0) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       request("/provider/onboarding/draft", {
         method: "PUT",
         body: JSON.stringify({
-          step,
-          category,
+          step, category, customCat,
           profile: { ...profile, photoFile: null, photoPreview: null },
-          services,
-          availability,
-          bufferMins,
-          bookingWindow,
-          handle,
-          stripeConnected,
+          services, availability, bufferMins, bookingWindow, handle, stripeConnected,
         }),
-      }).catch(() => {}); // fire-and-forget; errors are non-critical
+      }).catch(() => {});
     }, 1500);
     return () => clearTimeout(saveTimer.current);
-  }, [step, category, profile, services, availability, bufferMins, bookingWindow, handle, stripeConnected, draftLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, category, customCat, profile, services, availability, bufferMins, bookingWindow, handle, stripeConnected, draftLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Availability helper ──────────────────────────────────────────────────
-  const updateAvailability = (dayKey, field, value) => {
-    setAvailability((prev) => ({
-      ...prev,
-      [dayKey]: { ...prev[dayKey], [field]: value },
-    }));
-  };
-
-  // ── Profile helper ────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const updateAvailability = (dayKey, field, value) =>
+    setAvailability((prev) => ({ ...prev, [dayKey]: { ...prev[dayKey], [field]: value } }));
   const setProfileField = (key, val) => setProfile((prev) => ({ ...prev, [key]: val }));
 
-  // ── Handle check ─────────────────────────────────────────────────────────
   const checkHandle = async () => {
     if (!handle.trim()) return;
-    if (!/^[a-z0-9-]+$/.test(handle)) {
-      setHandleStatus("invalid");
-      return;
-    }
+    if (!/^[a-z0-9-]+$/.test(handle)) { setHandleStatus("invalid"); return; }
     setHandleStatus("checking");
     try {
       const data = await request(`/provider/check-handle?handle=${encodeURIComponent(handle)}`);
@@ -945,7 +728,6 @@ function ProviderOnboardingPage() {
     }
   };
 
-  // ── Stripe connect ────────────────────────────────────────────────────────
   const handleStripeConnect = async () => {
     setStripeLoading(true);
     try {
@@ -956,49 +738,39 @@ function ProviderOnboardingPage() {
           returnUrl:  `${window.location.origin}/provider/onboarding?stripe=done`,
         }),
       });
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (data.url) window.location.href = data.url;
     } catch (err) {
       toast.push({ title: "Stripe setup failed", description: err.message, variant: "error" });
       setStripeLoading(false);
     }
   };
 
-  // ── Continue logic ────────────────────────────────────────────────────────
   const canContinue = () => {
-    if (step === 1) return !!category;
+    if (step === 1) return !!category && (category !== "Other" || customCat.trim().length > 0);
     if (step === 2) return profile.businessName.trim() && profile.city.trim() && profile.bio.trim();
     if (step === 3) return services.length > 0;
-    if (step === 4) return true; // always enabled
+    if (step === 4) return true;
     if (step === 5) return handleStatus === "available";
     return false;
   };
 
   const handleContinue = async () => {
-    if (step < 5) {
-      setStep((s) => s + 1);
-      return;
-    }
-    // Final submit
+    if (step < 5) { setStep((s) => s + 1); return; }
     setSubmitting(true);
     try {
       await request("/provider/onboarding/complete", {
         method: "POST",
         body: JSON.stringify({
-          category,
+          category: category === "Other" ? customCat : category,
           businessName: profile.businessName,
-          city:         profile.city,
-          bio:          profile.bio,
-          handle,
-          services,
-          availability,
-          bufferMinutes:      bufferMins,
+          city: profile.city,
+          bio: profile.bio,
+          handle, services, availability,
+          bufferMinutes: bufferMins,
           bookingWindowWeeks: bookingWindow,
         }),
       });
       await updateProfile({ isProfileComplete: true });
-      // Clear the draft from Supabase
       request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
       toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
       navigate("/provider", { replace: true });
@@ -1011,130 +783,98 @@ function ProviderOnboardingPage() {
 
   const handleBack = () => {
     if (step > 1) setStep((s) => s - 1);
+    else if (step === 1) setStep(0);
     else navigate(-1);
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (draftLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen font-sora" style={{ background: BG }}>
-        <Logo size={22} color="accent" />
-        <div className="mt-6 w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: ACCENT, borderTopColor: "transparent" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: t.base }}>
+        <span style={{ fontFamily: f, fontSize: "20px", fontWeight: 600, color: t.accent, letterSpacing: "-0.02em" }}>kliques</span>
+        <div style={{ marginTop: 24, width: 32, height: 32, borderRadius: "50%", border: `2px solid ${t.line}`, borderTopColor: t.accent, animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
+  // ── Step 0: Welcome splash (no back bar, no step bar) ─────────────────────
+  if (step === 0) {
+    return (
+      <>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <StepWelcome onStart={() => setStep(1)} />
+      </>
+    );
+  }
+
+  // ── Steps 1–5 ─────────────────────────────────────────────────────────────
   return (
-    <div
-      className="flex flex-col min-h-screen font-sora"
-      style={{ background: BG }}
-    >
-      {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-4 pt-3 pb-1 flex-shrink-0"
-        style={{ background: BG }}
-      >
-        {/* Back */}
-        {step > 1 ? (
-          <button
-            onClick={handleBack}
-            className="flex items-center focus:outline-none -ml-1"
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "8px" }}
-          >
-            <svg width="24" height="24" fill="none" stroke={FG} strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        ) : (
-          <div style={{ width: 40 }} />
-        )}
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap');*{box-sizing:border-box}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ minHeight: "100vh", background: t.base, position: "relative" }}>
+        {/* Top nav */}
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, background: t.base, padding: "16px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <BackBtn onClick={handleBack} />
+          <span style={{ fontFamily: f, fontSize: "20px", fontWeight: 600, color: t.accent, letterSpacing: "-0.02em" }}>kliques</span>
+          <span style={{ fontFamily: f, fontSize: "13px", color: t.faded, minWidth: 40, textAlign: "right" }}>{step}/{TOTAL_STEPS}</span>
+        </div>
 
-        {/* Logo */}
-        <Logo size={18} color="accent" />
+        {/* Content offset for fixed nav */}
+        <div style={{ paddingTop: "64px" }}>
+          {step === 1 && (
+            <StepCategory selected={category} customCat={customCat} onSelect={setCategory} onCustomCat={setCustomCat} />
+          )}
+          {step === 2 && (
+            <StepProfile data={profile} onChange={setProfileField} />
+          )}
+          {step === 3 && (
+            <StepServices
+              services={services}
+              onAdd={(svc) => setServices((prev) => [...prev, svc])}
+              onEdit={(idx, svc) => setServices((prev) => prev.map((s, i) => i === idx ? svc : s))}
+              onDelete={(idx) => setServices((prev) => prev.filter((_, i) => i !== idx))}
+            />
+          )}
+          {step === 4 && (
+            <StepAvailability
+              availability={availability}
+              onChange={updateAvailability}
+              buffer={bufferMins}
+              onBuffer={setBufferMins}
+              bookingWindow={bookingWindow}
+              onBookingWindow={setBookingWindow}
+            />
+          )}
+          {step === 5 && (
+            <StepGoLive
+              handle={handle}
+              onHandle={(v) => { setHandle(v); setHandleStatus(null); }}
+              handleStatus={handleStatus}
+              onCheckHandle={checkHandle}
+              stripeConnected={stripeConnected}
+              onStripeConnect={handleStripeConnect}
+              stripeLoading={stripeLoading}
+            />
+          )}
+        </div>
 
-        {/* Step label */}
-        <span
-          className="font-sora text-[13px] font-semibold"
-          style={{ color: MUTED, minWidth: 40, textAlign: "right" }}
-        >
-          {step}/{TOTAL_STEPS}
-        </span>
+        {/* Sticky bottom bar */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 24px 32px", background: t.base, borderTop: `1px solid ${t.line}`, zIndex: 10 }}>
+          <PrimaryBtn onClick={handleContinue} disabled={!canContinue()} loading={submitting}>
+            {step === 5 ? "Launch My Page" : "Continue"}
+          </PrimaryBtn>
+          {step === 4 && (
+            <button
+              onClick={handleContinue}
+              style={{ width: "100%", marginTop: "12px", background: "none", border: "none", cursor: "pointer", fontFamily: f, fontSize: "14px", color: t.muted }}
+            >
+              Skip for now
+            </button>
+          )}
+        </div>
       </div>
-
-      {/* Progress bar */}
-      <StepBar step={step} />
-
-      {/* Step subtitle */}
-      <p
-        className="font-sora text-[12px] font-semibold tracking-wide uppercase px-5 mb-0 mt-1"
-        style={{ color: ACCENT }}
-      >
-        {STEP_TITLES[step - 1]}
-      </p>
-
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto pb-36">
-        {step === 1 && (
-          <StepCategory selected={category} onChange={setCategory} />
-        )}
-        {step === 2 && (
-          <StepProfile data={profile} onChange={setProfileField} />
-        )}
-        {step === 3 && (
-          <StepServices
-            services={services}
-            onAdd={(svc) => setServices((prev) => [...prev, svc])}
-            onEdit={(idx, svc) => setServices((prev) => prev.map((s, i) => i === idx ? svc : s))}
-            onDelete={(idx) => setServices((prev) => prev.filter((_, i) => i !== idx))}
-          />
-        )}
-        {step === 4 && (
-          <StepAvailability
-            availability={availability}
-            onChange={updateAvailability}
-            buffer={bufferMins}
-            onBuffer={setBufferMins}
-            bookingWindow={bookingWindow}
-            onBookingWindow={setBookingWindow}
-          />
-        )}
-        {step === 5 && (
-          <StepGoLive
-            handle={handle}
-            onHandle={(v) => { setHandle(v); setHandleStatus(null); }}
-            handleStatus={handleStatus}
-            onCheckHandle={checkHandle}
-            stripeConnected={stripeConnected}
-            onStripeConnect={handleStripeConnect}
-            stripeLoading={stripeLoading}
-          />
-        )}
-
-        <Footer />
-      </div>
-
-      {/* Sticky bottom bar */}
-      <div
-        className="fixed bottom-0 left-0 right-0 px-4 pt-3 pb-8 flex flex-col gap-3"
-        style={{ background: BG, borderTop: `0.5px solid ${DIVIDER}` }}
-      >
-        <ContinueBtn
-          onClick={handleContinue}
-          disabled={!canContinue()}
-          loading={submitting}
-          label={step === 5 ? "Launch my page" : "Continue"}
-        />
-        {step === 4 && (
-          <button
-            onClick={handleContinue}
-            className="font-sora text-[14px] font-semibold text-center focus:outline-none"
-            style={{ color: MUTED, background: "none", border: "none", cursor: "pointer" }}
-          >
-            Skip for now
-          </button>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
