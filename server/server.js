@@ -10391,6 +10391,8 @@ app.post("/api/provider/stripe/connect", async (req, res) => {
 // ─── POST /api/provider/onboarding/complete — persist all onboarding data ────
 app.post("/api/provider/onboarding/complete", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: "Authentication required." });
+
   const {
     category,
     businessName,
@@ -10398,7 +10400,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     bio,
     handle,
     services,        // [{ name, duration, price, paymentType, depositType, depositValue }]
-    availability,    // { monday: { enabled, from, to }, ... }
+    availability,    // { monday: { enabled, slots }, ... }
     bufferMinutes,
     bookingWindowWeeks,
     photoUrl,
@@ -10430,6 +10432,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
 
     if (provErr) {
       console.error("[onboarding/complete] provider upsert error", provErr);
+      throw provErr;
     }
 
     // Insert services (skip if already exist for this provider)

@@ -649,6 +649,8 @@ function ProviderOnboardingPage() {
   const handleContinue = async () => {
     if (step < 4) { setStep((s) => s + 1); return; }
     setSubmitting(true);
+    // Cancel any pending draft save so it doesn't overwrite after navigate
+    clearTimeout(saveTimer.current);
     try {
       await request("/provider/onboarding/complete", {
         method: "POST",
@@ -662,8 +664,9 @@ function ProviderOnboardingPage() {
           bookingWindowWeeks: bookingWindow,
         }),
       });
+      // Delete draft first, then update local profile, then navigate
+      await request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
       await updateProfile({ isProfileComplete: true });
-      request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
       toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
       navigate("/provider", { replace: true });
     } catch (err) {
