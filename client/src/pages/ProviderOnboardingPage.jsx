@@ -485,7 +485,7 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
 }
 
 // ─── Step 5 — Handle + Stripe ─────────────────────────────────────────────────
-function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConnected, onStripeConnect, stripeLoading }) {
+function StepGoLive({ handle, onHandle, handleStatus, stripeConnected, onStripeConnect, stripeLoading }) {
   return (
     <div style={{ minHeight: "100vh", background: t.base, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "32px 24px 16px" }} />
@@ -499,7 +499,6 @@ function StepGoLive({ handle, onHandle, handleStatus, onCheckHandle, stripeConne
         <input
           value={handle}
           onChange={(e) => onHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-          onBlur={onCheckHandle}
           placeholder="e.g., anny-wong"
           style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${handleStatus === "taken" || handleStatus === "invalid" ? t.danger : handleStatus === "available" ? t.success : t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box", marginBottom: "6px" }}
         />
@@ -640,17 +639,24 @@ function ProviderOnboardingPage() {
     setAvailability((prev) => ({ ...prev, [dayKey]: { ...prev[dayKey], [field]: value } }));
   const setProfileField = (key, val) => setProfile((prev) => ({ ...prev, [key]: val }));
 
-  const checkHandle = async () => {
-    if (!handle.trim()) return;
+  // ── Debounced handle check — fires 600ms after user stops typing ─────────
+  const handleCheckTimer = useRef(null);
+  useEffect(() => {
+    if (step !== 4) return;
+    clearTimeout(handleCheckTimer.current);
+    if (!handle.trim()) { setHandleStatus(null); return; }
     if (!/^[a-z0-9-]+$/.test(handle)) { setHandleStatus("invalid"); return; }
     setHandleStatus("checking");
-    try {
-      const data = await request(`/provider/check-handle?handle=${encodeURIComponent(handle)}`);
-      setHandleStatus(data.available ? "available" : "taken");
-    } catch {
-      setHandleStatus(null);
-    }
-  };
+    handleCheckTimer.current = setTimeout(async () => {
+      try {
+        const data = await request(`/provider/check-handle?handle=${encodeURIComponent(handle)}`);
+        setHandleStatus(data.available ? "available" : "taken");
+      } catch {
+        setHandleStatus(null);
+      }
+    }, 600);
+    return () => clearTimeout(handleCheckTimer.current);
+  }, [handle, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStripeConnect = async () => {
     setStripeLoading(true);
@@ -767,9 +773,8 @@ function ProviderOnboardingPage() {
           {step === 4 && (
             <StepGoLive
               handle={handle}
-              onHandle={(v) => { setHandle(v); setHandleStatus(null); }}
+              onHandle={setHandle}
               handleStatus={handleStatus}
-              onCheckHandle={checkHandle}
               stripeConnected={stripeConnected}
               onStripeConnect={handleStripeConnect}
               stripeLoading={stripeLoading}
