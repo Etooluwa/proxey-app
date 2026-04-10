@@ -303,7 +303,7 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
             `}</style>
 
             {/* Hero */}
-            <div className="fade-1" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px' }}>
+            <div className="fade-1" style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px 0' }}>
                 <div style={{ background: T.hero, borderRadius: 24, padding: '40px 36px 36px', position: 'relative', overflow: 'hidden', marginBottom: 28 }}>
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO_SVG, backgroundSize: 'cover', opacity: 0.08, pointerEvents: 'none', borderRadius: 24 }} />
                     {/* Profile row */}
@@ -435,18 +435,18 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
                 <div
                     className="fade-4"
                     style={{
-                        padding: '32px 0 16px',
+                        padding: '36px 0 20px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 8,
+                        gap: 10,
                     }}
                 >
-                    <span style={{ fontFamily: F, fontSize: 11, color: T.faded, lineHeight: 1 }}>Powered by</span>
+                    <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.faded, lineHeight: 1 }}>Powered by</span>
                     <img
                         src={klogo}
                         alt="kliques"
-                        style={{ height: 'clamp(18px, 2vw, 26px)', width: 'auto', display: 'block' }}
+                        style={{ height: 'clamp(36px, 5vw, 52px)', width: 'auto', display: 'block' }}
                     />
                 </div>
             </div>
