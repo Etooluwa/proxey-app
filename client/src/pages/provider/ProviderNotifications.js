@@ -382,7 +382,7 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
 
             {/* ── Content */}
             <div className="px-5 flex-1 flex flex-col">
-                <Divider />
+                {!isDesktop && <Divider />}
 
                 {/* Loading */}
                 {loading && (
