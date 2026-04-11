@@ -44,20 +44,20 @@ function getInitials(profile) {
     if (!profile) return '?';
     const f = profile.first_name?.[0] || '';
     const l = profile.last_name?.[0] || '';
-    return (f + l).toUpperCase() || '?';
+    if (f || l) return (f + l).toUpperCase();
+    const name = profile.business_name || profile.name || '';
+    return name.slice(0, 2).toUpperCase() || '?';
 }
 
 function buildSubtitle(profile) {
     const parts = [];
-    if (profile?.business_name) parts.push(profile.business_name);
     if (profile?.city) parts.push(profile.city);
     return parts.join(' · ') || 'Provider';
 }
 
 function buildName(profile) {
     if (!profile) return '';
-    const parts = [profile.first_name, profile.last_name].filter(Boolean);
-    return parts.join(' ') || profile.name || 'Provider';
+    return profile.business_name || profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Provider';
 }
 
 // ─── Settings row ─────────────────────────────────────────────────────────────
