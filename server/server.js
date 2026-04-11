@@ -10436,6 +10436,28 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
       throw provErr;
     }
 
+    // Upsert provider_time_blocks from availability object
+    // availability = { monday: { enabled, slots:[] }, tuesday: ... }
+    if (availability && typeof availability === "object") {
+      const dayKeys = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+      const timeBlockRows = dayKeys.map((key, idx) => {
+        const d = availability[key] || {};
+        return {
+          id: crypto.randomUUID(),
+          provider_id: providerId,
+          day_index: idx,
+          is_available: Boolean(d.enabled),
+          time_slots: Array.isArray(d.slots) ? d.slots : [],
+          start_time: null,
+          end_time: null,
+        };
+      });
+      // Delete existing blocks then re-insert so onboarding is idempotent
+      await supabase.from("provider_time_blocks").delete().eq("provider_id", providerId);
+      const { error: tbErr } = await supabase.from("provider_time_blocks").insert(timeBlockRows);
+      if (tbErr) console.error("[onboarding/complete] time_blocks insert error", tbErr);
+    }
+
     // Insert services (skip if already exist for this provider)
     if (Array.isArray(services) && services.length > 0) {
       const { data: existing } = await supabase

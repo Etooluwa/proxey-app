@@ -4,6 +4,7 @@ import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import { request } from "../data/apiClient";
 import { useCitySearch } from "../hooks/useCitySearch";
+import { uploadProfilePhoto } from "../utils/photoUpload";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const t = {
@@ -689,6 +690,16 @@ function ProviderOnboardingPage() {
     // Cancel any pending draft save so it doesn't overwrite after navigate
     clearTimeout(saveTimer.current);
     try {
+      // Upload photo to Supabase Storage if one was selected
+      let photoUrl = null;
+      if (profile.photoFile && session?.user?.id) {
+        try {
+          photoUrl = await uploadProfilePhoto(profile.photoFile, session.user.id);
+        } catch (photoErr) {
+          console.warn("[onboarding] Photo upload failed, continuing without photo:", photoErr.message);
+        }
+      }
+
       await request("/provider/onboarding/complete", {
         method: "POST",
         body: JSON.stringify({
@@ -699,6 +710,7 @@ function ProviderOnboardingPage() {
           handle, availability,
           bufferMinutes: bufferMins,
           bookingWindowWeeks: bookingWindow,
+          photoUrl,
         }),
       });
       // Delete draft first, then update local profile, then navigate
