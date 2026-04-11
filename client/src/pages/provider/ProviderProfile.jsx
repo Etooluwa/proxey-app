@@ -27,8 +27,8 @@ const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBo
 // ─── Settings rows ────────────────────────────────────────────────────────────
 
 const SETTINGS = [
-    { label: 'Personal details',    sub: 'Name, email, phone',         route: '/provider/profile/personal' },
-    { label: 'Business details',    sub: 'Studio name, address',       route: '/provider/profile/business' },
+    { label: 'Personal details',    sub: 'Business name, email, phone', route: '/provider/profile/personal' },
+    { label: 'Business details',    sub: 'Business category, address',  route: '/provider/profile/business' },
     { label: 'Photos & portfolio',  sub: 'Manage gallery images',      route: '/provider/profile/photos' },
     { label: 'Payouts & billing',   sub: 'Stripe Connect',             route: '/provider/profile/payouts' },
     { label: 'Working hours',       sub: 'Availability schedule',      route: '/provider/calendar/availability' },

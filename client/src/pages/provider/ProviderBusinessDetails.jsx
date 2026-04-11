@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProviderProfile, updateProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
+import { useCitySearch } from '../../hooks/useCitySearch';
 
 const T = {
   ink: '#3D231E',
@@ -102,8 +103,9 @@ export default function ProviderBusinessDetails() {
   const [categorySearch, setCategorySearch] = useState('');
   const [useCustomCategory, setUseCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
-  const [address1, setAddress1] = useState('');
-  const [address2, setAddress2] = useState('');
+  const [city, setCity] = useState('');
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const { suggestions: citySuggestions, loading: cityLoading } = useCitySearch(city);
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -127,8 +129,7 @@ export default function ProviderBusinessDetails() {
 
         if (profile) {
           const existingCategory = profile.category || (profile.categories || [])[0] || '';
-          setAddress1(profile.address_line1 || '');
-          setAddress2(profile.address_line2 || '');
+          setCity(profile.city || '');
           setBio(profile.bio || '');
 
           if (existingCategory && !uniqueOptions.includes(existingCategory)) {
@@ -172,8 +173,7 @@ export default function ProviderBusinessDetails() {
       await updateProviderProfile({
         category: selectedCategory || null,
         categories: selectedCategory ? [selectedCategory] : [],
-        address_line1: address1,
-        address_line2: address2,
+        city,
         bio,
       });
       navigate(-1);
@@ -343,28 +343,49 @@ export default function ProviderBusinessDetails() {
               )}
             </div>
 
-            {/* Address Line 1 */}
-            <div>
-              <Lbl>Address Line 1</Lbl>
-              <input
-                type="text"
-                value={address1}
-                onChange={(e) => setAddress1(e.target.value)}
-                placeholder="123 Main Street"
-                style={inputStyle}
-              />
-            </div>
-
-            {/* Address Line 2 */}
-            <div>
-              <Lbl>Address Line 2</Lbl>
-              <input
-                type="text"
-                value={address2}
-                onChange={(e) => setAddress2(e.target.value)}
-                placeholder="City, Province, Postal Code"
-                style={inputStyle}
-              />
+            {/* City */}
+            <div style={{ marginBottom: 20, position: 'relative' }}>
+              <Lbl>City</Lbl>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => { setCity(e.target.value); setShowCitySuggestions(true); }}
+                  onFocus={() => city.length > 0 && setShowCitySuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowCitySuggestions(false), 150)}
+                  placeholder="Start typing your city…"
+                  autoComplete="off"
+                  style={{ ...inputStyle, marginBottom: 0, paddingRight: 36 }}
+                />
+                {city.length > 0 && (
+                  <button
+                    onClick={() => { setCity(''); setShowCitySuggestions(false); }}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
+                  >
+                    <svg width="16" height="16" fill="none" stroke={T.faded} strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+                  </button>
+                )}
+              </div>
+              {showCitySuggestions && city.trim().length >= 2 && (cityLoading || citySuggestions.length > 0) && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: T.card, borderRadius: 12, border: `1px solid ${T.line}`, boxShadow: '0 8px 24px rgba(61,35,30,0.08)', zIndex: 20, overflow: 'hidden', maxHeight: 220, overflowY: 'auto' }}>
+                  {cityLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', fontFamily: F, fontSize: 13, color: T.muted }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${T.line}`, borderTopColor: T.accent, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                      Searching…
+                    </div>
+                  ) : citySuggestions.map((c) => (
+                    <button
+                      key={c}
+                      onMouseDown={() => { setCity(c); setShowCitySuggestions(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${T.line}`, cursor: 'pointer', width: '100%', textAlign: 'left', fontFamily: F }}
+                    >
+                      <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      <span style={{ fontSize: 14, color: T.ink }}>{c}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
 
             {/* Bio */}
