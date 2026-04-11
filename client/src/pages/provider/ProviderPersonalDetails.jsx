@@ -61,6 +61,22 @@ export default function ProviderPersonalDetails() {
   const [emailConfirmSent, setEmailConfirmSent] = useState(false);
   const currentEmail = session?.user?.email || '';
 
+  // Detect if signed in via Google OAuth — email cannot be changed for OAuth accounts
+  const isGoogleUser = Boolean(
+    session?.user?.metadata?.iss?.includes('google') ||
+    session?.user?.metadata?.provider_id ||
+    session?.user?.metadata?.sub
+  );
+  // More reliable: check Supabase raw identities via the supabase client
+  const [authProvider, setAuthProvider] = useState('email');
+  useEffect(() => {
+    supabase?.auth.getUser().then(({ data }) => {
+      const identities = data?.user?.identities || [];
+      const hasGoogle = identities.some((id) => id.provider === 'google');
+      if (hasGoogle) setAuthProvider('google');
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchProviderProfile()
       .then((profile) => {
@@ -146,13 +162,27 @@ export default function ProviderPersonalDetails() {
 
           <div>
             <Lbl>Email</Lbl>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              style={inputStyle}
-            />
+            {authProvider === 'google' ? (
+              <>
+                <input
+                  type="email"
+                  value={email}
+                  readOnly
+                  style={{ ...inputStyle, color: T.faded, cursor: 'not-allowed' }}
+                />
+                <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '-14px 0 20px', lineHeight: 1.5 }}>
+                  You signed in with Google. Email cannot be changed here.
+                </p>
+              </>
+            ) : (
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                style={inputStyle}
+              />
+            )}
           </div>
 
           <div>
