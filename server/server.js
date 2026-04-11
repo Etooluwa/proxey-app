@@ -4056,7 +4056,12 @@ app.get("/api/provider/me", async (req, res) => {
           profile: {
             ...(providerRecord || {}),
             ...(providerProfile || {}),
-            name: providerRecord?.name || providerProfile?.name || "",
+            name:
+              providerProfile?.business_name ||
+              providerRecord?.business_name ||
+              providerProfile?.name ||
+              providerRecord?.name ||
+              "",
             email: providerProfile?.email || providerRecord?.email || "",
             phone: providerProfile?.phone || providerRecord?.phone || "",
             business_name: providerProfile?.business_name || providerRecord?.business_name || "",
@@ -4342,6 +4347,12 @@ app.patch("/api/provider/me", async (req, res) => {
         profile: {
           ...(providerData || {}),
           ...(profileData || {}),
+          name:
+            profileData?.business_name ||
+            providerData?.business_name ||
+            profileData?.name ||
+            providerData?.name ||
+            "",
           business_name: profileData?.business_name || providerData?.business_name || "",
           bio: profileData?.bio || providerData?.bio || "",
           city: profileData?.city || providerData?.city || "",

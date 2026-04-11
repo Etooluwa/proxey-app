@@ -151,7 +151,9 @@ const ProviderLayout = () => {
                 if (cancelled || !providerProfile) return;
 
                 await updateProfile({
-                    name: providerProfile.name || providerProfile.business_name || profile?.name,
+                    name: providerProfile.business_name || providerProfile.name || profile?.name,
+                    business_name: providerProfile.business_name || providerProfile.name || profile?.business_name,
+                    businessName: providerProfile.business_name || providerProfile.name || profile?.businessName,
                     city: providerProfile.city || profile?.city,
                     photo: providerProfile.photo || providerProfile.avatar || profile?.photo,
                     avatar: providerProfile.avatar || providerProfile.photo || profile?.avatar,

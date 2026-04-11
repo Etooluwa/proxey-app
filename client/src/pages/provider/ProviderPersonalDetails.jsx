@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchProviderProfile } from '../../data/provider';
-import { request } from '../../data/apiClient';
+import { fetchProviderProfile, updateProviderProfile } from '../../data/provider';
 import { useSession } from '../../auth/authContext';
 import supabase from '../../utils/supabase';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
@@ -51,7 +50,7 @@ const inputStyle = {
 
 export default function ProviderPersonalDetails() {
   const navigate = useNavigate();
-  const { session } = useSession();
+  const { session, updateProfile } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -109,18 +108,14 @@ export default function ProviderPersonalDetails() {
         const { error: emailErr } = await supabase.auth.updateUser({ email: email.trim() });
         if (emailErr) throw new Error(emailErr.message);
         // Save name + phone but NOT the new email yet (it isn't confirmed).
-        await request('/provider/me', {
-          method: 'PATCH',
-          body: JSON.stringify({ name, business_name: name, phone }),
-        });
+        await updateProviderProfile({ name, business_name: name, phone });
+        await updateProfile({ name, business_name: name, businessName: name });
         setEmailConfirmSent(true);
         return; // Stay on page to show the confirmation message
       }
 
-      await request('/provider/me', {
-        method: 'PATCH',
-        body: JSON.stringify({ name, business_name: name, email, phone }),
-      });
+      await updateProviderProfile({ name, business_name: name, email, phone });
+      await updateProfile({ name, business_name: name, businessName: name });
       navigate(-1);
     } catch (err) {
       setError(err.message || 'Failed to save changes');
