@@ -221,29 +221,35 @@ const ProviderClients = () => {
                     )}
 
                     {/* Empty state */}
-                    {!loading && clients.length === 0 && (
-                        <div style={{ maxWidth: 640, margin: '0 auto' }}>
-                            {/* Hero card */}
-                            <div style={{ background: '#FDDCC6', borderRadius: 24, padding: '28px 24px', position: 'relative', overflow: 'hidden', marginBottom: 20 }}>
-                                <div style={{ position: 'absolute', inset: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`, backgroundSize: 'cover', opacity: 0.1, pointerEvents: 'none' }} />
-                                <div style={{ position: 'relative', zIndex: 1 }}>
-                                    {/* Ghost avatars */}
-                                    <div style={{ display: 'flex', marginBottom: 24 }}>
-                                        {[0, 1, 2].map((i) => (
-                                            <div key={i} style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: '2px solid rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i > 0 ? -10 : 0, zIndex: 3 - i }}>
-                                                <svg width="18" height="18" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
-                                                    <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                            </div>
-                                        ))}
+                    {!loading && clients.length === 0 && (() => {
+                        const TOPO = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
+                        return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+                                {/* Left: hero card */}
+                                <div style={{ background: '#FDDCC6', borderRadius: 24, padding: '36px 32px', position: 'relative', overflow: 'hidden', minHeight: 260 }}>
+                                    <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO, backgroundSize: 'cover', opacity: 0.1, pointerEvents: 'none' }} />
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
+                                        <div style={{ display: 'flex', marginBottom: 28 }}>
+                                            {[0, 1, 2].map((i) => (
+                                                <div key={i} style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: '2px solid rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i > 0 ? -12 : 0, zIndex: 3 - i }}>
+                                                    <svg width="20" height="20" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
+                                                        <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p style={{ fontFamily: F, fontSize: 26, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, color: T.ink, margin: '0 0 12px' }}>Your people are<br />out there.</p>
+                                        <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7 }}>When clients accept your invite or book a session, they become part of your klique. Every session and milestone — tracked here.</p>
                                     </div>
-                                    <p style={{ fontFamily: F, fontSize: 22, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, color: T.ink, margin: '0 0 8px' }}>Your people are<br />out there.</p>
-                                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.6 }}>When clients accept your invite or book a session, they become part of your klique. Every session and milestone — tracked here.</p>
+                                </div>
+
+                                {/* Right: share links stacked */}
+                                <div>
+                                    <DesktopShareLinks handle={handle} />
                                 </div>
                             </div>
-                            <DesktopShareLinks handle={handle} />
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Data table */}
                     {!loading && clients.length > 0 && (
