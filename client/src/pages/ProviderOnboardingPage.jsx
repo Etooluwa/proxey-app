@@ -372,6 +372,7 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
               {/* Day header row */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                  {/* Toggle switch */}
                   <button
                     onClick={() => {
                       const enabling = !d.enabled;
@@ -379,9 +380,9 @@ function StepAvailability({ availability, onChange, buffer, onBuffer, bookingWin
                       if (enabling) setExpandedDay(day.key);
                       else if (expandedDay === day.key) setExpandedDay(null);
                     }}
-                    style={{ width: "22px", height: "22px", borderRadius: "6px", border: d.enabled ? "none" : `1.5px solid ${t.line}`, background: d.enabled ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                    style={{ width: "44px", height: "26px", borderRadius: "13px", border: "none", background: d.enabled ? t.accent : "rgba(140,106,100,0.2)", cursor: "pointer", flexShrink: 0, position: "relative", transition: "background 0.2s", padding: 0 }}
                   >
-                    {d.enabled && <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                    <span style={{ position: "absolute", top: "3px", left: d.enabled ? "21px" : "3px", width: "20px", height: "20px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.18)", transition: "left 0.2s" }} />
                   </button>
                   <span style={{ fontFamily: f, fontSize: "15px", fontWeight: 400, color: d.enabled ? t.ink : t.faded }}>{day.label}</span>
                 </div>
