@@ -94,7 +94,7 @@ export default function ProviderPersonalDetails() {
   };
 
   return (
-    <SettingsPageLayout title="Personal Details">
+    <SettingsPageLayout title="Account Details">
       {loading ? (
         <>
           {[0, 1, 2].map((i) => (
@@ -114,12 +114,12 @@ export default function ProviderPersonalDetails() {
       ) : (
         <>
           <div>
-            <Lbl>Full Name / Business Name</Lbl>
+            <Lbl>Business Name</Lbl>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your name or business name"
+              placeholder="Your business name"
               style={inputStyle}
             />
           </div>
