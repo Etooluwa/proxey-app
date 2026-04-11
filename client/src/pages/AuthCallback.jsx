@@ -76,7 +76,7 @@ export default function AuthCallback() {
         window.localStorage.removeItem('proxey.pending_role');
       }
 
-      // Send welcome email for new Google OAuth signups (non-blocking)
+      // Send welcome email for all new signups (OAuth + email/password) after confirmation (non-blocking)
       if (isNewOAuthSignup && session.user.email) {
         const pendingName = window.localStorage.getItem('proxey.pendingName') || '';
         window.localStorage.removeItem('proxey.pendingName');
@@ -86,6 +86,7 @@ export default function AuthCallback() {
           body: JSON.stringify({ email: session.user.email, name: pendingName, role }),
         }).catch(() => {});
       }
+
 
       if (role === "provider") {
         // New OAuth signup → go to onboarding. Returning provider (role already set) → go to dashboard.

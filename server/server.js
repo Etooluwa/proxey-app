@@ -806,16 +806,20 @@ async function getProviderEmailInfo(providerId) {
 }
 
 // ─── Email templates ──────────────────────────────────────────────────────────
+const KLIQUES_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="108" height="28" viewBox="0 0 108 28" fill="none">
+  <text x="0" y="22" font-family="'Sora',Helvetica,Arial,sans-serif" font-size="22" font-weight="600" fill="#3D231E" letter-spacing="-0.02em">kliques</text>
+</svg>`;
+
 function emailBase(bodyHtml) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#FBF7F2;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid rgba(140,106,100,0.15);">
 <tr><td style="background:#FDDCC6;padding:28px 32px;">
-  <span style="font-size:22px;font-weight:600;color:#3D231E;letter-spacing:-0.02em;">kliques</span>
+  ${KLIQUES_LOGO_SVG}
 </td></tr>
 <tr><td style="padding:32px;">${bodyHtml}</td></tr>
 <tr><td style="padding:16px 32px 28px;border-top:1px solid rgba(140,106,100,0.15);">
-  <p style="margin:0;font-size:12px;color:#B0948F;">You're receiving this because you have an account on <a href="https://mykliques.com" style="color:#C25E4A;text-decoration:none;">mykliques.com</a>.</p>
+  <p style="margin:0;font-size:12px;color:#B0948F;">You're receiving this because you have an account on <a href="https://app.mykliques.com" style="color:#C25E4A;text-decoration:none;">mykliques.com</a>.</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -10641,9 +10645,10 @@ app.post("/api/auth/send-welcome", async (req, res) => {
 
   const isProvider = role === "provider";
   const displayName = name?.trim() || (isProvider ? "there" : "there");
+  const appBase = process.env.FRONTEND_URL || "https://app.mykliques.com";
   const onboardingUrl = isProvider
-    ? "https://mykliques.com/provider/onboarding"
-    : "https://mykliques.com/app";
+    ? `${appBase}/provider/onboarding`
+    : `${appBase}/app`;
 
   await sendEmail({
     to: email.trim(),
@@ -10659,12 +10664,12 @@ app.post("/api/auth/send-welcome", async (req, res) => {
           ? "Your provider account is ready. Complete your profile so clients can find and book you."
           : "Your account is ready. Start exploring providers and book your first session."}
       </p>
-      <div style="text-align:center;margin:32px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:32px 0;"><tr><td align="center">
         <a href="${onboardingUrl}"
-           style="display:inline-block;background:#3D231E;color:#fff;padding:16px 40px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:-0.01em;">
-          ${isProvider ? "Complete your profile →" : "Get started →"}
+           style="display:inline-block;background:#3D231E;color:#fff;padding:16px 40px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:-0.01em;white-space:nowrap;">
+          ${isProvider ? "Complete your profile &#8594;" : "Get started &#8594;"}
         </a>
-      </div>
+      </td></tr></table>
       ${isProvider ? `
       <div style="background:#FFF5E6;border-radius:14px;padding:20px 24px;margin-bottom:24px;border:1px solid rgba(194,94,74,0.15);">
         <p style="margin:0 0 12px;font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">What to expect</p>

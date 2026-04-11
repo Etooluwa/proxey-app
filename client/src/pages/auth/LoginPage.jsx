@@ -345,12 +345,7 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
             if (err) throw err;
             window.localStorage.setItem('proxey.pending_role', role);
             window.localStorage.setItem('proxey.pendingName', name.trim());
-            // Send branded welcome email (non-blocking — don't fail signup if this errors)
-            fetch(`${process.env.REACT_APP_API_BASE || '/api'}/auth/send-welcome`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim(), name: name.trim(), role }),
-            }).catch(() => {});
+            // Welcome email is sent in AuthCallback after email confirmation
             onSuccess(email.trim());
         } catch (err) {
             setError(err.message || 'Signup failed. Please try again.');
