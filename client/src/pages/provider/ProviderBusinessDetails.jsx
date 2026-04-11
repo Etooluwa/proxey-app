@@ -209,7 +209,8 @@ export default function ProviderBusinessDetails() {
     if (nextCategory === 'Other') {
       setUseCustomCategory(true);
       setCategory('Other');
-      setCategoryOpen(false);
+      setCustomCategory('');
+      // Keep dropdown open so user can type their category inline
       return;
     }
     setUseCustomCategory(false);
@@ -291,76 +292,86 @@ export default function ProviderBusinessDetails() {
                     marginBottom: 20,
                   }}
                 >
-                  <input
-                    type="text"
-                    value={categorySearch}
-                    onChange={(e) => setCategorySearch(e.target.value)}
-                    placeholder="Search categories"
-                    style={{
-                      ...inputStyle,
-                      background: '#FBF7F2',
-                      marginBottom: 12,
-                    }}
-                  />
-
-                  <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {filteredCategories.map((option) => {
-                      const active = !useCustomCategory && category === option;
-                      return (
+                  {useCustomCategory ? (
+                    /* "Other" selected — type your category inline */
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                         <button
-                          key={option}
                           type="button"
-                          onClick={() => handleCategorySelect(option)}
+                          onClick={() => { setUseCustomCategory(false); setCustomCategory(''); setCategory(''); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                        >
+                          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>Type your category</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="e.g. Interior Design"
+                        autoFocus
+                        style={{ ...inputStyle, background: '#FBF7F2', marginBottom: 8 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { if (customCategory.trim()) setCategoryOpen(false); }}
+                        disabled={!customCategory.trim()}
+                        style={{
+                          width: '100%', padding: '12px 14px', borderRadius: 12, border: 'none',
+                          background: customCategory.trim() ? T.ink : 'rgba(140,106,100,0.15)',
+                          color: customCategory.trim() ? '#fff' : T.faded,
+                          fontFamily: F, fontSize: 14, fontWeight: 500, cursor: customCategory.trim() ? 'pointer' : 'default',
+                        }}
+                      >
+                        Use "{customCategory.trim() || '…'}"
+                      </button>
+                    </div>
+                  ) : (
+                    /* Normal category list */
+                    <>
+                      <input
+                        type="text"
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        placeholder="Search categories"
+                        style={{ ...inputStyle, background: '#FBF7F2', marginBottom: 12 }}
+                      />
+                      <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {filteredCategories.map((option) => {
+                          const active = !useCustomCategory && category === option;
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => handleCategorySelect(option)}
+                              style={{
+                                width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 12,
+                                border: active ? '1px solid #C25E4A' : `1px solid ${T.line}`,
+                                background: active ? 'rgba(194,94,74,0.10)' : '#FBF7F2',
+                                color: T.ink, fontFamily: F, fontSize: 14, cursor: 'pointer',
+                              }}
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => handleCategorySelect('Other')}
                           style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '12px 14px',
-                            borderRadius: 12,
-                            border: active ? '1px solid #C25E4A' : `1px solid ${T.line}`,
-                            background: active ? 'rgba(194,94,74,0.10)' : '#FBF7F2',
-                            color: T.ink,
-                            fontFamily: F,
-                            fontSize: 14,
-                            cursor: 'pointer',
+                            width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 12,
+                            border: `1px dashed ${T.line}`,
+                            background: '#FBF7F2', color: T.ink, fontFamily: F, fontSize: 14, cursor: 'pointer',
                           }}
                         >
-                          {option}
+                          Other — type my own
                         </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={() => handleCategorySelect('Other')}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '12px 14px',
-                        borderRadius: 12,
-                        border: useCustomCategory ? '1px solid #C25E4A' : `1px dashed ${T.line}`,
-                        background: useCustomCategory ? 'rgba(194,94,74,0.10)' : '#FBF7F2',
-                        color: T.ink,
-                        fontFamily: F,
-                        fontSize: 14,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Other
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {useCustomCategory && (
-                <div>
-                  <Lbl>Custom Category</Lbl>
-                  <input
-                    type="text"
-                    value={customCategory}
-                    onChange={(e) => setCustomCategory(e.target.value)}
-                    placeholder="Enter your category"
-                    style={inputStyle}
-                  />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
