@@ -73,11 +73,11 @@ const EarningsEmpty = () => (
             </span>
         </div>
         <EmptyBars />
-        <p className="text-[18px] font-semibold text-ink text-center leading-tight tracking-[-0.02em] mt-5 mb-2">
-            Your first dollar is coming.
+        <p className="text-[20px] text-ink text-center leading-tight tracking-[-0.02em] mt-5 mb-2" style={{ fontWeight: 400 }}>
+            Your first dollar<br />is coming.
         </p>
         <p className="text-[14px] text-muted text-center leading-relaxed">
-            Earnings from completed sessions will appear here.
+            Once clients start booking and paying, your revenue and payouts show up here.
         </p>
     </HeroCard>
 );

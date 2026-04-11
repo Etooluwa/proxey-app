@@ -94,11 +94,11 @@ const EmptyServices = ({ onAdd }) => (
                 <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         </div>
-        <h2 className="text-[22px] font-semibold text-ink tracking-[-0.02em] leading-snug m-0 mb-2">
-            Set up your menu.
+        <h2 className="text-[22px] font-weight-[400] text-ink tracking-[-0.02em] leading-snug m-0 mb-2">
+            What do you offer?
         </h2>
         <p className="text-[14px] text-muted leading-relaxed m-0 mb-5">
-            Add the services you offer — name, duration, price, and how you collect payment. Clients will see this when they book.
+            Define your services — name, duration, price, and how you'd like to get paid. Clients will see this when they book.
         </p>
         <button
             onClick={onAdd}
@@ -108,7 +108,7 @@ const EmptyServices = ({ onAdd }) => (
             <svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
-            Create first service
+            Create Your First Service
         </button>
     </HeroCard>
 );

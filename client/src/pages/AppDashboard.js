@@ -333,101 +333,128 @@ function ProviderCard({ provider, onClick }) {
     );
 }
 
-function GhostProviderCard() {
+// Ghost avatars — overlapping circles with user icons
+function GhostAvatars() {
     return (
-        <div
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 20,
-                padding: '20px 24px',
-                marginBottom: 10,
-                borderRadius: 18,
-                border: `1px solid ${T.line}`,
-                background: T.card,
-                opacity: 0.35,
-                pointerEvents: 'none',
-            }}
-        >
-            <div
-                style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: '50%',
-                    background: T.avatarBg,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+        <div style={{ display: 'flex', marginBottom: 24 }}>
+            {[0, 1, 2].map((i) => (
+                <div key={i} style={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.5)',
+                    border: '2px solid rgba(255,255,255,0.7)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginLeft: i > 0 ? -12 : 0,
+                    zIndex: 3 - i,
                     flexShrink: 0,
-                    fontFamily: F,
-                    fontSize: 20,
-                    fontWeight: 500,
-                    color: T.faded,
-                }}
-            >
-                +
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: '0 0 2px', fontFamily: F, fontSize: 16, fontWeight: 500, color: T.faded }}>
-                    Your next connection
+                }}>
+                    <svg width="20" height="20" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24" style={{ opacity: 1 - i * 0.25 }}>
+                        <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Full empty state hero card — shown when kliques.length === 0
+function EmptyKliquesHero() {
+    const TOPO = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
+    return (
+        <div style={{
+            background: T.hero, borderRadius: 28, padding: '32px 28px',
+            position: 'relative', overflow: 'hidden', marginBottom: 20,
+            animation: 'fadeUp 0.4s ease 0.05s both',
+        }}>
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO, backgroundSize: 'cover', opacity: 0.12, borderRadius: 28, pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+                <GhostAvatars />
+                <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, margin: '0 0 10px', color: T.ink }}>
+                    Your circle<br />starts here.
+                </h2>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
+                    Every great relationship begins with a first step. Book with a provider or accept an invite — your shared history will live here.
                 </p>
-                <p style={{ margin: 0, fontFamily: F, fontSize: 13, color: T.muted }}>
-                    Accept an invite or book a session
-                </p>
             </div>
-            <svg width="20" height="20" fill="none" stroke={T.faded} strokeWidth="1.5" viewBox="0 0 24 24">
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
         </div>
     );
 }
 
 function InviteHintCard() {
     return (
-        <section
-            style={{
-                marginTop: 28,
-                padding: 24,
-                borderRadius: 18,
-                background: T.avatarBg,
-                display: 'flex',
-                gap: 16,
-                alignItems: 'flex-start',
-                animation: 'fadeUp 0.4s ease 0.19s both',
-            }}
-        >
-            <div
-                style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
-                    background: T.callout,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                }}
-            >
-                <svg width="20" height="20" fill="none" stroke="#92400E" strokeWidth="1.5" viewBox="0 0 24 24">
+        <section style={{
+            marginTop: 4,
+            padding: 20,
+            borderRadius: 18,
+            background: T.avatarBg,
+            display: 'flex',
+            gap: 16,
+            alignItems: 'flex-start',
+            animation: 'fadeUp 0.4s ease 0.19s both',
+        }}>
+            <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: T.callout,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+                <svg width="18" height="18" fill="none" stroke="#92400E" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             </div>
-            <p style={{ margin: 0, fontFamily: F, fontSize: 14, color: T.muted, lineHeight: 1.6 }}>
-                <strong style={{ color: T.ink, fontWeight: 500 }}>Got an invite link?</strong>{' '}
-                Tap the link your provider sent you — you&apos;ll be connected instantly and they&apos;ll appear here.
-            </p>
+            <div>
+                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Got an invite?</p>
+                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.6 }}>
+                    Tap the link your provider sent you. One tap and you&apos;re connected.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+function EverythingInOnePlaceCard() {
+    return (
+        <section style={{
+            marginTop: 8,
+            padding: 20,
+            borderRadius: 18,
+            background: T.avatarBg,
+            display: 'flex',
+            gap: 16,
+            alignItems: 'flex-start',
+            animation: 'fadeUp 0.4s ease 0.27s both',
+        }}>
+            <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: 'rgba(140,106,100,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+                <svg width="18" height="18" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+            <div>
+                <p style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Everything in one place</p>
+                <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0, lineHeight: 1.6 }}>
+                    Session history, messages, and bookings — all tied to each relationship.
+                </p>
+            </div>
         </section>
     );
 }
 
 function ProvidersSection({ kliques, onSelect }) {
-    const showGhost = kliques.length < 3;
+    const isEmpty = kliques.length === 0;
 
     return (
         <section style={{ animation: 'fadeUp 0.4s ease 0.12s both' }}>
-            {kliques.length > 0 && (
-                <p
-                    style={{
+            {isEmpty ? (
+                <>
+                    <EmptyKliquesHero />
+                    <InviteHintCard />
+                    <EverythingInOnePlaceCard />
+                </>
+            ) : (
+                <>
+                    <p style={{
                         margin: '0 0 14px',
                         fontFamily: F,
                         fontSize: 11,
@@ -435,22 +462,18 @@ function ProvidersSection({ kliques, onSelect }) {
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
                         color: T.muted,
-                    }}
-                >
-                    {providerCountLabel(kliques.length)}
-                </p>
+                    }}>
+                        {providerCountLabel(kliques.length)}
+                    </p>
+                    {kliques.map((provider) => (
+                        <ProviderCard
+                            key={provider.provider_id}
+                            provider={provider}
+                            onClick={() => onSelect(provider.provider_id)}
+                        />
+                    ))}
+                </>
             )}
-
-            {kliques.map((provider) => (
-                <ProviderCard
-                    key={provider.provider_id}
-                    provider={provider}
-                    onClick={() => onSelect(provider.provider_id)}
-                />
-            ))}
-
-            {showGhost && <GhostProviderCard />}
-            {showGhost && <InviteHintCard />}
         </section>
     );
 }

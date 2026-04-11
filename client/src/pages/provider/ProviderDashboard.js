@@ -413,7 +413,7 @@ const ProviderDashboard = () => {
                                 </div>
                             ) : (
                                 <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>
-                                    No upcoming appointments for today.
+                                    Your day is wide open.
                                 </p>
                             )}
                         </div>
@@ -457,8 +457,8 @@ const ProviderDashboard = () => {
 
                     {!loading && schedule.length === 0 && (
                         <div style={{ padding: '32px 0', textAlign: 'center' }}>
-                            <p style={{ fontFamily: F, fontSize: '16px', color: T.ink, margin: '0 0 6px' }}>No upcoming appointments for today.</p>
-                            <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>Once clients book for today, they show up here.</p>
+                            <p style={{ fontFamily: F, fontSize: '16px', color: T.ink, margin: '0 0 6px' }}>Your day is wide open.</p>
+                            <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: 0 }}>Once clients book, their sessions show up here.</p>
                         </div>
                     )}
 
@@ -525,7 +525,7 @@ const ProviderDashboard = () => {
                                 <ArrowIcon />
                             </button>
                         ) : (
-                            <p className="text-[15px] text-muted m-0">No upcoming appointments for today.</p>
+                            <p className="text-[15px] text-muted m-0">Your day is wide open.</p>
                         )}
                     </div>
                 </HeroCard>
@@ -581,8 +581,8 @@ const ProviderDashboard = () => {
                 {!loading && schedule.length === 0 && (
                     <>
                         <div className="py-8 text-center">
-                            <p className="text-[16px] text-ink m-0 mb-1">No upcoming appointments for today.</p>
-                            <p className="text-[14px] text-muted m-0">Once clients book for today, they show up here.</p>
+                            <p className="text-[16px] text-ink m-0 mb-1">Your day is wide open.</p>
+                            <p className="text-[14px] text-muted m-0">Once clients book, their sessions show up here.</p>
                         </div>
                         <Divider />
                     </>

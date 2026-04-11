@@ -206,14 +206,14 @@ function showReviewPrompt(n) {
 
 const Empty = () => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 24px', textAlign: 'center' }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-            <svg width="24" height="24" fill="none" stroke="#8C6A64" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path d="M15 17H20L18.595 15.595A1.98 1.98 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" />
+        <div style={{ width: 72, height: 72, borderRadius: 20, background: '#F2EBE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <svg width="32" height="32" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         </div>
-        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 18, fontWeight: 600, color: '#3D231E', margin: '0 0 8px', letterSpacing: '-0.02em' }}>All clear</p>
-        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, color: '#8C6A64', margin: 0, lineHeight: 1.7, maxWidth: 260 }}>
-            No notifications yet. Check back after your next booking.
+        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 20, fontWeight: 400, color: '#3D231E', margin: '0 0 8px', letterSpacing: '-0.02em' }}>All clear</p>
+        <p style={{ fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, color: '#8C6A64', margin: 0, lineHeight: 1.6, maxWidth: 280 }}>
+            You're all caught up. Booking confirmations, messages, and session reminders will appear here.
         </p>
     </div>
 );

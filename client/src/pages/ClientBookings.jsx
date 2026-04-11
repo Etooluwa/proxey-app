@@ -54,7 +54,7 @@ function getEmptyCopy(tab) {
     if (tab === 'upcoming') {
         return {
             icon: <CalendarIcon />,
-            title: 'Nothing upcoming',
+            title: 'Nothing upcoming yet',
             description: "Once a provider confirms your booking, it'll show up here.",
         };
     }
@@ -62,7 +62,7 @@ function getEmptyCopy(tab) {
     return {
         icon: <ClockIcon />,
         title: 'No past sessions',
-        description: 'Your completed and cancelled sessions will be listed here.',
+        description: "When you book a session with a provider, it'll show up here — pending requests, upcoming sessions, and your full history.",
     };
 }
 
