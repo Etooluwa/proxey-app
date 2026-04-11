@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
 import { request } from "../data/apiClient";
+import { invalidateProviderProfileCache } from "../data/provider";
 import { useCitySearch } from "../hooks/useCitySearch";
 import { uploadProfilePhoto } from "../utils/photoUpload";
 
@@ -723,7 +724,16 @@ function ProviderOnboardingPage() {
       });
       // Delete draft first, then update local profile, then navigate
       await request("/provider/onboarding/draft", { method: "DELETE" }).catch(() => {});
-      await updateProfile({ isProfileComplete: true });
+      invalidateProviderProfileCache();
+      await updateProfile({
+        isProfileComplete: true,
+        name: profile.businessName,
+        businessName: profile.businessName,
+        business_name: profile.businessName,
+        city: profile.city,
+        photo: photoUrl || profile.photoPreview || undefined,
+        avatar: photoUrl || profile.photoPreview || undefined,
+      });
       toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
       navigate("/provider", { replace: true });
     } catch (err) {

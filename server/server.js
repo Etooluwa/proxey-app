@@ -10422,7 +10422,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     if (city)                updates.city = city;
     if (bio)                 updates.bio = bio;
     if (handle)              updates.handle = handle;
-    if (photoUrl)            updates.photo = photoUrl;
+    if (photoUrl)            { updates.photo = photoUrl; updates.avatar = photoUrl; }
     if (availability)        updates.availability = availability;
     if (bufferMinutes != null)       updates.buffer_minutes = bufferMinutes;
     if (bookingWindowWeeks != null)  updates.booking_window_weeks = bookingWindowWeeks;
