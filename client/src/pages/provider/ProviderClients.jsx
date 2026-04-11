@@ -24,6 +24,7 @@ import DesktopShareLinks from '../../components/DesktopShareLinks';
 // ─── Desktop tokens ────────────────────────────────────────────────────────────
 const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', success: '#5A8A5E' };
 const F = "'Sora',system-ui,sans-serif";
+const TOPO = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -221,9 +222,8 @@ const ProviderClients = () => {
                     )}
 
                     {/* Empty state */}
-                    {!loading && clients.length === 0 && (() => {
-                        const TOPO = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
-                        return (
+                    {!loading && clients.length === 0 && (
+                        <>
                             {/* Hero card — full width */}
                             <div style={{ background: '#FDDCC6', borderRadius: 24, padding: '36px 32px', position: 'relative', overflow: 'hidden', marginBottom: 28 }}>
                                 <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO, backgroundSize: 'cover', opacity: 0.1, pointerEvents: 'none' }} />
@@ -244,8 +244,8 @@ const ProviderClients = () => {
 
                             {/* Share links — side by side below */}
                             <DesktopShareLinks handle={handle} />
-                        );
-                    })()}
+                        </>
+                    )}
 
                     {/* Data table */}
                     {!loading && clients.length > 0 && (
