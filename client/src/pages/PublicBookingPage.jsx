@@ -323,24 +323,6 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
                             <h1 style={{ fontFamily: F, fontSize: 26, fontWeight: 400, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 4px', lineHeight: 1.2 }}>{displayName}</h1>
                             {subtitle && <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 14px' }}>{subtitle}</p>}
                             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-                                {provider?.rating && (
-                                    <>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
-                                            <svg width="14" height="14" fill={T.accent} viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                                            <span style={{ fontWeight: 500, color: T.accent }}>{parseFloat(provider.rating).toFixed(1)}</span>
-                                        </div>
-                                        <span style={{ color: T.line }}>·</span>
-                                    </>
-                                )}
-                                {provider?.review_count > 0 && (
-                                    <>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: T.muted }}>
-                                            <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                            {provider.review_count} review{provider.review_count !== 1 ? 's' : ''}
-                                        </div>
-                                        <span style={{ color: T.line }}>·</span>
-                                    </>
-                                )}
                                 {provider?.client_count > 0 && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: T.muted }}>
                                         <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
