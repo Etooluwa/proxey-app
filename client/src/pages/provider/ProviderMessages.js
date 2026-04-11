@@ -280,7 +280,6 @@ const ProviderMessages = () => {
             return (
                 <div style={{ padding: '40px', fontFamily: F }}>
                     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-                        <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 600, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 32px' }}>Messages</h1>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0' }}>
                             {/* Two overlapping chat bubble shapes */}
                             <div style={{ position: 'relative', width: 120, height: 90, marginBottom: 28 }}>
