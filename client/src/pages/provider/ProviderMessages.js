@@ -275,6 +275,37 @@ const ProviderMessages = () => {
 
     // ── Desktop layout ─────────────────────────────────────────────────────────
     if (isDesktop) {
+        // Empty state — full-width centered, no panel layout
+        if (conversations.length === 0) {
+            return (
+                <div style={{ padding: '40px', fontFamily: F }}>
+                    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                        <h1 style={{ fontFamily: F, fontSize: 32, fontWeight: 600, letterSpacing: '-0.03em', color: T.ink, margin: '0 0 32px' }}>Messages</h1>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0' }}>
+                            {/* Two overlapping chat bubble shapes */}
+                            <div style={{ position: 'relative', width: 120, height: 90, marginBottom: 28 }}>
+                                <div style={{ position: 'absolute', left: 0, top: 0, width: 72, height: 56, borderRadius: '20px 20px 4px 20px', background: T.hero, transform: 'rotate(-3deg)' }} />
+                                <div style={{ position: 'absolute', right: 0, bottom: 0, width: 72, height: 56, borderRadius: '20px 20px 20px 4px', background: T.avatarBg, transform: 'rotate(3deg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', paddingTop: 4 }}>
+                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F' }} />
+                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F', opacity: 0.6 }} />
+                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B0948F', opacity: 0.3 }} />
+                                    </div>
+                                </div>
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 20, fontWeight: 400, letterSpacing: '-0.02em', color: T.ink, margin: '0 0 8px', textAlign: 'center' }}>
+                                The best conversations<br />haven't started yet.
+                            </p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
+                                When clients connect with you, this is where you'll coordinate sessions and keep the relationship going.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Conversations exist — two-panel layout
         return (
             <div style={{ padding: '40px', fontFamily: F }}>
                 <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -284,11 +315,6 @@ const ProviderMessages = () => {
                             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.line}` }}>
                                 <span style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>Conversations</span>
                             </div>
-                            {conversations.length === 0 && (
-                                <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-                                    <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>No messages yet.</p>
-                                </div>
-                            )}
                             {conversations.map((chat) => {
                                 const unread = (chat.provider_unread_count || 0) > 0;
                                 const isActive = activeChat?.id === chat.id;
@@ -305,7 +331,7 @@ const ProviderMessages = () => {
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
                                                 <span style={{ fontFamily: F, fontSize: 14, fontWeight: unread ? 600 : 400, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chat.client_name || 'Client'}</span>
-                                                <span style={{ fontFamily: F, fontSize: 11, color: T.faded, flexShrink: 0, marginLeft: 6 }}>{formatRelTime(chat.last_message_at)}</span>
+                                                <span style={{ fontFamily: F, fontSize: 11, color: '#B0948F', flexShrink: 0, marginLeft: 6 }}>{formatRelTime(chat.last_message_at)}</span>
                                             </div>
                                             <span style={{ fontFamily: F, fontSize: 12, color: unread ? T.ink : T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{chat.last_message || 'No messages yet'}</span>
                                         </div>
@@ -314,7 +340,7 @@ const ProviderMessages = () => {
                             })}
                         </div>
 
-                        {/* Right: chat or placeholder */}
+                        {/* Right: active chat or select-prompt */}
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             {activeChat ? (
                                 <DesktopChatPanel
@@ -326,10 +352,7 @@ const ProviderMessages = () => {
                                 />
                             ) : (
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-                                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(194,94,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                                        <svg width="22" height="22" fill="none" stroke={T.accent} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                    </div>
-                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.ink, margin: '0 0 6px' }}>Select a conversation</p>
+                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 6px' }}>Select a conversation</p>
                                     <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>Pick a client from the list to start chatting.</p>
                                 </div>
                             )}

@@ -153,6 +153,8 @@ export default function ClientBookings() {
     const rows = activeTab === 'pending' ? pending : activeTab === 'upcoming' ? upcoming : past;
     const emptyCopy = getEmptyCopy(activeTab);
 
+    const allEmpty = !loading && bookings.length === 0;
+
     const content = (
         <>
             <style>{`
@@ -167,40 +169,50 @@ export default function ClientBookings() {
             `}</style>
 
             <BookingsPageHeader label="Your Sessions" />
-            <BookingsTabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-            <div style={{ animation: 'fadeUp 0.4s ease 0.19s both' }}>
-                {loading ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                        <div
-                            style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: '50%',
-                                border: `2px solid ${BOOKING_TOKENS.accent}`,
-                                borderTopColor: 'transparent',
-                                animation: 'spin 0.7s linear infinite',
-                            }}
-                        />
-                    </div>
-                ) : rows.length === 0 ? (
-                    <BookingsEmptyState
-                        icon={emptyCopy.icon}
-                        title={emptyCopy.title}
-                        description={emptyCopy.description}
+            {loading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                    <div
+                        style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: `2px solid ${BOOKING_TOKENS.accent}`,
+                            borderTopColor: 'transparent',
+                            animation: 'spin 0.7s linear infinite',
+                        }}
                     />
-                ) : (
-                    rows.map((booking) => (
-                        <BookingCard
-                            key={booking.id}
-                            booking={booking}
-                            personName={booking.provider_name || 'Provider'}
-                            isDesktop={isDesktop}
-                            onClick={() => navigate(`/app/bookings/${booking.id}`)}
-                        />
-                    ))
-                )}
-            </div>
+                </div>
+            ) : allEmpty ? (
+                <BookingsEmptyState
+                    icon={<CalendarIcon />}
+                    title="No bookings yet"
+                    description="Your pending requests, upcoming sessions, and full session history will all show up here."
+                />
+            ) : (
+                <>
+                    <BookingsTabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+                    <div style={{ animation: 'fadeUp 0.4s ease 0.19s both' }}>
+                        {rows.length === 0 ? (
+                            <BookingsEmptyState
+                                icon={emptyCopy.icon}
+                                title={emptyCopy.title}
+                                description={emptyCopy.description}
+                            />
+                        ) : (
+                            rows.map((booking) => (
+                                <BookingCard
+                                    key={booking.id}
+                                    booking={booking}
+                                    personName={booking.provider_name || 'Provider'}
+                                    isDesktop={isDesktop}
+                                    onClick={() => navigate(`/app/bookings/${booking.id}`)}
+                                />
+                            ))
+                        )}
+                    </div>
+                </>
+            )}
         </>
     );
 

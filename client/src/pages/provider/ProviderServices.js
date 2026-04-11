@@ -347,9 +347,15 @@ const ProviderServices = () => {
                     {/* Empty state — only when no services AND no groups */}
                     {!loading && services.length === 0 && groups.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Set up your menu.</p>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 20px' }}>Add the services you offer — name, duration, price.</p>
-                            <button onClick={() => navigate('/provider/services/new')} style={{ padding: '10px 20px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Create first service</button>
+                            {/* Tag icon */}
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(194,94,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                <svg width="24" height="24" fill="none" stroke="#C25E4A" strokeWidth="1.5" viewBox="0 0 24 24">
+                                    <path d="M7 7h.01M7 3H5a2 2 0 00-2 2v2a2 2 0 00.586 1.414l9 9a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-9-9A2 2 0 0010 3H7z" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>What do you offer?</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 20px' }}>Define your services — name, duration, price, and deposit options.</p>
+                            <button onClick={() => navigate('/provider/services/new')} style={{ padding: '10px 24px', borderRadius: 12, background: T.ink, border: 'none', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Create Your First Service</button>
                         </div>
                     )}
 

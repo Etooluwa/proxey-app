@@ -242,9 +242,14 @@ const ProviderEarnings = () => {
                     {/* Empty state */}
                     {!loading && !hasEarnings && (
                         <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <span style={{ fontFamily: F, fontSize: 48, fontWeight: 600, color: T.muted, letterSpacing: '-0.03em', display: 'block', marginBottom: 16 }}>$0</span>
-                            <p style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Your first dollar is coming.</p>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>Earnings from completed sessions will appear here.</p>
+                            {/* Bar chart ghost */}
+                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginBottom: 20 }}>
+                                {[28, 16, 36, 20, 44].map((h, i) => (
+                                    <div key={i} style={{ width: 18, height: h, borderRadius: 6, background: i === 4 ? 'rgba(194,94,74,0.25)' : 'rgba(140,106,100,0.12)' }} />
+                                ))}
+                            </div>
+                            <p style={{ fontFamily: F, fontSize: 22, fontWeight: 400, color: T.ink, margin: '0 0 8px', letterSpacing: '-0.02em' }}>Your first dollar<br />is coming.</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0 }}>Once clients start booking and paying, your revenue and payouts show up here.</p>
                         </div>
                     )}
                 </div>

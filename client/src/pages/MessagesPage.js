@@ -324,8 +324,17 @@ const MessagesPage = () => {
                                 <span style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>Messages</span>
                             </div>
                             {conversations.length === 0 && (
-                                <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-                                    <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>No conversations yet.</p>
+                                <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative', width: 80, height: 60, marginBottom: 16 }}>
+                                        <div style={{ position: 'absolute', left: 0, top: 0, width: 48, height: 38, borderRadius: '14px 14px 4px 14px', background: T.hero, transform: 'rotate(-3deg)' }} />
+                                        <div style={{ position: 'absolute', right: 0, bottom: 0, width: 48, height: 38, borderRadius: '14px 14px 14px 4px', background: T.avatarBg, transform: 'rotate(3deg)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: T.faded }} />
+                                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: T.faded, opacity: 0.6 }} />
+                                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: T.faded, opacity: 0.3 }} />
+                                        </div>
+                                    </div>
+                                    <p style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, margin: '0 0 4px' }}>Quiet in here...</p>
+                                    <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>for now.</p>
                                 </div>
                             )}
                             {conversations.map((chat) => {
