@@ -195,7 +195,12 @@ const ProviderLayout = () => {
     const activeId = useActiveId(PROVIDER_MENU, '/provider');
     const { title, subtitle } = usePageMeta('/provider');
 
-    const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'You';
+    const displayName =
+        profile?.business_name ||
+        profile?.businessName ||
+        profile?.name ||
+        session?.user?.email?.split('@')[0] ||
+        'You';
     const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
     const avatarSrc = profile?.photo || profile?.avatar || '';
 

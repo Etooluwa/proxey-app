@@ -66,6 +66,22 @@ function sanitizeProfile(profile) {
         }
     });
 
+    const resolvedBusinessName = safeProfile.business_name || safeProfile.businessName || '';
+    const resolvedName = resolvedBusinessName || safeProfile.name || '';
+    const resolvedPhoto = safeProfile.photo || safeProfile.avatar || '';
+
+    if (resolvedName) {
+        safeProfile.name = resolvedName;
+    }
+    if (resolvedBusinessName) {
+        safeProfile.business_name = resolvedBusinessName;
+        safeProfile.businessName = resolvedBusinessName;
+    }
+    if (resolvedPhoto) {
+        safeProfile.photo = resolvedPhoto;
+        safeProfile.avatar = resolvedPhoto;
+    }
+
     return safeProfile;
 }
 

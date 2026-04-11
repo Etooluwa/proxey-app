@@ -316,8 +316,17 @@ const ProviderDashboard = () => {
         return () => { cancelled = true; };
     }, []);
 
-    const providerDisplayName = sessionProfile?.name?.trim() || 'there';
-    const initials = getInitials(sessionProfile?.name);
+    const providerDisplayName = (
+        sessionProfile?.business_name ||
+        sessionProfile?.businessName ||
+        sessionProfile?.name ||
+        'there'
+    ).trim();
+    const initials = getInitials(
+        sessionProfile?.business_name ||
+        sessionProfile?.businessName ||
+        sessionProfile?.name
+    );
     const avatarSrc = sessionProfile?.photo || sessionProfile?.avatar || '';
     const isEmpty = !loading && schedule.length === 0 && weeklyEarnings === 0;
     const upNext = schedule.find((appt) => appt.dashboardStatus !== 'completed') || null;
