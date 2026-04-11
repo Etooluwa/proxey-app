@@ -96,7 +96,6 @@ const FALLBACK_CATEGORIES = [
 
 export default function ProviderBusinessDetails() {
   const navigate = useNavigate();
-  const [businessName, setBusinessName] = useState('');
   const [category, setCategory] = useState('');
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORIES);
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -128,7 +127,6 @@ export default function ProviderBusinessDetails() {
 
         if (profile) {
           const existingCategory = profile.category || (profile.categories || [])[0] || '';
-          setBusinessName(profile.business_name || '');
           setAddress1(profile.address_line1 || '');
           setAddress2(profile.address_line2 || '');
           setBio(profile.bio || '');
@@ -172,7 +170,6 @@ export default function ProviderBusinessDetails() {
       }
 
       await updateProviderProfile({
-        business_name: businessName,
         category: selectedCategory || null,
         categories: selectedCategory ? [selectedCategory] : [],
         address_line1: address1,
@@ -220,18 +217,6 @@ export default function ProviderBusinessDetails() {
           </>
         ) : (
           <>
-            {/* Business Name */}
-            <div>
-              <Lbl>Business Name</Lbl>
-              <input
-                type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Your business name"
-                style={inputStyle}
-              />
-            </div>
-
             {/* Category */}
             <div>
               <Lbl>Category</Lbl>
