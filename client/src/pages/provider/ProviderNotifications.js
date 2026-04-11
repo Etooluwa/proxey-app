@@ -10,7 +10,7 @@
  *   connected / new_client / new_connection     → "connected"
  *   (default)                                   → "reminder"
  */
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useOutletContext } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import BackBtn from '../../components/ui/BackBtn';
 import Avatar from '../../components/ui/Avatar';
@@ -304,6 +304,7 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const showAll = showAllProp || searchParams.get('all') === '1';
+    const { isDesktop } = useOutletContext() || {};
 
     const { notifications, markAsRead, markAllAsRead, loading } = useNotifications();
 
@@ -351,21 +352,33 @@ const ProviderNotifications = ({ showAll: showAllProp = false }) => {
 
     return (
         <div className="flex flex-col min-h-screen bg-base">
-            {/* ── Header */}
-            <div className="flex items-center gap-3 px-5 pt-10 pb-4">
-                <BackBtn onClick={handleBack} />
-                <p className="flex-1 text-[13px] font-semibold text-ink m-0">
-                    {showAll ? 'All Notifications' : 'Notifications'}
-                </p>
-                {unreadCount > 0 && (
+            {/* ── Header — mobile only (desktop shows title in sidebar layout) */}
+            {!isDesktop && (
+                <div className="flex items-center gap-3 px-5 pt-10 pb-4">
+                    <BackBtn onClick={handleBack} />
+                    <p className="flex-1 text-[13px] font-semibold text-ink m-0">
+                        {showAll ? 'All Notifications' : 'Notifications'}
+                    </p>
+                    {unreadCount > 0 && (
+                        <button
+                            onClick={handleMarkAllRead}
+                            className="text-[11px] font-semibold text-accent focus:outline-none uppercase tracking-[0.04em]"
+                        >
+                            Mark all read
+                        </button>
+                    )}
+                </div>
+            )}
+            {isDesktop && unreadCount > 0 && (
+                <div className="flex justify-end px-5 pb-4">
                     <button
                         onClick={handleMarkAllRead}
                         className="text-[11px] font-semibold text-accent focus:outline-none uppercase tracking-[0.04em]"
                     >
                         Mark all read
                     </button>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* ── Content */}
             <div className="px-5 flex-1 flex flex-col">
