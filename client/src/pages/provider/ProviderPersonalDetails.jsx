@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
+import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 
 const T = {
   ink: '#3D231E',
@@ -89,108 +90,84 @@ export default function ProviderPersonalDetails() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: T.base, display: 'flex', flexDirection: 'column', fontFamily: F }}>
-      {/* Nav bar */}
-      <div style={{ padding: '20px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          aria-label="Go back"
-        >
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={T.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 500, color: T.muted }}>Personal Details</span>
-        <div style={{ width: 28 }} />
-      </div>
+    <SettingsPageLayout title="Personal Details">
+      {loading ? (
+        <>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                height: 48,
+                borderRadius: 12,
+                background: 'rgba(140,106,100,0.08)',
+                marginBottom: 20,
+                animation: 'pulse 1.5s infinite',
+              }}
+            />
+          ))}
+          <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+        </>
+      ) : (
+        <>
+          <div>
+            <Lbl>Full Name</Lbl>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              style={inputStyle}
+            />
+          </div>
 
-      {/* Content */}
-      <div style={{ padding: '12px 24px 0', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600, width: '100%', margin: '0 auto' }}>
-        {loading ? (
-          <>
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: 48,
-                  borderRadius: 12,
-                  background: 'rgba(140,106,100,0.08)',
-                  marginBottom: 20,
-                  animation: 'pulse 1.5s infinite',
-                }}
-              />
-            ))}
-          </>
-        ) : (
-          <>
-            <div>
-              <Lbl>Full Name</Lbl>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your full name"
-                style={inputStyle}
-              />
-            </div>
+          <div>
+            <Lbl>Email</Lbl>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              style={inputStyle}
+            />
+          </div>
 
-            <div>
-              <Lbl>Email</Lbl>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                style={inputStyle}
-              />
-            </div>
+          <div>
+            <Lbl>Phone</Lbl>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 (555) 000-0000"
+              style={inputStyle}
+            />
+          </div>
 
-            <div>
-              <Lbl>Phone</Lbl>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 (555) 000-0000"
-                style={inputStyle}
-              />
-            </div>
+          {error && (
+            <p style={{ color: '#B04040', fontSize: 13, margin: '8px 0' }}>{error}</p>
+          )}
 
-            {error && (
-              <p style={{ color: '#B04040', fontSize: 13, margin: '8px 0' }}>{error}</p>
-            )}
-
-            <div style={{ marginTop: 'auto', paddingBottom: 40 }}>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                  width: '100%',
-                  padding: 16,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: saving ? T.faded : T.ink,
-                  color: '#fff',
-                  fontFamily: F,
-                  fontSize: 14,
-                  fontWeight: 500,
-                  cursor: saving ? 'default' : 'pointer',
-                }}
-              >
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
-    </div>
+          <div style={{ marginTop: 24 }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                width: '100%',
+                padding: 16,
+                borderRadius: 12,
+                border: 'none',
+                background: saving ? T.faded : T.ink,
+                color: '#fff',
+                fontFamily: F,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: saving ? 'default' : 'pointer',
+              }}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </>
+      )}
+    </SettingsPageLayout>
   );
 }
