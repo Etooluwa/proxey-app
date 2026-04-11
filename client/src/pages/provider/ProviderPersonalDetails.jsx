@@ -83,7 +83,7 @@ export default function ProviderPersonalDetails() {
     try {
       await request('/provider/me', {
         method: 'PATCH',
-        body: JSON.stringify({ name, email, phone }),
+        body: JSON.stringify({ name, business_name: name, email, phone }),
       });
       navigate(-1);
     } catch (err) {
@@ -114,12 +114,12 @@ export default function ProviderPersonalDetails() {
       ) : (
         <>
           <div>
-            <Lbl>Full Name</Lbl>
+            <Lbl>Full Name / Business Name</Lbl>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your full name"
+              placeholder="Your name or business name"
               style={inputStyle}
             />
           </div>
