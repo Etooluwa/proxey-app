@@ -237,22 +237,28 @@ const AvailabilityPage = () => {
                             <div key={dayName}>
                                 {/* Day header row */}
                                 <div className="flex items-center gap-3 py-4">
-                                    {/* Checkbox */}
+                                    {/* Toggle switch */}
                                     <button
                                         onClick={() => toggleDay(i)}
                                         className="focus:outline-none flex-shrink-0"
                                         style={{
-                                            width: 22, height: 22, borderRadius: 6,
-                                            border: d.enabled ? 'none' : '2px solid rgba(140,106,100,0.3)',
-                                            background: d.enabled ? '#3D231E' : 'transparent',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            width: 44, height: 26, borderRadius: 13,
+                                            border: 'none',
+                                            background: d.enabled ? '#C25E4A' : 'rgba(140,106,100,0.2)',
+                                            position: 'relative',
+                                            transition: 'background 0.2s',
+                                            padding: 0,
                                         }}
                                     >
-                                        {d.enabled && (
-                                            <svg width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
-                                                <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        )}
+                                        <span style={{
+                                            position: 'absolute', top: 3,
+                                            left: d.enabled ? 21 : 3,
+                                            width: 20, height: 20, borderRadius: '50%',
+                                            background: '#fff',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                            transition: 'left 0.2s',
+                                            display: 'block',
+                                        }} />
                                     </button>
 
                                     {/* Day name */}
