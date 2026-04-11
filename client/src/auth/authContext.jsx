@@ -191,6 +191,30 @@ function setLocalRole(email, role) {
     window.localStorage.setItem(LOCAL_ROLE_KEY, JSON.stringify(map));
 }
 
+function getPendingRole() {
+    try {
+        return window.localStorage.getItem('proxey.pending_role');
+    } catch {
+        return null;
+    }
+}
+
+function applyPendingRoleToMappedSession(mapped, userEmail) {
+    const pendingRole = getPendingRole();
+    if (!pendingRole || !mapped?.user) return mapped;
+
+    if (userEmail) {
+        setLocalRole(userEmail, pendingRole);
+    }
+    return {
+        ...mapped,
+        user: {
+            ...mapped.user,
+            role: pendingRole,
+        },
+    };
+}
+
 export function AuthProvider({ children }) {
     const [session, setSession] = useState(() => loadStoredSession());
     const [profile, setProfile] = useState(() =>
@@ -208,7 +232,10 @@ export function AuthProvider({ children }) {
                         data: { session: sbSession },
                     } = await supabase.auth.getSession();
                     if (sbSession) {
-                        const mapped = mapSupabaseSession(sbSession);
+                        const mapped = applyPendingRoleToMappedSession(
+                            mapSupabaseSession(sbSession),
+                            sbSession.user?.email
+                        );
                         setSession(mapped);
                         persistSession(mapped);
                         const storedProfile = loadProfile(mapped.user.id);
@@ -223,16 +250,22 @@ export function AuthProvider({ children }) {
                 }
                 const { data } = supabase.auth.onAuthStateChange(async (_event, sbSession) => {
                     if (sbSession) {
-                        const mapped = mapSupabaseSession(sbSession);
+                        let mapped = mapSupabaseSession(sbSession);
 
                         // Apply pending role from OAuth/email signup immediately.
                         // setLocalRole first (synchronous) so mapSupabaseSession picks it
                         // up right away via getLocalRole — avoids the race where ProtectedRoute
                         // renders before updateUser resolves and sees "client" instead.
-                        const pendingRole = window.localStorage.getItem('proxey.pending_role');
+                        const pendingRole = getPendingRole();
                         if (pendingRole) {
                             setLocalRole(sbSession.user.email, pendingRole);
-                            mapped.user.role = pendingRole;
+                            mapped = {
+                                ...mapped,
+                                user: {
+                                    ...mapped.user,
+                                    role: pendingRole,
+                                },
+                            };
                             // Persist to Supabase user_metadata async (fire and forget)
                             supabase.auth.updateUser({ data: { role: pendingRole } }).catch((err) => {
                                 console.warn("[auth] Failed to set role for OAuth user", err);

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { request } from "../data/apiClient";
 
+const LOCAL_ROLE_KEY = "proxey.userRoles";
 // sessionStorage keys — must match InviteFlow and PublicBookingFlow
 const INVITE_KEY = "kliques.pending_invite_code";
 const SS_PREFIX = "kliques.pub_booking.";
@@ -12,6 +13,18 @@ const SS_SELECTED_SLOT = SS_PREFIX + "selectedSlot";
 
 function ssGet(key) {
   try { return JSON.parse(sessionStorage.getItem(key)); } catch { return null; }
+}
+
+function setLocalRole(email, role) {
+  if (!email || !role) return;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_ROLE_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[email.toLowerCase()] = role;
+    window.localStorage.setItem(LOCAL_ROLE_KEY, JSON.stringify(map));
+  } catch (error) {
+    console.warn("[AuthCallback] Failed to persist local role", error);
+  }
 }
 
 export default function AuthCallback() {
@@ -77,6 +90,10 @@ export default function AuthCallback() {
       const isNewSignup = Boolean(urlRole || lsRole);
       const role = urlRole || lsRole || session.user.role || "client";
       const pendingName = urlName || lsName;
+
+      if (session.user.email && role) {
+        setLocalRole(session.user.email, role);
+      }
 
       // Clean up localStorage
       if (lsRole) window.localStorage.removeItem('proxey.pending_role');
