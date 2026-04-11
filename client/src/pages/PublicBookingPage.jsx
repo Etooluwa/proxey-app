@@ -270,7 +270,7 @@ function StarRow({ rating, max = 5 }) {
 }
 
 // ─── STEP 1: Provider Profile ───────────────────────────────────────────────────
-function Step1Profile({ provider, services, groups, reviews, selectedService, selectedHours, onSelectService, onContinue }) {
+function Step1Profile({ provider, services, groups, reviews, portfolio, selectedService, selectedHours, onSelectService, onContinue }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
     const category = provider?.category || (provider?.categories?.[0]) || '';
     const subtitle = [category, provider?.city].filter(Boolean).join(' · ');
@@ -340,6 +340,24 @@ function Step1Profile({ provider, services, groups, reviews, selectedService, se
                     )}
                 </div>
             </div>
+
+            {/* Portfolio Gallery */}
+            {portfolio?.length > 0 && (
+                <div className="fade-2" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px' }}>
+                    <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, display: 'block', marginBottom: 12 }}>Portfolio</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                        {portfolio.map((item) => (
+                            <div key={item.id} style={{ aspectRatio: '1', borderRadius: 12, overflow: 'hidden', background: T.abg }}>
+                                <img
+                                    src={item.url || item.media_url}
+                                    alt={item.title || 'Portfolio'}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Services + Reviews */}
             <div className="content" style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 120px' }}>
@@ -976,6 +994,7 @@ export default function PublicBookingPage() {
     const [services, setServices] = useState([]);
     const [groups, setGroups] = useState([]);
     const [reviews, setReviews] = useState([]);
+    const [portfolio, setPortfolio] = useState([]);
 
     // Selections
     const [selectedService, setSelectedService] = useState(null);
@@ -1002,6 +1021,7 @@ export default function PublicBookingPage() {
                 setServices(data.services || []);
                 setGroups(data.groups || []);
                 setReviews(data.reviews || []);
+                setPortfolio(data.portfolio || []);
             })
             .catch(() => setError('Failed to load provider.'))
             .finally(() => setLoadingProvider(false));
@@ -1108,6 +1128,7 @@ export default function PublicBookingPage() {
             services={services}
             groups={groups}
             reviews={reviews}
+            portfolio={portfolio}
             selectedService={selectedService}
             selectedHours={selectedHours}
             onSelectService={setSelectedService}
