@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
 import { useSession } from '../../auth/authContext';
+import supabase from '../../utils/supabase';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 
 const T = {
@@ -57,6 +58,8 @@ export default function ProviderPersonalDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [emailConfirmSent, setEmailConfirmSent] = useState(false);
+  const currentEmail = session?.user?.email || '';
 
   useEffect(() => {
     fetchProviderProfile()
@@ -80,7 +83,24 @@ export default function ProviderPersonalDetails() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    setEmailConfirmSent(false);
     try {
+      const emailChanged = email.trim().toLowerCase() !== currentEmail.trim().toLowerCase();
+
+      if (emailChanged) {
+        // Trigger Supabase's email-change confirmation flow — user gets a
+        // verification link at the new address before anything updates.
+        const { error: emailErr } = await supabase.auth.updateUser({ email: email.trim() });
+        if (emailErr) throw new Error(emailErr.message);
+        // Save name + phone but NOT the new email yet (it isn't confirmed).
+        await request('/provider/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ name, business_name: name, phone }),
+        });
+        setEmailConfirmSent(true);
+        return; // Stay on page to show the confirmation message
+      }
+
       await request('/provider/me', {
         method: 'PATCH',
         body: JSON.stringify({ name, business_name: name, email, phone }),
@@ -148,6 +168,15 @@ export default function ProviderPersonalDetails() {
 
           {error && (
             <p style={{ color: '#B04040', fontSize: 13, margin: '8px 0' }}>{error}</p>
+          )}
+
+          {emailConfirmSent && (
+            <div style={{ background: '#EBF2EC', border: '1px solid #5A8A5E', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+              <p style={{ fontFamily: F, fontSize: 14, color: '#3A5E3D', fontWeight: 500, margin: '0 0 4px' }}>Confirmation email sent</p>
+              <p style={{ fontFamily: F, fontSize: 13, color: '#5A8A5E', margin: 0 }}>
+                Check <strong>{email}</strong> and click the link to confirm your new email address.
+              </p>
+            </div>
           )}
 
           <div style={{ marginTop: 24 }}>
