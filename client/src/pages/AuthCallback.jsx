@@ -64,9 +64,20 @@ export default function AuthCallback() {
       }
 
       // ── 3. Default role-based redirect ────────────────────────────────────
-      const role = session.user.role || "client";
+      // For OAuth (Google) sign-ins, session.user.role may still be "client"
+      // here because the onAuthStateChange listener (which applies pending_role)
+      // fires asynchronously. Read pending_role directly from localStorage so we
+      // never send a provider into the client flow.
+      const pendingRole = window.localStorage.getItem('proxey.pending_role');
+      const isNewOAuthSignup = Boolean(pendingRole);
+      const role = (pendingRole || session.user.role) || "client";
+      if (pendingRole) {
+        // Remove it now so onAuthStateChange doesn't try to re-apply it
+        window.localStorage.removeItem('proxey.pending_role');
+      }
       if (role === "provider") {
-        navigate("/provider", { replace: true });
+        // New OAuth signup → go to onboarding. Returning provider (role already set) → go to dashboard.
+        navigate(isNewOAuthSignup ? "/provider/onboarding" : "/provider", { replace: true });
       } else if (role === "admin") {
         navigate("/admin", { replace: true });
       } else {

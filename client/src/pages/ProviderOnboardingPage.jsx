@@ -559,8 +559,15 @@ function StepGoLive({ handle, onHandle, handleStatus, stripeConnected, onStripeC
 function ProviderOnboardingPage() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { session, updateProfile } = useSession();
+  const { session, updateProfile, isProfileComplete } = useSession();
   const toast     = useToast();
+
+  // If already onboarded, skip straight to the dashboard
+  useEffect(() => {
+    if (isProfileComplete) {
+      navigate("/provider", { replace: true });
+    }
+  }, [isProfileComplete, navigate]);
 
   const [draftLoading, setDraftLoading] = useState(true);
   const [step, setStep]                 = useState(0); // 0 = welcome splash
