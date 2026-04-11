@@ -106,12 +106,9 @@ export default function ProviderBusinessDetails() {
   const [address1, setAddress1] = useState('');
   const [address2, setAddress2] = useState('');
   const [bio, setBio] = useState('');
-  const [languages, setLanguages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [showAddLang, setShowAddLang] = useState(false);
-  const [newLang, setNewLang] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +132,6 @@ export default function ProviderBusinessDetails() {
           setAddress1(profile.address_line1 || '');
           setAddress2(profile.address_line2 || '');
           setBio(profile.bio || '');
-          setLanguages(profile.languages || []);
 
           if (existingCategory && !uniqueOptions.includes(existingCategory)) {
             setUseCustomCategory(true);
@@ -182,7 +178,6 @@ export default function ProviderBusinessDetails() {
         address_line1: address1,
         address_line2: address2,
         bio,
-        languages,
       });
       navigate(-1);
     } catch (err) {
@@ -190,19 +185,6 @@ export default function ProviderBusinessDetails() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAddLang = () => {
-    const trimmed = newLang.trim();
-    if (trimmed && !languages.includes(trimmed)) {
-      setLanguages([...languages, trimmed]);
-    }
-    setShowAddLang(false);
-    setNewLang('');
-  };
-
-  const handleRemoveLang = (lang) => {
-    setLanguages(languages.filter((l) => l !== lang));
   };
 
   const handleCategorySelect = (nextCategory) => {
@@ -414,122 +396,6 @@ export default function ProviderBusinessDetails() {
                   resize: 'vertical',
                 }}
               />
-            </div>
-
-            {/* Languages */}
-            <div style={{ marginBottom: 20 }}>
-              <Lbl>Languages</Lbl>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                {languages.map((lang) => (
-                  <div
-                    key={lang}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 9999,
-                      background: T.hero,
-                      border: '2px solid #C25E4A',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: T.accent,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    {lang}
-                    <button
-                      onClick={() => handleRemoveLang(lang)}
-                      style={{
-                        fontSize: 14,
-                        color: T.accent,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        lineHeight: 1,
-                        padding: 0,
-                      }}
-                      aria-label={`Remove ${lang}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-
-                {!showAddLang && (
-                  <button
-                    onClick={() => setShowAddLang(true)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: 9999,
-                      border: '1px dashed rgba(140,106,100,0.4)',
-                      fontSize: 12,
-                      color: T.accent,
-                      cursor: 'pointer',
-                      background: 'none',
-                      fontFamily: F,
-                    }}
-                  >
-                    + Add
-                  </button>
-                )}
-              </div>
-
-              {showAddLang && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    value={newLang}
-                    onChange={(e) => setNewLang(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddLang(); }}
-                    placeholder="e.g. Spanish"
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: `1px solid ${T.line}`,
-                      fontFamily: F,
-                      fontSize: 13,
-                      color: T.ink,
-                      outline: 'none',
-                      background: T.avatarBg,
-                    }}
-                  />
-                  <button
-                    onClick={handleAddLang}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: 10,
-                      border: 'none',
-                      background: T.ink,
-                      color: '#fff',
-                      fontFamily: F,
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Add
-                  </button>
-                  <button
-                    onClick={() => { setShowAddLang(false); setNewLang(''); }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 10,
-                      border: `1px solid ${T.line}`,
-                      background: 'none',
-                      color: T.muted,
-                      fontFamily: F,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
             </div>
 
             {error && (
