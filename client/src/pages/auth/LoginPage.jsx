@@ -345,7 +345,13 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
             if (err) throw err;
             window.localStorage.setItem('proxey.pending_role', role);
             window.localStorage.setItem('proxey.pendingName', name.trim());
-            onSuccess();
+            // Send branded welcome email (non-blocking — don't fail signup if this errors)
+            fetch(`${process.env.REACT_APP_API_BASE || '/api'}/auth/send-welcome`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email.trim(), name: name.trim(), role }),
+            }).catch(() => {});
+            onSuccess(email.trim());
         } catch (err) {
             setError(err.message || 'Signup failed. Please try again.');
         } finally {
@@ -457,27 +463,37 @@ function MagicLinkScreen({ onSent }) {
     );
 }
 
-function MagicSentScreen({ email, onResend, onSignInWithPassword }) {
+function MagicSentScreen({ email, isSignup, onResend, onSignInWithPassword }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flex: 1, padding: '32px 0' }}>
             <div style={{ width: 80, height: 80, borderRadius: 24, background: T.hero, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
                 <EnvelopeIcon />
             </div>
-            <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Check your email</h2>
-            <p style={{ fontFamily: F, fontSize: 15, color: T.muted, margin: '0 0 6px', lineHeight: 1.6 }}>We sent a magic link to</p>
+            <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 10px' }}>
+                {isSignup ? 'Almost there — check your email' : 'Check your email'}
+            </h2>
+            <p style={{ fontFamily: F, fontSize: 15, color: T.muted, margin: '0 0 6px', lineHeight: 1.6 }}>
+                {isSignup ? 'We sent a confirmation link to' : 'We sent a magic link to'}
+            </p>
             <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, margin: '0 0 28px' }}>{email}</p>
             <div style={{ padding: '14px 24px', background: T.callout, borderRadius: 12, marginBottom: 12, maxWidth: 340 }}>
                 <p style={{ fontFamily: F, fontSize: 13, color: '#92400E', margin: 0, lineHeight: 1.5 }}>
-                    Click the link to sign in instantly. The link expires in 1 hour.
+                    {isSignup
+                        ? 'Click the link in the email to confirm your account and get started.'
+                        : 'Click the link to sign in instantly. The link expires in 1 hour.'}
                 </p>
             </div>
-            <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '0 0 28px', maxWidth: 300, lineHeight: 1.5 }}>
-                If you don't have an account yet, one will be created for you automatically.
-            </p>
+            {isSignup && (
+                <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '0 0 28px', maxWidth: 300, lineHeight: 1.5 }}>
+                    You'll also receive a welcome email from Kliques with everything you need to get started.
+                </p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-                <button onClick={onResend} style={{ fontFamily: F, fontSize: 13, color: T.ink, fontWeight: 500, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
-                    Resend magic link
-                </button>
+                {!isSignup && (
+                    <button onClick={onResend} style={{ fontFamily: F, fontSize: 13, color: T.ink, fontWeight: 500, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                        Resend magic link
+                    </button>
+                )}
                 <button onClick={onSignInWithPassword} style={{ fontFamily: F, fontSize: 13, color: T.muted, padding: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
                     Sign in with password instead
                 </button>
@@ -567,6 +583,7 @@ export default function LoginPage() {
     const [screen, setScreen] = useState('role'); // role | client_login | provider_login | client_signup | provider_signup | magic_link | magic_sent
     const [flowRole, setFlowRole] = useState('client');
     const [sentEmail, setSentEmail] = useState('');
+    const [isSignup, setIsSignup] = useState(false);
 
     const goBack = () => {
         if (screen === 'client_signup') setScreen('client_login');
@@ -614,19 +631,20 @@ export default function LoginPage() {
                         role={flowRole}
                         onLogin={() => setScreen(flowRole + '_login')}
                         onGoogleSignup={handleGoogle}
-                        onSuccess={() => setScreen('magic_sent')}
+                        onSuccess={(email) => { setSentEmail(email); setIsSignup(true); setScreen('magic_sent'); }}
                     />
                 );
             case 'magic_link':
                 return (
                     <MagicLinkScreen
-                        onSent={(email) => { setSentEmail(email); setScreen('magic_sent'); }}
+                        onSent={(email) => { setSentEmail(email); setIsSignup(false); setScreen('magic_sent'); }}
                     />
                 );
             case 'magic_sent':
                 return (
                     <MagicSentScreen
                         email={sentEmail}
+                        isSignup={isSignup}
                         onResend={() => setScreen('magic_link')}
                         onSignInWithPassword={() => setScreen(flowRole + '_login')}
                     />

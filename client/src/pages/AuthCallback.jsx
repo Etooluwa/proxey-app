@@ -75,6 +75,18 @@ export default function AuthCallback() {
         // Remove it now so onAuthStateChange doesn't try to re-apply it
         window.localStorage.removeItem('proxey.pending_role');
       }
+
+      // Send welcome email for new Google OAuth signups (non-blocking)
+      if (isNewOAuthSignup && session.user.email) {
+        const pendingName = window.localStorage.getItem('proxey.pendingName') || '';
+        window.localStorage.removeItem('proxey.pendingName');
+        fetch(`${process.env.REACT_APP_API_BASE || '/api'}/auth/send-welcome`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: session.user.email, name: pendingName, role }),
+        }).catch(() => {});
+      }
+
       if (role === "provider") {
         // New OAuth signup → go to onboarding. Returning provider (role already set) → go to dashboard.
         navigate(isNewOAuthSignup ? "/provider/onboarding" : "/provider", { replace: true });

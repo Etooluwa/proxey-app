@@ -10611,6 +10611,60 @@ app.get("/api/provider/public/:handle", async (req, res) => {
   }
 });
 
+// POST /api/auth/send-welcome — send branded welcome email after signup
+// Called from the frontend immediately after supabase.auth.signUp() or Google OAuth signup.
+app.post("/api/auth/send-welcome", async (req, res) => {
+  const { email, name, role } = req.body || {};
+  if (!email?.trim()) return res.status(400).json({ error: "email is required." });
+
+  const isProvider = role === "provider";
+  const displayName = name?.trim() || (isProvider ? "there" : "there");
+  const onboardingUrl = isProvider
+    ? "https://mykliques.com/provider/onboarding"
+    : "https://mykliques.com/app";
+
+  await sendEmail({
+    to: email.trim(),
+    subject: isProvider
+      ? "Welcome to Kliques — let's set up your profile"
+      : "Welcome to Kliques — you're all set",
+    html: emailBase(`
+      <h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;color:#331D19;">
+        Welcome to Kliques${displayName && displayName !== "there" ? `, ${displayName}` : ""}
+      </h1>
+      <p style="margin:0 0 24px;color:#8C6A64;font-size:15px;line-height:1.6;">
+        ${isProvider
+          ? "Your provider account is ready. Complete your profile so clients can find and book you."
+          : "Your account is ready. Start exploring providers and book your first session."}
+      </p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${onboardingUrl}"
+           style="display:inline-block;background:#3D231E;color:#fff;padding:16px 40px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:-0.01em;">
+          ${isProvider ? "Complete your profile →" : "Get started →"}
+        </a>
+      </div>
+      ${isProvider ? `
+      <div style="background:#FFF5E6;border-radius:14px;padding:20px 24px;margin-bottom:24px;border:1px solid rgba(194,94,74,0.15);">
+        <p style="margin:0 0 12px;font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">What to expect</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#3D231E;line-height:1.6;">• Add your business name, category, and city</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#3D231E;line-height:1.6;">• Set your working hours and services</p>
+        <p style="margin:0;font-size:14px;color:#3D231E;line-height:1.6;">• Connect Stripe to receive payments</p>
+      </div>` : `
+      <div style="background:#FFF5E6;border-radius:14px;padding:20px 24px;margin-bottom:24px;border:1px solid rgba(194,94,74,0.15);">
+        <p style="margin:0 0 12px;font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">What you can do</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#3D231E;line-height:1.6;">• Discover and book service providers</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#3D231E;line-height:1.6;">• Manage your upcoming appointments</p>
+        <p style="margin:0;font-size:14px;color:#3D231E;line-height:1.6;">• Message providers directly in the app</p>
+      </div>`}
+      <p style="margin:0;font-size:13px;color:#B0948F;line-height:1.5;">
+        If you didn't create this account, you can safely ignore this email.
+      </p>
+    `),
+  }).catch(() => {});
+
+  res.json({ ok: true });
+});
+
 // POST /api/auth/check-email — check whether an email has an account
 // Rate limited strictly to prevent account enumeration abuse
 app.post("/api/auth/check-email", sensitiveAuthLimiter, async (req, res) => {
