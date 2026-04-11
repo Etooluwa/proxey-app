@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProviderProfile } from '../../data/provider';
 import { request } from '../../data/apiClient';
+import { useSession } from '../../auth/authContext';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 
 const T = {
@@ -49,6 +50,7 @@ const inputStyle = {
 
 export default function ProviderPersonalDetails() {
   const navigate = useNavigate();
+  const { session } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -62,16 +64,18 @@ export default function ProviderPersonalDetails() {
         if (profile) {
           setName(
             profile.name ||
-              [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
-              ''
+            profile.business_name ||
+            [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
+            ''
           );
-          setEmail(profile.email || '');
+          // Fall back to auth session email if profile email is blank
+          setEmail(profile.email || session?.user?.email || '');
           setPhone(profile.phone || '');
         }
       })
       .catch((err) => setError(err.message || 'Failed to load profile'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [session?.user?.email]);
 
   const handleSave = async () => {
     setSaving(true);

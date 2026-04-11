@@ -4013,7 +4013,7 @@ app.get("/api/provider/me", async (req, res) => {
           .maybeSingle(),
         supabase
           .from("providers")
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
+          .select("id, user_id, name, email, phone, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .eq("user_id", providerId)
           .maybeSingle(),
       ]);
@@ -4030,7 +4030,7 @@ app.get("/api/provider/me", async (req, res) => {
             },
             { onConflict: "user_id" }
           )
-          .select("id, user_id, name, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
+          .select("id, user_id, name, email, phone, business_name, category, categories, city, bio, handle, photo, avatar, stripe_account_id")
           .maybeSingle();
 
         if (backfilledProvider) {
@@ -4053,6 +4053,9 @@ app.get("/api/provider/me", async (req, res) => {
           profile: {
             ...(providerRecord || {}),
             ...(providerProfile || {}),
+            name: providerRecord?.name || providerProfile?.name || "",
+            email: providerProfile?.email || providerRecord?.email || "",
+            phone: providerProfile?.phone || providerRecord?.phone || "",
             business_name: providerProfile?.business_name || providerRecord?.business_name || "",
             bio: providerProfile?.bio || providerRecord?.bio || "",
             city: providerProfile?.city || providerRecord?.city || "",
@@ -10434,6 +10437,39 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     if (provErr) {
       console.error("[onboarding/complete] provider upsert error", provErr);
       throw provErr;
+    }
+
+    // Keep onboarding booking-window data in sync with the availability screen,
+    // which reads provider_profiles.booking_settings.bookingWindowDays.
+    if (bookingWindowWeeks != null) {
+      const bookingWindowDays = Math.max(1, Number(bookingWindowWeeks) || 0) * 7;
+      const { data: profileData, error: profileReadErr } = await supabase
+        .from("provider_profiles")
+        .select("booking_settings")
+        .eq("provider_id", providerId)
+        .maybeSingle();
+      if (profileReadErr) {
+        console.error("[onboarding/complete] provider_profiles read error", profileReadErr);
+        throw profileReadErr;
+      }
+
+      const bookingSettings = profileData?.booking_settings || {};
+      bookingSettings.bookingWindowDays = bookingWindowDays;
+
+      const { error: profileUpsertErr } = await supabase
+        .from("provider_profiles")
+        .upsert(
+          {
+            provider_id: providerId,
+            booking_settings: bookingSettings,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "provider_id" }
+        );
+      if (profileUpsertErr) {
+        console.error("[onboarding/complete] provider_profiles upsert error", profileUpsertErr);
+        throw profileUpsertErr;
+      }
     }
 
     // Upsert provider_time_blocks from availability object
