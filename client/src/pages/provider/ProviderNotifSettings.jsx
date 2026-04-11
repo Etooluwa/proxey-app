@@ -13,13 +13,11 @@ const F = "'Sora',system-ui,sans-serif";
 const DEFAULT_PREFS = {
     email_new_bookings: true,
     email_reviews:      true,
-    email_payout_updates: false,
 };
 
 const EMAIL_ITEMS = [
     { key: 'email_new_bookings', label: 'New booking requests' },
-    { key: 'email_reviews',   label: 'New reviews' },
-    { key: 'email_payout_updates', label: 'Payout updates' },
+    { key: 'email_reviews',      label: 'New reviews' },
 ];
 
 export default function ProviderNotifSettings() {

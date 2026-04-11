@@ -786,21 +786,22 @@ async function getProviderEmailInfo(providerId) {
 
   const { data: profileRow } = await supabase
     .from('provider_profiles')
-    .select('email, name, business_name')
+    .select('email, name, business_name, notification_preferences')
     .eq('provider_id', providerId)
     .maybeSingle();
 
   const name = providerRow?.business_name || providerRow?.name || profileRow?.business_name || profileRow?.name || null;
   const profileEmail = providerRow?.email || profileRow?.email || null;
+  const notifPrefs = profileRow?.notification_preferences || {};
 
-  if (profileEmail) return { email: profileEmail, name };
+  if (profileEmail) return { email: profileEmail, name, notifPrefs };
 
   // Fall back to auth.users if no email in profile tables
   try {
     const { data: authUser } = await supabase.auth.admin.getUserById(providerId);
-    return { email: authUser?.user?.email || null, name };
+    return { email: authUser?.user?.email || null, name, notifPrefs };
   } catch {
-    return { email: null, name };
+    return { email: null, name, notifPrefs };
   }
 }
 
@@ -2844,13 +2845,15 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
       if (data.status === "confirmed") {
         const provInfo = await getProviderEmailInfo(data.provider_id);
         const { name: clientName } = await getClientNotifPrefs(data.client_id);
-        await sendProviderNewBookingEmail({
-          to: provInfo.email,
-          clientName,
-          serviceName: data.service_name,
-          scheduledAt: data.scheduled_at,
-          autoAccepted: true,
-        }).catch(() => {});
+        if (provInfo.notifPrefs?.email_new_bookings !== false) {
+          await sendProviderNewBookingEmail({
+            to: provInfo.email,
+            clientName,
+            serviceName: data.service_name,
+            scheduledAt: data.scheduled_at,
+            autoAccepted: true,
+          }).catch(() => {});
+        }
       }
     }
 
@@ -11115,13 +11118,15 @@ app.post("/api/bookings/create", createChargedBookingHandler({
             .maybeSingle()
         : { data: null };
 
-    await sendProviderNewBookingEmail({
-      to: providerEmailInfo.email,
-      clientName: bookingClientName,
-      serviceName: bookingService?.name || null,
-      scheduledAt,
-      autoAccepted: autoAccept,
-    }).catch(() => {});
+    if (providerEmailInfo.notifPrefs?.email_new_bookings !== false) {
+      await sendProviderNewBookingEmail({
+        to: providerEmailInfo.email,
+        clientName: bookingClientName,
+        serviceName: bookingService?.name || null,
+        scheduledAt,
+        autoAccepted: autoAccept,
+      }).catch(() => {});
+    }
 
     if (autoAccept && userId) {
       await createClientNotification(userId, {
@@ -11335,13 +11340,15 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
 
     const providerEmailInfo = await getProviderEmailInfo(providerId);
     const { email: clientEmail } = await getClientNotifPrefs(clientId);
-    await sendProviderNewBookingEmail({
-      to: providerEmailInfo.email,
-      clientName,
-      serviceName,
-      scheduledAt,
-      autoAccepted: autoAccept,
-    }).catch(() => {});
+    if (providerEmailInfo.notifPrefs?.email_new_bookings !== false) {
+      await sendProviderNewBookingEmail({
+        to: providerEmailInfo.email,
+        clientName,
+        serviceName,
+        scheduledAt,
+        autoAccepted: autoAccept,
+      }).catch(() => {});
+    }
 
     if (autoAccept) {
       await createClientNotification(clientId, {
