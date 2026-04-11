@@ -806,16 +806,12 @@ async function getProviderEmailInfo(providerId) {
 }
 
 // ─── Email templates ──────────────────────────────────────────────────────────
-const KLIQUES_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="108" height="28" viewBox="0 0 108 28" fill="none">
-  <text x="0" y="22" font-family="'Sora',Helvetica,Arial,sans-serif" font-size="22" font-weight="600" fill="#3D231E" letter-spacing="-0.02em">kliques</text>
-</svg>`;
-
 function emailBase(bodyHtml) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#FBF7F2;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid rgba(140,106,100,0.15);">
-<tr><td style="background:#FDDCC6;padding:28px 32px;">
-  ${KLIQUES_LOGO_SVG}
+<tr><td style="background:#FDDCC6;padding:24px 32px;">
+  <img src="https://i.imgur.com/2aeeOeG.png" alt="kliques" height="36" style="display:block;border:0;height:36px;max-height:36px;" />
 </td></tr>
 <tr><td style="padding:32px;">${bodyHtml}</td></tr>
 <tr><td style="padding:16px 32px 28px;border-top:1px solid rgba(140,106,100,0.15);">

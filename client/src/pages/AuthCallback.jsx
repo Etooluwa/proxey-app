@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { request } from "../data/apiClient";
 
@@ -16,6 +16,7 @@ function ssGet(key) {
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { session, loading } = useAuth();
   const processed = useRef(false); // prevent double-fire in React StrictMode
 
@@ -64,22 +65,25 @@ export default function AuthCallback() {
       }
 
       // ── 3. Default role-based redirect ────────────────────────────────────
-      // For OAuth (Google) sign-ins, session.user.role may still be "client"
-      // here because the onAuthStateChange listener (which applies pending_role)
-      // fires asynchronously. Read pending_role directly from localStorage so we
-      // never send a provider into the client flow.
-      const pendingRole = window.localStorage.getItem('proxey.pending_role');
-      const isNewOAuthSignup = Boolean(pendingRole);
-      const role = (pendingRole || session.user.role) || "client";
-      if (pendingRole) {
-        // Remove it now so onAuthStateChange doesn't try to re-apply it
-        window.localStorage.removeItem('proxey.pending_role');
-      }
+      // Role/name can come from:
+      //   a) URL params (signup_role, signup_name) — survives cross-device email confirmation
+      //   b) localStorage (proxey.pending_role) — same device/browser fallback
+      //   c) session.user.role — returning user
+      const urlRole = searchParams.get('signup_role');
+      const urlName = searchParams.get('signup_name') ? decodeURIComponent(searchParams.get('signup_name')) : '';
+      const lsRole = window.localStorage.getItem('proxey.pending_role');
+      const lsName = window.localStorage.getItem('proxey.pendingName') || '';
 
-      // Send welcome email for all new signups (OAuth + email/password) after confirmation (non-blocking)
-      if (isNewOAuthSignup && session.user.email) {
-        const pendingName = window.localStorage.getItem('proxey.pendingName') || '';
-        window.localStorage.removeItem('proxey.pendingName');
+      const isNewSignup = Boolean(urlRole || lsRole);
+      const role = urlRole || lsRole || session.user.role || "client";
+      const pendingName = urlName || lsName;
+
+      // Clean up localStorage
+      if (lsRole) window.localStorage.removeItem('proxey.pending_role');
+      if (lsName) window.localStorage.removeItem('proxey.pendingName');
+
+      // Send welcome email for all new signups after confirmation (non-blocking)
+      if (isNewSignup && session.user.email) {
         fetch(`${process.env.REACT_APP_API_BASE || '/api'}/auth/send-welcome`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -87,13 +91,13 @@ export default function AuthCallback() {
         }).catch(() => {});
       }
 
-
       if (role === "provider") {
-        // New OAuth signup → go to onboarding. Returning provider (role already set) → go to dashboard.
-        navigate(isNewOAuthSignup ? "/provider/onboarding" : "/provider", { replace: true });
+        // New signup → go to onboarding. Returning provider → go to dashboard.
+        navigate(isNewSignup ? "/provider/onboarding" : "/provider", { replace: true });
       } else if (role === "admin") {
         navigate("/admin", { replace: true });
       } else {
+        // New client signup → go to app. Returning client → go to app.
         navigate("/app", { replace: true });
       }
     }

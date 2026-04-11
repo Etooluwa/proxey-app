@@ -339,10 +339,13 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
                 password,
                 options: {
                     data: { role, full_name: name.trim(), phone: phone.trim() || null },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    // Encode role in the redirect URL so AuthCallback can read it
+                    // even if the user opens the confirmation link on a different device.
+                    emailRedirectTo: `${window.location.origin}/auth/callback?signup_role=${role}&signup_name=${encodeURIComponent(name.trim())}`,
                 },
             });
             if (err) throw err;
+            // Also store in localStorage as fallback (same device/browser)
             window.localStorage.setItem('proxey.pending_role', role);
             window.localStorage.setItem('proxey.pendingName', name.trim());
             // Welcome email is sent in AuthCallback after email confirmation
