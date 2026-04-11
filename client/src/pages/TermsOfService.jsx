@@ -15,7 +15,7 @@ const SECTIONS = [
   },
   {
     title: 'Description of Service',
-    body: 'Kliques is a relationship management platform connecting clients with independent service providers. We provide tools to manage bookings, messaging, and payment processing. Kliques is not a party to any service agreements between clients and providers — all such agreements are solely between the client and the provider.',
+    body: 'Kliques is a relationship management platform connecting clients with independent service providers. We provide tools to manage bookings, messaging, and payment processing. Kliques is not a party to any service agreements between clients and providers; all such agreements are solely between the client and the provider.',
   },
   {
     title: 'User Accounts',
@@ -43,7 +43,7 @@ const SECTIONS = [
   },
   {
     title: 'Limitation of Liability',
-    body: 'Kliques is provided "as is" and "as available" without warranties of any kind. To the fullest extent permitted by applicable law, Kliques Inc. is not liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of — or inability to use — the service, even if we have been advised of the possibility of such damages.',
+    body: 'Kliques is provided "as is" and "as available" without warranties of any kind. To the fullest extent permitted by applicable law, Kliques Inc. is not liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of or inability to use the service, even if we have been advised of the possibility of such damages.',
   },
   {
     title: 'Governing Law',

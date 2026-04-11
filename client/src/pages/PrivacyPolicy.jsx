@@ -11,7 +11,7 @@ const F = "'Sora',system-ui,sans-serif";
 const SECTIONS = [
   {
     title: 'What We Collect',
-    body: 'We collect information you provide directly — such as your name, email address, phone number, and city — as well as usage data (pages visited, features used, session timestamps). Payment data is processed by Stripe; we do not store card numbers or full payment details on Kliques servers. We also collect data related to your bookings, messages, and interactions within the platform.',
+    body: 'We collect information you provide directly (such as your name, email address, phone number, and city) as well as usage data (pages visited, features used, session timestamps). Payment data is processed by Stripe; we do not store card numbers or full payment details on Kliques servers. We also collect data related to your bookings, messages, and interactions within the platform.',
   },
   {
     title: 'How We Use Your Data',
@@ -35,7 +35,7 @@ const SECTIONS = [
   },
   {
     title: 'Security',
-    body: 'We use industry-standard security measures including TLS encryption in transit and AES-256 encryption at rest. Our infrastructure providers — Supabase and Stripe — are SOC 2 Type II compliant. While we take reasonable precautions to protect your data, no system is 100% secure. We encourage you to use a strong, unique password and to log out of shared devices.',
+    body: 'We use industry-standard security measures including TLS encryption in transit and AES-256 encryption at rest. Our infrastructure providers (Supabase and Stripe) are SOC 2 Type II compliant. While we take reasonable precautions to protect your data, no system is 100% secure. We encourage you to use a strong, unique password and to log out of shared devices.',
   },
   {
     title: 'Children',
