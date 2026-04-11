@@ -11,11 +11,11 @@ const F = "'Sora',system-ui,sans-serif";
 const FAQ_ITEMS = [
   {
     q: 'What is Kliques?',
-    a: "Kliques is a relationship OS for clients and their service providers. Instead of treating every booking as a one-off transaction, Kliques keeps your full history, notes, and messages with each provider in one place — so the relationship only gets better over time.",
+    a: "Kliques is a relationship OS for clients and their service providers. Instead of treating every booking as a one-off transaction, Kliques keeps your full history, notes, and messages with each provider in one place, so the relationship only gets better over time.",
   },
   {
     q: 'How do I connect with a provider?',
-    a: "Two ways: tap a booking link your provider shares (mykliques.com/book/their-handle) to book directly, or tap an invite link (mykliques.com/join/their-handle) to connect without booking right away. Once connected, they appear in your My Kliques list.",
+    a: "Two ways: tap a booking link your provider shares (mykliques.com/book/their-handle) to book directly, or tap an invite link (mykliques.com/join/their-handle) to connect without booking right away. Once connected they appear in your My Kliques list.",
   },
   {
     q: 'How do I book a session?',
@@ -35,7 +35,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How do I find my invoices?',
-    a: "Go to Bookings → a completed session → Invoice, or check the Invoices section in your profile. Invoices are generated automatically when your provider marks a session as complete.",
+    a: "Go to Bookings, open a completed session, and tap Invoice. Invoices are generated automatically when your provider marks a session as complete.",
   },
   {
     q: 'Is my data safe?',
@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How do I delete my account?',
-    a: "Go to Profile → Privacy & Security → Delete account. This permanently removes your account and all associated data. This action cannot be undone.",
+    a: "Go to Profile, then Privacy & Security, then Delete account. This permanently removes your account and all associated data. This action cannot be undone.",
   },
 ];
 
