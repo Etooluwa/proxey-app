@@ -280,6 +280,17 @@ function StepProfile({ data, onChange }) {
           />
         </div>
 
+        <div style={{ marginBottom: "20px" }}>
+          <Lbl style={{ marginBottom: "8px" }}>Phone Number</Lbl>
+          <input
+            type="tel"
+            value={data.phone}
+            onChange={(e) => onChange("phone", e.target.value)}
+            placeholder="+1 (555) 000-0000"
+            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
+          />
+        </div>
+
         <div style={{ marginBottom: "20px", position: "relative" }}>
           <Lbl style={{ marginBottom: "8px" }}>City</Lbl>
           <div style={{ position: "relative" }}>
@@ -578,7 +589,7 @@ function ProviderOnboardingPage() {
   const [category, setCategory]   = useState("");
   const [customCat, setCustomCat] = useState("");
   // Step 2
-  const [profile, setProfile]     = useState({ businessName: "", city: "", bio: "", photoFile: null, photoPreview: null });
+  const [profile, setProfile]     = useState({ businessName: "", phone: "", city: "", bio: "", photoFile: null, photoPreview: null });
   // Step 3
   const [availability, setAvailability] = useState(DEFAULT_AVAILABILITY);
   const [bufferMins, setBufferMins]     = useState(0);
@@ -714,6 +725,7 @@ function ProviderOnboardingPage() {
         body: JSON.stringify({
           category: category === "Other" ? customCat : category,
           businessName: profile.businessName,
+          phone: profile.phone,
           city: profile.city,
           bio: profile.bio,
           handle, availability,
@@ -730,6 +742,7 @@ function ProviderOnboardingPage() {
         name: profile.businessName,
         businessName: profile.businessName,
         business_name: profile.businessName,
+        phone: profile.phone,
         city: profile.city,
         photo: photoUrl || profile.photoPreview || undefined,
         avatar: photoUrl || profile.photoPreview || undefined,

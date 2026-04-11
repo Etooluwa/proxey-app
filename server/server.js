@@ -10399,6 +10399,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
   const {
     category,
     businessName,
+    phone,
     city,
     bio,
     handle,
@@ -10422,6 +10423,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     };
     if (category)            updates.category = category;
     if (businessName)        { updates.business_name = businessName; updates.name = businessName; }
+    if (phone)               updates.phone = phone;
     if (city)                updates.city = city;
     if (bio)                 updates.bio = bio;
     if (handle)              updates.handle = handle;
@@ -10438,6 +10440,19 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
       console.error("[onboarding/complete] provider upsert error", provErr);
       throw provErr;
     }
+
+    // Save profile fields (phone, bio, city, etc.) to provider_profiles table
+    // so Personal Details and other pages read them correctly.
+    const profileFields = { provider_id: providerId, updated_at: new Date().toISOString() };
+    if (phone)        profileFields.phone = phone;
+    if (bio)          profileFields.bio = bio;
+    if (city)         profileFields.city = city;
+    if (businessName) profileFields.business_name = businessName;
+    if (photoUrl)     profileFields.photo = photoUrl;
+    const { error: profileFieldsErr } = await supabase
+      .from("provider_profiles")
+      .upsert(profileFields, { onConflict: "provider_id" });
+    if (profileFieldsErr) console.error("[onboarding/complete] provider_profiles fields upsert error", profileFieldsErr);
 
     // Keep onboarding booking-window data in sync with the availability screen,
     // which reads provider_profiles.booking_settings.bookingWindowDays.
