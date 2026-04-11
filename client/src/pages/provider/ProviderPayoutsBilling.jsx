@@ -12,17 +12,6 @@ const Divider = () => (
   <div style={{ height: 1, background: T.line, margin: '0' }} />
 );
 
-function fmtMoney(value) {
-  if (value === null || value === undefined || value === '') return '—';
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) return '—';
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(numeric);
-}
 
 export default function ProviderPayoutsBilling() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,7 +19,6 @@ export default function ProviderPayoutsBilling() {
   const stripeReturnComplete = searchParams.get('stripe') === 'done';
   const [hasStripeAccount, setHasStripeAccount] = useState(false);
   const [last4, setLast4] = useState('');
-  const [nextPayout, setNextPayout] = useState('');
   const [accountStatus, setAccountStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stripeLoading, setStripeLoading] = useState(false);
@@ -50,22 +38,7 @@ export default function ProviderPayoutsBilling() {
         const hasConnectedStripeAccount = !!profile.stripe_account_id;
         setHasStripeAccount(hasConnectedStripeAccount);
         setLast4(profile.stripe_last4 || '');
-        setNextPayout('—');
         setAccountStatus(null);
-
-        try {
-          const earningsData = await request('/provider/earnings');
-          if (!active) return;
-          const earnings = earningsData?.earnings || null;
-          setNextPayout(
-            earnings?.nextPayoutDate
-              ? `${fmtMoney(earnings.availableBalance)} · ${earnings.nextPayoutDate}`
-              : fmtMoney(earnings?.availableBalance)
-          );
-        } catch (_) {
-          if (!active) return;
-          setNextPayout('—');
-        }
 
         if (hasConnectedStripeAccount) {
           try {
@@ -166,13 +139,6 @@ export default function ProviderPayoutsBilling() {
   const statusBackground = stripeStatus.tone === 'ready' ? T.successBg : T.warningBg;
   const statusForeground = stripeStatus.tone === 'ready' ? T.success : T.ink;
 
-  const INFO_ROWS = [
-    { label: 'Payout schedule', value: 'Weekly (every Monday)' },
-    { label: 'Default currency', value: 'CAD' },
-    { label: 'Platform fee', value: '10% per transaction' },
-    { label: 'Next payout', value: nextPayout || '—' },
-  ];
-
   return (
     <SettingsPageLayout title="Payouts & Billing">
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -198,17 +164,6 @@ export default function ProviderPayoutsBilling() {
           </div>
         </div>
 
-        <Divider />
-
-        {/* Info rows */}
-        {INFO_ROWS.map((row, i) => (
-          <div key={i} style={{ borderBottom: `1px solid ${T.line}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0' }}>
-              <span style={{ fontSize: 15, color: T.ink }}>{row.label}</span>
-              <span style={{ fontSize: 14, color: T.muted }}>{row.value}</span>
-            </div>
-          </div>
-        ))}
 
         {/* Manage / Connect Stripe button */}
         <button
