@@ -21,6 +21,10 @@ import { supabase } from '../../utils/supabase';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import klogo from '../../klogo.png';
 
+// Always redirect back to the canonical app domain, regardless of which
+// domain the user signed up from (mykliques.com or app.mykliques.com).
+const APP_ORIGIN = process.env.REACT_APP_ORIGIN || window.location.origin;
+
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
     ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
