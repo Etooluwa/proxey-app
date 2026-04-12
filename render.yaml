@@ -26,6 +26,8 @@ services:
     envVars:
       - key: REACT_APP_API_BASE
         value: https://proxeybooking-app.onrender.com/api
+      - key: REACT_APP_APP_URL
+        value: https://app.mykliques.com
       - key: REACT_APP_SUPABASE_URL
         value: https://iruabnazdxfmvtxhgemf.supabase.co
       - key: REACT_APP_STRIPE_PUBLISHABLE_KEY
