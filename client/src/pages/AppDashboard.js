@@ -368,10 +368,10 @@ function EmptyKliquesHero() {
             <div style={{ position: 'absolute', inset: 0, backgroundImage: TOPO, backgroundSize: 'cover', opacity: 0.12, borderRadius: 28, pointerEvents: 'none' }} />
             <div style={{ position: 'relative', zIndex: 1 }}>
                 <GhostAvatars />
-                <h2 style={{ fontFamily: F, fontSize: 24, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, margin: '0 0 10px', color: T.ink }}>
-                    Your circle<br />starts here.
+                <h2 style={{ fontFamily: F, fontSize: 28, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.2, margin: '16px 0 12px', color: T.ink }}>
+                    Your circle starts here.
                 </h2>
-                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7, maxWidth: 280 }}>
+                <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.7 }}>
                     Every great relationship begins with a first step. Book with a provider or accept an invite — your shared history will live here.
                 </p>
             </div>
