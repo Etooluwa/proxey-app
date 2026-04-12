@@ -32,7 +32,6 @@ const T = {
     base: '#FBF7F2', card: '#FFFFFF', danger: '#B04040', callout: '#FFF5E6',
 };
 const F = "'Sora',system-ui,sans-serif";
-const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 // ─── Right-panel images & captions ─────────────────────────────────────────────
 const IMG = {
