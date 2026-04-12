@@ -25,6 +25,7 @@ const T = {
     callout: '#FFF5E6',
 };
 const F = "'Sora',system-ui,sans-serif";
+const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 200 Q 100 100 200 200 T 400 200' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M-50 250 Q 50 150 150 250 T 350 250' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M50 150 Q 150 50 250 150 T 450 150' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3Cpath d='M0 300 Q 100 200 200 300 T 400 300' stroke='%233D231E' stroke-width='0.5' fill='none'/%3E%3C/svg%3E")`;
 
@@ -347,7 +348,7 @@ function ScreenSignup({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToLog
                 password,
                 options: {
                     data: { role: 'client', full_name: name.trim() },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    emailRedirectTo: `${APP_ORIGIN}/auth/callback`,
                 },
             });
             if (err) throw err;

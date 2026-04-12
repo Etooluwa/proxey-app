@@ -28,6 +28,7 @@ const T = {
     base: '#FBF7F2', card: '#FFFFFF', danger: '#B04040', callout: '#FFF5E6',
 };
 const F = "'Sora',system-ui,sans-serif";
+const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 // ─── Right-panel images & captions ─────────────────────────────────────────────
 const IMG = {
@@ -341,7 +342,7 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
                     data: { role, full_name: name.trim(), phone: phone.trim() || null },
                     // Encode role in the redirect URL so AuthCallback can read it
                     // even if the user opens the confirmation link on a different device.
-                    emailRedirectTo: `${window.location.origin}/auth/callback?signup_role=${role}&signup_name=${encodeURIComponent(name.trim())}`,
+                    emailRedirectTo: `${APP_ORIGIN}/auth/callback?signup_role=${role}&signup_name=${encodeURIComponent(name.trim())}`,
                 },
             });
             if (err) throw err;
@@ -417,7 +418,7 @@ function MagicLinkScreen({ onSent }) {
         try {
             await supabase.auth.signInWithOtp({
                 email: email.trim(),
-                options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+                options: { emailRedirectTo: `${APP_ORIGIN}/auth/callback` },
             });
             onSent(email.trim());
         } catch (err) {
