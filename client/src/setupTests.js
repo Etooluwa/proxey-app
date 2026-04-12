@@ -10,3 +10,7 @@ if (typeof global.TextEncoder === 'undefined') {
   global.TextEncoder = TextEncoder;
   global.TextDecoder = TextDecoder;
 }
+
+if (typeof window !== 'undefined') {
+  window.scrollTo = jest.fn();
+}

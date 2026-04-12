@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { request } from "../data/apiClient";
@@ -32,6 +32,31 @@ export default function AuthCallback() {
   const [searchParams] = useSearchParams();
   const { session, loading } = useAuth();
   const processed = useRef(false); // prevent double-fire in React StrictMode
+  const authParams = useMemo(() => {
+    const merged = new URLSearchParams(searchParams);
+    const hash = window.location.hash || "";
+
+    if (hash.startsWith("#")) {
+      const hashParams = new URLSearchParams(hash.slice(1));
+      hashParams.forEach((value, key) => {
+        if (!merged.has(key)) {
+          merged.set(key, value);
+        }
+      });
+    }
+
+    return merged;
+  }, [searchParams]);
+
+  const errorCode = authParams.get("error_code");
+  const errorDescription = authParams.get("error_description");
+  const errorMessage = useMemo(() => {
+    if (!errorCode && !errorDescription) return "";
+    if (errorCode === "otp_expired") {
+      return "This email confirmation link is invalid or has expired. Request a new confirmation email and try again.";
+    }
+    return errorDescription || "We could not complete email confirmation.";
+  }, [errorCode, errorDescription]);
 
   useEffect(() => {
     if (loading) return;
@@ -39,6 +64,10 @@ export default function AuthCallback() {
     processed.current = true;
 
     async function handle() {
+      if (errorCode || errorDescription) {
+        return;
+      }
+
       if (!session?.user) {
         navigate("/login", { replace: true });
         return;
@@ -120,7 +149,61 @@ export default function AuthCallback() {
     }
 
     handle();
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, errorCode, errorDescription, searchParams, authParams]);
+
+  if (errorMessage) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          padding: 24,
+          fontFamily: "'Sora', system-ui, sans-serif",
+          background: "#FBF7F2",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 460,
+            background: "#FFFFFF",
+            border: "1px solid rgba(140,106,100,0.18)",
+            borderRadius: 20,
+            padding: 28,
+            boxShadow: "0 12px 30px rgba(61,35,30,0.06)",
+          }}
+        >
+          <p style={{ margin: "0 0 8px", color: "#C25E4A", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Email Confirmation
+          </p>
+          <h1 style={{ margin: "0 0 12px", color: "#3D231E", fontSize: 28, lineHeight: 1.15 }}>
+            Link expired
+          </h1>
+          <p style={{ margin: "0 0 20px", color: "#6B7280", fontSize: 15, lineHeight: 1.6 }}>
+            {errorMessage}
+          </p>
+          <button
+            onClick={() => navigate("/login", { replace: true })}
+            style={{
+              width: "100%",
+              padding: 14,
+              borderRadius: 12,
+              border: "none",
+              background: "#3D231E",
+              color: "#FFFFFF",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Back to login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

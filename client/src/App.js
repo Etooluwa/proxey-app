@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE } from './data/apiClient';
 import { AuthProvider } from './auth/authContext';
 import { ToastProvider } from './components/ui/ToastProvider';
@@ -111,6 +111,31 @@ function ScrollToTopOnRouteChange() {
   return null;
 }
 
+function AuthRedirectShim() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (!hash || location.pathname !== '/') return;
+
+    const rawHash = hash.startsWith('#') ? hash.slice(1) : hash;
+    const hashParams = new URLSearchParams(rawHash);
+    const looksLikeAuthPayload =
+      hashParams.has('access_token') ||
+      hashParams.has('refresh_token') ||
+      hashParams.has('error') ||
+      hashParams.has('error_code') ||
+      hashParams.has('type');
+
+    if (!looksLikeAuthPayload) return;
+
+    navigate(`/auth/callback#${rawHash}`, { replace: true });
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function RouteFallback() {
   return (
     <div
@@ -153,6 +178,7 @@ function App() {
     <ErrorBoundary>
       <Router>
         <ScrollToTopOnRouteChange />
+        <AuthRedirectShim />
         <AuthProvider>
           <ToastProvider>
             <NotificationProvider>

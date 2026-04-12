@@ -348,7 +348,7 @@ function ScreenSignup({ provider, onBack, onSuccess, onGoogleAuth, onSwitchToLog
                 password,
                 options: {
                     data: { role: 'client', full_name: name.trim() },
-                    emailRedirectTo: `${APP_ORIGIN}/auth/callback`,
+                    emailRedirectTo: `${APP_ORIGIN}/auth/callback?signup_role=client&signup_name=${encodeURIComponent(name.trim())}`,
                 },
             });
             if (err) throw err;

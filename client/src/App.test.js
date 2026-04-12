@@ -13,12 +13,13 @@ jest.mock("react-router-dom", () => {
   return {
     BrowserRouter: ({ children }) => <div data-testid="router">{children}</div>,
     Routes: ({ children }) => <div data-testid="routes">{children}</div>,
-    Route: ({ element }) => element ?? null,
+    Route: () => null,
     Navigate: ({ to }) => <div data-testid="navigate" data-to={to} />,
     Outlet: Stub,
     useNavigate: () => () => {},
     useLocation: () => ({ pathname: "/", search: "" }),
     useSearchParams: () => [new URLSearchParams(), () => {}],
+    useParams: () => ({}),
     NavLink,
     Link: NavLink,
   };
@@ -53,8 +54,8 @@ jest.mock("./components/ui/ToastProvider", () => ({
 
 import App from "./App";
 
-test("renders app routes without crashing", () => {
+test("renders app routes without crashing", async () => {
   render(<App />);
   expect(screen.getByTestId("router")).toBeInTheDocument();
-  expect(screen.getByTestId("routes")).toBeInTheDocument();
+  expect(await screen.findByTestId("routes")).toBeInTheDocument();
 });

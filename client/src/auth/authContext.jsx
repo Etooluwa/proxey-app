@@ -475,6 +475,7 @@ export function AuthProvider({ children }) {
                 password,
                 options: {
                     data: { role },
+                    emailRedirectTo: `${window.location.origin}/auth/callback?signup_role=${encodeURIComponent(role)}`,
                 },
             });
             if (error) {
