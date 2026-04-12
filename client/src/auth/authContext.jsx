@@ -511,18 +511,24 @@ export function AuthProvider({ children }) {
         persistSession(null);
     };
 
-    const loginWithGoogle = async (role = "client", pendingName = "") => {
+    const loginWithGoogle = async (role = "client", pendingName = "", isSignup = false) => {
         setAuthError(null);
         if (!supabase) {
             throw new Error("Supabase is not configured");
         }
 
-        // Persist the intended role/profile context before OAuth redirects away.
-        window.localStorage.setItem('proxey.pending_role', role);
-        const normalizedPendingName = typeof pendingName === "string" ? pendingName.trim() : "";
-        if (normalizedPendingName) {
-            window.localStorage.setItem('proxey.pendingName', normalizedPendingName);
+        // Only persist pending_role for new signups — not for returning logins.
+        // AuthCallback uses pending_role to detect new signups and send the welcome email.
+        if (isSignup) {
+            window.localStorage.setItem('proxey.pending_role', role);
+            const normalizedPendingName = typeof pendingName === "string" ? pendingName.trim() : "";
+            if (normalizedPendingName) {
+                window.localStorage.setItem('proxey.pendingName', normalizedPendingName);
+            } else {
+                window.localStorage.removeItem('proxey.pendingName');
+            }
         } else {
+            window.localStorage.removeItem('proxey.pending_role');
             window.localStorage.removeItem('proxey.pendingName');
         }
 

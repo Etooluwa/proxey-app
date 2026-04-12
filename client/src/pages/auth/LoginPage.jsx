@@ -600,8 +600,8 @@ export default function LoginPage() {
         navigate('/');
     };
 
-    const handleGoogle = async (pendingName = '') => {
-        try { await loginWithGoogle(flowRole, pendingName); } catch (e) { /* handled by context */ }
+    const handleGoogle = async (pendingName = '', isSignup = false) => {
+        try { await loginWithGoogle(flowRole, pendingName, isSignup); } catch (e) { /* handled by context */ }
     };
 
     const renderScreen = () => {
@@ -632,7 +632,7 @@ export default function LoginPage() {
                     <SignupScreen
                         role={flowRole}
                         onLogin={() => setScreen(flowRole + '_login')}
-                        onGoogleSignup={handleGoogle}
+                        onGoogleSignup={(name) => handleGoogle(name, true)}
                         onSuccess={(email) => { setSentEmail(email); setIsSignup(true); setScreen('magic_sent'); }}
                     />
                 );
