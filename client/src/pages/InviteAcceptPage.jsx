@@ -682,7 +682,7 @@ export default function InviteAcceptPage() {
         // Store the invite code so AuthCallback can redirect back
         sessionStorage.setItem('kliques.pending_invite_code', code);
         try {
-            await loginWithGoogle('client', pendingName);
+            await loginWithGoogle('client', pendingName, true);
         } catch {
             // OAuth redirects, nothing to catch
         }
