@@ -73,7 +73,7 @@ export function DesktopSidebar({ items, active, onNav, userName, userInitials, u
         }}>
             {/* Logo */}
             <div style={{ padding: '28px 28px 8px' }}>
-                <img src={klogo} alt="kliques" style={{ height: 24, width: 'auto', display: 'block', marginBottom: 4 }} />
+                <img src={klogo} alt="kliques" style={{ height: 40, width: 'auto', display: 'block', marginBottom: 4 }} />
                 <p style={{ fontFamily: F, fontSize: '11px', color: T.faded, margin: '4px 0 0', letterSpacing: '0.03em' }}>
                     Relationship OS
                 </p>
