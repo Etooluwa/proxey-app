@@ -51,9 +51,19 @@ function fmtDate(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
+function normalizeTimeValue(timeStr) {
+    if (!timeStr) return '';
+    const raw = String(timeStr).trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return raw;
+    const [, hours, minutes] = match;
+    return `${hours.padStart(2, '0')}:${minutes}`;
+}
 function fmtTime(timeStr) {
     if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
+    const normalized = normalizeTimeValue(timeStr);
+    const [h, m] = normalized.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return normalized;
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = h % 12 || 12;
     return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
@@ -517,7 +527,11 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, selected
         if (!selectedDate || !provider?.id) return;
         setLoadingSlots(true); setNoSlots(false);
         request(`/public/provider/${provider.id}/slots?date=${selectedDate}&duration=${getSelectedServiceDuration(service, selectedHours) || 60}&buffer=${provider.buffer_minutes || 0}`)
-            .then(data => { setSlots(data.slots || []); setNoSlots(!data.slots?.length); })
+            .then(data => {
+                const normalizedSlots = (data.slots || []).map(normalizeTimeValue);
+                setSlots(normalizedSlots);
+                setNoSlots(!normalizedSlots.length);
+            })
             .catch(() => { setSlots([]); setNoSlots(true); })
             .finally(() => setLoadingSlots(false));
     }, [selectedDate, provider?.id, service, selectedHours]); // eslint-disable-line react-hooks/exhaustive-deps
