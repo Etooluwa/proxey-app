@@ -1,189 +1,211 @@
 import React, { useEffect, useState } from 'react';
-import { Icons } from '../../components/Icons';
 import { fetchAdminBookings } from '../../data/admin';
 
+const INK = '#3D231E';
+const MUTED = '#8C6A64';
+const FADED = '#B0948F';
+const ACCENT = '#C25E4A';
+const LINE = 'rgba(140,106,100,0.2)';
+const AVATAR_BG = '#F2EBE5';
+
+const statusStyle = (s) => {
+  switch (s?.toLowerCase()) {
+    case 'completed': return { background: '#EBF2EC', color: '#5A8A5E' };
+    case 'confirmed': return { background: '#EBF0FA', color: '#4A6CA8' };
+    case 'pending': return { background: '#FFF5E6', color: '#A07030' };
+    case 'cancelled': return { background: '#FDEDEA', color: '#A04030' };
+    default: return { background: AVATAR_BG, color: MUTED };
+  }
+};
+
+const formatCurrency = (cents) => {
+  if (!cents) return '—';
+  return `$${(cents / 100).toFixed(2)}`;
+};
+
 const AdminBookings = () => {
-    const [bookings, setBookings] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [status, setStatus] = useState('');
-    const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate] = useState('');
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-    const loadBookings = async () => {
-        setLoading(true);
-        try {
-            const data = await fetchAdminBookings({
-                status: status || undefined,
-                from: fromDate || undefined,
-                to: toDate || undefined,
-                page,
-                limit: 20
-            });
-            setBookings(data.bookings || []);
-            setTotalPages(data.totalPages || 1);
-        } catch (error) {
-            console.error("Failed to load bookings", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadBookings = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchAdminBookings({
+        status: status || undefined,
+        from: fromDate || undefined,
+        to: toDate || undefined,
+        page,
+        limit: 20,
+      });
+      setBookings(data.bookings || []);
+      setTotalPages(data.totalPages || 1);
+    } catch (err) {
+      console.error('Failed to load bookings', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        loadBookings();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page]);
+  useEffect(() => {
+    loadBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
-    const handleFilter = () => {
-        setPage(1);
-        loadBookings();
-    };
+  const handleFilter = () => {
+    setPage(1);
+    loadBookings();
+  };
 
-    const getStatusColor = (s) => {
-        switch (s?.toLowerCase()) {
-            case 'completed': return 'bg-green-100 text-green-700';
-            case 'confirmed': return 'bg-blue-100 text-blue-700';
-            case 'pending': return 'bg-yellow-100 text-yellow-700';
-            case 'cancelled': return 'bg-red-100 text-red-700';
-            default: return 'bg-gray-100 text-gray-700';
-        }
-    };
+  const inputStyle = {
+    border: `1px solid ${LINE}`,
+    background: '#FBF7F2',
+    color: INK,
+    borderRadius: '12px',
+    padding: '8px 14px',
+    fontSize: '13px',
+    outline: 'none',
+    fontFamily: 'Sora, sans-serif',
+  };
 
-    const formatCurrency = (cents) => {
-        if (!cents) return '-';
-        return `$${(cents / 100).toFixed(2)}`;
-    };
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-semibold" style={{ color: INK, letterSpacing: '-0.03em' }}>
+          Bookings
+        </h1>
+        <p className="text-sm mt-1" style={{ color: MUTED }}>View all platform bookings</p>
+      </div>
 
-    return (
-        <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
-                <p className="text-gray-500 mt-1">View all platform bookings</p>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                <div className="flex flex-col md:flex-row gap-4 items-end">
-                    {/* Status Filter */}
-                    <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                        </select>
-                    </div>
-
-                    {/* Date Range */}
-                    <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">From Date</label>
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100"
-                        />
-                    </div>
-                    <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">To Date</label>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-100"
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleFilter}
-                        className="px-6 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 transition-colors"
-                    >
-                        Apply Filters
-                    </button>
-                </div>
-            </div>
-
-            {/* Bookings Table */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <Icons.Loader className="w-8 h-8 animate-spin text-brand-500" />
-                    </div>
-                ) : bookings.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-100">
-                                <tr>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Client</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Provider</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Service</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Date</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Price</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {bookings.map((booking) => (
-                                    <tr key={booking.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <span className="font-medium text-gray-900">{booking.client_name || 'Unknown'}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{booking.provider_name || 'Unknown'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{booking.service_name || '-'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">
-                                            {booking.scheduled_at ? new Date(booking.scheduled_at).toLocaleString() : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                                            {formatCurrency(booking.price)}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
-                                                {booking.status || 'unknown'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                        <Icons.Calendar size={32} className="text-gray-300 mb-2" />
-                        <p>No bookings found</p>
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-                        <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1}
-                            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-                        <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
-                        <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
-                            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
-                    </div>
-                )}
-            </div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-medium mb-1.5" style={{ color: FADED }}>Status</p>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
-    );
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-medium mb-1.5" style={{ color: FADED }}>From</p>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={inputStyle} />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-medium mb-1.5" style={{ color: FADED }}>To</p>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={inputStyle} />
+        </div>
+        <button
+          onClick={handleFilter}
+          className="text-sm font-medium px-5 py-2 rounded-xl"
+          style={{ background: INK, color: '#fff' }}
+        >
+          Apply
+        </button>
+      </div>
+
+      {/* Table */}
+      <div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: LINE, borderTopColor: ACCENT }} />
+          </div>
+        ) : bookings.length > 0 ? (
+          <div>
+            <div
+              className="grid gap-4 px-4 py-3 text-[11px] uppercase tracking-widest font-medium"
+              style={{
+                gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr 1fr',
+                borderBottom: `1px solid ${LINE}`,
+                color: FADED,
+              }}
+            >
+              <span>Client</span>
+              <span>Provider</span>
+              <span>Service</span>
+              <span>Date</span>
+              <span>Price</span>
+              <span>Status</span>
+            </div>
+            {bookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="grid gap-4 px-4 py-4 items-center"
+                style={{
+                  gridTemplateColumns: '2fr 2fr 2fr 1.5fr 1fr 1fr',
+                  borderBottom: `1px solid ${LINE}`,
+                }}
+              >
+                <span className="text-sm font-medium truncate" style={{ color: INK }}>
+                  {booking.client_name || 'Unknown'}
+                </span>
+                <span className="text-sm truncate" style={{ color: MUTED }}>
+                  {booking.provider_name || 'Unknown'}
+                </span>
+                <span className="text-sm truncate" style={{ color: MUTED }}>
+                  {booking.service_name || '—'}
+                </span>
+                <span className="text-xs" style={{ color: MUTED }}>
+                  {booking.scheduled_at ? new Date(booking.scheduled_at).toLocaleString() : '—'}
+                </span>
+                <span className="text-sm font-medium" style={{ color: INK }}>
+                  {formatCurrency(booking.price)}
+                </span>
+                <span>
+                  <span
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                    style={statusStyle(booking.status)}
+                  >
+                    {booking.status || 'unknown'}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="flex flex-col items-center justify-center py-16 rounded-xl"
+            style={{ border: `1px dashed ${LINE}` }}
+          >
+            <p className="text-sm" style={{ color: MUTED }}>No bookings found</p>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-6">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="text-xs font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+              style={{ background: AVATAR_BG, color: INK }}
+            >
+              Previous
+            </button>
+            <span className="text-xs" style={{ color: MUTED }}>Page {page} of {totalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="text-xs font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+              style={{ background: AVATAR_BG, color: INK }}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default AdminBookings;

@@ -1,538 +1,476 @@
 import React, { useEffect, useState } from 'react';
-import { Icons } from '../../components/Icons';
-import { StatCard } from '../../components/StatCard';
+import { X, Check } from '@phosphor-icons/react';
 import { fetchAdminDisputes, fetchDisputeStats, resolveDispute, fetchAdminDispute } from '../../data/admin';
 
-const STATUS_COLORS = {
-    open: 'bg-yellow-100 text-yellow-700',
-    under_review: 'bg-blue-100 text-blue-700',
-    resolved: 'bg-green-100 text-green-700',
-    dismissed: 'bg-gray-100 text-gray-600',
+const INK = '#3D231E';
+const MUTED = '#8C6A64';
+const FADED = '#B0948F';
+const ACCENT = '#C25E4A';
+const LINE = 'rgba(140,106,100,0.2)';
+const AVATAR_BG = '#F2EBE5';
+
+const STATUS_STYLE = {
+  open: { background: '#FFF5E6', color: '#A07030' },
+  under_review: { background: '#EBF0FA', color: '#4A6CA8' },
+  resolved: { background: '#EBF2EC', color: '#5A8A5E' },
+  dismissed: { background: AVATAR_BG, color: MUTED },
 };
 
 const RESOLUTION_OPTIONS = [
-    { value: 'full_refund', label: 'Full Refund to Client' },
-    { value: 'partial_refund', label: 'Partial Refund to Client' },
-    { value: 'payment_released', label: 'Release Payment to Provider' },
-    { value: 'dismissed', label: 'Dismiss Dispute' },
+  { value: 'full_refund', label: 'Full Refund to Client' },
+  { value: 'partial_refund', label: 'Partial Refund to Client' },
+  { value: 'payment_released', label: 'Release Payment to Provider' },
+  { value: 'dismissed', label: 'Dismiss Dispute' },
 ];
 
+const formatCurrency = (cents) => {
+  if (!cents) return '$0.00';
+  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'N/A';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+};
+
 const AdminDisputes = () => {
-    const [disputes, setDisputes] = useState([]);
-    const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+  const [disputes, setDisputes] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedDispute, setSelectedDispute] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolutionForm, setResolutionForm] = useState({ resolution: '', resolution_amount: '', resolution_notes: '' });
 
-    // Detail modal state
-    const [selectedDispute, setSelectedDispute] = useState(null);
-    const [detailLoading, setDetailLoading] = useState(false);
-    const [resolving, setResolving] = useState(false);
-    const [resolutionForm, setResolutionForm] = useState({
-        resolution: '',
-        resolution_amount: '',
-        resolution_notes: ''
-    });
-
-    const loadDisputes = async () => {
-        setLoading(true);
-        try {
-            const result = await fetchAdminDisputes({ status: statusFilter, page, limit: 20 });
-            setDisputes(result.data || []);
-            setTotalPages(result.totalPages || 1);
-        } catch (error) {
-            console.error("Failed to load disputes", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadStats = async () => {
-        try {
-            const result = await fetchDisputeStats();
-            setStats(result);
-        } catch (error) {
-            console.error("Failed to load stats", error);
-        }
-    };
-
-    useEffect(() => {
-        loadDisputes();
-        loadStats();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, statusFilter]);
-
-    const handleFilterChange = (newStatus) => {
-        setStatusFilter(newStatus);
-        setPage(1);
-    };
-
-    const openDetail = async (disputeId) => {
-        setDetailLoading(true);
-        try {
-            const result = await fetchAdminDispute(disputeId);
-            setSelectedDispute(result);
-            setResolutionForm({
-                resolution: '',
-                resolution_amount: '',
-                resolution_notes: ''
-            });
-        } catch (error) {
-            console.error("Failed to load dispute detail", error);
-        } finally {
-            setDetailLoading(false);
-        }
-    };
-
-    const closeDetail = () => {
-        setSelectedDispute(null);
-        setResolutionForm({ resolution: '', resolution_amount: '', resolution_notes: '' });
-    };
-
-    const handleResolve = async () => {
-        if (!resolutionForm.resolution) return;
-
-        setResolving(true);
-        try {
-            await resolveDispute(selectedDispute.id, {
-                status: 'resolved',
-                resolution: resolutionForm.resolution,
-                resolution_amount: resolutionForm.resolution === 'partial_refund'
-                    ? parseInt(resolutionForm.resolution_amount) * 100  // Convert to cents
-                    : undefined,
-                resolution_notes: resolutionForm.resolution_notes
-            });
-            closeDetail();
-            loadDisputes();
-            loadStats();
-        } catch (error) {
-            console.error("Failed to resolve dispute", error);
-            alert(error.message || "Failed to resolve dispute");
-        } finally {
-            setResolving(false);
-        }
-    };
-
-    const handleMarkUnderReview = async () => {
-        setResolving(true);
-        try {
-            await resolveDispute(selectedDispute.id, { status: 'under_review' });
-            const updated = await fetchAdminDispute(selectedDispute.id);
-            setSelectedDispute(updated);
-            loadDisputes();
-            loadStats();
-        } catch (error) {
-            console.error("Failed to update status", error);
-        } finally {
-            setResolving(false);
-        }
-    };
-
-    const formatCurrency = (cents) => {
-        if (!cents) return '$0.00';
-        return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    };
-
-    const formatDate = (dateStr) => {
-        if (!dateStr) return 'N/A';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-        });
-    };
-
-    if (loading && disputes.length === 0) {
-        return (
-            <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
-                <Icons.Loader className="w-8 h-8 animate-spin text-brand-500" />
-            </div>
-        );
+  const loadDisputes = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchAdminDisputes({ status: statusFilter, page, limit: 20 });
+      setDisputes(result.data || []);
+      setTotalPages(result.totalPages || 1);
+    } catch (err) {
+      console.error('Failed to load disputes', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return (
-        <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dispute Resolution</h1>
-                <p className="text-gray-500 mt-1">Review and resolve disputes between clients and providers</p>
+  const loadStats = async () => {
+    try {
+      const result = await fetchDisputeStats();
+      setStats(result);
+    } catch (err) {
+      console.error('Failed to load stats', err);
+    }
+  };
+
+  useEffect(() => {
+    loadDisputes();
+    loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, statusFilter]);
+
+  const openDetail = async (id) => {
+    setDetailLoading(true);
+    try {
+      const result = await fetchAdminDispute(id);
+      setSelectedDispute(result);
+      setResolutionForm({ resolution: '', resolution_amount: '', resolution_notes: '' });
+    } catch (err) {
+      console.error('Failed to load dispute', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setSelectedDispute(null);
+    setResolutionForm({ resolution: '', resolution_amount: '', resolution_notes: '' });
+  };
+
+  const handleResolve = async () => {
+    if (!resolutionForm.resolution) return;
+    setResolving(true);
+    try {
+      await resolveDispute(selectedDispute.id, {
+        status: 'resolved',
+        resolution: resolutionForm.resolution,
+        resolution_amount: resolutionForm.resolution === 'partial_refund'
+          ? parseInt(resolutionForm.resolution_amount) * 100 : undefined,
+        resolution_notes: resolutionForm.resolution_notes,
+      });
+      closeDetail();
+      loadDisputes();
+      loadStats();
+    } catch (err) {
+      console.error('Failed to resolve dispute', err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handleMarkUnderReview = async () => {
+    setResolving(true);
+    try {
+      await resolveDispute(selectedDispute.id, { status: 'under_review' });
+      const updated = await fetchAdminDispute(selectedDispute.id);
+      setSelectedDispute(updated);
+      loadDisputes();
+      loadStats();
+    } catch (err) {
+      console.error('Failed to update status', err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const inputStyle = {
+    border: `1px solid ${LINE}`,
+    background: '#FBF7F2',
+    color: INK,
+    borderRadius: '10px',
+    padding: '8px 12px',
+    fontSize: '13px',
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'Sora, sans-serif',
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-semibold" style={{ color: INK, letterSpacing: '-0.03em' }}>
+          Disputes
+        </h1>
+        <p className="text-sm mt-1" style={{ color: MUTED }}>Review and resolve disputes between clients and providers</p>
+      </div>
+
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {[
+          { label: 'Open', value: stats?.open ?? 0 },
+          { label: 'Under Review', value: stats?.under_review ?? 0 },
+          { label: 'Resolved This Week', value: stats?.resolved_this_week ?? 0 },
+          { label: 'Avg. Resolution', value: `${stats?.avg_resolution_hours ?? 0}h` },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ borderBottom: `1px solid ${LINE}` }} className="pb-4">
+            <p className="text-[11px] uppercase tracking-widest font-medium mb-1" style={{ color: FADED }}>{label}</p>
+            <p className="text-2xl font-semibold" style={{ color: INK, letterSpacing: '-0.02em' }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Status filter pills */}
+      <div className="flex flex-wrap gap-2">
+        {['all', 'open', 'under_review', 'resolved', 'dismissed'].map((s) => (
+          <button
+            key={s}
+            onClick={() => { setStatusFilter(s); setPage(1); }}
+            className="px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
+            style={{
+              background: statusFilter === s ? INK : AVATAR_BG,
+              color: statusFilter === s ? '#fff' : MUTED,
+            }}
+          >
+            {s === 'all' ? 'All' : s.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: LINE, borderTopColor: ACCENT }} />
+          </div>
+        ) : disputes.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 rounded-xl"
+            style={{ border: `1px dashed ${LINE}` }}
+          >
+            <p className="text-sm" style={{ color: MUTED }}>No disputes found</p>
+          </div>
+        ) : (
+          <div>
+            <div
+              className="grid gap-4 px-4 py-3 text-[11px] uppercase tracking-widest font-medium"
+              style={{ gridTemplateColumns: '2fr 1.5fr 1.5fr 1.5fr 1fr 1fr 80px', borderBottom: `1px solid ${LINE}`, color: FADED }}
+            >
+              <span>Service</span>
+              <span>Client</span>
+              <span>Provider</span>
+              <span>Reason</span>
+              <span>Status</span>
+              <span>Opened</span>
+              <span></span>
             </div>
+            {disputes.map((dispute) => (
+              <div
+                key={dispute.id}
+                className="grid gap-4 px-4 py-4 items-center"
+                style={{ gridTemplateColumns: '2fr 1.5fr 1.5fr 1.5fr 1fr 1fr 80px', borderBottom: `1px solid ${LINE}` }}
+              >
+                <div>
+                  <p className="text-sm font-medium" style={{ color: INK }}>
+                    {dispute.bookings?.services?.name || 'Service'}
+                  </p>
+                  <p className="text-xs" style={{ color: MUTED }}>
+                    {formatCurrency(dispute.bookings?.price)}
+                  </p>
+                </div>
+                <span className="text-sm truncate" style={{ color: MUTED }}>{dispute.client_name}</span>
+                <span className="text-sm truncate" style={{ color: MUTED }}>{dispute.provider_name}</span>
+                <span
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block"
+                  style={{ background: AVATAR_BG, color: MUTED }}
+                >
+                  {dispute.reason_label}
+                </span>
+                <span
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block"
+                  style={STATUS_STYLE[dispute.status] || { background: AVATAR_BG, color: MUTED }}
+                >
+                  {dispute.status?.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+                <span className="text-xs" style={{ color: FADED }}>
+                  {formatDate(dispute.created_at)}
+                </span>
+                <button
+                  onClick={() => openDetail(dispute.id)}
+                  className="text-xs font-medium underline underline-offset-2"
+                  style={{ color: ACCENT }}
+                >
+                  View
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    label="Open Disputes"
-                    value={stats?.open || 0}
-                    icon={Icons.AlertCircle}
-                    colorClass="bg-yellow-500 text-yellow-500"
-                />
-                <StatCard
-                    label="Under Review"
-                    value={stats?.under_review || 0}
-                    icon={Icons.Eye}
-                    colorClass="bg-blue-500 text-blue-500"
-                />
-                <StatCard
-                    label="Resolved This Week"
-                    value={stats?.resolved_this_week || 0}
-                    icon={Icons.CheckCircle}
-                    colorClass="bg-green-500 text-green-500"
-                />
-                <StatCard
-                    label="Avg. Resolution Time"
-                    value={`${stats?.avg_resolution_hours || 0}h`}
-                    icon={Icons.Clock}
-                    colorClass="bg-purple-500 text-purple-500"
-                />
-            </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-6">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="text-xs font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+              style={{ background: AVATAR_BG, color: INK }}
+            >
+              Previous
+            </button>
+            <span className="text-xs" style={{ color: MUTED }}>Page {page} of {totalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="text-xs font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+              style={{ background: AVATAR_BG, color: INK }}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
 
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Icons.Filter size={18} className="text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700">Status:</span>
+      {/* Detail drawer / modal */}
+      {selectedDispute && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+          <div
+            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl"
+            style={{ background: '#FBF7F2', fontFamily: 'Sora, sans-serif' }}
+          >
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: LINE, borderTopColor: ACCENT }} />
+              </div>
+            ) : (
+              <>
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: `1px solid ${LINE}` }}>
+                  <div>
+                    <h2 className="text-lg font-semibold" style={{ color: INK }}>Dispute Details</h2>
+                    <span
+                      className="text-[11px] font-medium px-2 py-0.5 rounded-full mt-1 inline-block"
+                      style={STATUS_STYLE[selectedDispute.status] || { background: AVATAR_BG, color: MUTED }}
+                    >
+                      {selectedDispute.status?.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                  </div>
+                  <button onClick={closeDetail} className="p-2 rounded-xl hover:bg-[#F2EBE5]">
+                    <X size={18} style={{ color: MUTED }} />
+                  </button>
+                </div>
+
+                <div className="px-6 py-5 space-y-6">
+                  {/* Booking info */}
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: AVATAR_BG }}>
+                    <p className="text-[11px] uppercase tracking-widest font-medium" style={{ color: FADED }}>Booking</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p style={{ color: FADED }} className="text-xs">Service</p>
+                        <p style={{ color: INK }} className="font-medium">{selectedDispute.bookings?.services?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p style={{ color: FADED }} className="text-xs">Amount</p>
+                        <p style={{ color: INK }} className="font-medium">{formatCurrency(selectedDispute.bookings?.price)}</p>
+                      </div>
+                      <div>
+                        <p style={{ color: FADED }} className="text-xs">Client</p>
+                        <p style={{ color: INK }} className="font-medium">{selectedDispute.client?.full_name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p style={{ color: FADED }} className="text-xs">Provider</p>
+                        <p style={{ color: INK }} className="font-medium">{selectedDispute.provider?.full_name || 'Unknown'}</p>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {['all', 'open', 'under_review', 'resolved', 'dismissed'].map((status) => (
-                            <button
-                                key={status}
-                                onClick={() => handleFilterChange(status)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statusFilter === status
-                                    ? 'bg-brand-500 text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                            >
-                                {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </button>
+                  </div>
+
+                  {/* Claim */}
+                  <div>
+                    <p className="text-[11px] uppercase tracking-widest font-medium mb-2" style={{ color: FADED }}>
+                      {selectedDispute.opened_by_role === 'client' ? 'Client' : 'Provider'}'s Claim
+                    </p>
+                    <span
+                      className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: '#FDEDEA', color: '#A04030' }}
+                    >
+                      {selectedDispute.reason_label}
+                    </span>
+                    <p className="text-sm mt-2" style={{ color: INK }}>{selectedDispute.description}</p>
+                    {selectedDispute.evidence_urls?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedDispute.evidence_urls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs underline" style={{ color: ACCENT }}>
+                            Evidence {i + 1}
+                          </a>
                         ))}
-                    </div>
-                </div>
-            </div>
+                      </div>
+                    )}
+                    <p className="text-xs mt-1" style={{ color: FADED }}>Opened {formatDate(selectedDispute.created_at)}</p>
+                  </div>
 
-            {/* Disputes Table */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                {disputes.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400">
-                        <Icons.AlertTriangle size={32} className="mx-auto mb-2 text-gray-300" />
-                        <p>No disputes found</p>
+                  {/* Response */}
+                  {selectedDispute.response_description ? (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-widest font-medium mb-2" style={{ color: FADED }}>
+                        {selectedDispute.opened_by_role === 'client' ? 'Provider' : 'Client'}'s Response
+                      </p>
+                      <p className="text-sm" style={{ color: INK }}>{selectedDispute.response_description}</p>
+                      <p className="text-xs mt-1" style={{ color: FADED }}>
+                        Responded {formatDate(selectedDispute.responded_at)}
+                      </p>
                     </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dispute</th>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Provider</th>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reason</th>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Opened</th>
-                                    <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {disputes.map((dispute) => (
-                                    <tr key={dispute.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {dispute.bookings?.services?.name || 'Service'}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {formatCurrency(dispute.bookings?.price)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{dispute.client_name}</div>
-                                            {dispute.opened_by_role === 'client' && (
-                                                <span className="text-xs text-brand-600">Opener</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{dispute.provider_name}</div>
-                                            {dispute.opened_by_role === 'provider' && (
-                                                <span className="text-xs text-brand-600">Opener</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                                                {dispute.reason_label}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[dispute.status]}`}>
-                                                {dispute.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">
-                                            {formatDate(dispute.created_at)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => openDetail(dispute.id)}
-                                                className="text-brand-600 hover:text-brand-700 text-sm font-medium"
-                                            >
-                                                View Details
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                  ) : (
+                    <p className="text-sm" style={{ color: FADED }}>
+                      No response from {selectedDispute.opened_by_role === 'client' ? 'provider' : 'client'} yet.
+                    </p>
+                  )}
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+                  {/* Resolution form */}
+                  {(selectedDispute.status === 'open' || selectedDispute.status === 'under_review') && (
+                    <div style={{ borderTop: `1px solid ${LINE}` }} className="pt-5 space-y-4">
+                      <p className="text-base font-semibold" style={{ color: INK }}>Resolve</p>
+
+                      {selectedDispute.status === 'open' && (
                         <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1}
-                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+                          onClick={handleMarkUnderReview}
+                          disabled={resolving}
+                          className="text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+                          style={{ background: '#EBF0FA', color: '#4A6CA8' }}
                         >
-                            Previous
+                          Mark as Under Review
                         </button>
-                        <span className="text-sm text-gray-500">
-                            Page {page} of {totalPages}
-                        </span>
-                        <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
-                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
-                        >
-                            Next
-                        </button>
-                    </div>
-                )}
-            </div>
+                      )}
 
-            {/* Detail Modal */}
-            {selectedDispute && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        {detailLoading ? (
-                            <div className="flex items-center justify-center py-16">
-                                <Icons.Loader className="w-8 h-8 animate-spin text-brand-500" />
-                            </div>
+                      <div>
+                        <p className="text-xs font-medium mb-1.5" style={{ color: MUTED }}>Resolution</p>
+                        <select
+                          value={resolutionForm.resolution}
+                          onChange={(e) => setResolutionForm((f) => ({ ...f, resolution: e.target.value }))}
+                          style={inputStyle}
+                        >
+                          <option value="">Select resolution...</option>
+                          {RESOLUTION_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {resolutionForm.resolution === 'partial_refund' && (
+                        <div>
+                          <p className="text-xs font-medium mb-1.5" style={{ color: MUTED }}>Refund Amount ($)</p>
+                          <input
+                            type="number"
+                            value={resolutionForm.resolution_amount}
+                            onChange={(e) => setResolutionForm((f) => ({ ...f, resolution_amount: e.target.value }))}
+                            placeholder="Enter amount"
+                            style={inputStyle}
+                          />
+                          <p className="text-xs mt-1" style={{ color: FADED }}>
+                            Max: {formatCurrency(selectedDispute.bookings?.price)}
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-xs font-medium mb-1.5" style={{ color: MUTED }}>Admin Notes</p>
+                        <textarea
+                          value={resolutionForm.resolution_notes}
+                          onChange={(e) => setResolutionForm((f) => ({ ...f, resolution_notes: e.target.value }))}
+                          rows={3}
+                          placeholder="Notes about this resolution..."
+                          style={{ ...inputStyle, resize: 'none' }}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleResolve}
+                        disabled={!resolutionForm.resolution || resolving}
+                        className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                        style={{ background: INK, color: '#fff' }}
+                      >
+                        {resolving ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
-                            <>
-                                {/* Modal Header */}
-                                <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-gray-900">Dispute Details</h2>
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-2 ${STATUS_COLORS[selectedDispute.status]}`}>
-                                            {selectedDispute.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                        </span>
-                                    </div>
-                                    <button onClick={closeDetail} className="p-2 hover:bg-gray-100 rounded-lg">
-                                        <Icons.X size={20} className="text-gray-500" />
-                                    </button>
-                                </div>
-
-                                {/* Modal Body */}
-                                <div className="p-6 space-y-6">
-                                    {/* Booking Info */}
-                                    <div className="bg-gray-50 rounded-xl p-4">
-                                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Booking Information</h3>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-gray-500">Service</p>
-                                                <p className="font-medium">{selectedDispute.bookings?.services?.name || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500">Amount</p>
-                                                <p className="font-medium">{formatCurrency(selectedDispute.bookings?.price)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500">Client</p>
-                                                <p className="font-medium">{selectedDispute.client?.full_name || selectedDispute.client?.name || 'Unknown'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500">Provider</p>
-                                                <p className="font-medium">{selectedDispute.provider?.full_name || selectedDispute.provider?.name || 'Unknown'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500">Scheduled</p>
-                                                <p className="font-medium">{formatDate(selectedDispute.bookings?.scheduled_at)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500">Booking Status</p>
-                                                <p className="font-medium capitalize">{selectedDispute.bookings?.status}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Opener's Claim */}
-                                    <div className="border border-gray-200 rounded-xl p-4">
-                                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                                            <Icons.User size={16} />
-                                            {selectedDispute.opened_by_role === 'client' ? 'Client' : 'Provider'}'s Claim
-                                        </h3>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700">
-                                                    {selectedDispute.reason_label}
-                                                </span>
-                                            </div>
-                                            <p className="text-gray-700">{selectedDispute.description}</p>
-                                            {selectedDispute.evidence_urls?.length > 0 && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedDispute.evidence_urls.map((url, i) => (
-                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 text-sm hover:underline">
-                                                            Evidence {i + 1}
-                                                        </a>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <p className="text-xs text-gray-400">Opened {formatDate(selectedDispute.created_at)}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Response */}
-                                    {selectedDispute.response_description ? (
-                                        <div className="border border-gray-200 rounded-xl p-4">
-                                            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                                                <Icons.User size={16} />
-                                                {selectedDispute.opened_by_role === 'client' ? 'Provider' : 'Client'}'s Response
-                                            </h3>
-                                            <div className="space-y-3">
-                                                <p className="text-gray-700">{selectedDispute.response_description}</p>
-                                                {selectedDispute.response_evidence_urls?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {selectedDispute.response_evidence_urls.map((url, i) => (
-                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 text-sm hover:underline">
-                                                                Evidence {i + 1}
-                                                            </a>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <p className="text-xs text-gray-400">Responded {formatDate(selectedDispute.responded_at)}</p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center text-gray-400">
-                                            <p className="text-sm">No response from {selectedDispute.opened_by_role === 'client' ? 'provider' : 'client'} yet</p>
-                                        </div>
-                                    )}
-
-                                    {/* Resolution Form (only for open/under_review) */}
-                                    {(selectedDispute.status === 'open' || selectedDispute.status === 'under_review') && (
-                                        <div className="border-t border-gray-200 pt-6">
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Resolve Dispute</h3>
-
-                                            {selectedDispute.status === 'open' && (
-                                                <button
-                                                    onClick={handleMarkUnderReview}
-                                                    disabled={resolving}
-                                                    className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
-                                                >
-                                                    Mark as Under Review
-                                                </button>
-                                            )}
-
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Resolution</label>
-                                                    <select
-                                                        value={resolutionForm.resolution}
-                                                        onChange={(e) => setResolutionForm(f => ({ ...f, resolution: e.target.value }))}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                                                    >
-                                                        <option value="">Select resolution...</option>
-                                                        {RESOLUTION_OPTIONS.map((opt) => (
-                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-
-                                                {resolutionForm.resolution === 'partial_refund' && (
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                            Refund Amount ($)
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            value={resolutionForm.resolution_amount}
-                                                            onChange={(e) => setResolutionForm(f => ({ ...f, resolution_amount: e.target.value }))}
-                                                            placeholder="Enter amount"
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                                                        />
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            Maximum: {formatCurrency(selectedDispute.bookings?.price)}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notes</label>
-                                                    <textarea
-                                                        value={resolutionForm.resolution_notes}
-                                                        onChange={(e) => setResolutionForm(f => ({ ...f, resolution_notes: e.target.value }))}
-                                                        rows={3}
-                                                        placeholder="Add notes about this resolution..."
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                                                    />
-                                                </div>
-
-                                                <button
-                                                    onClick={handleResolve}
-                                                    disabled={!resolutionForm.resolution || resolving}
-                                                    className="w-full py-3 bg-brand-500 text-white rounded-xl font-semibold hover:bg-brand-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                                >
-                                                    {resolving ? (
-                                                        <>
-                                                            <Icons.Loader className="w-4 h-4 animate-spin" />
-                                                            Processing...
-                                                        </>
-                                                    ) : (
-                                                        'Resolve Dispute'
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Show resolution details if resolved */}
-                                    {selectedDispute.status === 'resolved' && (
-                                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                                            <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
-                                                <Icons.CheckCircle size={16} />
-                                                Resolution
-                                            </h3>
-                                            <div className="space-y-2 text-sm">
-                                                <p className="text-green-800">
-                                                    <span className="font-medium">Decision:</span>{' '}
-                                                    {RESOLUTION_OPTIONS.find(o => o.value === selectedDispute.resolution)?.label || selectedDispute.resolution}
-                                                </p>
-                                                {selectedDispute.resolution_amount && (
-                                                    <p className="text-green-800">
-                                                        <span className="font-medium">Refund Amount:</span>{' '}
-                                                        {formatCurrency(selectedDispute.resolution_amount)}
-                                                    </p>
-                                                )}
-                                                {selectedDispute.refund_id && (
-                                                    <p className="text-green-800">
-                                                        <span className="font-medium">Refund ID:</span> {selectedDispute.refund_id}
-                                                    </p>
-                                                )}
-                                                {selectedDispute.resolution_notes && (
-                                                    <p className="text-green-700 mt-2">{selectedDispute.resolution_notes}</p>
-                                                )}
-                                                <p className="text-xs text-green-600 mt-2">Resolved {formatDate(selectedDispute.resolved_at)}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
+                          <><Check size={16} weight="bold" /> Resolve Dispute</>
                         )}
+                      </button>
                     </div>
+                  )}
+
+                  {/* Resolved summary */}
+                  {selectedDispute.status === 'resolved' && (
+                    <div className="rounded-xl p-4" style={{ background: '#EBF2EC' }}>
+                      <p className="text-sm font-semibold mb-2" style={{ color: '#5A8A5E' }}>Resolution</p>
+                      <p className="text-sm" style={{ color: '#3D5C40' }}>
+                        {RESOLUTION_OPTIONS.find((o) => o.value === selectedDispute.resolution)?.label || selectedDispute.resolution}
+                      </p>
+                      {selectedDispute.resolution_amount && (
+                        <p className="text-sm" style={{ color: '#3D5C40' }}>
+                          Refund: {formatCurrency(selectedDispute.resolution_amount)}
+                        </p>
+                      )}
+                      {selectedDispute.resolution_notes && (
+                        <p className="text-sm mt-1" style={{ color: '#3D5C40' }}>{selectedDispute.resolution_notes}</p>
+                      )}
+                      <p className="text-xs mt-2" style={{ color: '#5A8A5E' }}>
+                        Resolved {formatDate(selectedDispute.resolved_at)}
+                      </p>
+                    </div>
+                  )}
                 </div>
+              </>
             )}
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default AdminDisputes;

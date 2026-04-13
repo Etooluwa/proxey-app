@@ -1,67 +1,150 @@
-import { Outlet, useNavigate } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
-import { Icons } from '../Icons';
+import { useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
+import {
+  SquaresFour,
+  ChartBar,
+  Users,
+  CalendarBlank,
+  Scales,
+  Wrench,
+  Star,
+  CurrencyDollar,
+  Tag,
+  SignOut,
+  List,
+  X,
+} from '@phosphor-icons/react';
+
+const NAV_ITEMS = [
+  { to: '/admin', label: 'Dashboard', icon: SquaresFour, end: true },
+  { to: '/admin/analytics', label: 'Analytics', icon: ChartBar },
+  { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/bookings', label: 'Bookings', icon: CalendarBlank },
+  { to: '/admin/disputes', label: 'Disputes', icon: Scales },
+  { to: '/admin/services', label: 'Services', icon: Wrench },
+  { to: '/admin/reviews', label: 'Reviews', icon: Star },
+  { to: '/admin/revenue', label: 'Revenue', icon: CurrencyDollar },
+  { to: '/admin/promotions', label: 'Promotions', icon: Tag },
+];
 
 const AdminShell = () => {
-    const navigate = useNavigate();
-    const { session, profile } = useSession();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { session, signOut } = useSession();
+  const navigate = useNavigate();
 
-    const displayName = profile?.name || session?.user?.email?.split('@')[0] || 'Admin';
-    const displayPhoto = profile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
-    return (
-        <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative">
-            <Sidebar role="admin" />
+  const linkClass = ({ isActive }) =>
+    `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+      isActive
+        ? 'bg-[#C25E4A]/10 text-[#C25E4A]'
+        : 'text-[#8C6A64] hover:text-[#3D231E] hover:bg-[#F2EBE5]'
+    }`;
 
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Top Bar */}
-                <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 sticky top-0 z-30 relative">
-                    <div className="flex items-center gap-4">
-                        <div className="md:hidden flex items-center gap-2">
-                            <div className="w-6 h-6 bg-brand-400 rounded-md transform rotate-45 flex items-center justify-center">
-                                <div className="w-3 h-3 bg-white rounded-sm transform -rotate-45"></div>
-                            </div>
-                            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Kliques</h1>
-                        </div>
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-6 py-6 border-b border-[rgba(140,106,100,0.15)]">
+        <span
+          className="text-xl font-semibold text-[#3D231E]"
+          style={{ fontFamily: 'Sora, sans-serif', letterSpacing: '-0.03em' }}
+        >
+          kliques
+        </span>
+        <span className="ml-2 text-[10px] uppercase tracking-widest font-semibold text-[#C25E4A] bg-[#C25E4A]/10 px-2 py-0.5 rounded-full align-middle">
+          admin
+        </span>
+      </div>
 
-                        <div className="hidden md:flex items-center gap-2">
-                            <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
-                                Admin
-                            </span>
-                        </div>
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          <NavLink key={to} to={to} end={end} className={linkClass} onClick={() => setMenuOpen(false)}>
+            <Icon size={18} weight="regular" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
 
-                        <div className="hidden md:flex items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-64 lg:w-96 transition-all focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300">
-                            <Icons.Search size={18} className="text-gray-400 mr-3" />
-                            <input type="text" placeholder="Search..." className="bg-transparent outline-none text-sm w-full placeholder-gray-400 text-gray-700" />
-                        </div>
-                    </div>
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-[rgba(140,106,100,0.15)]">
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-[#8C6A64] hover:text-[#3D231E] hover:bg-[#F2EBE5] transition-colors"
+        >
+          <SignOut size={18} />
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
 
-                    <div className="flex items-center gap-3 md:gap-6 relative">
-                        <button
-                            onClick={() => navigate('/admin/users')}
-                            className="flex items-center gap-3 pl-2 md:pl-4 border-l border-gray-100 hover:bg-gray-50 rounded-xl transition-colors p-1"
-                        >
-                            <div className="text-right hidden md:block">
-                                <p className="text-sm font-bold text-gray-900">{displayName}</p>
-                            </div>
-                            <img
-                                src={displayPhoto}
-                                alt="Profile"
-                                className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm object-cover"
-                            />
-                        </button>
-                    </div>
-                </header>
+  return (
+    <div className="flex h-screen font-sans" style={{ background: '#FBF7F2', fontFamily: 'Sora, sans-serif' }}>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-56 flex-col flex-shrink-0 border-r border-[rgba(140,106,100,0.15)]" style={{ background: '#FBF7F2' }}>
+        <SidebarContent />
+      </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth pb-24 md:pb-10">
-                    <Outlet />
-                </main>
-
-            </div>
+      {/* Mobile off-canvas */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="fixed inset-0 bg-black/30" onClick={() => setMenuOpen(false)} />
+          <aside className="relative w-64 flex flex-col border-r border-[rgba(140,106,100,0.15)]" style={{ background: '#FBF7F2' }}>
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-[#F2EBE5] text-[#8C6A64]"
+            >
+              <X size={20} />
+            </button>
+            <SidebarContent />
+          </aside>
         </div>
-    );
+      )}
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="h-14 flex items-center justify-between px-5 border-b border-[rgba(140,106,100,0.15)] bg-[#FBF7F2] sticky top-0 z-30">
+          <button
+            className="md:hidden p-1.5 rounded-lg hover:bg-[#F2EBE5] text-[#C25E4A]"
+            onClick={() => setMenuOpen(true)}
+          >
+            <List size={22} weight="bold" />
+          </button>
+          <div className="md:hidden absolute left-1/2 -translate-x-1/2">
+            <span className="text-base font-semibold text-[#3D231E]" style={{ letterSpacing: '-0.03em' }}>
+              kliques
+            </span>
+          </div>
+          <div className="hidden md:flex items-center gap-2">
+            <span className="text-sm text-[#8C6A64]">
+              {session?.user?.email}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+              style={{ background: '#C25E4A' }}
+            >
+              {(session?.user?.email?.[0] || 'A').toUpperCase()}
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-5 py-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 };
 
 export default AdminShell;

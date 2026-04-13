@@ -1,181 +1,174 @@
 import React, { useEffect, useState } from 'react';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { Icons } from '../../components/Icons';
-import { StatCard } from '../../components/StatCard';
 import { fetchAdminRevenue } from '../../data/admin';
 
+const INK = '#3D231E';
+const MUTED = '#8C6A64';
+const FADED = '#B0948F';
+const ACCENT = '#C25E4A';
+const LINE = 'rgba(140,106,100,0.2)';
+const AVATAR_BG = '#F2EBE5';
+
+const formatCurrency = (cents) => {
+  if (!cents) return '$0';
+  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+};
+
+const statusStyle = (s) => {
+  if (s === 'completed') return { background: '#EBF2EC', color: '#5A8A5E' };
+  if (s === 'pending') return { background: '#FFF5E6', color: '#A07030' };
+  return { background: AVATAR_BG, color: MUTED };
+};
+
 const AdminRevenue = () => {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        let cancelled = false;
-        async function load() {
-            setLoading(true);
-            try {
-                const result = await fetchAdminRevenue();
-                if (!cancelled) {
-                    setData(result);
-                }
-            } catch (error) {
-                console.error("Failed to load revenue data", error);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        }
-        load();
-        return () => { cancelled = true; };
-    }, []);
-
-    const formatCurrency = (cents) => {
-        if (!cents) return '$0.00';
-        return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    };
-
-    const monthlyData = data?.monthlyRevenue || [
-        { name: 'Jan', value: 0 },
-        { name: 'Feb', value: 0 },
-        { name: 'Mar', value: 0 },
-        { name: 'Apr', value: 0 },
-        { name: 'May', value: 0 },
-        { name: 'Jun', value: 0 },
-    ];
-
-    const transactions = data?.transactions || [];
-
-    if (loading) {
-        return (
-            <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
-                <Icons.Loader className="w-8 h-8 animate-spin text-brand-500" />
-            </div>
-        );
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const result = await fetchAdminRevenue();
+        if (!cancelled) setData(result);
+      } catch (err) {
+        console.error('Failed to load revenue data', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
+  const monthlyData = data?.monthlyRevenue || [
+    { name: 'Jan', value: 0 }, { name: 'Feb', value: 0 }, { name: 'Mar', value: 0 },
+    { name: 'Apr', value: 0 }, { name: 'May', value: 0 }, { name: 'Jun', value: 0 },
+  ];
+
+  const transactions = data?.transactions || [];
+
+  if (loading) {
     return (
-        <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Revenue</h1>
-                <p className="text-gray-500 mt-1">Platform financial overview</p>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard
-                    label="Total Revenue"
-                    value={formatCurrency(data?.totalRevenue)}
-                    icon={Icons.Wallet}
-                    colorClass="bg-emerald-500 text-emerald-500"
-                />
-                <StatCard
-                    label="This Month"
-                    value={formatCurrency(data?.thisMonthRevenue)}
-                    icon={Icons.TrendingUp}
-                    colorClass="bg-blue-500 text-blue-500"
-                />
-                <StatCard
-                    label="Avg per Booking"
-                    value={formatCurrency(data?.avgPerBooking)}
-                    icon={Icons.Calendar}
-                    colorClass="bg-purple-500 text-purple-500"
-                />
-            </div>
-
-            {/* Revenue Chart */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-6">Monthly Revenue</h3>
-                <div className="h-80 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis
-                                dataKey="name"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                dy={10}
-                            />
-                            <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                tickFormatter={(value) => `$${(value / 100).toFixed(0)}`}
-                            />
-                            <Tooltip
-                                cursor={{ fill: '#f8fafc' }}
-                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                formatter={(value) => [formatCurrency(value), 'Revenue']}
-                            />
-                            <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                                {monthlyData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#10b981' : '#e2e8f0'} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* Transactions Table */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900">Recent Transactions</h3>
-                </div>
-                {transactions.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-100">
-                                <tr>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Date</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Client</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Provider</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Amount</th>
-                                    <th className="text-left px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {transactions.map((tx) => (
-                                    <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 text-sm text-gray-600">
-                                            {tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-900">{tx.client_name || '-'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{tx.provider_name || '-'}</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                                            {formatCurrency(tx.amount)}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                tx.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                'bg-gray-100 text-gray-700'
-                                            }`}>
-                                                {tx.status || 'unknown'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-48 text-gray-500">
-                        <Icons.Wallet size={32} className="text-gray-300 mb-2" />
-                        <p>No transactions yet</p>
-                    </div>
-                )}
-            </div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: LINE, borderTopColor: ACCENT }} />
+      </div>
     );
+  }
+
+  return (
+    <div className="space-y-10">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-semibold" style={{ color: INK, letterSpacing: '-0.03em' }}>Revenue</h1>
+        <p className="text-sm mt-1" style={{ color: MUTED }}>Platform financial overview</p>
+      </div>
+
+      {/* Metric strip */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10">
+        {[
+          { label: 'Total Revenue', value: formatCurrency(data?.totalRevenue) },
+          { label: 'This Month', value: formatCurrency(data?.thisMonthRevenue) },
+          { label: 'Avg per Booking', value: formatCurrency(data?.avgPerBooking) },
+        ].map(({ label, value }) => (
+          <div key={label} className="py-5" style={{ borderBottom: `1px solid ${LINE}` }}>
+            <p className="text-[11px] uppercase tracking-widest font-medium mb-1" style={{ color: FADED }}>{label}</p>
+            <p className="text-2xl font-semibold" style={{ color: INK, letterSpacing: '-0.02em' }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div>
+        <h2 className="text-base font-semibold mb-5" style={{ color: INK }}>Monthly Revenue</h2>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyData} barCategoryGap="40%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={LINE} />
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: FADED, fontSize: 11, fontFamily: 'Sora, sans-serif' }}
+                dy={8}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: FADED, fontSize: 11, fontFamily: 'Sora, sans-serif' }}
+                tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
+              />
+              <Tooltip
+                cursor={{ fill: AVATAR_BG }}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: `1px solid ${LINE}`,
+                  boxShadow: 'none',
+                  fontFamily: 'Sora, sans-serif',
+                  fontSize: 12,
+                  color: INK,
+                }}
+                formatter={(v) => [formatCurrency(v), 'Revenue']}
+              />
+              <Bar dataKey="value" radius={[5, 5, 0, 0]} barSize={28}>
+                {monthlyData.map((entry, i) => (
+                  <Cell key={`cell-${i}`} fill={entry.value > 0 ? '#5A8A5E' : LINE} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Transactions */}
+      <div>
+        <h2 className="text-base font-semibold mb-5" style={{ color: INK }}>Recent Transactions</h2>
+        {transactions.length > 0 ? (
+          <div>
+            <div
+              className="grid gap-4 px-4 py-3 text-[11px] uppercase tracking-widest font-medium"
+              style={{ gridTemplateColumns: '1.5fr 2fr 2fr 1fr 1fr', borderBottom: `1px solid ${LINE}`, color: FADED }}
+            >
+              <span>Date</span>
+              <span>Client</span>
+              <span>Provider</span>
+              <span>Amount</span>
+              <span>Status</span>
+            </div>
+            {transactions.map((tx) => (
+              <div
+                key={tx.id}
+                className="grid gap-4 px-4 py-4 items-center"
+                style={{ gridTemplateColumns: '1.5fr 2fr 2fr 1fr 1fr', borderBottom: `1px solid ${LINE}` }}
+              >
+                <span className="text-xs" style={{ color: MUTED }}>
+                  {tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '—'}
+                </span>
+                <span className="text-sm" style={{ color: INK }}>{tx.client_name || '—'}</span>
+                <span className="text-sm" style={{ color: MUTED }}>{tx.provider_name || '—'}</span>
+                <span className="text-sm font-medium" style={{ color: INK }}>{formatCurrency(tx.amount)}</span>
+                <span
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block"
+                  style={statusStyle(tx.status)}
+                >
+                  {tx.status || 'unknown'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="flex items-center justify-center py-12 rounded-xl"
+            style={{ border: `1px dashed ${LINE}` }}
+          >
+            <p className="text-sm" style={{ color: MUTED }}>No transactions yet</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default AdminRevenue;
