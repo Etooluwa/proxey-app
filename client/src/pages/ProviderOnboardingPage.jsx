@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import { useToast } from "../components/ui/ToastProvider";
@@ -747,6 +748,15 @@ function ProviderOnboardingPage() {
         photo: photoUrl || profile.photoPreview || undefined,
         avatar: photoUrl || profile.photoPreview || undefined,
       });
+      if (posthog.__loaded) {
+        posthog.capture("provider_onboarding_completed", {
+          category: category === "Other" ? customCat : category,
+          has_photo: Boolean(photoUrl || profile.photoPreview),
+          has_stripe_connected: stripeConnected,
+          booking_window_weeks: bookingWindow,
+          buffer_minutes: bufferMins,
+        });
+      }
       toast.push({ title: "You're live!", description: "Welcome to Kliques.", variant: "success" });
       navigate("/provider", { replace: true });
     } catch (err) {

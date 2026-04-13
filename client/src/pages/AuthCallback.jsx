@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import posthog from "posthog-js";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { request } from "../data/apiClient";
@@ -130,6 +131,12 @@ export default function AuthCallback() {
 
       // Send welcome email for all new signups after confirmation (non-blocking)
       if (isNewSignup && session.user.email) {
+        if (posthog.__loaded) {
+          posthog.capture("signup_completed", {
+            role,
+            signup_method: session.user?.app_metadata?.provider === "google" ? "google" : "email",
+          });
+        }
         fetch(`${process.env.REACT_APP_API_BASE || '/api'}/auth/send-welcome`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

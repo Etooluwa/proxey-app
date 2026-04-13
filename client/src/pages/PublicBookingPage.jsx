@@ -10,6 +10,7 @@
  *   5 — Confirmation (pending)
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
+import posthog from 'posthog-js';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
@@ -1032,6 +1033,7 @@ export default function PublicBookingPage() {
     const [bookingId, setBookingId] = useState(null);
     const [paymentData, setPaymentData] = useState(null);
     const preselectedServiceAppliedRef = useRef(false);
+    const bookingStartedTrackedRef = useRef(false);
 
     // Load provider
     useEffect(() => {
@@ -1131,6 +1133,17 @@ export default function PublicBookingPage() {
                 await supabase.from('booking_intake_responses').insert(intakeRows);
             }
 
+            if (posthog.__loaded) {
+                posthog.capture('booking_submitted', {
+                    provider_id: provider.user_id || provider.id,
+                    service_id: selectedService.id,
+                    payment_type: pmtData?.payment_type || selectedService?.payment_type || 'none',
+                    has_intake: intakeRows.length > 0 || Boolean(intakeFreeform),
+                    requested_duration_minutes: getSelectedServiceDuration(selectedService, selectedHours),
+                    requested_price_cents: getSelectedServicePrice(selectedService, selectedHours),
+                });
+            }
+
             setBookingId(data.booking.id);
             setStep(5);
         } catch (err) {
@@ -1154,7 +1167,18 @@ export default function PublicBookingPage() {
             selectedService={selectedService}
             selectedHours={selectedHours}
             onSelectService={setSelectedService}
-            onContinue={() => setStep(2)}
+            onContinue={() => {
+                if (!bookingStartedTrackedRef.current && selectedService && posthog.__loaded) {
+                    bookingStartedTrackedRef.current = true;
+                    posthog.capture('booking_started', {
+                        provider_id: provider?.user_id || provider?.id,
+                        service_id: selectedService.id,
+                        payment_type: selectedService?.payment_type || 'none',
+                        selected_hours: isPerHourService(selectedService) ? getSelectedServiceHours(selectedService, selectedHours) : null,
+                    });
+                }
+                setStep(2);
+            }}
         />
     );
 
@@ -1238,6 +1262,14 @@ export default function PublicBookingPage() {
             session={session}
             onBack={() => setStep(4)}
             onSuccess={(pmtData) => {
+                if (posthog.__loaded) {
+                    posthog.capture('payment_succeeded', {
+                        provider_id: provider?.user_id || provider?.id,
+                        service_id: selectedService?.id,
+                        payment_type: pmtData?.payment_type || selectedService?.payment_type || 'none',
+                        amount_cents: getSelectedServicePrice(selectedService, selectedHours),
+                    });
+                }
                 setPaymentData(pmtData);
                 handleSubmitBooking(pmtData);
             }}

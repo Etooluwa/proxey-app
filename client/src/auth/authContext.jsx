@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import posthog from "posthog-js";
 import supabase from "../utils/supabase";
 import { uploadProfilePhoto } from "../utils/photoUpload";
 import { request } from "../data/apiClient";
@@ -309,6 +310,26 @@ export function AuthProvider({ children }) {
             persistProfile(session.user.id, profile);
         }
     }, [session?.user?.id, profile]);
+
+    useEffect(() => {
+        if (!posthog.__loaded) return;
+
+        if (!session?.user?.id) {
+            posthog.reset();
+            return;
+        }
+
+        posthog.identify(session.user.id, {
+            email: session.user.email || undefined,
+            role: session.user.role || undefined,
+            name:
+                profile?.business_name ||
+                profile?.businessName ||
+                profile?.name ||
+                session.user.metadata?.full_name ||
+                undefined,
+        });
+    }, [session?.user?.id, session?.user?.email, session?.user?.role, session?.user?.metadata?.full_name, profile?.business_name, profile?.businessName, profile?.name]);
 
     useEffect(() => {
         let active = true;
