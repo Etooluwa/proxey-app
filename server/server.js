@@ -131,6 +131,16 @@ const sensitiveAuthLimiter = rateLimit({
   skip: shouldBypassRateLimit,
 });
 
+// Stricter limiter for booking creation — prevents slot exhaustion and Stripe abuse
+const bookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,                   // 20 booking attempts per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many booking attempts. Please try again later.' },
+  skip: shouldBypassRateLimit,
+});
+
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
@@ -1180,6 +1190,28 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Authentication required." });
   }
   next();
+}
+
+// Require the user to have an actual providers row in the database.
+// This prevents a client who self-sets role=provider in user_metadata
+// (via localStorage pending_role manipulation) from accessing provider endpoints.
+async function requireProvider(req, res, next) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Authentication required." });
+  if (!supabase) return next(); // skip in local/demo mode
+  try {
+    const { data, error } = await supabase
+      .from("providers")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) {
+      return res.status(403).json({ error: "Provider account required." });
+    }
+    next();
+  } catch {
+    return res.status(403).json({ error: "Provider account required." });
+  }
 }
 
 // Sanitize error messages before sending to client — prevents leaking internal details
@@ -2904,7 +2936,7 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
   }
 }
 
-app.post("/api/bookings", createBookingHandler({
+app.post("/api/bookings", bookingLimiter, createBookingHandler({
   getUserId,
   getProviderBookingRules: async (providerId) => {
     if (!supabase) return normalizeProviderBookingRules();
@@ -8174,7 +8206,7 @@ app.post("/api/provider/connected-account", async (req, res) => {
 
 // POST /api/provider/onboarding-link
 // Generate onboarding link for provider to complete Stripe setup
-app.post("/api/provider/onboarding-link", async (req, res) => {
+app.post("/api/provider/onboarding-link", requireProvider, async (req, res) => {
   const { accountId } = req.body;
 
   if (!accountId) {
@@ -10350,7 +10382,7 @@ app.get("/api/provider/check-handle", async (req, res) => {
 });
 
 // ─── POST /api/provider/stripe/connect — create Stripe Connect account link ──
-app.post("/api/provider/stripe/connect", async (req, res) => {
+app.post("/api/provider/stripe/connect", requireProvider, async (req, res) => {
   const providerId = getProviderId(req);
   // Never use client-supplied redirect URLs — always build from known app origin
   // to prevent open-redirect attacks via the Stripe Connect flow.
@@ -10410,7 +10442,7 @@ app.post("/api/provider/stripe/connect", async (req, res) => {
     res.json({ url: link.url, accountId: account.id });
   } catch (err) {
     console.error("[stripe/connect]", err);
-    res.status(500).json({ error: err.message || "Failed to create Stripe Connect link." });
+    res.status(500).json({ error: safeErrorMessage(err) });
   }
 });
 
@@ -11006,7 +11038,7 @@ app.delete("/api/payments/methods/:paymentMethodId", async (req, res) => {
 });
 
 // POST /api/bookings/create — create booking and charge via PaymentIntent
-app.post("/api/bookings/create", createChargedBookingHandler({
+app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
   getUserId,
   getProviderBookingRules: async (providerId) =>
     normalizeProviderBookingRules(
@@ -11940,9 +11972,9 @@ app.post("/api/bookings/:id/charge-card", async (req, res) => {
     console.error("[bookings/charge-card]", err);
     // Surface Stripe card errors clearly
     if (err.type === "StripeCardError") {
-      return res.status(402).json({ error: err.message });
+      return res.status(402).json({ error: safeErrorMessage(err) });
     }
-    return res.status(500).json({ error: err.message || "Failed to charge card." });
+    return res.status(500).json({ error: safeErrorMessage(err) });
   }
 });
 
@@ -12038,7 +12070,7 @@ app.post("/api/bookings/:id/retry-payment", async (req, res) => {
     return res.json({ requires_action: true, client_secret: pi.client_secret });
   } catch (err) {
     console.error("[bookings/retry-payment]", err);
-    return res.status(500).json({ error: err.message || "Failed to process payment." });
+    return res.status(500).json({ error: safeErrorMessage(err) });
   }
 });
 
