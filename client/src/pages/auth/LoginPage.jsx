@@ -355,7 +355,11 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
             // Welcome email is sent in AuthCallback after email confirmation
             onSuccess(email.trim());
         } catch (err) {
-            setError(err.message || 'Signup failed. Please try again.');
+            const raw = err.message || '';
+            const isWeakPassword = raw.toLowerCase().includes('should contain') || raw.toLowerCase().includes('password');
+            setError(isWeakPassword
+                ? 'Password must be at least 8 characters and include uppercase, lowercase, and a number.'
+                : raw || 'Signup failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
