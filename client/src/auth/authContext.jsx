@@ -672,28 +672,29 @@ export function AuthProvider({ children }) {
             photo: photoUrl,
         };
 
+        setProfile(nextProfile);
+        persistProfile(session.user.id, nextProfile);
+
         if (supabase) {
             try {
-                // Update auth user metadata
-                const { error: authError } = await supabase.auth.updateUser({
+                const updatePromise = supabase.auth.updateUser({
                     data: {
                         profile: nextProfile,
                     },
                 });
+
+                const timeoutPromise = new Promise((_, reject) => {
+                    window.setTimeout(() => reject(new Error("Profile metadata update timed out.")), 8000);
+                });
+
+                const { error: authError } = await Promise.race([updatePromise, timeoutPromise]);
                 if (authError) {
                     console.warn("[auth] Failed to update user metadata", authError);
                 }
-
             } catch (error) {
                 console.warn("[auth] Failed to update profile via Supabase", error);
             }
         }
-
-        setProfile(nextProfile);
-
-        // Immediately persist to localStorage to ensure data is saved
-        console.log('[authContext] Persisting profile to localStorage:', nextProfile);
-        persistProfile(session.user.id, nextProfile);
 
         return nextProfile;
     }, [session, profile]);

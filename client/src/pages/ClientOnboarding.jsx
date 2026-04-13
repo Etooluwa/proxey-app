@@ -410,13 +410,16 @@ const ClientOnboarding = () => {
                 }),
             });
 
-            // Also update local authContext profile so ProtectedRoute is satisfied
-            await updateProfile({
+            // Also update local authContext profile so ProtectedRoute is satisfied.
+            // This should not block the onboarding flow if Supabase metadata sync is slow.
+            updateProfile({
                 name: form.name.trim(),
                 phone: form.phone.trim(),
                 email: form.email.trim(),
                 defaultLocation: form.city.trim(),
                 isProfileComplete: true,
+            }).catch((profileErr) => {
+                console.warn('[ClientOnboarding] local profile sync error:', profileErr);
             });
 
             localStorage.removeItem('proxey.pendingName');
