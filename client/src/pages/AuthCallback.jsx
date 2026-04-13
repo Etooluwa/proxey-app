@@ -119,15 +119,17 @@ export default function AuthCallback() {
 
       const isNewSignup = Boolean(urlRole || lsRole);
       const role = urlRole || lsRole || session.user.role || "client";
-      const pendingName = urlName || lsName;
+      // Name priority: URL param → localStorage → Google/OAuth user_metadata → email prefix
+      const metaName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || '';
+      const pendingName = urlName || lsName || metaName;
 
       if (session.user.email && role) {
         setLocalRole(session.user.email, role);
       }
 
-      // Clean up localStorage
-      if (lsRole) window.localStorage.removeItem('proxey.pending_role');
-      if (lsName) window.localStorage.removeItem('proxey.pendingName');
+      // Clean up localStorage — always clear to prevent stale names leaking to future signups
+      window.localStorage.removeItem('proxey.pending_role');
+      window.localStorage.removeItem('proxey.pendingName');
 
       // Send welcome email for all new signups after confirmation (non-blocking)
       if (isNewSignup && session.user.email) {
