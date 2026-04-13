@@ -8881,17 +8881,31 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
         .gte("created_at", oneWeekAgo),
       supabase.from("client_profiles").select("*", { count: "exact", head: true })
         .gte("created_at", oneWeekAgo),
-      // Revenue from completed/confirmed bookings that have a price
+      // Paid bookings — price is provider fee in cents
       supabase.from("bookings").select("price")
         .in("status", ["completed", "confirmed"])
-        .not("price", "is", null),
+        .not("price", "is", null)
+        .gt("price", 0),
       // Monthly bookings for chart (past 6 months, non-cancelled)
       supabase.from("bookings").select("created_at")
         .gte("created_at", sixMonthsAgo)
         .not("status", "in", '("cancelled","declined")'),
     ]);
 
-    const totalRevenue = (revenueRows || []).reduce((sum, b) => sum + (b.price || 0), 0);
+    // bookings.price = provider fee in cents (what provider charges)
+    // Client pays: price × 1.10 (Kliques adds 10% service fee)
+    // Stripe fee per transaction: (price × 1.10) × 2.9% + $0.30
+    // Kliques net per transaction: (price × 10%) - stripe fee
+    const grossTransactionVolume = (revenueRows || []).reduce((sum, b) => sum + (b.price || 0), 0);
+    let kliquesNetRevenue = 0;
+    (revenueRows || []).forEach((b) => {
+      const providerPrice = b.price || 0;
+      const clientTotal = Math.round(providerPrice * 1.10);
+      const stripeFee = Math.round(clientTotal * 0.029) + 30; // cents
+      const kliquesGross = clientTotal - providerPrice; // the 10% service fee
+      const kliquesNet = kliquesGross - stripeFee;
+      kliquesNetRevenue += kliquesNet;
+    });
 
     // Build monthly bookings array for the past 6 months
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -8912,8 +8926,8 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
       totalProviders: providerCount || 0,
       totalClients: clientCount || 0,
       totalBookings: bookingCount || 0,
-      totalRevenue,
-      platformRevenue: totalRevenue,
+      grossTransactionVolume,
+      kliquesNetRevenue,
       pendingDisputes: disputeCount || 0,
       newSignupsThisWeek: (newProviders || 0) + (newClients || 0),
       monthlyBookings: Object.values(monthlyCounts),

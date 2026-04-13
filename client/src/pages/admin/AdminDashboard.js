@@ -119,10 +119,10 @@ const AdminDashboard = () => {
           icon={CalendarBlank}
         />
         <MetricCard
-          label="Platform Revenue"
-          value={formatCurrency(stats?.platformRevenue ?? stats?.totalRevenue)}
+          label="Kliques Net Revenue"
+          value={formatCurrency(stats?.kliquesNetRevenue)}
           icon={CurrencyDollar}
-          sub="Your cut"
+          sub={`10% fee − Stripe costs · Gross: ${formatCurrency(stats?.grossTransactionVolume)}`}
         />
         <MetricCard
           label="Pending Disputes"
