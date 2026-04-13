@@ -53,8 +53,12 @@ export default function ProviderStripeReadinessBanner({ compact = false }) {
     async function loadStripeStatus() {
       try {
         const profile = await fetchProviderProfile();
-        if (!active || !profile?.stripe_account_id) {
-          if (active) setBannerState(null);
+        if (!active) {
+          return;
+        }
+
+        if (!profile?.stripe_account_id) {
+          setBannerState(resolveBannerState(profile, null));
           return;
         }
 

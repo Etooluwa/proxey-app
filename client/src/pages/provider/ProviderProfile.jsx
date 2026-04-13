@@ -14,6 +14,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import Header from '../../components/ui/Header';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
+import ProviderStripeReadinessBanner from '../../components/provider/ProviderStripeReadinessBanner';
 import { ArrowUpRight } from '@phosphor-icons/react';
 
 // ─── Desktop tokens ────────────────────────────────────────────────────────────
@@ -153,28 +154,32 @@ const ProviderProfile = () => {
 
                     </div>
 
-                    {/* Right: Settings list */}
-                    <div style={{ background: DT.card, borderRadius: 20, border: `1px solid ${DT.line}`, overflow: 'hidden' }}>
-                        {SETTINGS.map((row, i) => (
-                            <button
-                                key={row.label}
-                                onClick={() => handleRowTap(row)}
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '20px 24px', background: 'none', border: 'none', borderBottom: `1px solid ${DT.line}`, cursor: 'pointer', textAlign: 'left' }}
-                            >
-                                <div>
-                                    <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: row.danger ? '#B04040' : DT.ink, margin: '0 0 2px' }}>{row.label}</p>
-                                    <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: 0 }}>{row.sub}</p>
-                                </div>
-                                <ArrowUpRight size={18} color={row.danger ? '#B04040' : DT.accent} weight="regular" />
-                            </button>
-                        ))}
-                        <div style={{ padding: '20px 24px' }}>
-                            <button
-                                onClick={handleSignOut}
-                                style={{ width: '100%', padding: '13px', borderRadius: 12, background: '#FDEDEA', border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#B04040', cursor: 'pointer' }}
-                            >
-                                Sign out
-                            </button>
+                    {/* Right: Banner + settings list */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <ProviderStripeReadinessBanner />
+
+                        <div style={{ background: DT.card, borderRadius: 20, border: `1px solid ${DT.line}`, overflow: 'hidden' }}>
+                            {SETTINGS.map((row, i) => (
+                                <button
+                                    key={row.label}
+                                    onClick={() => handleRowTap(row)}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '20px 24px', background: 'none', border: 'none', borderBottom: `1px solid ${DT.line}`, cursor: 'pointer', textAlign: 'left' }}
+                                >
+                                    <div>
+                                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: row.danger ? '#B04040' : DT.ink, margin: '0 0 2px' }}>{row.label}</p>
+                                        <p style={{ fontFamily: F, fontSize: 13, color: DT.muted, margin: 0 }}>{row.sub}</p>
+                                    </div>
+                                    <ArrowUpRight size={18} color={row.danger ? '#B04040' : DT.accent} weight="regular" />
+                                </button>
+                            ))}
+                            <div style={{ padding: '20px 24px' }}>
+                                <button
+                                    onClick={handleSignOut}
+                                    style={{ width: '100%', padding: '13px', borderRadius: 12, background: '#FDEDEA', border: 'none', fontFamily: F, fontSize: 14, fontWeight: 600, color: '#B04040', cursor: 'pointer' }}
+                                >
+                                    Sign out
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -257,6 +262,10 @@ const ProviderProfile = () => {
 
             {/* ── Settings rows ── */}
             <div className="px-5 flex-1 flex flex-col mt-4">
+                <div className="mb-5">
+                    <ProviderStripeReadinessBanner compact />
+                </div>
+
                 <Divider />
                 {SETTINGS.map((row) => (
                     <SettingsRow
