@@ -127,6 +127,10 @@ export function createChargedBookingHandler({
 
       return res.json({ ok: true, bookingId, paymentIntentId });
     } catch (err) {
+      // Postgres unique constraint violation — slot was taken by a concurrent request
+      if (err?.code === '23505' || err?.message?.includes('idx_bookings_no_double_book')) {
+        return res.status(409).json({ error: "That time slot was just booked by someone else. Please choose a different time." });
+      }
       return res
         .status(500)
         .json({ error: err.message || "Failed to create booking." });
