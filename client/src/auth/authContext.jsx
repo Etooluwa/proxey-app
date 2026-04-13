@@ -216,6 +216,61 @@ function applyPendingRoleToMappedSession(mapped, userEmail) {
     };
 }
 
+async function syncAuthoritativeRole(mapped, sbSession = null, options = {}) {
+    if (!mapped?.user?.id) return { mapped, profile: null };
+
+    const { forceCheck = false } = options;
+    const currentRole = getSessionRole(mapped);
+    if (!forceCheck && (currentRole === "provider" || currentRole === "admin")) {
+        return { mapped, profile: null };
+    }
+
+    try {
+        const data = await request("/auth/role");
+        if (data?.role !== "provider") {
+            return { mapped, profile: null };
+        }
+
+        const nextMapped = {
+            ...mapped,
+            user: {
+                ...mapped.user,
+                role: "provider",
+                metadata: {
+                    ...(mapped.user.metadata || {}),
+                    role: "provider",
+                },
+            },
+        };
+
+        if (mapped.user.email) {
+            setLocalRole(mapped.user.email, "provider");
+        }
+
+        if (sbSession && supabase) {
+            supabase.auth.updateUser({ data: { role: "provider" } }).catch((error) => {
+                console.warn("[auth] Failed to persist authoritative provider role", error);
+            });
+        }
+
+        try {
+            const providerData = await request("/provider/me");
+            return {
+                mapped: nextMapped,
+                profile: mapProviderApiProfile(providerData?.profile),
+            };
+        } catch (error) {
+            console.warn("[auth] Failed to hydrate provider profile after role sync", error);
+            return { mapped: nextMapped, profile: null };
+        }
+    } catch (error) {
+        if (error?.status !== 401) {
+            console.warn("[auth] Failed to resolve authoritative account role", error);
+        }
+        return { mapped, profile: null };
+    }
+}
+
 export function AuthProvider({ children }) {
     const [session, setSession] = useState(() => loadStoredSession());
     const [profile, setProfile] = useState(() =>
@@ -233,14 +288,19 @@ export function AuthProvider({ children }) {
                         data: { session: sbSession },
                     } = await supabase.auth.getSession();
                     if (sbSession) {
-                        const mapped = applyPendingRoleToMappedSession(
+                        let mapped = applyPendingRoleToMappedSession(
                             mapSupabaseSession(sbSession),
                             sbSession.user?.email
                         );
+                        const roleSync = await syncAuthoritativeRole(mapped, sbSession);
+                        mapped = roleSync.mapped;
+
                         setSession(mapped);
                         persistSession(mapped);
                         const storedProfile = loadProfile(mapped.user.id);
-                        if (storedProfile) {
+                        if (roleSync.profile) {
+                            setProfile(roleSync.profile);
+                        } else if (storedProfile) {
                             setProfile(storedProfile);
                         } else if (sbSession.user?.user_metadata?.profile) {
                             setProfile(sanitizeProfile(sbSession.user.user_metadata.profile));
@@ -274,11 +334,17 @@ export function AuthProvider({ children }) {
                             // Do NOT remove here — AuthCallback reads and removes it.
                         }
 
+                        const roleSync = await syncAuthoritativeRole(mapped, sbSession);
+                        mapped = roleSync.mapped;
+
                         setSession(mapped);
                         persistSession(mapped);
                         const storedProfile = loadProfile(mapped.user.id);
                         setProfile(
-                            storedProfile || sanitizeProfile(sbSession.user?.user_metadata?.profile) || null
+                            roleSync.profile ||
+                            storedProfile ||
+                            sanitizeProfile(sbSession.user?.user_metadata?.profile) ||
+                            null
                         );
                     } else {
                         setSession(null);
@@ -403,17 +469,23 @@ export function AuthProvider({ children }) {
 
             // Determine the actual role - prefer Supabase metadata, then localStorage
             const actualRole = supabaseRole || localRole;
+            let mapped = mapSupabaseSession(data.session);
+            mapped.user.role = actualRole || role;
+
+            const roleSync = await syncAuthoritativeRole(mapped, data.session, { forceCheck: true });
+            mapped = roleSync.mapped;
+            const resolvedRole = getSessionRole(mapped);
 
             // If user has a stored role and it doesn't match what they selected, show error
             // Admin users bypass this check - they can sign in from any tab
-            if (actualRole && actualRole !== role && actualRole !== 'admin') {
-                const roleLabel = actualRole === 'provider' ? 'Service Provider' : 'Client';
-                const switchToRole = actualRole === 'provider' ? 'Service Provider tab' : 'Client tab';
+            if (resolvedRole && resolvedRole !== role && resolvedRole !== 'admin') {
+                const roleLabel = resolvedRole === 'provider' ? 'Service Provider' : 'Client';
+                const switchToRole = resolvedRole === 'provider' ? 'Service Provider tab' : 'Client tab';
                 const err = new Error(
                     `This account is registered as a ${roleLabel}. Please switch to the ${switchToRole} to sign in.`
                 );
                 // Sync localStorage with the actual role to prevent future confusion
-                setLocalRole(email, actualRole);
+                setLocalRole(email, resolvedRole);
                 try {
                     await supabase.auth.signOut();
                 } catch (signOutError) {
@@ -427,7 +499,7 @@ export function AuthProvider({ children }) {
             }
 
             // If no role stored in Supabase, save the selected role
-            if (!supabaseRole && role) {
+            if (!supabaseRole && resolvedRole === role && role) {
                 try {
                     await supabase.auth.updateUser({
                         data: {
@@ -438,12 +510,14 @@ export function AuthProvider({ children }) {
                     console.warn("[auth] Failed to persist role metadata", metaError);
                 }
             }
-            const mapped = mapSupabaseSession(data.session);
-            mapped.user.role = actualRole || role;
             setSession(mapped);
             persistSession(mapped);
             setLocalRole(email, mapped.user.role || role);
             const storedProfile = loadProfile(mapped.user.id);
+            if (roleSync.profile) {
+                setProfile(roleSync.profile);
+                return { session: mapped, profile: roleSync.profile };
+            }
             if (storedProfile) {
                 setProfile(storedProfile);
                 return { session: mapped, profile: storedProfile };

@@ -1192,6 +1192,31 @@ function requireAuth(req, res, next) {
   next();
 }
 
+app.get("/api/auth/role", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId || !supabase) {
+    return res.status(200).json({ role: "client", hasProviderAccount: false });
+  }
+
+  try {
+    const { data: providerRow, error } = await supabase
+      .from("providers")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      role: providerRow ? "provider" : "client",
+      hasProviderAccount: Boolean(providerRow),
+    });
+  } catch (error) {
+    console.error("[auth/role]", error);
+    return res.status(500).json({ error: "Failed to resolve account role." });
+  }
+});
+
 // Require the user to have an actual providers row in the database.
 // This prevents a client who self-sets role=provider in user_metadata
 // (via localStorage pending_role manipulation) from accessing provider endpoints.
