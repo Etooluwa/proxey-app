@@ -275,7 +275,7 @@ function StepProfile({ data, onChange }) {
           <input
             value={data.businessName}
             onChange={(e) => onChange("businessName", e.target.value)}
-            placeholder="e.g., Anny Wong Vocal Studio"
+            placeholder="e.g., Maya James Vocal Studio"
             style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
           />
         </div>
@@ -513,7 +513,7 @@ function StepGoLive({ handle, onHandle, handleStatus, stripeConnected, onStripeC
         <input
           value={handle}
           onChange={(e) => onHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-          placeholder="e.g., anny-wong"
+          placeholder="e.g., maya-james"
           style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${handleStatus === "taken" || handleStatus === "invalid" ? t.danger : handleStatus === "available" ? t.success : t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box", marginBottom: "6px" }}
         />
 
