@@ -92,7 +92,8 @@ export default function ProviderStripeReadinessBanner({ compact = false }) {
         borderRadius: compact ? 18 : 20,
         padding: compact ? '16px 18px' : '18px 20px',
         display: 'flex',
-        alignItems: compact ? 'flex-start' : 'center',
+        flexDirection: compact ? 'column' : 'row',
+        alignItems: compact ? 'stretch' : 'center',
         justifyContent: 'space-between',
         gap: 16,
       }}
@@ -155,6 +156,8 @@ export default function ProviderStripeReadinessBanner({ compact = false }) {
           cursor: 'pointer',
           whiteSpace: 'nowrap',
           flexShrink: 0,
+          alignSelf: compact ? 'stretch' : 'flex-start',
+          width: compact ? '100%' : 'auto',
         }}
       >
         Open Payouts
