@@ -30,11 +30,11 @@ const NAV_ITEMS = [
 
 const AdminShell = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { session, signOut } = useSession();
+  const { session, logout } = useSession();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
+    await logout();
     navigate('/login');
   };
 

@@ -201,7 +201,7 @@ const AdminDashboard = () => {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate" style={{ color: INK }}>
-                      {item.client_name || 'Client'}
+                      {item.title || item.client_name || 'Booking'}
                     </p>
                     <span
                       className="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0"
@@ -211,10 +211,10 @@ const AdminDashboard = () => {
                     </span>
                   </div>
                   <p className="text-xs mt-0.5 truncate" style={{ color: MUTED }}>
-                    {item.service_name || 'Service'}
+                    {item.subtitle || item.service_name || ''}
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: FADED }}>
-                    {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : ''}
+                    {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : ''}
                   </p>
                 </div>
               ))}

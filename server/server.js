@@ -8852,37 +8852,71 @@ app.delete("/api/provider/availability/:id", async (req, res) => {
 app.get("/api/admin/stats", requireAdmin, async (req, res) => {
   if (!supabase) {
     return res.status(200).json({
-      stats: { total_providers: 0, total_clients: 0, total_bookings: 0, total_revenue: 0 }
+      totalProviders: 0, totalClients: 0, totalBookings: 0,
+      totalRevenue: 0, platformRevenue: 0, pendingDisputes: 0,
+      newSignupsThisWeek: 0, monthlyBookings: [],
     });
   }
 
   try {
-    const { count: providerCount } = await supabase
-      .from("providers")
-      .select("*", { count: "exact", head: true });
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const sixMonthsAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).toISOString();
 
-    const { count: clientCount } = await supabase
-      .from("client_profiles")
-      .select("*", { count: "exact", head: true });
+    const [
+      { count: providerCount },
+      { count: clientCount },
+      { count: bookingCount },
+      { count: disputeCount },
+      { count: newProviders },
+      { count: newClients },
+      { data: revenueRows },
+      { data: monthlyRaw },
+    ] = await Promise.all([
+      supabase.from("providers").select("*", { count: "exact", head: true }),
+      supabase.from("client_profiles").select("*", { count: "exact", head: true }),
+      supabase.from("bookings").select("*", { count: "exact", head: true }),
+      supabase.from("disputes").select("*", { count: "exact", head: true })
+        .in("status", ["open", "under_review"]),
+      supabase.from("providers").select("*", { count: "exact", head: true })
+        .gte("created_at", oneWeekAgo),
+      supabase.from("client_profiles").select("*", { count: "exact", head: true })
+        .gte("created_at", oneWeekAgo),
+      // Revenue from completed/confirmed bookings that have a price
+      supabase.from("bookings").select("price")
+        .in("status", ["completed", "confirmed"])
+        .not("price", "is", null),
+      // Monthly bookings for chart (past 6 months, non-cancelled)
+      supabase.from("bookings").select("created_at")
+        .gte("created_at", sixMonthsAgo)
+        .not("status", "in", '("cancelled","declined")'),
+    ]);
 
-    const { count: bookingCount } = await supabase
-      .from("bookings")
-      .select("*", { count: "exact", head: true });
+    const totalRevenue = (revenueRows || []).reduce((sum, b) => sum + (b.price || 0), 0);
 
-    const { data: transactions } = await supabase
-      .from("client_transactions")
-      .select("amount")
-      .eq("status", "completed");
-
-    const totalRevenue = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
+    // Build monthly bookings array for the past 6 months
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now = new Date();
+    const monthlyCounts = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthlyCounts[key] = { name: monthNames[d.getMonth()], value: 0 };
+    }
+    (monthlyRaw || []).forEach((b) => {
+      const d = new Date(b.created_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (monthlyCounts[key]) monthlyCounts[key].value++;
+    });
 
     res.status(200).json({
-      stats: {
-        total_providers: providerCount || 0,
-        total_clients: clientCount || 0,
-        total_bookings: bookingCount || 0,
-        total_revenue: totalRevenue,
-      }
+      totalProviders: providerCount || 0,
+      totalClients: clientCount || 0,
+      totalBookings: bookingCount || 0,
+      totalRevenue,
+      platformRevenue: totalRevenue,
+      pendingDisputes: disputeCount || 0,
+      newSignupsThisWeek: (newProviders || 0) + (newClients || 0),
+      monthlyBookings: Object.values(monthlyCounts),
     });
   } catch (err) {
     console.error("[admin] Failed to load stats", err);
