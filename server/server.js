@@ -8940,22 +8940,22 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
     if (!role || role === "provider" || role === "all") {
       let providerQuery = supabase
         .from("providers")
-        .select("user_id, name, email, phone, city, is_active, created_at", { count: "exact" })
+        .select("user_id, name, email, phone, city, is_active, created_at")
         .order("created_at", { ascending: false });
 
       if (search) {
         providerQuery = providerQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       }
 
-      const { data: providers, count: providerTotal } = await providerQuery;
-      users = users.concat((providers || []).map(p => ({ ...p, role: "provider" })));
+      const { data: providers } = await providerQuery;
+      users = users.concat((providers || []).map(p => ({ ...p, id: p.user_id, role: "provider" })));
     }
 
     // Fetch clients if role is not 'provider'
     if (!role || role === "client" || role === "all") {
       let clientQuery = supabase
         .from("client_profiles")
-        .select("user_id, name, email, phone, city, is_profile_complete, updated_at", { count: "exact" })
+        .select("user_id, name, email, phone, city, is_profile_complete, updated_at")
         .order("updated_at", { ascending: false });
 
       if (search) {
@@ -8965,19 +8965,49 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
       const { data: clients } = await clientQuery;
       users = users.concat((clients || []).map(c => ({
         ...c,
+        id: c.user_id,
         role: "client",
         is_active: c.is_profile_complete !== false,
-        created_at: c.updated_at
+        created_at: c.updated_at,
       })));
     }
 
+    // Enrich with emails from auth.users for those missing email
+    const missingEmailUserIds = users
+      .filter(u => !u.email && u.user_id)
+      .map(u => u.user_id);
+
+    if (missingEmailUserIds.length > 0) {
+      // Fetch up to 1000 auth users (paginated if needed)
+      const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const authUsers = authData?.users || [];
+      const authMap = {};
+      authUsers.forEach(au => { authMap[au.id] = au.email; });
+
+      users = users.map(u => ({
+        ...u,
+        email: u.email || authMap[u.user_id] || null,
+      }));
+    }
+
+    // Apply search filter on enriched email too
+    let filtered = users;
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = users.filter(u =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q)
+      );
+    }
+
     // Sort by created_at descending
-    users.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    // Paginate
-    const paginatedUsers = users.slice(offset, offset + parseInt(limit));
+    const total = filtered.length;
+    const paginatedUsers = filtered.slice(offset, offset + parseInt(limit));
+    const totalPages = Math.ceil(total / parseInt(limit));
 
-    res.status(200).json({ users: paginatedUsers, total: users.length });
+    res.status(200).json({ users: paginatedUsers, total, totalPages });
   } catch (err) {
     console.error("[admin] Failed to load users", err);
     res.status(500).json({ error: "Failed to load users." });
