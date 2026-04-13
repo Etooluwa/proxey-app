@@ -4138,8 +4138,9 @@ app.get("/api/provider/dashboard", async (req, res) => {
         .eq("payment_status", "paid"),
       supabase
         .from("bookings")
-        .select("client_id, scheduled_at")
+        .select("client_id, scheduled_at, status")
         .in("provider_id", providerIds)
+        .in("status", ["confirmed", "completed"])
         .gte("scheduled_at", `${weekStartKey}T00:00:00`)
         .lt("scheduled_at", `${weekEndKey}T00:00:00`),
     ]);
@@ -4173,6 +4174,7 @@ app.get("/api/provider/dashboard", async (req, res) => {
         .from("bookings")
         .select("client_id")
         .in("provider_id", providerIds)
+        .in("status", ["confirmed", "completed"])
         .lt("scheduled_at", `${weekStartKey}T00:00:00`)
         .in("client_id", [...weekClientIds]);
 
@@ -8173,18 +8175,21 @@ app.post("/api/provider/connected-account", async (req, res) => {
 // POST /api/provider/onboarding-link
 // Generate onboarding link for provider to complete Stripe setup
 app.post("/api/provider/onboarding-link", async (req, res) => {
-  const { accountId, refreshUrl, returnUrl } = req.body;
+  const { accountId } = req.body;
 
   if (!accountId) {
     return res.status(400).json({ error: "accountId required" });
   }
 
+  // Always build redirect URLs server-side — never trust client-supplied values.
+  const appOrigin = process.env.FRONTEND_URL || "https://app.mykliques.com";
+
   try {
     const link = await stripe.accountLinks.create({
       account: accountId,
       type: "account_onboarding",
-      refresh_url: refreshUrl,
-      return_url: returnUrl,
+      refresh_url: `${appOrigin}/provider/onboarding?step=5`,
+      return_url: `${appOrigin}/provider/onboarding?stripe=done`,
     });
 
     res.json({
@@ -10347,7 +10352,11 @@ app.get("/api/provider/check-handle", async (req, res) => {
 // ─── POST /api/provider/stripe/connect — create Stripe Connect account link ──
 app.post("/api/provider/stripe/connect", async (req, res) => {
   const providerId = getProviderId(req);
-  const { refreshUrl, returnUrl } = req.body || {};
+  // Never use client-supplied redirect URLs — always build from known app origin
+  // to prevent open-redirect attacks via the Stripe Connect flow.
+  const appOrigin = process.env.FRONTEND_URL || "https://app.mykliques.com";
+  const refreshUrl = `${appOrigin}/provider/onboarding?step=5`;
+  const returnUrl = `${appOrigin}/provider/onboarding?stripe=done`;
   try {
     // Fetch provider email / business name
     let email = null;
@@ -10364,8 +10373,8 @@ app.post("/api/provider/stripe/connect", async (req, res) => {
       if (data?.stripe_account_id) {
         const link = await stripe.accountLinks.create({
           account: data.stripe_account_id,
-          refresh_url: refreshUrl || `${req.headers.origin}/provider/onboarding?step=5`,
-          return_url: returnUrl || `${req.headers.origin}/provider/onboarding?stripe=done`,
+          refresh_url: refreshUrl,
+          return_url: returnUrl,
           type: "account_onboarding",
         });
         return res.json({ url: link.url, accountId: data.stripe_account_id });
@@ -10394,8 +10403,8 @@ app.post("/api/provider/stripe/connect", async (req, res) => {
     }
     const link = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: refreshUrl || `${req.headers.origin}/provider/onboarding?step=5`,
-      return_url: returnUrl || `${req.headers.origin}/provider/onboarding?stripe=done`,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
       type: "account_onboarding",
     });
     res.json({ url: link.url, accountId: account.id });
