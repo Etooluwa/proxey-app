@@ -101,6 +101,7 @@ function formatDate(isoDate) {
 function formatTime(isoDate) {
   if (!isoDate) return "";
   const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return "";
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
@@ -347,11 +348,15 @@ function StepTime({ provider, service, onNext, onBack }) {
     const dateStr = selectedDate.toISOString().slice(0, 10);
     request(`/public/provider/${provider.id}/slots?date=${dateStr}&duration=${service?.duration || 60}&buffer=${provider?.buffer_minutes || 0}`)
       .then((data) => {
-        const mappedSlots = (data?.slots || []).map((time) => ({
-          id: `${dateStr}-${time}`,
-          datetime: `${dateStr}T${time}:00`,
-          time_slot: time,
-        }));
+        const mappedSlots = (data?.slots || []).map((time) => {
+          // Normalise to HH:MM — the API may return "HH:MM" or "HH:MM:SS"
+          const hhmm = String(time).slice(0, 5);
+          return {
+            id: `${dateStr}-${hhmm}`,
+            datetime: `${dateStr}T${hhmm}:00`,
+            time_slot: hhmm,
+          };
+        });
         setSlots(mappedSlots);
       })
       .catch(() => setSlots([]))
