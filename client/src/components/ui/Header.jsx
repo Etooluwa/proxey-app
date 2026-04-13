@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MenuBtn from './MenuBtn';
 import NotifBell from './NotifBell';
 import Avatar from './Avatar';
@@ -26,20 +27,42 @@ const Header = ({
     showAvatar = true,
     initials = '?',
     avatarSrc = '',
-}) => (
-    <div className="relative flex items-center justify-between px-5 py-3 bg-base">
-        {/* Left: hamburger */}
-        <MenuBtn onClick={onMenu} />
+}) => {
+    const navigate = useNavigate();
+    const location = useLocation();
 
-        {/* Center: logo (absolute so it's truly centered) */}
-        <img src={klogo} alt="kliques" className="absolute left-1/2 -translate-x-1/2 select-none pointer-events-none" style={{ height: 44, width: 'auto' }} />
+    const handleAvatarClick = () => {
+        if (location.pathname.startsWith('/provider')) {
+            navigate('/provider/profile');
+            return;
+        }
+        navigate('/app/profile');
+    };
 
-        {/* Right: bell + optional avatar */}
-        <div className="flex items-center gap-1">
-            <NotifBell count={notifCount} onClick={onNotif} />
-            {showAvatar && <Avatar initials={initials} size={32} src={avatarSrc} />}
+    return (
+        <div className="relative flex items-center justify-between px-5 py-3 bg-base">
+            {/* Left: hamburger */}
+            <MenuBtn onClick={onMenu} />
+
+            {/* Center: logo (absolute so it's truly centered) */}
+            <img src={klogo} alt="kliques" className="absolute left-1/2 -translate-x-1/2 select-none pointer-events-none" style={{ height: 44, width: 'auto' }} />
+
+            {/* Right: bell + optional avatar */}
+            <div className="flex items-center gap-1">
+                <NotifBell count={notifCount} onClick={onNotif} />
+                {showAvatar && (
+                    <button
+                        type="button"
+                        onClick={handleAvatarClick}
+                        aria-label="Open profile"
+                        className="flex items-center justify-center p-0 bg-transparent border-0 cursor-pointer"
+                    >
+                        <Avatar initials={initials} size={32} src={avatarSrc} />
+                    </button>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export default Header;
