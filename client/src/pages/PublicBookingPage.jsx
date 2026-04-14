@@ -1055,6 +1055,24 @@ export default function PublicBookingPage() {
     const [hasIntake, setHasIntake] = useState(false);
     const [lightboxImg, setLightboxImg] = useState(null);
 
+    // Intercept browser back button and map to in-app step navigation
+    useEffect(() => {
+        window.history.pushState({ step }, '', window.location.href);
+        const handlePopState = (e) => {
+            // Always push a new state so the back button stays interceptable
+            window.history.pushState({ step }, '', window.location.href);
+            // Map current step to its previous step
+            if (step === 45) setStep(4);
+            else if (step === 4) setStep(session ? (hasIntake ? 3 : 2) : 35);
+            else if (step === 35) setStep(hasIntake ? 3 : 2);
+            else if (step === 3) setStep(2);
+            else if (step === 2) setStep(1);
+            else if (step === 1) navigate(-1); // leave the page
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [step, session, hasIntake, navigate]);
+
     // Submission
     const [submitting, setSubmitting] = useState(false);
     const [bookingId, setBookingId] = useState(null);
