@@ -486,32 +486,47 @@ const AppDashboard = () => {
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const clientId = session?.user?.id;
+    const accessToken = session?.accessToken;
 
     useEffect(() => {
-        if (!session?.accessToken) {
+        let active = true;
+
+        if (!accessToken) {
             setLoading(false);
-            return;
+            return () => {
+                active = false;
+            };
         }
 
         const fetchKliques = async () => {
-            setLoading(true);
-            setError(null);
+            if (active) {
+                setLoading(true);
+                setError(null);
+            }
             try {
                 const data = await request('/client/kliques');
+                if (!active) return;
                 setKliques(Array.isArray(data.kliques) ? data.kliques : []);
             } catch (err) {
+                if (!active) return;
                 console.error('Failed to load kliques:', err);
                 setError('Could not load your kliques.');
             } finally {
-                setLoading(false);
+                if (active) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchKliques();
-    }, [session]);
+        return () => {
+            active = false;
+        };
+    }, [accessToken, clientId]);
 
     useEffect(() => {
-        if (!supabase || !session?.user?.id) return undefined;
+        if (!supabase || !clientId) return undefined;
 
         const refresh = async () => {
             try {
@@ -521,14 +536,14 @@ const AppDashboard = () => {
         };
 
         const channel = supabase
-            .channel(`client-kliques:${session.user.id}`)
+            .channel(`client-kliques:${clientId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: 'provider_clients',
-                    filter: `client_id=eq.${session.user.id}`,
+                    filter: `client_id=eq.${clientId}`,
                 },
                 refresh,
             )
@@ -538,7 +553,7 @@ const AppDashboard = () => {
                     event: '*',
                     schema: 'public',
                     table: 'bookings',
-                    filter: `client_id=eq.${session.user.id}`,
+                    filter: `client_id=eq.${clientId}`,
                 },
                 refresh,
             )
@@ -547,7 +562,7 @@ const AppDashboard = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [session?.user?.id]);
+    }, [clientId]);
 
     const firstName = useMemo(() => {
         const fullName = sessionProfile?.name || session?.user?.user_metadata?.full_name || '';
