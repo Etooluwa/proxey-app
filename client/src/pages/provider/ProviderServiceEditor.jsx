@@ -169,7 +169,12 @@ const QuestionCard = ({ q, qi, onTextChange, onAddOption, onRemoveOption, onRemo
             </button>
         </div>
 
-        <Lbl className="block mb-2">Select options</Lbl>
+        <div className="mb-2">
+            <Lbl className="block mb-0.5">Answer options</Lbl>
+            <p className="text-[11px] m-0 leading-relaxed" style={{ color: '#B0948F' }}>
+                Add options → client picks one from a list. Leave empty → client types a free-text answer.
+            </p>
+        </div>
 
         {/* Option pills + adder */}
         <div className="flex flex-wrap gap-1.5">

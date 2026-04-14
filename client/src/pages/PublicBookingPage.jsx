@@ -698,12 +698,20 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
                 {questions.map(q => (
                     <div key={q.id} style={{ marginBottom: 28, padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16 }}>
                         <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 14px' }}>{q.question_text}</p>
-                        {(q.question_type === 'multiple_choice' || q.question_type === 'select') && q.options?.length > 0 ? (
+                        {q.options?.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                 {q.options.map(opt => {
                                     const sel = (answers[q.id] || []).includes(opt.option_text);
                                     return (
-                                        <button key={opt.id} onClick={() => toggleOption(q.id, opt.option_text)}
+                                        <button key={opt.id}
+                                            onClick={() => {
+                                                // Single-select: pick one, tap again to deselect
+                                                const current = answers[q.id]?.[0];
+                                                onAnswersChange({
+                                                    ...answers,
+                                                    [q.id]: current === opt.option_text ? [] : [opt.option_text],
+                                                });
+                                            }}
                                             style={{ padding: '10px 16px', borderRadius: 20, border: `1px solid ${sel ? T.accent : T.line}`, background: sel ? T.hero : 'transparent', fontFamily: F, fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? T.accent : T.ink, cursor: 'pointer', transition: 'all .15s' }}>
                                             {opt.option_text}
                                         </button>
