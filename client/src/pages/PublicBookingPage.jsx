@@ -282,7 +282,7 @@ function StarRow({ rating, max = 5 }) {
 }
 
 // ─── STEP 1: Provider Profile ───────────────────────────────────────────────────
-function Step1Profile({ provider, services, groups, reviews, portfolio, selectedService, selectedHours, onSelectService, onContinue }) {
+function Step1Profile({ provider, services, groups, reviews, portfolio, selectedService, selectedHours, onSelectService, onContinue, onViewPhoto }) {
     const displayName = provider?.business_name || provider?.name || 'Provider';
     const category = provider?.category || (provider?.categories?.[0]) || '';
     const subtitle = [category, provider?.city].filter(Boolean).join(' · ');
@@ -394,13 +394,14 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                                             className={`svc-card${selected ? ' selected' : ''}`}
                                         >
                                             {svc.image_url && (
-                                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                                                    <img
-                                                        src={svc.image_url}
-                                                        alt={svc.name}
-                                                        style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, display: 'block' }}
-                                                    />
-                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); onViewPhoto(svc.image_url); }}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 10, padding: '5px 12px', borderRadius: 20, border: '1px solid rgba(140,106,100,0.25)', background: T.abg, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 500, color: T.muted }}
+                                                >
+                                                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 16l5-5 4 4 3-3 5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                                    View photo
+                                                </button>
                                             )}
                                             <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
@@ -1038,6 +1039,7 @@ export default function PublicBookingPage() {
     const [intakeAnswers, setIntakeAnswers] = useState({});
     const [intakeFreeform, setIntakeFreeform] = useState('');
     const [hasIntake, setHasIntake] = useState(false);
+    const [lightboxImg, setLightboxImg] = useState(null);
 
     // Submission
     const [submitting, setSubmitting] = useState(false);
@@ -1169,28 +1171,59 @@ export default function PublicBookingPage() {
 
     // Step routing
     if (step === 1) return (
-        <Step1Profile
-            provider={provider}
-            services={services}
-            groups={groups}
-            reviews={reviews}
-            portfolio={portfolio}
-            selectedService={selectedService}
-            selectedHours={selectedHours}
-            onSelectService={setSelectedService}
-            onContinue={() => {
-                if (!bookingStartedTrackedRef.current && selectedService && posthog.__loaded) {
-                    bookingStartedTrackedRef.current = true;
-                    posthog.capture('booking_started', {
-                        provider_id: provider?.user_id || provider?.id,
-                        service_id: selectedService.id,
-                        payment_type: selectedService?.payment_type || 'none',
-                        selected_hours: isPerHourService(selectedService) ? getSelectedServiceHours(selectedService, selectedHours) : null,
-                    });
-                }
-                setStep(2);
-            }}
-        />
+        <>
+            <Step1Profile
+                provider={provider}
+                services={services}
+                groups={groups}
+                reviews={reviews}
+                portfolio={portfolio}
+                selectedService={selectedService}
+                selectedHours={selectedHours}
+                onSelectService={setSelectedService}
+                onViewPhoto={setLightboxImg}
+                onContinue={() => {
+                    if (!bookingStartedTrackedRef.current && selectedService && posthog.__loaded) {
+                        bookingStartedTrackedRef.current = true;
+                        posthog.capture('booking_started', {
+                            provider_id: provider?.user_id || provider?.id,
+                            service_id: selectedService.id,
+                            payment_type: selectedService?.payment_type || 'none',
+                            selected_hours: isPerHourService(selectedService) ? getSelectedServiceHours(selectedService, selectedHours) : null,
+                        });
+                    }
+                    setStep(2);
+                }}
+            />
+            {lightboxImg && (
+                <div
+                    onClick={() => setLightboxImg(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        background: 'rgba(0,0,0,0.85)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <button
+                        onClick={() => setLightboxImg(null)}
+                        style={{
+                            position: 'absolute', top: 20, right: 20,
+                            width: 36, height: 36, borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.15)', border: 'none',
+                            color: '#fff', fontSize: 22, lineHeight: 1, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                    >×</button>
+                    <img
+                        src={lightboxImg}
+                        alt="Service"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', display: 'block' }}
+                    />
+                </div>
+            )}
+        </>
     );
 
     if (step === 2) return (
