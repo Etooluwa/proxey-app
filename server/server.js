@@ -10729,7 +10729,7 @@ app.get("/api/provider/public/:handle", async (req, res) => {
     const [servicesRes, groupsRes, reviewsRes, clientCountRes, portfolioRes] = await Promise.all([
       supabase
         .from("services")
-        .select("id, name, duration, base_price, unit, payment_type, deposit_type, deposit_value, description, group_id, metadata")
+        .select("id, name, duration, base_price, unit, payment_type, deposit_type, deposit_value, description, group_id, metadata, image_url")
         .eq("provider_id", provider.user_id)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
