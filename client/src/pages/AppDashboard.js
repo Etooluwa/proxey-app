@@ -505,6 +505,7 @@ const AppDashboard = () => {
     const [kliques, setKliques] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [usingFallbackState, setUsingFallbackState] = useState(false);
     const clientId = session?.user?.id;
     const accessToken = session?.accessToken;
 
@@ -513,7 +514,8 @@ const AppDashboard = () => {
         const loadingWatchdog = window.setTimeout(() => {
             if (!active) return;
             setLoading(false);
-            setError((prev) => prev || 'Could not load your kliques.');
+            setError(null);
+            setUsingFallbackState(true);
         }, 12000);
 
         if (!accessToken) {
@@ -528,15 +530,19 @@ const AppDashboard = () => {
             if (active) {
                 setLoading(true);
                 setError(null);
+                setUsingFallbackState(false);
             }
             try {
                 const data = await request('/client/kliques');
                 if (!active) return;
                 setKliques(Array.isArray(data.kliques) ? data.kliques : []);
+                setUsingFallbackState(false);
             } catch (err) {
                 if (!active) return;
                 console.error('Failed to load kliques:', err);
-                setError('Could not load your kliques.');
+                setKliques((prev) => (Array.isArray(prev) ? prev : []));
+                setError(null);
+                setUsingFallbackState(true);
             } finally {
                 if (active) {
                     setLoading(false);
@@ -620,10 +626,17 @@ const AppDashboard = () => {
             {!error && loading && <ProvidersSkeleton />}
 
             {!error && !loading && (
-                <ProvidersSection
-                    kliques={kliques}
-                    onSelect={(providerId) => navigate(`/app/relationship/${providerId}`)}
-                />
+                <>
+                    {usingFallbackState && (
+                        <p style={{ margin: '0 0 18px', fontFamily: F, fontSize: 13, color: T.muted }}>
+                            We couldn&apos;t refresh your latest relationships, but you can keep using the app.
+                        </p>
+                    )}
+                    <ProvidersSection
+                        kliques={kliques}
+                        onSelect={(providerId) => navigate(`/app/relationship/${providerId}`)}
+                    />
+                </>
             )}
         </>
     );
