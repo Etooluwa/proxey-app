@@ -392,18 +392,17 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                                             key={svc.id}
                                             onClick={() => onSelectService(selected ? null : svc)}
                                             className={`svc-card${selected ? ' selected' : ''}`}
-                                            style={{ padding: 0, overflow: 'hidden' }}
                                         >
                                             {svc.image_url && (
-                                                <div style={{ width: '100%', height: 120, overflow: 'hidden', borderRadius: '14px 14px 0 0' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                                                     <img
                                                         src={svc.image_url}
                                                         alt={svc.name}
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                        style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, display: 'block' }}
                                                     />
                                                 </div>
                                             )}
-                                            <div style={{ padding: '14px 16px 14px' }}>
+                                            <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
                                                     <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{svc.name}</span>
                                                     {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtServicePriceSummary(svc, selected ? selectedHours : null)}</span>}
