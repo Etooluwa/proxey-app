@@ -93,7 +93,7 @@ export const NotificationProvider = ({ children }) => {
 
         const userId = session.user.id;
         const tableName = isProvider ? 'notifications' : 'client_notifications';
-        const filterField = isProvider ? 'provider_id' : 'user_id';
+        const filterField = 'user_id';
 
         // Subscribe to INSERT and UPDATE events
         const channel = supabase
