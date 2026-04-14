@@ -8,7 +8,7 @@
  * Services are organised under group headers.
  * Ungrouped services appear under an implicit "General" group.
  */
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -23,6 +23,7 @@ import Footer from '../../components/ui/Footer';
 // ─── Desktop tokens ────────────────────────────────────────────────────────────
 const T = { ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A', line: 'rgba(140,106,100,0.18)', card: '#FFFFFF', avatarBg: '#F2EBE5', success: '#5A8A5E' };
 const F = "'Sora',system-ui,sans-serif";
+const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,12 +114,53 @@ const EmptyServices = ({ onAdd }) => (
     </HeroCard>
 );
 
+// ─── Copy link button ─────────────────────────────────────────────────────────
+
+const CopyLinkBtn = ({ url }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-[11px] font-semibold focus:outline-none active:opacity-60 flex-shrink-0"
+            style={{
+                background: copied ? '#EBF2EC' : 'rgba(140,106,100,0.1)',
+                color: copied ? '#5A8A5E' : '#8C6A64',
+                border: 'none',
+                transition: 'all .2s',
+            }}
+            title="Copy booking link for this service"
+        >
+            {copied ? (
+                <>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Copied
+                </>
+            ) : (
+                <>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-8a2 2 0 01-2-2v-2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Copy link
+                </>
+            )}
+        </button>
+    );
+};
+
 // ─── Service row ──────────────────────────────────────────────────────────────
 
-const ServiceRow = ({ svc, onClick, isLast }) => {
+const ServiceRow = ({ svc, onClick, isLast, handle }) => {
     const booked = svc.bookings_this_month || 0;
     const isDraft = svc.is_active === false;
     const meta = fmtServiceMeta(svc);
+    const bookingUrl = handle ? `${APP_ORIGIN}/book/${handle}?service=${svc.id}` : null;
 
     return (
         <>
@@ -138,14 +180,17 @@ const ServiceRow = ({ svc, onClick, isLast }) => {
                             </span>
                         )}
                     </div>
-                    <p className="text-[13px] text-muted m-0">
-                        {meta || '—'}
-                        {booked > 0 && (
-                            <span className="ml-2 text-[12px]" style={{ color: '#5A8A5E' }}>
-                                {booked} booked
-                            </span>
-                        )}
-                    </p>
+                    <div className="flex items-center gap-3 flex-wrap mt-1">
+                        <p className="text-[13px] text-muted m-0">
+                            {meta || '—'}
+                            {booked > 0 && (
+                                <span className="ml-2 text-[12px]" style={{ color: '#5A8A5E' }}>
+                                    {booked} booked
+                                </span>
+                            )}
+                        </p>
+                        {bookingUrl && <CopyLinkBtn url={bookingUrl} />}
+                    </div>
                 </div>
                 <ArrowIcon size={16} />
             </button>
@@ -156,7 +201,7 @@ const ServiceRow = ({ svc, onClick, isLast }) => {
 
 // ─── Group section ────────────────────────────────────────────────────────────
 
-const GroupSection = ({ group, services, onServiceClick, onAddToGroup, onGroupClick }) => {
+const GroupSection = ({ group, services, onServiceClick, onAddToGroup, onGroupClick, handle }) => {
     const groupName = group ? group.name : 'General';
     const count = services.length;
 
@@ -202,6 +247,7 @@ const GroupSection = ({ group, services, onServiceClick, onAddToGroup, onGroupCl
                             svc={svc}
                             onClick={() => onServiceClick(svc)}
                             isLast={i === services.length - 1}
+                            handle={handle}
                         />
                     ))}
                 </div>
@@ -388,9 +434,9 @@ const ProviderServices = () => {
                                 </div>
                                 <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
                                     {/* Table header */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 32px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
-                                        {['Service', 'Duration', 'Price', 'Booked', ''].map((h) => (
-                                            <span key={h} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 120px 32px', padding: '10px 20px', borderBottom: `1px solid ${T.line}` }}>
+                                        {['Service', 'Duration', 'Price', 'Booked', '', ''].map((h, idx) => (
+                                            <span key={idx} style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
                                         ))}
                                     </div>
                                     {section.services.length === 0 ? (
@@ -402,21 +448,27 @@ const ProviderServices = () => {
                                         const price = fmtPrice(svc.base_price || svc.basePrice);
                                         const booked = svc.bookings_this_month || 0;
                                         const isDraft = svc.is_active === false;
+                                        const bookingUrl = profile?.handle ? `${APP_ORIGIN}/book/${profile.handle}?service=${svc.id}` : null;
                                         return (
-                                            <button
+                                            <div
                                                 key={svc.id}
-                                                onClick={() => handleServiceClick(svc)}
-                                                style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 32px', alignItems: 'center', padding: '14px 20px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', borderBottom: i < section.services.length - 1 ? `1px solid ${T.line}` : 'none', textAlign: 'left' }}
+                                                style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 120px 32px', alignItems: 'center', padding: '14px 20px', borderBottom: i < section.services.length - 1 ? `1px solid ${T.line}` : 'none' }}
                                             >
-                                                <div>
+                                                <button
+                                                    onClick={() => handleServiceClick(svc)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                                                >
                                                     <span style={{ fontFamily: F, fontSize: 14, color: T.ink }}>{svc.name}</span>
                                                     {isDraft && <span style={{ fontFamily: F, fontSize: 10, fontWeight: 600, color: T.faded, textTransform: 'uppercase', letterSpacing: '0.04em', marginLeft: 8 }}>Draft</span>}
-                                                </div>
+                                                </button>
                                                 <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{duration || '—'}</span>
                                                 <span style={{ fontFamily: F, fontSize: 13, color: T.muted }}>{price || '—'}</span>
                                                 <span style={{ fontFamily: F, fontSize: 13, color: booked > 0 ? T.success : T.faded }}>{booked > 0 ? booked : '—'}</span>
-                                                <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                            </button>
+                                                {bookingUrl && <CopyLinkBtn url={bookingUrl} />}
+                                                <button onClick={() => handleServiceClick(svc)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                                                    <svg width="14" height="14" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                </button>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -498,6 +550,7 @@ const ProviderServices = () => {
                                 onServiceClick={handleServiceClick}
                                 onAddToGroup={handleAddToGroup}
                                 onGroupClick={handleGroupClick}
+                                handle={profile?.handle}
                             />
                         ))}
 

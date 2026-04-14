@@ -13,6 +13,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useSession } from '../../auth/authContext';
 import { request } from '../../data/apiClient';
 import { supabase } from '../../utils/supabase';
 import BackBtn from '../../components/ui/BackBtn';
@@ -22,6 +23,8 @@ import Toggle from '../../components/ui/Toggle';
 import { useToast } from '../../components/ui/ToastProvider';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 const fmt$ = (n) => `$${Number(n).toFixed(2)}`;
 
@@ -219,6 +222,18 @@ const ProviderServiceEditor = () => {
     const location = useLocation();
     const isNew = !id || id === 'new';
     const toast = useToast();
+    const { profile } = useSession();
+
+    const [linkCopied, setLinkCopied] = useState(false);
+    const bookingUrl = !isNew && profile?.handle ? `${APP_ORIGIN}/book/${profile.handle}?service=${id}` : null;
+
+    const copyBookingLink = () => {
+        if (!bookingUrl) return;
+        navigator.clipboard.writeText(bookingUrl).then(() => {
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        });
+    };
 
     // Pre-selected group from ProviderServices "Add to group"
     const preGroupId = location.state?.groupId || null;
@@ -513,7 +528,33 @@ const ProviderServiceEditor = () => {
                 <p className="text-[14px] font-semibold text-muted m-0">
                     {isNew ? 'New service' : 'Edit service'}
                 </p>
-                <div style={{ width: 36 }} /> {/* spacer */}
+                {bookingUrl ? (
+                    <button
+                        onClick={copyBookingLink}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold focus:outline-none active:opacity-60"
+                        style={{
+                            background: linkCopied ? '#EBF2EC' : 'rgba(140,106,100,0.1)',
+                            color: linkCopied ? '#5A8A5E' : '#8C6A64',
+                            border: 'none',
+                            transition: 'all .2s',
+                        }}
+                        title="Copy booking link for this service"
+                    >
+                        {linkCopied ? (
+                            <>
+                                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Copied
+                            </>
+                        ) : (
+                            <>
+                                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-8a2 2 0 01-2-2v-2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Copy link
+                            </>
+                        )}
+                    </button>
+                ) : (
+                    <div style={{ width: 36 }} />
+                )}
             </div>
 
             {/* ── Scrollable body ── */}
