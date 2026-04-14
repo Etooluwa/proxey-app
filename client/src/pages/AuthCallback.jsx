@@ -117,11 +117,10 @@ export default function AuthCallback() {
       const lsRole = window.localStorage.getItem('proxey.pending_role');
       const lsName = window.localStorage.getItem('proxey.pendingName') || '';
 
-      // Only treat as new signup if role params are present AND the account was created recently
-      // (within 5 minutes of now) — prevents welcome email on returning logins with stale localStorage
-      const accountCreatedAt = session.user.created_at ? new Date(session.user.created_at) : null;
-      const isRecentAccount = accountCreatedAt && (Date.now() - accountCreatedAt.getTime()) < 5 * 60 * 1000;
-      const isNewSignup = Boolean(urlRole || lsRole) && isRecentAccount;
+      // Only treat as new signup if role params are present (set during signup flow, never during login).
+      // We intentionally do NOT check account age — Google OAuth can reuse old created_at timestamps
+      // when an account is deleted and re-created with the same email, which would break the check.
+      const isNewSignup = Boolean(urlRole || lsRole);
       const role = urlRole || lsRole || session.user.role || "client";
       // Name priority: URL param → localStorage → Google/OAuth user_metadata → email prefix
       const metaName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || '';
