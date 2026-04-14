@@ -395,7 +395,7 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                                             style={{ padding: 0, overflow: 'hidden' }}
                                         >
                                             {svc.image_url && (
-                                                <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', borderRadius: '14px 14px 0 0' }}>
+                                                <div style={{ width: '100%', height: 120, overflow: 'hidden', borderRadius: '14px 14px 0 0' }}>
                                                     <img
                                                         src={svc.image_url}
                                                         alt={svc.name}
