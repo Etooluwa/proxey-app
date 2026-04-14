@@ -392,18 +392,30 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                                             key={svc.id}
                                             onClick={() => onSelectService(selected ? null : svc)}
                                             className={`svc-card${selected ? ' selected' : ''}`}
+                                            style={{ padding: 0, overflow: 'hidden' }}
                                         >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
-                                                <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{svc.name}</span>
-                                                {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtServicePriceSummary(svc, selected ? selectedHours : null)}</span>}
-                                            </div>
-                                            {(svc.duration || isPerHourService(svc)) && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                                                    <svg width="12" height="12" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                                    <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtServiceDurationSummary(svc, selected ? selectedHours : null)}</span>
+                                            {svc.image_url && (
+                                                <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', borderRadius: '14px 14px 0 0' }}>
+                                                    <img
+                                                        src={svc.image_url}
+                                                        alt={svc.name}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                    />
                                                 </div>
                                             )}
-                                            {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0 }}>{svc.description}</p>}
+                                            <div style={{ padding: '14px 16px 14px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, paddingRight: 32 }}>
+                                                    <span style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>{svc.name}</span>
+                                                    {svc.base_price && <span style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.accent, flexShrink: 0, marginLeft: 16 }}>{fmtServicePriceSummary(svc, selected ? selectedHours : null)}</span>}
+                                                </div>
+                                                {(svc.duration || isPerHourService(svc)) && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                                                        <svg width="12" height="12" fill="none" stroke={T.muted} strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                        <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtServiceDurationSummary(svc, selected ? selectedHours : null)}</span>
+                                                    </div>
+                                                )}
+                                                {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0 }}>{svc.description}</p>}
+                                            </div>
                                             <div className="svc-check">
                                                 <svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                             </div>
