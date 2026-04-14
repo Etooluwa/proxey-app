@@ -8600,7 +8600,7 @@ app.get("/api/provider/:providerId/availability/closest", async (req, res) => {
 app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
   const { providerId } = req.params;
-  const { date, duration = 60 } = req.query;
+  const { date, duration = 60, buffer = 0 } = req.query;
   if (!date) return res.status(400).json({ error: "date is required (YYYY-MM-DD)." });
 
   try {
@@ -8650,7 +8650,8 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       .gte("scheduled_at", dayStart)
       .lte("scheduled_at", dayEnd);
 
-    // Build booked minute-ranges (start inclusive, end exclusive) to block full duration
+    // Build booked minute-ranges (start inclusive, end exclusive) to block full duration + buffer
+    const bufferMinutes = parseInt(buffer) || 0;
     const bookedTimes = new Set();
     const bookedBookingRanges = [];
     for (const b of bookings || []) {
@@ -8662,7 +8663,7 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       const [bh, bm] = timeStr.split(":").map(Number);
       const startMins = bh * 60 + bm;
       const dur = parseInt(b.duration) || 60;
-      const endMins = startMins + dur;
+      const endMins = startMins + dur + bufferMinutes;
       bookedTimes.add(timeStr);
       bookedBookingRanges.push({ start: startMins, end: endMins });
     }
@@ -8693,20 +8694,23 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
       const overrideStart = availabilityOverride ? availabilityOverride.start_time : null;
       const overrideEnd = availabilityOverride ? availabilityOverride.end_time : null;
 
+      const slotDurMins = parseInt(duration) || 60;
+      const bufferMins = parseInt(buffer) || 0;
       slots = [...new Set(allSlots)]
         .sort()
         .filter((slot) => {
           const [h, m] = slot.split(":").map(Number);
-          const mins = h * 60 + m;
-          // Block if this slot overlaps any existing booking's duration
-          if (bookedBookingRanges.some((r) => mins >= r.start && mins < r.end)) return false;
+          const slotStart = h * 60 + m;
+          const slotEnd = slotStart + slotDurMins + bufferMins;
+          // Block if this slot overlaps any existing booking (including buffer)
+          if (bookedBookingRanges.some((r) => slotStart < r.end && slotEnd > r.start)) return false;
           // Check partial blocks
-          if (blockedRanges.some((r) => mins >= r.start && mins < r.end)) return false;
+          if (blockedRanges.some((r) => slotStart < r.end && slotEnd > r.start)) return false;
           // Check override window
           if (overrideStart && overrideEnd) {
             const [oh, om] = overrideStart.split(":").map(Number);
             const [eh, em] = overrideEnd.split(":").map(Number);
-            if (mins < oh * 60 + om || mins >= eh * 60 + em) return false;
+            if (slotStart < oh * 60 + om || slotStart >= eh * 60 + em) return false;
           }
           return true;
         });
