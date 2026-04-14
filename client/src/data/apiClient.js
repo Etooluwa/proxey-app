@@ -10,33 +10,37 @@ async function resolveUserHeaders() {
   let accessToken = null;
   let userId = null;
 
+  // Read from localStorage first so requests are never blocked on Supabase session resolution.
+  try {
+    const rawSession = window.localStorage.getItem("proxey.auth.session");
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession);
+      const storedAccessToken = parsed?.access_token || parsed?.accessToken || null;
+      if (storedAccessToken) {
+        accessToken = storedAccessToken;
+        userId = parsed.user?.id || null;
+      }
+    }
+  } catch (error) {
+    console.warn("[api] Unable to parse stored session", error);
+  }
+
   // Primary: get the live Supabase session for a verified JWT
   if (supabase?.auth?.getSession) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const liveSessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error("Supabase session lookup timed out.")), 4000);
+        }),
+      ]);
+      const { data: { session } } = liveSessionResult;
       if (session?.access_token) {
         accessToken = session.access_token;
         userId = session.user?.id || null;
       }
     } catch (error) {
       console.warn("[api] Unable to resolve Supabase session", error);
-    }
-  }
-
-  // Fallback: read from localStorage cache if live session unavailable
-  if (!accessToken) {
-    try {
-      const rawSession = window.localStorage.getItem("proxey.auth.session");
-      if (rawSession) {
-        const parsed = JSON.parse(rawSession);
-        const storedAccessToken = parsed?.access_token || parsed?.accessToken || null;
-        if (storedAccessToken) {
-          accessToken = storedAccessToken;
-          userId = parsed.user?.id || null;
-        }
-      }
-    } catch (error) {
-      console.warn("[api] Unable to parse stored session", error);
     }
   }
 

@@ -1878,7 +1878,7 @@ app.post("/api/services", async (req, res) => {
 
   const {
     paymentType, depositType, depositValue, clientNotesEnabled,
-    isActive, photos, preAppointmentInfo, pricingType, minHours, maxHours,
+    isActive, photos, preAppointmentInfo, pricingType, minHours, maxHours, imageUrl,
   } = req.body || {};
 
   let providerId;
@@ -1913,6 +1913,7 @@ app.post("/api/services", async (req, res) => {
     deposit_value: depositValue != null ? depositValue : null,
     client_notes_enabled: clientNotesEnabled !== undefined ? clientNotesEnabled : true,
     metadata: Object.keys(metadataFields).length > 0 ? metadataFields : undefined,
+    image_url: imageUrl || null,
   };
 
   try {
@@ -2037,7 +2038,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   const {
     name, description, category, basePrice, duration, isActive,
     paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
-    pricingType, minHours, maxHours,
+    pricingType, minHours, maxHours, imageUrl,
   } = req.body || {};
 
   try {
@@ -2056,6 +2057,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
     if (depositType !== undefined)          updates.deposit_type = depositType;
     if (depositValue !== undefined)         updates.deposit_value = depositValue;
     if (clientNotesEnabled !== undefined)   updates.client_notes_enabled = clientNotesEnabled;
+    if (imageUrl !== undefined)             updates.image_url = imageUrl;
     if (pricingType !== undefined)          updates.unit = pricingType === 'per_hour' ? 'hour' : 'visit';
     if (photos !== undefined || preAppointmentInfo !== undefined || pricingType !== undefined) {
       const { data: existing } = await supabase.from("services").select("metadata").eq("id", id).single();

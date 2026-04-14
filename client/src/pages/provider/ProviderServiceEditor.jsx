@@ -14,6 +14,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { request } from '../../data/apiClient';
+import { supabase } from '../../utils/supabase';
 import BackBtn from '../../components/ui/BackBtn';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
@@ -202,6 +203,7 @@ const EMPTY_FORM = {
     is_active: true,
     group_id: null,
     preAppointmentInfo: [],
+    imageUrl: '',
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -224,6 +226,8 @@ const ProviderServiceEditor = () => {
     const [saving, setSaving] = useState(false);
     const [savingStatus, setSavingStatus] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [photoUploading, setPhotoUploading] = useState(false);
+    const photoInputRef = useRef(null);
 
     // ── Load existing ────────────────────────────────────────────────────────
     const load = useCallback(async () => {
@@ -251,6 +255,7 @@ const ProviderServiceEditor = () => {
                     is_active:          svc.is_active !== false,
                     group_id:           svc.group_id || null,
                     preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
+                    imageUrl:           svc.image_url || '',
                 });
             }
             setQuestions(data.questions || []);
@@ -319,6 +324,41 @@ const ProviderServiceEditor = () => {
         });
     };
 
+    // ── Photo upload ─────────────────────────────────────────────────────────
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            toast.push({ title: 'Invalid file', description: 'Please select an image file.', variant: 'error' });
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.push({ title: 'File too large', description: 'Max photo size is 5 MB.', variant: 'error' });
+            return;
+        }
+        setPhotoUploading(true);
+        try {
+            const ext = file.name.split('.').pop();
+            const fileName = `service-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            const { data, error } = await supabase.storage
+                .from('kliques-media')
+                .upload(fileName, file, { cacheControl: '3600', upsert: false });
+            if (error) throw error;
+            const { data: { publicUrl } } = supabase.storage
+                .from('kliques-media')
+                .getPublicUrl(data.path);
+            set('imageUrl')(publicUrl);
+        } catch (err) {
+            console.error('[ProviderServiceEditor] photo upload error:', err);
+            toast.push({ title: 'Upload failed', description: err.message, variant: 'error' });
+        } finally {
+            setPhotoUploading(false);
+            if (photoInputRef.current) photoInputRef.current.value = '';
+        }
+    };
+
+    const handleRemovePhoto = () => set('imageUrl')('');
+
     // ── Save ─────────────────────────────────────────────────────────────────
     const handleSave = async () => {
         const errs = {};
@@ -349,6 +389,7 @@ const ProviderServiceEditor = () => {
                 pricingType:        form.pricingType,
                 minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
                 maxHours:           form.pricingType === 'per_hour' ? Number(form.maxHours) : null,
+                imageUrl:           form.imageUrl || null,
             };
 
             let serviceId = id;
@@ -535,6 +576,86 @@ const ProviderServiceEditor = () => {
                             ))}
                         </select>
                     </div>
+                </Section>
+
+                <Divider />
+
+                {/* ─ Service photo ─ */}
+                <Section>
+                    <SectionLabel>Service photo</SectionLabel>
+                    <p className="text-[13px] text-muted m-0 mb-4 leading-relaxed">
+                        Add a photo to showcase this service on your booking page. Optional.
+                    </p>
+
+                    <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoChange}
+                        style={{ display: 'none' }}
+                    />
+
+                    {form.imageUrl ? (
+                        <div className="relative" style={{ width: '100%', borderRadius: 14, overflow: 'hidden', aspectRatio: '16/9' }}>
+                            <img
+                                src={form.imageUrl}
+                                alt="Service"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            />
+                            <div
+                                className="absolute inset-0 flex items-end justify-end p-3"
+                                style={{ background: 'linear-gradient(to top, rgba(61,35,30,0.5) 0%, transparent 60%)' }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={handleRemovePhoto}
+                                    className="px-3 py-1.5 rounded-lg text-[12px] font-semibold focus:outline-none"
+                                    style={{ background: 'rgba(61,35,30,0.7)', color: '#fff', border: 'none' }}
+                                >
+                                    Remove
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => photoInputRef.current?.click()}
+                                    className="ml-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold focus:outline-none"
+                                    style={{ background: 'rgba(255,255,255,0.85)', color: '#3D231E', border: 'none' }}
+                                >
+                                    Change
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => !photoUploading && photoInputRef.current?.click()}
+                            disabled={photoUploading}
+                            className="w-full flex flex-col items-center justify-center gap-2 focus:outline-none"
+                            style={{
+                                border: '1.5px dashed rgba(140,106,100,0.4)',
+                                borderRadius: 14,
+                                background: 'transparent',
+                                padding: '32px 16px',
+                                cursor: photoUploading ? 'not-allowed' : 'pointer',
+                                opacity: photoUploading ? 0.6 : 1,
+                            }}
+                        >
+                            {photoUploading ? (
+                                <>
+                                    <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(140,106,100,0.2)', borderTop: '2px solid #C25E4A', animation: 'spin 0.8s linear infinite' }} />
+                                    <span className="text-[13px] text-muted">Uploading…</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="28" height="28" fill="none" stroke="#B0948F" strokeWidth="1.5" viewBox="0 0 24 24">
+                                        <path d="M4 16l4-4 4 4 4-6 4 6" strokeLinecap="round" strokeLinejoin="round" />
+                                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                                    </svg>
+                                    <span className="text-[13px] font-medium" style={{ color: '#8C6A64' }}>Tap to upload photo</span>
+                                    <span className="text-[11px]" style={{ color: '#B0948F' }}>JPG, PNG, WEBP · Max 5 MB</span>
+                                </>
+                            )}
+                        </button>
+                    )}
                 </Section>
 
                 <Divider />
