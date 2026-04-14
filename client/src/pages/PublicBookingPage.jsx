@@ -698,7 +698,7 @@ function Step3Intake({ service, provider, answers, onAnswersChange, onBack, onCo
                 {questions.map(q => (
                     <div key={q.id} style={{ marginBottom: 28, padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16 }}>
                         <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: '0 0 14px' }}>{q.question_text}</p>
-                        {q.question_type === 'multiple_choice' && q.options?.length > 0 ? (
+                        {(q.question_type === 'multiple_choice' || q.question_type === 'select') && q.options?.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                 {q.options.map(opt => {
                                     const sel = (answers[q.id] || []).includes(opt.option_text);
