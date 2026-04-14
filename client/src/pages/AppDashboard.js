@@ -478,6 +478,25 @@ function ProvidersSection({ kliques, onSelect }) {
     );
 }
 
+function ProvidersSkeleton() {
+    return (
+        <section style={{ animation: 'fadeUp 0.4s ease 0.12s both' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0 28px' }}>
+                <div
+                    style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        border: `2px solid ${T.accent}`,
+                        borderTopColor: 'transparent',
+                        animation: 'spin 0.7s linear infinite',
+                    }}
+                />
+            </div>
+        </section>
+    );
+}
+
 const AppDashboard = () => {
     const navigate = useNavigate();
     const { onMenu, isDesktop } = useOutletContext() || {};
@@ -491,9 +510,15 @@ const AppDashboard = () => {
 
     useEffect(() => {
         let active = true;
+        const loadingWatchdog = window.setTimeout(() => {
+            if (!active) return;
+            setLoading(false);
+            setError((prev) => prev || 'Could not load your kliques.');
+        }, 12000);
 
         if (!accessToken) {
             setLoading(false);
+            window.clearTimeout(loadingWatchdog);
             return () => {
                 active = false;
             };
@@ -516,12 +541,14 @@ const AppDashboard = () => {
                 if (active) {
                     setLoading(false);
                 }
+                window.clearTimeout(loadingWatchdog);
             }
         };
 
         fetchKliques();
         return () => {
             active = false;
+            window.clearTimeout(loadingWatchdog);
         };
     }, [accessToken, clientId]);
 
@@ -584,28 +611,15 @@ const AppDashboard = () => {
 
             <GreetingBlock firstName={firstName} count={kliques.length} />
 
-            {loading && (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                    <div
-                        style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            border: `2px solid ${T.accent}`,
-                            borderTopColor: 'transparent',
-                            animation: 'spin 0.7s linear infinite',
-                        }}
-                    />
-                </div>
-            )}
-
-            {!loading && error && (
+            {error && (
                 <p style={{ margin: 0, fontFamily: F, fontSize: 14, color: T.muted }}>
                     {error}
                 </p>
             )}
 
-            {!loading && !error && (
+            {!error && loading && <ProvidersSkeleton />}
+
+            {!error && !loading && (
                 <ProvidersSection
                     kliques={kliques}
                     onSelect={(providerId) => navigate(`/app/relationship/${providerId}`)}
