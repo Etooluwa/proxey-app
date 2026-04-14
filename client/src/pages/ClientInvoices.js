@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request, API_BASE } from '../data/apiClient';
+import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -72,8 +73,10 @@ const ClientInvoices = () => {
     const handleDownload = async (invoice) => {
         setDownloadingId(invoice.id);
         try {
+            const { data: { session: liveSession } } = await supabase.auth.getSession();
+            const token = liveSession?.access_token;
             const res = await fetch(`${API_BASE}/invoices/${invoice.id}/pdf`, {
-                headers: { 'x-user-id': session?.user?.id },
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
             });
             if (!res.ok) throw new Error('Failed');
             const blob = await res.blob();
