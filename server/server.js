@@ -527,9 +527,20 @@ async function getClientNotifPrefs(userId) {
     .select('notification_preferences, email, name')
     .eq('user_id', userId)
     .maybeSingle();
+
+  let email = data?.email || null;
+
+  // Fallback: Google OAuth users have null email in client_profiles — fetch from auth.users
+  if (!email) {
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      email = authUser?.user?.email || null;
+    } catch {}
+  }
+
   return {
     prefs: data?.notification_preferences || {},
-    email: data?.email || null,
+    email,
     name: data?.name || null,
   };
 }
