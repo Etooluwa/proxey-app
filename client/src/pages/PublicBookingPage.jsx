@@ -976,7 +976,7 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, selectedH
 
 // ─── STEP 45: Payment ───────────────────────────────────────────────────────────
 
-function Step45Payment({ service, provider, session, onSuccess, onBack }) {
+function Step45Payment({ service, provider, session, onSuccess, onBack, bookingError }) {
     return (
         <StepWrap>
             <StepHeader onBack={onBack} current={5} total={5} />
@@ -985,12 +985,18 @@ function Step45Payment({ service, provider, session, onSuccess, onBack }) {
                 sub={{ save_card: 'Your card is saved securely. No charge is made now.', deposit: 'The remaining balance is due after your session.', full: 'Your card will be charged now to secure the booking.' }[service?.payment_type || 'full']}
             />
             <div style={{ padding: '0 24px 100px' }} className="step-fade">
+                {bookingError && (
+                    <div style={{ marginBottom: 16, padding: '14px 18px', borderRadius: 12, background: T.dangerBg, fontFamily: F, fontSize: 13, color: T.danger }}>
+                        {bookingError}
+                    </div>
+                )}
                 <BookingPaymentForm
                     service={service}
                     provider={provider}
                     session={session}
                     onSuccess={onSuccess}
                     onError={() => {}}
+                    key={bookingError || 'form'}
                 />
             </div>
         </StepWrap>
@@ -1120,9 +1126,12 @@ export default function PublicBookingPage() {
         } catch { }
     }, [session]);
 
+    const [bookingError, setBookingError] = useState(null);
+
     const handleSubmitBooking = async (pmtData) => {
         if (!session) return;
         setSubmitting(true);
+        setBookingError(null);
         try {
             // Ensure client_profiles row exists
             await supabase.from('client_profiles').upsert(
@@ -1169,6 +1178,8 @@ export default function PublicBookingPage() {
             setStep(5);
         } catch (err) {
             console.error('[PublicBookingPage] submit error:', err);
+            const msg = err?.message || 'Something went wrong. Please try again.';
+            setBookingError(msg);
         } finally {
             setSubmitting(false);
         }
@@ -1313,6 +1324,7 @@ export default function PublicBookingPage() {
             provider={provider}
             session={session}
             onBack={() => setStep(4)}
+            bookingError={bookingError}
             onSuccess={(pmtData) => {
                 if (posthog.__loaded) {
                     posthog.capture('payment_succeeded', {
