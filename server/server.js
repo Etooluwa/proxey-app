@@ -3061,11 +3061,15 @@ ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
       if (clientEmail) {
         await sendEmail({
           to: clientEmail,
-          subject: 'Booking Cancelled',
-          html: `<p>Hi ${clientName || 'there'},</p>
-<p>${providerName} has cancelled your booking scheduled for <strong>${scheduledDate}</strong>.</p>
-${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-<p>Log in to <a href="https://mykliques.com">Kliques</a> to book another time.</p>`
+          subject: `Your booking with ${providerName} has been cancelled`,
+          html: emailBase(`
+            <h1 style="margin:0 0 12px;font-size:28px;line-height:1.1;color:#331D19;">Booking cancelled</h1>
+            <p style="margin:0 0 24px;color:#8C6A64;font-size:15px;line-height:1.6;">
+              Hi ${clientName || 'there'}, your booking with <strong>${providerName}</strong> scheduled for <strong>${scheduledDate}</strong> has been cancelled.
+            </p>
+            ${reason ? `<div style="background:#FFF5E6;border-radius:14px;padding:16px 20px;margin-bottom:20px;"><p style="margin:0;font-size:14px;color:#92400E;"><strong>Reason:</strong> ${reason}</p></div>` : ''}
+            <p style="margin:0;color:#8C6A64;font-size:14px;">You can book another time by visiting your provider's booking page.</p>
+          `),
         }).catch(() => {});
       }
     }

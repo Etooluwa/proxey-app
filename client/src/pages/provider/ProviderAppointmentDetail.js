@@ -711,6 +711,7 @@ const ProviderAppointmentDetail = () => {
     const isPending = statusLower === 'pending';
     const isConfirmed = statusLower === 'confirmed' || statusLower === 'accepted';
     const isAlreadyCompleted = statusLower === 'completed';
+    const isCancelled = statusLower === 'cancelled' || statusLower === 'declined';
     const price = fmtPrice(job.price);
     const duration = fmtDuration(job.duration);
     const dateLabel = fmtDate(job.scheduled_at);
@@ -804,6 +805,14 @@ const ProviderAppointmentDetail = () => {
                             Completed
                         </span>
                     )}
+                    {isCancelled && (
+                        <span
+                            className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
+                            style={{ background: '#FDEDEA', color: '#C25E4A' }}
+                        >
+                            Cancelled
+                        </span>
+                    )}
                     <span
                         className="inline-flex px-3 py-1.5 rounded-pill text-[11px] font-semibold uppercase tracking-[0.05em]"
                         style={{ background: paymentMeta.bg, color: paymentMeta.color }}
@@ -843,13 +852,13 @@ const ProviderAppointmentDetail = () => {
                                         <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                         <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Card charged successfully.</p>
                                     </div>
-                                ) : (
+                                ) : !isCancelled ? (
                                     <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
                                         <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
                                             The full amount will be charged automatically when you mark this booking complete.
                                         </p>
                                     </div>
-                                )}
+                                ) : null}
                             </>
                         ) : paymentType === 'deposit' && depositPaid !== null ? (
                             <>
@@ -866,13 +875,13 @@ const ProviderAppointmentDetail = () => {
                                         <svg width="14" height="14" fill="none" stroke="#5A8A5E" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                         <p className="text-[13px] m-0" style={{ color: '#5A8A5E' }}>Remaining balance charged.</p>
                                     </div>
-                                ) : (
+                                ) : !isCancelled ? (
                                     <div className="px-4 py-3 rounded-[12px]" style={{ background: '#FFF5E6' }}>
                                         <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
                                             Remaining ${remaining.toFixed(2)} will be charged automatically on completion.
                                         </p>
                                     </div>
-                                )}
+                                ) : null}
                             </>
                         ) : (
                             <div className="flex justify-between">
