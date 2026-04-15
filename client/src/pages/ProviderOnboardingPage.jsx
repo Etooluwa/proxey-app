@@ -7,6 +7,7 @@ import { request } from "../data/apiClient";
 import { invalidateProviderProfileCache } from "../data/provider";
 import { useCitySearch } from "../hooks/useCitySearch";
 import { uploadProfilePhoto } from "../utils/photoUpload";
+import PhoneInput from "../components/ui/PhoneInput";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const t = {
@@ -283,12 +284,9 @@ function StepProfile({ data, onChange }) {
 
         <div style={{ marginBottom: "20px" }}>
           <Lbl style={{ marginBottom: "8px" }}>Phone Number</Lbl>
-          <input
-            type="tel"
+          <PhoneInput
             value={data.phone}
-            onChange={(e) => onChange("phone", e.target.value)}
-            placeholder="+1 (555) 000-0000"
-            style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${t.line}`, fontFamily: f, fontSize: "14px", color: t.ink, outline: "none", background: t.avatarBg, boxSizing: "border-box" }}
+            onChange={(v) => onChange("phone", v)}
           />
         </div>
 

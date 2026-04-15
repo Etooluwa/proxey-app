@@ -4,6 +4,7 @@ import { fetchProviderProfile, updateProviderProfile } from '../../data/provider
 import { useSession } from '../../auth/authContext';
 import supabase from '../../utils/supabase';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 const T = {
   ink: '#3D231E',
@@ -182,12 +183,9 @@ export default function ProviderPersonalDetails() {
 
           <div>
             <Lbl>Phone</Lbl>
-            <input
-              type="tel"
+            <PhoneInput
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 (555) 000-0000"
-              style={inputStyle}
+              onChange={(v) => setPhone(v)}
             />
           </div>
 

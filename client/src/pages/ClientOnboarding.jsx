@@ -16,6 +16,7 @@ import { request } from '../data/apiClient';
 import { useCitySearch } from '../hooks/useCitySearch';
 import BackBtn from '../components/ui/BackBtn';
 import Divider from '../components/ui/Divider';
+import PhoneInput from '../components/ui/PhoneInput';
 
 // ─── Topographic SVG (same as LoginPage) ─────────────────────────────────────
 
@@ -186,14 +187,15 @@ const AboutYouStep = ({ form, onChange, onNext, onBack, saving, error }) => {
                     placeholder="you@email.com"
                     autoComplete="email"
                 />
-                <Field
-                    label="Phone Number"
-                    value={form.phone}
-                    onChange={(v) => onChange('phone', v)}
-                    type="tel"
-                    placeholder="+1 (555) 000-0000"
-                    autoComplete="tel"
-                />
+                <div className="mb-5">
+                    <span className="block mb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-muted">
+                        Phone Number
+                    </span>
+                    <PhoneInput
+                        value={form.phone}
+                        onChange={(v) => onChange('phone', v)}
+                    />
+                </div>
 
                 {/* City with autocomplete dropdown */}
                 <div className="mb-5 relative">
