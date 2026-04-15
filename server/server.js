@@ -846,7 +846,7 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt, preAppointmentInfo }) {
+async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt, preAppointmentInfo, confirmationMessage }) {
   if (!to) return;
 
   const resolvedProvider = providerName || "Your provider";
@@ -859,6 +859,14 @@ async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, 
         ${preAppointmentInfo.filter(Boolean).map(item => `
         <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;padding-bottom:8px;">• ${item}</td></tr>
         `).join('')}
+      </table>`
+    : '';
+
+  const confirmationMsgHtml = confirmationMessage
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F2EBE5;border-radius:14px;padding:16px 20px;margin-top:20px;border:1px solid rgba(140,106,100,0.2);">
+        <tr><td style="font-size:12px;color:#8C6A64;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:8px;">Message from ${resolvedProvider}</td></tr>
+        <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;white-space:pre-wrap;">${confirmationMessage}</td></tr>
       </table>`
     : '';
 
@@ -876,6 +884,7 @@ async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, 
         <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
         <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(scheduledAt)}</td></tr>
       </table>
+      ${confirmationMsgHtml}
       ${mustKnowsHtml}
       <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">You can view your appointment details anytime in Kliques.</p>
     `),
@@ -2620,6 +2629,7 @@ app.get("/api/bookings/:id", async (req, res) => {
       pre_appointment_info: serviceInfo?.metadata?.preAppointmentInfo || null,
       intake_responses: intakeResponses,
       client_message: booking.metadata?.client_message || null,
+      confirmation_message: booking.metadata?.confirmationMessage || null,
       session_notes: booking.session_notes || null,
       session_recommendation: booking.session_recommendation || null,
       session_photos: sessionPhotos,
@@ -2665,6 +2675,35 @@ app.patch("/api/bookings/:id/notes", async (req, res) => {
     res.json({ booking: data });
   } catch (err) {
     console.error("[bookings/:id/notes]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/bookings/:id/confirmation-message — provider updates the post-confirmation message
+app.patch("/api/bookings/:id/confirmation-message", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const bookingId = req.params.id;
+  const userId = getUserId(req);
+  const { confirmationMessage } = req.body || {};
+
+  try {
+    const { data: booking } = await supabase
+      .from("bookings").select("provider_id, metadata, status").eq("id", bookingId).single();
+    if (!booking) return res.status(404).json({ error: "Booking not found." });
+    if (booking.provider_id !== userId) return res.status(403).json({ error: "Not authorized." });
+
+    const updatedMetadata = { ...(booking.metadata || {}), confirmationMessage: confirmationMessage || '' };
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ metadata: updatedMetadata, updated_at: new Date().toISOString() })
+      .eq("id", bookingId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.json({ confirmation_message: data.metadata?.confirmationMessage || '' });
+  } catch (err) {
+    console.error("[bookings/:id/confirmation-message]", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -11587,17 +11626,23 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
     if (fetchErr) return null;
     return booking || null;
   },
-  updateAcceptedBooking: async ({ bookingId, updatedAt }) => {
+  updateAcceptedBooking: async ({ bookingId, updatedAt, confirmationMessage }) => {
+    const updatePayload = { status: "confirmed", updated_at: updatedAt };
+    if (confirmationMessage !== undefined && confirmationMessage !== null) {
+      // Merge into existing metadata
+      const { data: existing } = await supabase.from("bookings").select("metadata").eq("id", bookingId).single();
+      updatePayload.metadata = { ...(existing?.metadata || {}), confirmationMessage: String(confirmationMessage) };
+    }
     const { data: updatedBooking, error: updateErr } = await supabase
       .from("bookings")
-      .update({ status: "confirmed", updated_at: updatedAt })
+      .update(updatePayload)
       .eq("id", bookingId)
       .select("*")
       .single();
     if (updateErr) throw updateErr;
     return updatedBooking;
   },
-  afterAccept: async ({ booking, requestingUserId }) => {
+  afterAccept: async ({ booking, requestingUserId, confirmationMessage }) => {
     const bookingId = booking.id;
     const displayDate = new Date(booking.scheduled_at).toLocaleDateString("en-US", {
       weekday: "short", month: "short", day: "numeric",
@@ -11644,6 +11689,7 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
           serviceName: sessionLabel,
           scheduledAt: booking.scheduled_at,
           preAppointmentInfo: acceptSvcMeta?.preAppointmentInfo || null,
+          confirmationMessage: confirmationMessage || null,
         }).catch(() => {});
       }
     }

@@ -587,17 +587,46 @@ const ProviderAppointmentDetail = () => {
 
     const [accepting, setAccepting] = useState(false);
     const [declining, setDeclining] = useState(false);
+    const [confirmationMsg, setConfirmationMsg] = useState('');
+    const [savingConfirmMsg, setSavingConfirmMsg] = useState(false);
+    const [confirmMsgSaved, setConfirmMsgSaved] = useState(false);
+
+    // Initialise confirmationMsg when job loads
+    useEffect(() => {
+        if (job?.confirmation_message != null) {
+            setConfirmationMsg(job.confirmation_message);
+        }
+    }, [job?.confirmation_message]);
 
     const handleAccept = async () => {
         setAccepting(true);
         setActionError(null);
         try {
-            const data = await request(`/bookings/${id}/accept`, { method: 'POST' });
-            setJob((prev) => ({ ...prev, status: data.booking?.status || 'confirmed' }));
+            const data = await request(`/bookings/${id}/accept`, {
+                method: 'POST',
+                body: JSON.stringify({ confirmationMessage: confirmationMsg.trim() || null }),
+            });
+            setJob((prev) => ({ ...prev, status: data.booking?.status || 'confirmed', confirmation_message: confirmationMsg.trim() || null }));
         } catch (err) {
             setActionError(err.message || 'Could not accept. Please try again.');
         } finally {
             setAccepting(false);
+        }
+    };
+
+    const handleSaveConfirmationMsg = async () => {
+        setSavingConfirmMsg(true);
+        try {
+            await request(`/bookings/${id}/confirmation-message`, {
+                method: 'PATCH',
+                body: JSON.stringify({ confirmationMessage: confirmationMsg }),
+            });
+            setConfirmMsgSaved(true);
+            setTimeout(() => setConfirmMsgSaved(false), 2500);
+        } catch (err) {
+            console.error('[saveConfirmationMsg]', err);
+        } finally {
+            setSavingConfirmMsg(false);
         }
     };
 
@@ -933,6 +962,32 @@ const ProviderAppointmentDetail = () => {
                     </>
                 )}
 
+                {/* ─ Message to client ─ */}
+                {(isConfirmed || isAlreadyCompleted) && (
+                    <>
+                        <div className="py-5">
+                            <div className="flex items-center justify-between mb-3">
+                                <Lbl>Message to Client</Lbl>
+                                {confirmMsgSaved && (
+                                    <span className="text-[11px]" style={{ color: '#5A8A5E' }}>Saved</span>
+                                )}
+                            </div>
+                            <textarea
+                                value={confirmationMsg}
+                                onChange={(e) => setConfirmationMsg(e.target.value)}
+                                onBlur={handleSaveConfirmationMsg}
+                                disabled={savingConfirmMsg}
+                                placeholder="e.g. Here's your Zoom link: zoom.us/j/... · Please arrive 5 min early"
+                                rows={3}
+                                className="w-full text-[14px] text-ink placeholder:text-muted focus:outline-none resize-none"
+                                style={{ padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.2)', background: '#F2EBE5', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                            />
+                            <p className="text-[11px] text-faded m-0 mt-1.5">Shown on the client's booking page. Update anytime.</p>
+                        </div>
+                        <Divider />
+                    </>
+                )}
+
                 {/* ─ Session Notes & Recommendations ─ */}
                 {(isConfirmed || isAlreadyCompleted) && <div className="py-5">
                     <div className="flex items-center justify-between mb-3">
@@ -1075,6 +1130,29 @@ const ProviderAppointmentDetail = () => {
                         <p className="w-full text-center text-[12px] mb-2 m-0" style={{ color: '#C25E4A' }}>
                             {(completeError && !showChargeFailureBanner ? completeError : null) || actionError}
                         </p>
+                    )}
+
+                    {/* Pending: optional message before accepting */}
+                    {isPending && (
+                        <div className="w-full mb-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted m-0 mb-1.5">
+                                Message to client (optional)
+                            </p>
+                            <textarea
+                                value={confirmationMsg}
+                                onChange={(e) => setConfirmationMsg(e.target.value)}
+                                placeholder="e.g. Here's your Zoom link: zoom.us/j/... · Please arrive 5 min early"
+                                rows={3}
+                                className="w-full rounded-[12px] px-4 py-3 text-[14px] text-ink resize-none focus:outline-none"
+                                style={{
+                                    background: '#F2EBE5',
+                                    border: '1px solid rgba(140,106,100,0.2)',
+                                    fontFamily: "'Sora',system-ui,sans-serif",
+                                    boxSizing: 'border-box',
+                                }}
+                            />
+                            <p className="text-[11px] text-faded m-0 mt-1">Sent to the client in their confirmation email and shown on their booking page.</p>
+                        </div>
                     )}
 
                     {/* Pending: Accept / Decline only */}

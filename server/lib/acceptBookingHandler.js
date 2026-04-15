@@ -9,6 +9,7 @@ export function createAcceptBookingHandler({
   return async function handleAcceptBooking(req, res) {
     const bookingId = getBookingId(req);
     const requestingUserId = getUserId(req);
+    const { confirmationMessage } = req.body || {};
 
     try {
       const booking = await fetchBooking(bookingId);
@@ -23,12 +24,14 @@ export function createAcceptBookingHandler({
       const updatedBooking = await updateAcceptedBooking({
         bookingId,
         updatedAt: getNowIso(),
+        confirmationMessage: confirmationMessage || null,
       });
 
       await afterAccept({
         booking,
         updatedBooking,
         requestingUserId,
+        confirmationMessage: confirmationMessage || null,
       });
 
       return res.status(200).json({ booking: updatedBooking });

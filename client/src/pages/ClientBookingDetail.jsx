@@ -626,6 +626,24 @@ const ClientBookingDetail = () => {
                     </>
                 )}
 
+                {/* Provider's confirmation message */}
+                {booking.confirmation_message && (
+                    <>
+                        <Divider />
+                        <div className="py-5">
+                            <Lbl className="block mb-3">Message from {booking.provider_name || 'Your Provider'}</Lbl>
+                            <div
+                                className="rounded-[14px] px-4 py-4"
+                                style={{ background: '#F2EBE5', border: '1px solid rgba(140,106,100,0.2)' }}
+                            >
+                                <p className="text-[14px] text-ink leading-relaxed m-0" style={{ whiteSpace: 'pre-wrap' }}>
+                                    {booking.confirmation_message}
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                )}
+
                 {/* Payment */}
                 {totalDollars && (
                     <>
