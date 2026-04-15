@@ -41,7 +41,7 @@ export function createBookingHandler({
 
     const now = getNowIso();
     const providerBookingRules =
-      (await getProviderBookingRules(providerId)) || normalizeProviderBookingRules();
+      (await getProviderBookingRules(providerId, serviceId)) || normalizeProviderBookingRules();
 
     try {
       assertBookingLeadTime({

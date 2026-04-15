@@ -208,6 +208,7 @@ const EMPTY_FORM = {
     depositType: 'percent',
     depositValue: 50,
     clientNotesEnabled: true,
+    autoAccept: false,
     is_active: true,
     group_id: null,
     preAppointmentInfo: [],
@@ -272,6 +273,7 @@ const ProviderServiceEditor = () => {
                     depositType:        svc.deposit_type || 'percent',
                     depositValue:       svc.deposit_value != null ? svc.deposit_value : 50,
                     clientNotesEnabled: svc.client_notes_enabled !== false,
+                    autoAccept:         svc.metadata?.autoAccept === true,
                     is_active:          svc.is_active !== false,
                     group_id:           svc.group_id || null,
                     preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
@@ -405,6 +407,7 @@ const ProviderServiceEditor = () => {
                 depositType:        form.payType === 'deposit' ? form.depositType : null,
                 depositValue:       form.payType === 'deposit' ? Number(form.depositValue) : null,
                 clientNotesEnabled: form.clientNotesEnabled,
+                autoAccept:         form.autoAccept,
                 preAppointmentInfo: form.preAppointmentInfo,
                 pricingType:        form.pricingType,
                 minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
@@ -976,6 +979,27 @@ const ProviderServiceEditor = () => {
                         <Toggle
                             on={form.clientNotesEnabled}
                             onChange={() => set('clientNotesEnabled')(!form.clientNotesEnabled)}
+                            activeColor="#3D231E"
+                        />
+                    </div>
+                </Section>
+
+                <Divider />
+
+                {/* ─ Auto-accept toggle ─ */}
+                <Section>
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 pr-4">
+                            <p className="text-[16px] font-semibold text-ink m-0">Instant booking</p>
+                            <p className="text-[13px] text-muted m-0 mt-0.5">
+                                {form.autoAccept
+                                    ? 'Bookings are confirmed automatically'
+                                    : 'You must approve each booking request'}
+                            </p>
+                        </div>
+                        <Toggle
+                            on={form.autoAccept}
+                            onChange={() => set('autoAccept')(!form.autoAccept)}
                             activeColor="#3D231E"
                         />
                     </div>
