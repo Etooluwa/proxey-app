@@ -214,7 +214,7 @@ export default function ProviderPersonalDetails() {
                   </svg>
                 </div>
                 <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '6px 0 0', lineHeight: 1.5 }}>
-                  Currency is locked once you have active services or bookings.
+                  Currency is locked once you have completed paid bookings.
                 </p>
               </>
             ) : (
@@ -224,7 +224,7 @@ export default function ProviderPersonalDetails() {
                   onChange={(v) => setCurrency(v)}
                 />
                 <p style={{ fontFamily: F, fontSize: 12, color: '#A07030', margin: '6px 0 0', lineHeight: 1.5 }}>
-                  Changing currency will update all your services. This cannot be undone after you have bookings.
+                  Changing currency will update all your services. Cannot be changed after you have completed paid bookings.
                 </p>
               </>
             )}

@@ -4208,17 +4208,20 @@ app.get("/api/provider/currency-lock", async (req, res) => {
   if (!supabase) return res.status(200).json({ locked: false });
 
   try {
-    const [{ count: serviceCount }, { count: bookingCount }] = await Promise.all([
-      supabase.from('services').select('id', { count: 'exact', head: true })
-        .eq('provider_id', providerId).eq('is_active', true),
-      supabase.from('bookings').select('id', { count: 'exact', head: true })
-        .eq('provider_id', providerId).in('status', ['pending', 'confirmed', 'completed']),
-    ]);
-    const locked = (serviceCount || 0) > 0 || (bookingCount || 0) > 0;
+    // Locked only when real money has moved — completed bookings that were charged.
+    // Having active services or pending/upcoming bookings is fine to reassign.
+    const { count: paidBookingCount } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider_id', providerId)
+      .eq('status', 'completed')
+      .not('stripe_payment_intent_id', 'is', null);
+
+    const locked = (paidBookingCount || 0) > 0;
     return res.status(200).json({ locked });
   } catch (err) {
     console.error('[currency-lock] error:', err);
-    return res.status(200).json({ locked: true }); // Safe default: locked on error
+    return res.status(200).json({ locked: false }); // Safe default: unlocked on error
   }
 });
 
@@ -4474,28 +4477,23 @@ app.patch("/api/provider/me", async (req, res) => {
         const newCurrency = (updates.currency || 'cad').toLowerCase();
 
         if (currentCurrency !== newCurrency) {
-          // Check for active services
-          // Check for active services
-          const { count: serviceCount } = await supabase
-            .from('services')
-            .select('id', { count: 'exact', head: true })
-            .eq('provider_id', providerId)
-            .eq('is_active', true);
-
-          // Check for non-cancelled bookings
-          const { count: bookingCount } = await supabase
+          // Only block when real money has moved — completed bookings that have
+          // been charged. Active services and pending/upcoming bookings are fine
+          // to reassign (no payment has settled yet).
+          const { count: paidBookingCount } = await supabase
             .from('bookings')
             .select('id', { count: 'exact', head: true })
             .eq('provider_id', providerId)
-            .in('status', ['pending', 'confirmed', 'completed']);
+            .eq('status', 'completed')
+            .not('stripe_payment_intent_id', 'is', null);
 
-          if ((serviceCount || 0) > 0 || (bookingCount || 0) > 0) {
+          if ((paidBookingCount || 0) > 0) {
             return res.status(400).json({
-              error: 'Currency cannot be changed after you have active services or bookings. Contact support if you need to change your currency.',
+              error: 'Currency cannot be changed after you have completed paid bookings. Contact support if you need to change your currency.',
             });
           }
 
-          // No active services or bookings — cascade currency update to all services
+          // Cascade currency to all services regardless of active status
           await supabase
             .from('services')
             .update({ currency: newCurrency, updated_at: now })
