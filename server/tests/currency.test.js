@@ -61,94 +61,56 @@ test("resolveChargeCurrency includes context string in the warning message", () 
 // ---------------------------------------------------------------------------
 // Integration tests — currency guardrail on PATCH /api/provider/me
 //
-// The handler needs a minimal Supabase-shaped client passed via dependency
-// injection. We build a tiny Express app with the same pattern server.js uses,
-// but swap the supabase client for a controllable stub.
+// Guardrail logic (current): only block if the provider has at least one
+// completed booking WITH a stripe_payment_intent_id (real money moved).
+// Active services and non-completed bookings do NOT trigger the lock.
 // ---------------------------------------------------------------------------
 
 /**
  * Build a minimal Express app that exercises the currency-guardrail logic.
- * `overrides.serviceCount`  — how many active services the provider has (default 0)
- * `overrides.bookingCount`  — how many non-cancelled bookings exist (default 0)
- * `overrides.updatedProfile` — what the profile update resolves to (default {})
+ * `overrides.paidBookingCount` — completed bookings with stripe_payment_intent_id (default 0)
+ * `overrides.updatedProfile`   — what the profile update resolves to (default {})
+ * `overrides.cascadedUpdates`  — what the service cascade update resolves to
  */
 function buildGuardrailApp(overrides = {}) {
   const {
-    serviceCount = 0,
-    bookingCount = 0,
+    paidBookingCount = 0,
     updatedProfile = {},
     cascadedUpdates = { data: null, error: null },
   } = overrides;
 
-  // Track cascade calls
+  // Track cascade calls so tests can assert it ran
   const calls = { cascade: [] };
 
-  // Stub Supabase client with chainable builder pattern
-  function makeChain(resolvedValue) {
-    const chain = {
-      select: () => chain,
-      eq: () => chain,
-      in: () => chain,
-      single: () => Promise.resolve(resolvedValue),
-      then: (res, rej) => Promise.resolve(resolvedValue).then(res, rej),
-    };
-    return chain;
-  }
-
+  // Stub Supabase client — mirrors the chainable builder pattern in server.js.
+  // The guardrail query is:
+  //   supabase.from('bookings')
+  //     .select('id', { count: 'exact', head: true })
+  //     .eq('provider_id', providerId)
+  //     .eq('status', 'completed')
+  //     .not('stripe_payment_intent_id', 'is', null)
   const supabase = {
     from: (table) => {
-      if (table === "services") {
-        // First call: count active services. Second call: cascade update.
-        let callCount = 0;
+      if (table === "bookings") {
+        // Return a chain that eventually resolves with paidBookingCount
         const chain = {
-          select: (fields) => {
-            if (fields && fields.includes("count")) {
-              // Counting active services
-              return {
-                eq: (col, val) =>
-                  col === "provider_id"
-                    ? {
-                        eq: () =>
-                          Promise.resolve({
-                            data: null,
-                            count: serviceCount,
-                            error: null,
-                          }),
-                      }
-                    : {
-                        eq: () =>
-                          Promise.resolve({
-                            data: null,
-                            count: serviceCount,
-                            error: null,
-                          }),
-                      },
-              };
-            }
-            return chain;
-          },
+          select: () => chain,
+          eq: () => chain,
+          not: () =>
+            Promise.resolve({ data: null, count: paidBookingCount, error: null }),
+        };
+        return chain;
+      }
+
+      if (table === "services") {
+        // Cascade update: services.update({ currency }).eq('provider_id', ...)
+        return {
           update: (vals) => {
             calls.cascade.push(vals);
             return {
               eq: () => Promise.resolve(cascadedUpdates),
             };
           },
-        };
-        return chain;
-      }
-
-      if (table === "bookings") {
-        return {
-          select: () => ({
-            eq: () => ({
-              in: () =>
-                Promise.resolve({
-                  data: null,
-                  count: bookingCount,
-                  error: null,
-                }),
-            }),
-          }),
         };
       }
 
@@ -165,8 +127,14 @@ function buildGuardrailApp(overrides = {}) {
         };
       }
 
-      // fallback
-      return makeChain({ data: null, error: null });
+      // Fallback — should not be hit in these tests
+      const fallback = {
+        select: () => fallback,
+        eq: () => fallback,
+        not: () => Promise.resolve({ data: null, count: 0, error: null }),
+        then: (res, rej) => Promise.resolve({ data: null, error: null }).then(res, rej),
+      };
+      return fallback;
     },
   };
 
@@ -179,34 +147,28 @@ function buildGuardrailApp(overrides = {}) {
     next();
   });
 
-  // Minimal replica of the guardrail logic from server.js
+  // Minimal replica of the guardrail logic from server.js (current version)
   app.patch("/api/provider/me", async (req, res) => {
     const providerId = req.providerId;
     const updates = req.body;
 
     if (updates.currency) {
-      // Count active services
-      const { count: svcCount } = await supabase
-        .from("services")
-        .select("count", { count: "exact", head: true })
-        .eq("provider_id", providerId)
-        .eq("is_active", true);
-
-      // Count non-cancelled bookings
-      const { count: bkCount } = await supabase
+      // Only block if real money has moved (completed + stripe_payment_intent_id)
+      const { count: paidCount } = await supabase
         .from("bookings")
-        .select("count", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("provider_id", providerId)
-        .in("status", ["pending", "confirmed", "completed"]);
+        .eq("status", "completed")
+        .not("stripe_payment_intent_id", "is", null);
 
-      if (svcCount > 0 || bkCount > 0) {
+      if ((paidCount || 0) > 0) {
         return res.status(400).json({
           error:
-            "Currency cannot be changed while you have active services or bookings.",
+            "Currency cannot be changed after you have completed paid bookings. Contact support if you need to change your currency.",
         });
       }
 
-      // Cascade to services
+      // Cascade currency to ALL services (not just active)
       await supabase
         .from("services")
         .update({ currency: updates.currency })
@@ -227,8 +189,8 @@ function buildGuardrailApp(overrides = {}) {
   return { app, calls };
 }
 
-test("PATCH /api/provider/me returns 400 when provider has active services", async () => {
-  const { app } = buildGuardrailApp({ serviceCount: 2, bookingCount: 0 });
+test("PATCH /api/provider/me returns 400 when provider has completed paid bookings", async () => {
+  const { app } = buildGuardrailApp({ paidBookingCount: 2 });
   const response = await invokeExpressApp(app, {
     method: "PATCH",
     url: "/api/provider/me",
@@ -243,24 +205,10 @@ test("PATCH /api/provider/me returns 400 when provider has active services", asy
   );
 });
 
-test("PATCH /api/provider/me returns 400 when provider has non-cancelled bookings", async () => {
-  const { app } = buildGuardrailApp({ serviceCount: 0, bookingCount: 3 });
-  const response = await invokeExpressApp(app, {
-    method: "PATCH",
-    url: "/api/provider/me",
-    headers: { "content-type": "application/json" },
-    body: { currency: "usd" },
-  });
-
-  assert.equal(response.status, 400);
-  assert.ok(response.json?.error?.toLowerCase().includes("currency"));
-});
-
-test("PATCH /api/provider/me allows currency change and cascades to services when none exist", async () => {
+test("PATCH /api/provider/me allows currency change when provider has no paid bookings", async () => {
   const updatedProfile = { provider_id: "provider-123", currency: "usd" };
   const { app, calls } = buildGuardrailApp({
-    serviceCount: 0,
-    bookingCount: 0,
+    paidBookingCount: 0,
     updatedProfile,
   });
 
@@ -272,15 +220,31 @@ test("PATCH /api/provider/me allows currency change and cascades to services whe
   });
 
   assert.equal(response.status, 200);
-  // The cascade update was called with the new currency
+});
+
+test("PATCH /api/provider/me cascades currency to services when allowed", async () => {
+  const updatedProfile = { provider_id: "provider-123", currency: "eur" };
+  const { app, calls } = buildGuardrailApp({
+    paidBookingCount: 0,
+    updatedProfile,
+  });
+
+  await invokeExpressApp(app, {
+    method: "PATCH",
+    url: "/api/provider/me",
+    headers: { "content-type": "application/json" },
+    body: { currency: "eur" },
+  });
+
   assert.ok(
-    calls.cascade.some((c) => c.currency === "usd"),
-    "Expected cascade update with currency: usd"
+    calls.cascade.some((c) => c.currency === "eur"),
+    "Expected cascade update with currency: eur"
   );
 });
 
 test("PATCH /api/provider/me does not trigger guardrail for non-currency updates", async () => {
-  const { app } = buildGuardrailApp({ serviceCount: 99, bookingCount: 99 });
+  // Even with paid bookings, a non-currency update should go through
+  const { app } = buildGuardrailApp({ paidBookingCount: 99 });
   const response = await invokeExpressApp(app, {
     method: "PATCH",
     url: "/api/provider/me",
