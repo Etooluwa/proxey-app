@@ -259,6 +259,7 @@ const ProviderDashboard = () => {
     const [weeklyEarnings, setWeeklyEarnings] = useState(0);
     const [newClients, setNewClients] = useState(0);
     const [handle, setHandle] = useState('');
+    const [providerCurrency, setProviderCurrency] = useState('cad');
     const [loading, setLoading] = useState(true);
 
     // Drawer state (desktop only)
@@ -291,6 +292,9 @@ const ProviderDashboard = () => {
 
                     if (prof?.handle) {
                         setHandle(prof.handle);
+                    }
+                    if (prof?.currency) {
+                        setProviderCurrency(prof.currency.toLowerCase());
                     }
 
                     // Sync photo/avatar from DB into authContext if missing from localStorage
@@ -327,7 +331,7 @@ const ProviderDashboard = () => {
     // Mobile-only color
     const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
     const clientsColor  = isEmpty ? '#B0948F' : '#C25E4A';
-    const weeklyEarningsLabel = fmtEarnings(weeklyEarnings, sessionProfile?.currency);
+    const weeklyEarningsLabel = fmtEarnings(weeklyEarnings, providerCurrency);
     const statValueFontSize = weeklyEarningsLabel.length > 6
         ? 'clamp(28px, 7vw, 40px)'
         : 'clamp(40px, 11vw, 52px)';
@@ -425,7 +429,7 @@ const ProviderDashboard = () => {
                     <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: '16px' }}>
                         <DesktopStatCard
                             label="Weekly Earnings"
-                            value={fmtEarnings(weeklyEarnings, sessionProfile?.currency)}
+                            value={fmtEarnings(weeklyEarnings, providerCurrency)}
                             onClick={() => navigate('/provider/earnings')}
                         />
                         <DesktopStatCard
