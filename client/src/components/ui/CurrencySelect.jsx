@@ -17,25 +17,22 @@ const T = {
 };
 const F = "'Sora',system-ui,sans-serif";
 
+// Only currencies with full Stripe Connect payout support.
+// Removed: NGN, GHS, KES (no Connect payout support), TTD, JMD (not in Stripe Connect).
 export const CURRENCIES = [
-    { code: 'cad', label: 'CAD', name: 'Canadian Dollar',     symbol: '$' },
-    { code: 'usd', label: 'USD', name: 'US Dollar',           symbol: '$' },
-    { code: 'gbp', label: 'GBP', name: 'British Pound',       symbol: '£' },
-    { code: 'eur', label: 'EUR', name: 'Euro',                symbol: '€' },
-    { code: 'aud', label: 'AUD', name: 'Australian Dollar',   symbol: '$' },
-    { code: 'ngn', label: 'NGN', name: 'Nigerian Naira',      symbol: '₦' },
-    { code: 'ghs', label: 'GHS', name: 'Ghanaian Cedi',       symbol: '₵' },
-    { code: 'kes', label: 'KES', name: 'Kenyan Shilling',     symbol: 'KSh' },
-    { code: 'zar', label: 'ZAR', name: 'South African Rand',  symbol: 'R' },
-    { code: 'inr', label: 'INR', name: 'Indian Rupee',        symbol: '₹' },
-    { code: 'sgd', label: 'SGD', name: 'Singapore Dollar',    symbol: '$' },
-    { code: 'nzd', label: 'NZD', name: 'New Zealand Dollar',  symbol: '$' },
-    { code: 'aed', label: 'AED', name: 'UAE Dirham',          symbol: 'د.إ' },
-    { code: 'jpy', label: 'JPY', name: 'Japanese Yen',        symbol: '¥' },
-    { code: 'brl', label: 'BRL', name: 'Brazilian Real',      symbol: 'R$' },
-    { code: 'mxn', label: 'MXN', name: 'Mexican Peso',        symbol: '$' },
-    { code: 'ttd', label: 'TTD', name: 'Trinidad & Tobago Dollar', symbol: '$' },
-    { code: 'jmd', label: 'JMD', name: 'Jamaican Dollar',     symbol: '$' },
+    { code: 'cad', label: 'CAD', name: 'Canadian Dollar',    symbol: '$' },
+    { code: 'usd', label: 'USD', name: 'US Dollar',          symbol: '$' },
+    { code: 'gbp', label: 'GBP', name: 'British Pound',      symbol: '£' },
+    { code: 'eur', label: 'EUR', name: 'Euro',               symbol: '€' },
+    { code: 'aud', label: 'AUD', name: 'Australian Dollar',  symbol: '$' },
+    { code: 'nzd', label: 'NZD', name: 'New Zealand Dollar', symbol: '$' },
+    { code: 'sgd', label: 'SGD', name: 'Singapore Dollar',   symbol: '$' },
+    { code: 'inr', label: 'INR', name: 'Indian Rupee',       symbol: '₹' },
+    { code: 'zar', label: 'ZAR', name: 'South African Rand', symbol: 'R' },
+    { code: 'aed', label: 'AED', name: 'UAE Dirham',         symbol: 'د.إ' },
+    { code: 'jpy', label: 'JPY', name: 'Japanese Yen',       symbol: '¥' },
+    { code: 'brl', label: 'BRL', name: 'Brazilian Real',     symbol: 'R$' },
+    { code: 'mxn', label: 'MXN', name: 'Mexican Peso',       symbol: '$' },
 ];
 
 export default function CurrencySelect({ value = 'cad', onChange, style = {} }) {
