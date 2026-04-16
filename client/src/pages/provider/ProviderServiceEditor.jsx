@@ -23,6 +23,7 @@ import Divider from '../../components/ui/Divider';
 import Toggle from '../../components/ui/Toggle';
 import { useToast } from '../../components/ui/ToastProvider';
 import { formatMoneyFromDollars } from '../../utils/formatMoney';
+import { CURRENCIES } from '../../components/ui/CurrencySelect';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -756,7 +757,7 @@ const ProviderServiceEditor = () => {
                             <span
                                 className="absolute text-[15px] text-muted pointer-events-none"
                                 style={{ left: 16, top: '50%', transform: 'translateY(-50%)' }}
-                            >$</span>
+                            >{CURRENCIES.find(c => c.code === providerCurrency)?.symbol || '$'}</span>
                             <input
                                 type="number"
                                 value={form.price}

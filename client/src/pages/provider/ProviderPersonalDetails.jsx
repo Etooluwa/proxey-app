@@ -57,7 +57,7 @@ export default function ProviderPersonalDetails() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [currency, setCurrency] = useState('cad');
-  const [currencyLocked, setCurrencyLocked] = useState(true); // Default locked until confirmed
+  const [currencyLocked, setCurrencyLocked] = useState(false); // Default unlocked; lock only after confirmed paid bookings
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
