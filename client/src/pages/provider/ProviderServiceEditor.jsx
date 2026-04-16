@@ -15,6 +15,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { request } from '../../data/apiClient';
+import { fetchProviderProfile } from '../../data/provider';
 import { supabase } from '../../utils/supabase';
 import BackBtn from '../../components/ui/BackBtn';
 import Lbl from '../../components/ui/Lbl';
@@ -246,6 +247,7 @@ const ProviderServiceEditor = () => {
     const [questions, setQuestions] = useState([]);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(!isNew);
+    const [providerCurrency, setProviderCurrency] = useState('cad');
     const [saving, setSaving] = useState(false);
     const [savingStatus, setSavingStatus] = useState('');
     const [deleting, setDeleting] = useState(false);
@@ -291,6 +293,12 @@ const ProviderServiceEditor = () => {
     }, [id, isNew]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        fetchProviderProfile().then((p) => {
+            if (p?.currency) setProviderCurrency(p.currency.toLowerCase());
+        }).catch(() => {});
+    }, []);
 
     // Load groups for the group selector
     useEffect(() => {
@@ -718,7 +726,7 @@ const ProviderServiceEditor = () => {
                     {/* Currency info — read-only, inherited from provider profile */}
                     <div className="mb-5 px-4 py-3 rounded-[12px]" style={{ background: '#F2EBE5', border: '1px solid rgba(140,106,100,0.15)' }}>
                         <p className="text-[13px] m-0" style={{ color: '#8C6A64' }}>
-                            Prices are in <strong style={{ color: '#3D231E' }}>{(profile?.currency || 'cad').toUpperCase()}</strong> — set in your{' '}
+                            Prices are in <strong style={{ color: '#3D231E' }}>{(providerCurrency || 'cad').toUpperCase()}</strong> — set in your{' '}
                             <button
                                 type="button"
                                 onClick={() => navigate('/provider/settings/personal')}
@@ -821,7 +829,7 @@ const ProviderServiceEditor = () => {
                         <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
                             <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#92400E' }}>
                                 {priceNum > 0 ? (
-                                    <>Client pays <strong>{fmt$(priceNum, profile?.currency)}</strong> in full at booking. You still confirm before the session takes place.</>
+                                    <>Client pays <strong>{fmt$(priceNum, providerCurrency)}</strong> in full at booking. You still confirm before the session takes place.</>
                                 ) : (
                                     <>Client pays the full service amount at booking. You still confirm before the session takes place.</>
                                 )}
@@ -882,11 +890,11 @@ const ProviderServiceEditor = () => {
                                         Client pays now:{' '}
                                         <strong>
                                             {form.depositType === 'percent'
-                                                ? `${form.depositValue}% (${fmt$(depositAmt, profile?.currency)})`
-                                                : fmt$(depositAmt, profile?.currency)}
+                                                ? `${form.depositValue}% (${fmt$(depositAmt, providerCurrency)})`
+                                                : fmt$(depositAmt, providerCurrency)}
                                         </strong>
                                         <br />
-                                        Remaining after service: <strong>{fmt$(remainder, profile?.currency)}</strong>
+                                        Remaining after service: <strong>{fmt$(remainder, providerCurrency)}</strong>
                                     </p>
                                 </div>
                             )}
