@@ -4227,6 +4227,7 @@ app.get("/api/provider/currency-lock", async (req, res) => {
 
 app.get("/api/provider/me", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: 'Authentication required.' });
 
   if (supabase) {
     try {
@@ -4458,6 +4459,7 @@ app.get("/api/provider/stats", async (req, res) => {
 
 app.patch("/api/provider/me", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: 'Authentication required.' });
   const updates = req.body || {};
 
   if (supabase) {
