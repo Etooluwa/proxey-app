@@ -12926,9 +12926,6 @@ app.delete("/api/accounts/me", async (req, res) => {
 
   try {
     const now = new Date().toISOString();
-    const hardDeleteAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const anonName = "Deleted User";
-    const anonEmail = `deleted+${userId}@kliques.invalid`;
 
     // ── 1. Cancel pending bookings and notify the other party ──────────────
     const { data: pendingBookings } = await supabase
@@ -12963,48 +12960,74 @@ app.delete("/api/accounts/me", async (req, res) => {
       }
     }
 
-    // ── 2. Anonymise client profile ────────────────────────────────────────
+    // ── 2. Anonymise completed bookings for financial/dispute history ─────
+    // Keep the rows but wipe PII — these are needed for financial records.
     await supabase
-      .from("client_profiles")
-      .update({
-        name: anonName,
-        email: anonEmail,
-        phone: null,
-        city: null,
-        avatar: null,
-        account_status: "deleted",
-        deleted_at: now,
-        scheduled_hard_delete_at: hardDeleteAt,
-      })
-      .eq("user_id", userId);
+      .from("bookings")
+      .update({ notes: null, session_notes: null, session_recommendation: null })
+      .eq("status", "completed")
+      .or(`provider_id.eq.${userId},client_id.eq.${userId}`);
 
-    // ── 3. Anonymise provider profile (if the user is also a provider) ─────
+    // ── 3. Delete all non-completed bookings ──────────────────────────────
     await supabase
-      .from("provider_profiles")
-      .update({
-        name: anonName,
-        email: anonEmail,
-        phone: null,
-        bio: null,
-        city: null,
-        address_line1: null,
-        address_line2: null,
-        avatar: null,
-        account_status: "deleted",
-        deleted_at: now,
-        scheduled_hard_delete_at: hardDeleteAt,
-      })
+      .from("bookings")
+      .delete()
+      .neq("status", "completed")
+      .or(`provider_id.eq.${userId},client_id.eq.${userId}`);
+
+    // ── 4. Delete services (provider only) ────────────────────────────────
+    await supabase
+      .from("services")
+      .delete()
       .eq("provider_id", userId);
 
-    // ── 4. Hard-delete the Supabase Auth user ─────────────────────────────
-    // This invalidates all sessions immediately and frees the email for re-use.
-    // Data is already anonymised above so there is nothing left to protect.
+    // ── 5. Delete service groups ───────────────────────────────────────────
+    await supabase
+      .from("service_groups")
+      .delete()
+      .eq("provider_id", userId);
+
+    // ── 6. Delete messages and conversations ──────────────────────────────
+    const { data: userConversations } = await supabase
+      .from("conversations")
+      .select("id")
+      .or(`provider_id.eq.${userId},client_id.eq.${userId}`);
+
+    if (userConversations?.length > 0) {
+      const convIds = userConversations.map((c) => c.id);
+      await supabase.from("messages").delete().in("conversation_id", convIds);
+      await supabase.from("conversations").delete().in("id", convIds);
+    }
+
+    // ── 7. Delete notifications ────────────────────────────────────────────
+    await supabase.from("notifications").delete().eq("provider_id", userId);
+    await supabase.from("client_notifications").delete().eq("user_id", userId);
+
+    // ── 8. Delete portfolio media ──────────────────────────────────────────
+    await supabase.from("portfolio_media").delete().eq("provider_id", userId);
+
+    // ── 9. Delete availability and time blocks ─────────────────────────────
+    await supabase.from("provider_availability").delete().eq("provider_id", userId);
+    await supabase.from("provider_time_blocks").delete().eq("provider_id", userId);
+
+    // ── 10. Delete reviews written by this user (as client) ───────────────
+    // Keep reviews received as a provider (attached to completed bookings).
+    await supabase.from("reviews").delete().eq("client_id", userId);
+
+    // ── 11. Delete client/provider profile rows ────────────────────────────
+    await supabase.from("client_profiles").delete().eq("user_id", userId);
+    await supabase.from("provider_profiles").delete().eq("provider_id", userId);
+
+    // ── 12. Delete provider row ────────────────────────────────────────────
+    await supabase.from("providers").delete().eq("user_id", userId);
+
+    // ── 13. Hard-delete the Supabase Auth user ────────────────────────────
+    // Invalidates all sessions and frees the email for re-use.
     await supabase.auth.admin.deleteUser(userId);
 
     res.status(200).json({
       ok: true,
-      message: "Account scheduled for deletion. All sessions have been invalidated.",
-      scheduled_hard_delete_at: hardDeleteAt,
+      message: "Account deleted. All data has been removed.",
     });
   } catch (err) {
     console.error("[accounts/me DELETE]", err);
