@@ -21,14 +21,15 @@ export const BOOKING_TOKENS = {
 
 export const BODY_FONT = "'Sora', system-ui, sans-serif";
 
-export function formatBookingPrice(value) {
+export function formatBookingPrice(value, currency = 'CAD') {
     if (value === null || value === undefined || value === '') return null;
     const cents = Number(value);
     if (!Number.isFinite(cents)) return null;
     const dollars = cents / 100;
+    const cur = (currency || 'CAD').toUpperCase();
     return new Intl.NumberFormat('en-CA', {
         style: 'currency',
-        currency: 'CAD',
+        currency: cur,
         maximumFractionDigits: dollars % 1 === 0 ? 0 : 2,
     }).format(dollars);
 }
@@ -638,7 +639,7 @@ export function BookingCard({
                                 color: BOOKING_TOKENS.accent,
                             }}
                         >
-                            {formatBookingPrice(booking.price) || '—'}
+                            {formatBookingPrice(booking.price, booking.currency) || '—'}
                         </span>
                         {paymentTheme && (
                             <span

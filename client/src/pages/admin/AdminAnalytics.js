@@ -4,6 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
 import { fetchAdminAnalytics } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -23,9 +24,9 @@ const tooltipStyle = {
   color: INK,
 };
 
-const formatCurrency = (cents) => {
-  if (!cents) return '$0';
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+const formatByCurrency = (groups) => {
+  if (!groups || groups.length === 0) return formatMoney(0, 'cad');
+  return groups.map(({ currency, total }) => formatMoney(total ?? 0, currency)).join(' · ');
 };
 
 const PERIODS = ['week', 'month', 'quarter', 'year'];
@@ -191,7 +192,11 @@ const AdminAnalytics = () => {
                   <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatCurrency(v), 'Revenue']} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, name, props) => {
+        const byCurrency = props?.payload?.revenueByCurrency;
+        if (byCurrency && byCurrency.length > 0) return [formatByCurrency(byCurrency), 'Revenue'];
+        return [formatMoney(v ?? 0, 'cad'), 'Revenue'];
+      }} />
             </PieChart>
           </ResponsiveContainer>
         ) : empty('No revenue data')
@@ -224,7 +229,7 @@ const AdminAnalytics = () => {
                 </div>
                 <p className="text-xs font-semibold truncate" style={{ color: INK }}>{provider.name || 'Provider'}</p>
                 <p className="text-[11px] mt-1" style={{ color: MUTED }}>{provider.bookings} bookings</p>
-                <p className="text-[11px] font-medium" style={{ color: ACCENT }}>{formatCurrency(provider.revenue)}</p>
+                <p className="text-[11px] font-medium" style={{ color: ACCENT }}>{formatByCurrency(provider.revenueByCurrency)}</p>
               </div>
             ))}
           </div>

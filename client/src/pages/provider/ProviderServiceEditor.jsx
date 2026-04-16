@@ -21,12 +21,14 @@ import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
 import Toggle from '../../components/ui/Toggle';
 import { useToast } from '../../components/ui/ToastProvider';
+import { formatMoneyFromDollars } from '../../utils/formatMoney';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
-const fmt$ = (n) => `$${Number(n).toFixed(2)}`;
+// fmt$ is called in render — receives currency from profile at call site
+const fmt$ = (n, currency = 'cad') => formatMoneyFromDollars(Number(n), currency);
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -713,6 +715,21 @@ const ProviderServiceEditor = () => {
                 <Section>
                     <SectionLabel>Pricing</SectionLabel>
 
+                    {/* Currency info — read-only, inherited from provider profile */}
+                    <div className="mb-5 px-4 py-3 rounded-[12px]" style={{ background: '#F2EBE5', border: '1px solid rgba(140,106,100,0.15)' }}>
+                        <p className="text-[13px] m-0" style={{ color: '#8C6A64' }}>
+                            Prices are in <strong style={{ color: '#3D231E' }}>{(profile?.currency || 'cad').toUpperCase()}</strong> — set in your{' '}
+                            <button
+                                type="button"
+                                onClick={() => navigate('/provider/settings/personal')}
+                                className="underline focus:outline-none"
+                                style={{ color: '#C25E4A', fontFamily: 'inherit', fontSize: 'inherit', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                            >
+                                profile settings
+                            </button>.
+                        </p>
+                    </div>
+
                     <div className="mb-4">
                         <FieldLabel>Pricing type</FieldLabel>
                         <Segment
@@ -804,7 +821,7 @@ const ProviderServiceEditor = () => {
                         <div className="px-4 py-3 rounded-[12px] mb-3" style={{ background: '#FFF5E6' }}>
                             <p className="text-[13px] m-0 leading-relaxed" style={{ color: '#92400E' }}>
                                 {priceNum > 0 ? (
-                                    <>Client pays <strong>{fmt$(priceNum)}</strong> in full at booking. You still confirm before the session takes place.</>
+                                    <>Client pays <strong>{fmt$(priceNum, profile?.currency)}</strong> in full at booking. You still confirm before the session takes place.</>
                                 ) : (
                                     <>Client pays the full service amount at booking. You still confirm before the session takes place.</>
                                 )}
@@ -865,11 +882,11 @@ const ProviderServiceEditor = () => {
                                         Client pays now:{' '}
                                         <strong>
                                             {form.depositType === 'percent'
-                                                ? `${form.depositValue}% (${fmt$(depositAmt)})`
-                                                : fmt$(depositAmt)}
+                                                ? `${form.depositValue}% (${fmt$(depositAmt, profile?.currency)})`
+                                                : fmt$(depositAmt, profile?.currency)}
                                         </strong>
                                         <br />
-                                        Remaining after service: <strong>{fmt$(remainder)}</strong>
+                                        Remaining after service: <strong>{fmt$(remainder, profile?.currency)}</strong>
                                     </p>
                                 </div>
                             )}

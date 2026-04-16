@@ -23,7 +23,6 @@ const T = {
 };
 
 const F = "'Sora', system-ui, sans-serif";
-const DISPLAY_F = "'Playfair Display', serif";
 
 function getInitials(name) {
     return (name || '?')
@@ -107,13 +106,7 @@ function GreetingBlock({ firstName, count }) {
                 }}
             >
                 {getGreeting()},{' '}
-                <span
-                    style={{
-                        fontFamily: DISPLAY_F,
-                        fontStyle: 'italic',
-                        color: T.accent,
-                    }}
-                >
+                <span style={{ color: T.accent }}>
                     {firstName || 'there'}.
                 </span>
             </h1>

@@ -1,24 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import {
-    BarChart,
-    Bar,
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell,
-    Legend
+    BarChart, Bar, LineChart, Line,
+    XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, Cell,
 } from 'recharts';
-import { Icons } from '../../components/Icons';
-import { StatCard } from '../../components/StatCard';
-import { PeriodSelector } from '../../components/charts/PeriodSelector';
-import { HeatmapChart } from '../../components/charts/HeatmapChart';
 import { fetchProviderAnalytics } from '../../data/provider';
+import { formatMoney } from '../../utils/formatMoney';
+import { useSession } from '../../auth/authContext';
+
+const T = {
+    base: '#FBF7F2',
+    ink: '#3D231E',
+    muted: '#8C6A64',
+    faded: '#B0948F',
+    accent: '#C25E4A',
+    avatarBg: '#F2EBE5',
+    line: 'rgba(140,106,100,0.2)',
+    successBg: '#EBF2EC',
+    success: '#5A8A5E',
+};
+const F = "'Sora', system-ui, sans-serif";
+
+const PERIODS = [
+    { id: 'week', label: 'Week' },
+    { id: 'month', label: 'Month' },
+    { id: 'year', label: 'Year' },
+];
+
+function StatTile({ label, value, sub }) {
+    return (
+        <div style={{ padding: '18px 20px', borderRadius: 18, background: T.avatarBg }}>
+            <p style={{ margin: '0 0 6px', fontFamily: F, fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: T.faded }}>
+                {label}
+            </p>
+            <p style={{ margin: '0 0 2px', fontFamily: F, fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', color: T.ink }}>
+                {value}
+            </p>
+            {sub && <p style={{ margin: 0, fontFamily: F, fontSize: 12, color: T.muted }}>{sub}</p>}
+        </div>
+    );
+}
 
 const ProviderAnalytics = () => {
+    const { profile } = useSession();
     const [period, setPeriod] = useState('month');
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -29,11 +53,9 @@ const ProviderAnalytics = () => {
             setLoading(true);
             try {
                 const result = await fetchProviderAnalytics({ period });
-                if (!cancelled) {
-                    setData(result);
-                }
+                if (!cancelled) setData(result);
             } catch (error) {
-                console.error("Failed to load analytics", error);
+                console.error('Failed to load analytics', error);
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -42,266 +64,243 @@ const ProviderAnalytics = () => {
         return () => { cancelled = true; };
     }, [period]);
 
-    const formatCurrency = (cents) => {
-        if (!cents) return '$0.00';
-        return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    };
-
-    if (loading) {
-        return (
-            <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
-                <Icons.Loader className="w-8 h-8 animate-spin text-brand-500" />
-            </div>
-        );
-    }
+    const fmt = (cents) => formatMoney(cents ?? 0, profile?.currency || 'cad');
 
     const { servicePerformance, clientInsights, peakTimes, bookingTrends, completionRate } = data || {};
-
-    // Calculate total revenue from service performance
-    const totalRevenue = (servicePerformance || []).reduce((sum, s) => sum + (s.revenue || 0), 0);
-    const totalBookings = (servicePerformance || []).reduce((sum, s) => sum + (s.bookings || 0), 0);
+    const totalRevenue = (servicePerformance || []).reduce((s, x) => s + (x.revenue || 0), 0);
+    const totalBookings = (servicePerformance || []).reduce((s, x) => s + (x.bookings || 0), 0);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div style={{ fontFamily: F, maxWidth: 760, margin: '0 auto', padding: '0 20px 60px' }}>
+            <style>{`
+                @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            `}</style>
+
+            {/* Header + period selector */}
+            <div style={{
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+                padding: '20px 0 24px', animation: 'fadeUp 0.35s ease both',
+            }}>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-                    <p className="text-gray-500 mt-1">Your performance metrics and insights</p>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: T.accent }}>
+                        Insights
+                    </p>
+                    <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600, letterSpacing: '-0.03em', color: T.ink }}>
+                        Analytics
+                    </h1>
                 </div>
-                <PeriodSelector value={period} onChange={setPeriod} />
+                <div style={{ display: 'flex', gap: 4, padding: '4px', borderRadius: 12, background: T.avatarBg }}>
+                    {PERIODS.map((p) => (
+                        <button
+                            key={p.id}
+                            onClick={() => setPeriod(p.id)}
+                            style={{
+                                padding: '6px 14px', borderRadius: 9,
+                                border: 'none', cursor: 'pointer',
+                                fontFamily: F, fontSize: 13, fontWeight: 500,
+                                background: period === p.id ? '#fff' : 'transparent',
+                                color: period === p.id ? T.ink : T.muted,
+                                boxShadow: period === p.id ? '0 1px 4px rgba(61,35,30,0.08)' : 'none',
+                                transition: 'all 0.15s ease',
+                            }}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    label="Total Revenue"
-                    value={formatCurrency(totalRevenue)}
-                    icon={Icons.Wallet}
-                    colorClass="bg-emerald-500 text-emerald-500"
-                />
-                <StatCard
-                    label="Total Bookings"
-                    value={totalBookings}
-                    icon={Icons.Calendar}
-                    colorClass="bg-blue-500 text-blue-500"
-                />
-                <StatCard
-                    label="Completion Rate"
-                    value={`${completionRate?.rate || 0}%`}
-                    icon={Icons.CheckCircle}
-                    colorClass="bg-green-500 text-green-500"
-                />
-                <StatCard
-                    label="Repeat Clients"
-                    value={`${clientInsights?.repeatRate || 0}%`}
-                    icon={Icons.Users}
-                    colorClass="bg-purple-500 text-purple-500"
-                />
-            </div>
+            {loading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+                    <div style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        border: `2px solid ${T.accent}`, borderTopColor: 'transparent',
+                        animation: 'spin 0.7s linear infinite',
+                    }} />
+                </div>
+            ) : (
+                <>
+                    {/* Stat tiles */}
+                    <div style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
+                        marginBottom: 28, animation: 'fadeUp 0.35s ease 0.05s both',
+                    }}>
+                        <StatTile label="Revenue" value={fmt(totalRevenue)} />
+                        <StatTile label="Bookings" value={totalBookings} />
+                        <StatTile label="Completion" value={`${completionRate?.rate || 0}%`} sub={`${completionRate?.completed || 0} completed`} />
+                        <StatTile label="Repeat Clients" value={`${clientInsights?.repeatRate || 0}%`} sub={`${clientInsights?.repeatClients || 0} of ${clientInsights?.totalClients || 0}`} />
+                    </div>
 
-            {/* Booking Trends */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-6">Booking Trends</h3>
-                <div className="h-72">
-                    {bookingTrends && bookingTrends.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={bookingTrends}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="date"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                />
-                                <YAxis
-                                    yAxisId="left"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                />
-                                <YAxis
-                                    yAxisId="right"
-                                    orientation="right"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
-                                />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                    formatter={(value, name) => [
-                                        name === 'revenue' ? formatCurrency(value) : value,
-                                        name === 'revenue' ? 'Revenue' : 'Bookings'
-                                    ]}
-                                    labelFormatter={(d) => new Date(d).toLocaleDateString()}
-                                />
-                                <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="bookings" name="Bookings" stroke="#C25E4A" strokeWidth={2} dot={false} />
-                                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue" stroke="#5A8A5E" strokeWidth={2} dot={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-gray-400">
-                            <div className="text-center">
-                                <Icons.TrendingUp size={32} className="mx-auto mb-2 text-gray-300" />
-                                <p>No booking data for this period</p>
+                    {/* Booking trends chart */}
+                    {bookingTrends && bookingTrends.length > 0 && (
+                        <div style={{ marginBottom: 28, animation: 'fadeUp 0.35s ease 0.1s both' }}>
+                            <p style={{ margin: '0 0 14px', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>
+                                Booking Trends
+                            </p>
+                            <div style={{ height: 200 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={bookingTrends}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={T.line} />
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false} tickLine={false}
+                                            tick={{ fill: T.faded, fontSize: 11, fontFamily: F }}
+                                            tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        />
+                                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: T.faded, fontSize: 11, fontFamily: F }} />
+                                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: T.faded, fontSize: 11, fontFamily: F }} tickFormatter={(v) => fmt(v)} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: 12, border: `1px solid ${T.line}`, fontFamily: F, fontSize: 13, background: '#fff' }}
+                                            formatter={(value, name) => [
+                                                name === 'revenue' ? fmt(value) : value,
+                                                name === 'revenue' ? 'Revenue' : 'Bookings',
+                                            ]}
+                                            labelFormatter={(d) => new Date(d).toLocaleDateString()}
+                                        />
+                                        <Line yAxisId="left" type="monotone" dataKey="bookings" stroke={T.accent} strokeWidth={2} dot={false} />
+                                        <Line yAxisId="right" type="monotone" dataKey="revenue" stroke={T.success} strokeWidth={2} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: F, fontSize: 12, color: T.muted }}>
+                                    <span style={{ width: 12, height: 2, borderRadius: 2, background: T.accent, display: 'inline-block' }} /> Bookings
+                                </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: F, fontSize: 12, color: T.muted }}>
+                                    <span style={{ width: 12, height: 2, borderRadius: 2, background: T.success, display: 'inline-block' }} /> Revenue
+                                </span>
                             </div>
                         </div>
                     )}
-                </div>
-            </div>
 
-            {/* Service Performance + Client Insights */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Service Performance */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Revenue by Service</h3>
-                    <div className="h-64">
-                        {servicePerformance && servicePerformance.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={servicePerformance}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#94a3b8', fontSize: 10 }}
-                                        interval={0}
-                                        angle={-20}
-                                        textAnchor="end"
-                                        height={50}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                        tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                        formatter={(value) => [formatCurrency(value), 'Revenue']}
-                                    />
-                                    <Bar dataKey="revenue" radius={[6, 6, 0, 0]} barSize={30}>
-                                        {servicePerformance.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill="#C25E4A" />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400">
-                                <p>No service data</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Service Breakdown Table */}
+                    {/* Revenue by service */}
                     {servicePerformance && servicePerformance.length > 0 && (
-                        <div className="mt-4 border-t border-gray-100 pt-4">
-                            <div className="space-y-2">
-                                {servicePerformance.map((service, index) => (
-                                    <div key={index} className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-700 truncate flex-1">{service.name}</span>
-                                        <span className="text-gray-500 mx-4">{service.bookings} bookings</span>
-                                        <span className="font-medium text-gray-900">{formatCurrency(service.revenue)}</span>
+                        <div style={{ marginBottom: 28, animation: 'fadeUp 0.35s ease 0.15s both' }}>
+                            <p style={{ margin: '0 0 14px', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>
+                                Revenue by Service
+                            </p>
+                            <div style={{ height: 180 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={servicePerformance}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={T.line} />
+                                        <XAxis
+                                            dataKey="name" axisLine={false} tickLine={false}
+                                            tick={{ fill: T.faded, fontSize: 10, fontFamily: F }}
+                                            interval={0} angle={-15} textAnchor="end" height={40}
+                                        />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: T.faded, fontSize: 11, fontFamily: F }} tickFormatter={(v) => fmt(v)} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: 12, border: `1px solid ${T.line}`, fontFamily: F, fontSize: 13, background: '#fff' }}
+                                            formatter={(value) => [fmt(value), 'Revenue']}
+                                        />
+                                        <Bar dataKey="revenue" radius={[6, 6, 0, 0]} barSize={28}>
+                                            {servicePerformance.map((_, i) => (
+                                                <Cell key={i} fill={T.accent} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Service breakdown rows */}
+                            <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 12 }}>
+                                {servicePerformance.map((svc, i) => (
+                                    <div key={i} style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        padding: '12px 0', borderBottom: `1px solid ${T.line}`,
+                                    }}>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: T.ink, flex: 1 }}>{svc.name}</span>
+                                        <span style={{ fontFamily: F, fontSize: 13, color: T.muted, marginRight: 16 }}>{svc.bookings} bookings</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{fmt(svc.revenue)}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
-                </div>
 
-                {/* Client Insights */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Client Insights</h3>
-
-                    <div className="space-y-6">
-                        {/* Total Clients */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                                    <Icons.Users size={20} className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">Total Clients</p>
-                                    <p className="text-xl font-bold text-gray-900">{clientInsights?.totalClients || 0}</p>
+                    {/* Client insights */}
+                    {clientInsights && (
+                        <div style={{ marginBottom: 28, animation: 'fadeUp 0.35s ease 0.2s both' }}>
+                            <p style={{ margin: '0 0 14px', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>
+                                Client Insights
+                            </p>
+                            <div style={{ borderTop: `1px solid ${T.line}` }}>
+                                {[
+                                    { label: 'Total Clients', value: clientInsights.totalClients || 0 },
+                                    { label: 'Repeat Clients', value: clientInsights.repeatClients || 0 },
+                                    { label: 'Avg. Satisfaction', value: clientInsights.avgSatisfaction ? `${clientInsights.avgSatisfaction.toFixed(1)} / 5` : '—' },
+                                ].map(({ label, value }) => (
+                                    <div key={label} style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        padding: '14px 0', borderBottom: `1px solid ${T.line}`,
+                                    }}>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>{label}</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{value}</span>
+                                    </div>
+                                ))}
+                                {/* Repeat rate bar */}
+                                <div style={{ padding: '14px 0', borderBottom: `1px solid ${T.line}` }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                        <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Repeat Rate</span>
+                                        <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{clientInsights.repeatRate || 0}%</span>
+                                    </div>
+                                    <div style={{ height: 6, borderRadius: 3, background: T.avatarBg, overflow: 'hidden' }}>
+                                        <div style={{
+                                            height: '100%', borderRadius: 3, background: T.accent,
+                                            width: `${Math.min(clientInsights.repeatRate || 0, 100)}%`,
+                                            transition: 'width 0.6s ease',
+                                        }} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        {/* Repeat Client Rate */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm text-gray-500">Repeat Client Rate</span>
-                                <span className="text-sm font-bold text-brand-600">{clientInsights?.repeatRate || 0}%</span>
+                    {/* Peak times heatmap (simple grid) */}
+                    {peakTimes && peakTimes.length > 0 && (
+                        <div style={{ animation: 'fadeUp 0.35s ease 0.25s both' }}>
+                            <p style={{ margin: '0 0 6px', fontFamily: F, fontSize: 13, fontWeight: 600, color: T.ink }}>
+                                Peak Booking Times
+                            </p>
+                            <p style={{ margin: '0 0 14px', fontFamily: F, fontSize: 12, color: T.muted }}>
+                                When clients book you most often
+                            </p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {peakTimes.map((slot, i) => {
+                                    const max = Math.max(...peakTimes.map((s) => s.count || 0), 1);
+                                    const intensity = (slot.count || 0) / max;
+                                    return (
+                                        <div
+                                            key={i}
+                                            title={`${slot.day} ${slot.hour}: ${slot.count} bookings`}
+                                            style={{
+                                                width: 28, height: 28, borderRadius: 6,
+                                                background: intensity > 0
+                                                    ? `rgba(194,94,74,${0.15 + intensity * 0.75})`
+                                                    : T.avatarBg,
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
-                            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                                    style={{ width: `${clientInsights?.repeatRate || 0}%` }}
-                                />
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">
-                                {clientInsights?.repeatClients || 0} out of {clientInsights?.totalClients || 0} clients returned
+                        </div>
+                    )}
+
+                    {/* Empty fallback */}
+                    {!bookingTrends?.length && !servicePerformance?.length && !clientInsights && (
+                        <div style={{
+                            padding: '48px 24px', borderRadius: 20,
+                            border: `1px dashed ${T.line}`, textAlign: 'center',
+                        }}>
+                            <p style={{ margin: '0 0 6px', fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink }}>No data yet</p>
+                            <p style={{ margin: 0, fontFamily: F, fontSize: 13, color: T.muted }}>
+                                Analytics will appear once you have completed bookings.
                             </p>
                         </div>
-
-                        {/* Average Satisfaction */}
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                            <div>
-                                <p className="text-sm text-gray-500">Avg. Satisfaction</p>
-                                <div className="flex items-center gap-1 mt-1">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <Icons.Star
-                                            key={star}
-                                            size={16}
-                                            className={star <= Math.round(clientInsights?.avgSatisfaction || 0)
-                                                ? 'text-yellow-400 fill-yellow-400'
-                                                : 'text-gray-200'
-                                            }
-                                        />
-                                    ))}
-                                    <span className="ml-2 font-bold text-gray-900">
-                                        {clientInsights?.avgSatisfaction?.toFixed(1) || '0.0'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Completion Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 bg-green-50 rounded-xl text-center">
-                                <Icons.CheckCircle size={20} className="text-green-600 mx-auto mb-1" />
-                                <p className="text-lg font-bold text-green-700">{completionRate?.completed || 0}</p>
-                                <p className="text-xs text-green-600">Completed</p>
-                            </div>
-                            <div className="p-3 bg-red-50 rounded-xl text-center">
-                                <Icons.XCircle size={20} className="text-red-600 mx-auto mb-1" />
-                                <p className="text-lg font-bold text-red-700">{completionRate?.cancelled || 0}</p>
-                                <p className="text-xs text-red-600">Cancelled</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Peak Times Heatmap */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Peak Booking Times</h3>
-                <p className="text-sm text-gray-500 mb-6">When clients book you most often</p>
-                {peakTimes && peakTimes.length > 0 ? (
-                    <HeatmapChart data={peakTimes} />
-                ) : (
-                    <div className="h-48 flex items-center justify-center text-gray-400">
-                        <div className="text-center">
-                            <Icons.Clock size={32} className="mx-auto mb-2 text-gray-300" />
-                            <p>No booking time data for this period</p>
-                        </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </>
+            )}
         </div>
     );
 };

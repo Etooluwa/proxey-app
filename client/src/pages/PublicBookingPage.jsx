@@ -16,7 +16,8 @@ import { useSession } from '../auth/authContext';
 import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
 import klogo from '../klogo.png';
-import BookingPaymentForm, { fmtCents } from '../components/payment/BookingPaymentForm';
+import BookingPaymentForm from '../components/payment/BookingPaymentForm';
+import { formatMoney } from '../utils/formatMoney';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -36,11 +37,7 @@ const TOPO_SVG = `url("data:image/svg+xml,%3Csvg width='400' height='400' viewBo
 const initials = (n = '') => n.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
 const isValidEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-function fmtPrice(cents) {
-    if (!cents && cents !== 0) return '';
-    const dollars = Number(cents) / 100;
-    return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
-}
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? '' : formatMoney(cents, currency));
 function fmtDuration(mins) {
     if (!mins) return '';
     if (mins < 60) return `${mins} min`;
@@ -137,9 +134,9 @@ function fmtServiceDurationSummary(service, selectedHours = null) {
 function fmtServicePriceSummary(service, selectedHours = null) {
     if (!service) return '';
     if (isPerHourService(service)) {
-        return `${fmtPrice(service?.base_price)}/hr`;
+        return `${fmtPrice(service?.base_price, service?.currency)}/hr`;
     }
-    return fmtPrice(getSelectedServicePrice(service, selectedHours));
+    return fmtPrice(getSelectedServicePrice(service, selectedHours), service?.currency);
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────────
@@ -257,7 +254,7 @@ function BookingSummaryCard({ service, date, time }) {
         <div style={{ background: T.abg, borderRadius: 14, padding: '16px 20px', marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: 0 }}>{service?.name}</p>
-                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(service?.base_price)}</p>
+                <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(service?.base_price, service?.currency)}</p>
             </div>
             {(date || time) && (
                 <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>
@@ -583,7 +580,7 @@ function Step2DateTime({ provider, service, selectedDate, selectedTime, selected
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontFamily: F, fontSize: 30, fontWeight: 600, color: T.ink, lineHeight: 1 }}>{selectedHours}</div>
                                 <div style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{selectedHours === 1 ? 'hour' : 'hours'}</div>
-                                <div style={{ fontFamily: F, fontSize: 12, color: T.accent, marginTop: 4 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))} total</div>
+                                <div style={{ fontFamily: F, fontSize: 12, color: T.accent, marginTop: 4 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours), service?.currency)} total</div>
                             </div>
                             <button
                                 type="button"
@@ -790,7 +787,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, selectedHou
                 <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: '18px 22px', marginBottom: 24 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: T.ink, margin: 0 }}>{service?.name}</p>
-                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{isPerHourService(service) ? `${fmtPrice(getSelectedServicePrice(service, selectedHours))} total` : fmtPrice(service?.base_price)}</p>
+                        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: T.accent, margin: 0 }}>{isPerHourService(service) ? `${fmtPrice(getSelectedServicePrice(service, selectedHours), service?.currency)} total` : fmtPrice(service?.base_price, service?.currency)}</p>
                     </div>
                     <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>{fmtDate(selectedDate)}{selectedDate && selectedTime ? ' · ' : ''}{fmtTime(selectedTime)}</p>
                     {(service?.duration || isPerHourService(service)) && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '4px 0 0' }}>{fmtServiceDurationSummary(service, selectedHours)}</p>}
@@ -887,7 +884,7 @@ function Step4Review({ provider, service, selectedDate, selectedTime, selectedHo
                     ))}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderTop: `1px solid ${T.line}`, background: T.abg }}>
                         <span style={{ fontFamily: F, fontSize: 14, color: T.muted }}>Total</span>
-                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.accent }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))}</span>
+                        <span style={{ fontFamily: F, fontSize: 20, fontWeight: 600, color: T.accent }}>{fmtPrice(getSelectedServicePrice(service, selectedHours), service?.currency)}</span>
                     </div>
                 </div>
 
@@ -950,7 +947,7 @@ function Step5Confirm({ provider, service, selectedDate, selectedTime, selectedH
                             <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '0 0 2px' }}>{fmtDate(selectedDate)} · {fmtTime(selectedTime)}</p>
                             {(service?.duration || isPerHourService(service)) && <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: 0 }}>{fmtServiceDurationSummary(service, selectedHours)}</p>}
                         </div>
-                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours))}</p>
+                        <p style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent, margin: 0 }}>{fmtPrice(getSelectedServicePrice(service, selectedHours), service?.currency)}</p>
                     </div>
                     <HRule />
                     <div style={{ paddingTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: T.callout, borderRadius: 20 }}>

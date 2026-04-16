@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { request } from '../../data/apiClient';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
+import { formatMoney } from '../../utils/formatMoney';
 
 const T = {
   ink: '#3D231E',
@@ -26,10 +27,7 @@ function fmtDuration(mins) {
   return m ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function fmtPrice(val) {
-  if (!val && val !== 0) return null;
-  return `$${Math.round(val / 100)}`;
-}
+const fmtPrice = (val, currency = 'cad') => (val == null ? null : formatMoney(val, currency));
 
 export default function ProviderNewServiceGroup() {
   const navigate = useNavigate();
@@ -130,9 +128,9 @@ export default function ProviderNewServiceGroup() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontFamily: F, fontSize: 15, color: T.ink, margin: 0, fontWeight: 500 }}>{svc.name}</p>
-                    {(fmtDuration(svc.duration) || fmtPrice(svc.price)) && (
+                    {(fmtDuration(svc.duration) || fmtPrice(svc.price, svc.currency)) && (
                       <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: '2px 0 0' }}>
-                        {[fmtDuration(svc.duration), fmtPrice(svc.price)].filter(Boolean).join(' · ')}
+                        {[fmtDuration(svc.duration), fmtPrice(svc.price, svc.currency)].filter(Boolean).join(' · ')}
                       </p>
                     )}
                   </div>

@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 import { fetchAdminRevenue } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -11,9 +12,10 @@ const ACCENT = '#C25E4A';
 const LINE = 'rgba(140,106,100,0.2)';
 const AVATAR_BG = '#F2EBE5';
 
-const formatCurrency = (cents) => {
-  if (!cents) return '$0';
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+// Render grouped currency totals as "CAD $X · USD $Y"
+const formatByCurrency = (groups) => {
+  if (!groups || groups.length === 0) return formatMoney(0, 'cad');
+  return groups.map(({ currency, total }) => formatMoney(total ?? 0, currency)).join(' · ');
 };
 
 const statusStyle = (s) => {
@@ -43,10 +45,15 @@ const AdminRevenue = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const monthlyData = data?.monthlyRevenue || [
-    { name: 'Jan', value: 0 }, { name: 'Feb', value: 0 }, { name: 'Mar', value: 0 },
-    { name: 'Apr', value: 0 }, { name: 'May', value: 0 }, { name: 'Jun', value: 0 },
-  ];
+  // monthly is [{month, revenue (CAD), byCurrency}]
+  const monthlyData = (data?.monthly || []).map(m => ({
+    name: m.month,
+    value: m.revenue || 0, // CAD total for bar chart height
+    byCurrency: m.byCurrency || [],
+  }));
+  if (monthlyData.length === 0) {
+    ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].forEach(name => monthlyData.push({ name, value: 0, byCurrency: [] }));
+  }
 
   const transactions = data?.transactions || [];
 
@@ -69,9 +76,9 @@ const AdminRevenue = () => {
       {/* Metric strip */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10">
         {[
-          { label: 'Total Revenue', value: formatCurrency(data?.totalRevenue) },
-          { label: 'This Month', value: formatCurrency(data?.thisMonthRevenue) },
-          { label: 'Avg per Booking', value: formatCurrency(data?.avgPerBooking) },
+          { label: 'Total Revenue', value: formatByCurrency(data?.summary?.totalByCurrency) },
+          { label: 'This Month', value: formatByCurrency(data?.summary?.thisMonthByCurrency) },
+          { label: 'Avg per Booking', value: formatByCurrency(data?.summary?.avgByCurrency?.map(x => ({ currency: x.currency, total: x.avg }))) },
         ].map(({ label, value }) => (
           <div key={label} className="py-5" style={{ borderBottom: `1px solid ${LINE}` }}>
             <p className="text-[11px] uppercase tracking-widest font-medium mb-1" style={{ color: FADED }}>{label}</p>
@@ -98,7 +105,7 @@ const AdminRevenue = () => {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: FADED, fontSize: 11, fontFamily: 'Sora, sans-serif' }}
-                tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
+                tickFormatter={(v) => (v >= 100 ? `$${(v / 100).toFixed(0)}` : String(v))}
               />
               <Tooltip
                 cursor={{ fill: AVATAR_BG }}
@@ -110,7 +117,13 @@ const AdminRevenue = () => {
                   fontSize: 12,
                   color: INK,
                 }}
-                formatter={(v) => [formatCurrency(v), 'Revenue']}
+                formatter={(v, name, props) => {
+                  const byCurrency = props?.payload?.byCurrency;
+                  if (byCurrency && byCurrency.length > 0) {
+                    return [formatByCurrency(byCurrency), 'Revenue'];
+                  }
+                  return [formatMoney(v ?? 0, 'cad'), 'Revenue'];
+                }}
               />
               <Bar dataKey="value" radius={[5, 5, 0, 0]} barSize={28}>
                 {monthlyData.map((entry, i) => (
@@ -148,7 +161,7 @@ const AdminRevenue = () => {
                 </span>
                 <span className="text-sm" style={{ color: INK }}>{tx.client_name || '—'}</span>
                 <span className="text-sm" style={{ color: MUTED }}>{tx.provider_name || '—'}</span>
-                <span className="text-sm font-medium" style={{ color: INK }}>{formatCurrency(tx.amount)}</span>
+                <span className="text-sm font-medium" style={{ color: INK }}>{formatMoney(tx.amount ?? 0, tx.currency || 'cad')}</span>
                 <span
                   className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block"
                   style={statusStyle(tx.status)}

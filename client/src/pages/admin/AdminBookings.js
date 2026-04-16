@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchAdminBookings } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -18,10 +19,7 @@ const statusStyle = (s) => {
   }
 };
 
-const formatCurrency = (cents) => {
-  if (!cents) return '—';
-  return `$${(cents / 100).toFixed(2)}`;
-};
+const formatCurrency = (cents, currency) => (cents == null ? '—' : formatMoney(cents, currency || 'cad'));
 
 const AdminBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -160,7 +158,7 @@ const AdminBookings = () => {
                   {booking.scheduled_at ? new Date(booking.scheduled_at).toLocaleString() : '—'}
                 </span>
                 <span className="text-sm font-medium" style={{ color: INK }}>
-                  {formatCurrency(booking.price)}
+                  {formatCurrency(booking.price, booking.currency)}
                 </span>
                 <span>
                   <span

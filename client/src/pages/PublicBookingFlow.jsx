@@ -9,6 +9,7 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import { useSession } from "../auth/authContext";
 import { request } from "../data/apiClient";
+import { formatMoney } from "../utils/formatMoney";
 import Avatar from "../components/ui/Avatar";
 import Card from "../components/ui/Card";
 import Footer from "../components/ui/Footer";
@@ -61,10 +62,7 @@ function initials(name) {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-function fmtPrice(cents) {
-  if (cents == null) return "—";
-  return "$" + (cents / 100).toFixed(2);
-}
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? "—" : formatMoney(cents, currency));
 
 function normalizePaymentErrorMessage(error) {
   const rawMessage = String(error?.message || "");
@@ -274,10 +272,10 @@ function StepServices({ provider, services, onNext }) {
                   {svc.duration}
                 </p>
                 <p style={{ fontSize: 15, fontWeight: 600, color: FG, margin: 0 }}>
-                  {fmtPrice(svc.base_price)}
+                  {fmtPrice(svc.base_price, svc.currency)}
                   {dep.isDeposit && (
                     <span style={{ fontSize: 12, color: MUTED, fontWeight: 400 }}>
-                      {" "}· {fmtPrice(dep.deposit)} deposit
+                      {" "}· {fmtPrice(dep.deposit, svc.currency)} deposit
                     </span>
                   )}
                 </p>
@@ -945,11 +943,11 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span style={{ fontSize: 14, color: MUTED }}>Due now (deposit)</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit)}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit, service?.currency)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ fontSize: 14, color: MUTED }}>Due after service</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining)}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining, service?.currency)}</span>
             </div>
             <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
               The remaining balance is collected by your provider after the appointment.
@@ -958,7 +956,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
         ) : (
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>Total</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep.total)}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep.total, service?.currency)}</span>
           </div>
         )}
       </Card>
@@ -1064,7 +1062,7 @@ function StepPaymentExisting({ service, provider, slot, onNext, onBack, session 
         disabled={!useNewCard && !selectedPm}
         loading={submitting}
         onClick={handlePay}
-        label={dep.isDeposit ? `Pay ${fmtPrice(dep.deposit)} deposit` : `Pay ${fmtPrice(dep.total)}`}
+        label={dep.isDeposit ? `Pay ${fmtPrice(dep.deposit, service?.currency)} deposit` : `Pay ${fmtPrice(dep.total, service?.currency)}`}
       />
     </PageShell>
   );
@@ -1130,17 +1128,17 @@ function StepConfirmedExisting({ result }) {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ fontSize: 14, color: MUTED }}>Deposit paid</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit)}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit, service?.currency)}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 14, color: MUTED }}>Remaining (after service)</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining)}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining, service?.currency)}</span>
               </div>
             </>
           ) : (
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>Total</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep?.total)}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep?.total, service?.currency)}</span>
             </div>
           )}
         </Card>
@@ -1310,17 +1308,17 @@ function StepCreateAccountPayment({ service, provider, slot, email, onNext, onBa
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span style={{ fontSize: 14, color: MUTED }}>Due now</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit)}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit, service?.currency)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 14, color: MUTED }}>Due after service</span>
-              <span style={{ fontSize: 14, color: MUTED }}>{fmtPrice(dep.remaining)}</span>
+              <span style={{ fontSize: 14, color: MUTED }}>{fmtPrice(dep.remaining, service?.currency)}</span>
             </div>
           </>
         ) : (
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>Total</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep.total)}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep.total, service?.currency)}</span>
           </div>
         )}
       </Card>
@@ -1331,7 +1329,7 @@ function StepCreateAccountPayment({ service, provider, slot, email, onNext, onBa
         disabled={!name.trim() || !phone.trim()}
         loading={submitting}
         onClick={handleSubmit}
-        label={dep.isDeposit ? `Pay ${fmtPrice(dep.deposit)} deposit & Book` : "Pay & Book"}
+        label={dep.isDeposit ? `Pay ${fmtPrice(dep.deposit, service?.currency)} deposit & Book` : "Pay & Book"}
       />
     </PageShell>
   );
@@ -1397,17 +1395,17 @@ function StepConfirmedNew({ result }) {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ fontSize: 14, color: MUTED }}>Deposit paid</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit)}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: FG }}>{fmtPrice(dep.deposit, service?.currency)}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 14, color: MUTED }}>Remaining (to be collected after your appointment)</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining)}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>{fmtPrice(dep.remaining, service?.currency)}</span>
               </div>
             </>
           ) : (
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>Total</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep?.total)}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: FG }}>{fmtPrice(dep?.total, service?.currency)}</span>
             </div>
           )}
         </Card>

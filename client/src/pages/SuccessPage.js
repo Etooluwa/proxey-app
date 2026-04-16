@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-const formatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "CAD",
-});
+function formatAmount(cents, currency) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: (currency || "CAD").toUpperCase(),
+  }).format((cents || 0) / 100);
+}
 
 function SuccessPage() {
   const [searchParams] = useSearchParams();
@@ -44,7 +46,7 @@ function SuccessPage() {
             <div className="summary__row">
               <span className="summary__label">Amount</span>
               <span className="summary__value">
-                {formatter.format(bookingSummary.amount / 100)}
+                {formatAmount(bookingSummary.amount, bookingSummary.currency)}
               </span>
             </div>
             <div className="summary__row">

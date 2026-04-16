@@ -1,8 +1,43 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Icons } from '../../components/Icons';
 import { fetchProviderJobs, updateProviderJobStatus } from '../../data/provider';
 import { useToast } from '../../components/ui/ToastProvider';
+
+const T = {
+    base: '#FBF7F2',
+    ink: '#3D231E',
+    muted: '#8C6A64',
+    faded: '#B0948F',
+    accent: '#C25E4A',
+    hero: '#FDDCC6',
+    avatarBg: '#F2EBE5',
+    line: 'rgba(140,106,100,0.2)',
+    card: '#FFFFFF',
+    successBg: '#EBF2EC',
+    success: '#5A8A5E',
+    dangerBg: '#FDEDEA',
+    danger: '#A04030',
+    callout: '#FFF5E6',
+};
+const F = "'Sora', system-ui, sans-serif";
+
+function getInitials(name) {
+    return (name || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((p) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+}
+
+function formatDate(iso) {
+    if (!iso) return 'TBD';
+    return new Date(iso).toLocaleString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+    });
+}
 
 const AppointmentRequestAcceptance = () => {
     const navigate = useNavigate();
@@ -10,152 +45,198 @@ const AppointmentRequestAcceptance = () => {
     const toast = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
     const [request, setRequest] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const load = useCallback(async () => {
+        setLoading(true);
         try {
-            const pending = await fetchProviderJobs({ status: "pending" });
+            const pending = await fetchProviderJobs({ status: 'pending' });
             setRequest(pending.find((j) => j.id === requestId) || null);
         } catch (error) {
-            console.error("Failed to load request", error);
-            toast.push({
-                title: "Error loading request",
-                description: error.message,
-                variant: "error",
-            });
+            console.error('Failed to load request', error);
+            toast.push({ title: 'Error loading request', description: error.message, variant: 'error' });
+        } finally {
+            setLoading(false);
         }
     }, [requestId, toast]);
 
-    useEffect(() => {
-        load();
-    }, [load]);
+    useEffect(() => { load(); }, [load]);
+
+    const handleUpdate = async (nextStatus, successMessage, variant = 'success') => {
+        setIsProcessing(true);
+        try {
+            await updateProviderJobStatus(request.id, nextStatus);
+            toast.push({
+                title: successMessage,
+                description: `${request.client_name || request.clientName || 'Client'} will be notified.`,
+                variant,
+            });
+            navigate('/provider/appointments');
+        } catch (error) {
+            console.error('Error updating request:', error);
+            toast.push({ title: 'Error', description: error.message || 'Failed to update appointment.', variant: 'error' });
+            setIsProcessing(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+                <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    border: `2px solid ${T.accent}`, borderTopColor: 'transparent',
+                    animation: 'spin 0.7s linear infinite',
+                }} />
+                <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
 
     if (!request) {
         return (
-            <div className="max-w-2xl mx-auto">
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 text-center">
-                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                        <Icons.AlertCircle size={32} />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Not Found</h2>
-                    <p className="text-gray-600 mb-6">This appointment request could not be found or has already been processed.</p>
+            <div style={{ padding: '0 20px', fontFamily: F }}>
+                <div style={{
+                    padding: '40px 24px', borderRadius: 20,
+                    border: `1px solid ${T.line}`, textAlign: 'center',
+                    background: T.dangerBg, marginTop: 24,
+                }}>
+                    <p style={{ fontFamily: F, fontSize: 16, fontWeight: 500, color: T.ink, margin: '0 0 8px' }}>
+                        Request not found
+                    </p>
+                    <p style={{ fontFamily: F, fontSize: 14, color: T.muted, margin: '0 0 20px' }}>
+                        This request could not be found or has already been processed.
+                    </p>
                     <button
-                        onClick={() => navigate('/provider/notifications')}
-                        className="px-6 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
+                        onClick={() => navigate('/provider/appointments')}
+                        style={{
+                            padding: '10px 24px', borderRadius: 12,
+                            background: T.ink, color: '#fff',
+                            border: 'none', fontFamily: F, fontSize: 14,
+                            fontWeight: 600, cursor: 'pointer',
+                        }}
                     >
-                        Back to Notifications
+                        Back to appointments
                     </button>
                 </div>
             </div>
         );
     }
 
-    const handleUpdate = async (nextStatus, successMessage, variant = "success") => {
-        setIsProcessing(true);
-        try {
-            await updateProviderJobStatus(request.id, nextStatus);
-            toast.push({
-                title: successMessage,
-                description: `${request.client_name || request.clientName || "Client"} will be notified.`,
-                variant,
-            });
-            await load();
-            navigate('/provider/appointments');
-        } catch (error) {
-            console.error('Error updating request:', error);
-            toast.push({
-                title: 'Error',
-                description: error.message || 'Failed to update appointment. Please try again.',
-                variant: 'error',
-            });
-            setIsProcessing(false);
-        }
-    };
-
+    const clientName = request.client_name || request.clientName || 'Client';
+    const serviceName = request.service_name || request.service || 'Service';
     const requestedDate = request.scheduled_at || request.scheduledAt;
-    const requestedTime = requestedDate ? new Date(requestedDate).toLocaleString() : 'TBD';
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Appointment Request</h1>
-                    <p className="text-gray-600 mt-1">Review and decide to accept or decline</p>
-                </div>
-                <button
-                    onClick={() => navigate('/provider/notifications')}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                    <Icons.X size={24} />
-                </button>
+        <div style={{ padding: '0 20px 40px', fontFamily: F, maxWidth: 600, margin: '0 auto' }}>
+            <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+
+            {/* Back */}
+            <button
+                onClick={() => navigate('/provider/appointments')}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: F, fontSize: 13, color: T.muted,
+                    padding: '20px 0 16px', marginLeft: -4,
+                }}
+            >
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back
+            </button>
+
+            {/* Header */}
+            <div style={{ marginBottom: 24, animation: 'fadeUp 0.4s ease 0.05s both' }}>
+                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: T.accent }}>
+                    New Request
+                </p>
+                <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600, letterSpacing: '-0.03em', color: T.ink }}>
+                    Appointment Request
+                </h1>
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="bg-gradient-to-r from-brand-50 to-brand-100 border-b border-gray-100 p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-600">
-                                {request.client_name?.[0] || request.clientName?.[0] || 'C'}
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900">{request.client_name || request.clientName || 'Client'}</h2>
-                                <p className="text-sm text-gray-600">{request.service_name || request.service || 'Service'}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-sm font-semibold text-gray-500 uppercase">Requested</div>
-                            <div className="text-sm text-gray-600">{requestedTime}</div>
-                        </div>
-                    </div>
+            {/* Client card */}
+            <div style={{
+                background: T.hero, borderRadius: 20, padding: '24px 20px',
+                marginBottom: 16, animation: 'fadeUp 0.4s ease 0.1s both',
+                display: 'flex', alignItems: 'center', gap: 16,
+            }}>
+                <div style={{
+                    width: 52, height: 52, borderRadius: '50%',
+                    background: T.avatarBg, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    fontFamily: F, fontSize: 18, fontWeight: 500, color: T.muted,
+                    flexShrink: 0,
+                }}>
+                    {getInitials(clientName)}
                 </div>
-
-                <div className="p-6 space-y-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Client Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Name</p>
-                                <p className="text-sm font-medium text-gray-900">{request.client_name || request.clientName || 'N/A'}</p>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Service</p>
-                                <p className="text-sm font-medium text-gray-900">{request.service_name || request.service || 'N/A'}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Appointment Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Date & Time</p>
-                                <p className="text-sm font-medium text-gray-900">{requestedTime}</p>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Status</p>
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                                    {request.status || 'pending'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <button
-                            onClick={() => handleUpdate("confirmed", "Appointment Accepted", "success")}
-                            disabled={isProcessing}
-                            className="flex-1 px-6 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors disabled:opacity-60"
-                        >
-                            {isProcessing ? "Processing..." : "Accept Request"}
-                        </button>
-                        <button
-                            onClick={() => handleUpdate("declined", "Appointment Declined", "info")}
-                            disabled={isProcessing}
-                            className="flex-1 px-6 py-3 bg-white border border-gray-200 text-gray-800 rounded-xl font-bold hover:bg-gray-50 transition-colors disabled:opacity-60"
-                        >
-                            Decline
-                        </button>
-                    </div>
+                <div>
+                    <p style={{ margin: '0 0 2px', fontSize: 17, fontWeight: 600, color: T.ink }}>{clientName}</p>
+                    <p style={{ margin: 0, fontSize: 13, color: T.muted }}>{serviceName}</p>
                 </div>
+            </div>
+
+            {/* Details */}
+            <div style={{ animation: 'fadeUp 0.4s ease 0.15s both' }}>
+                <div style={{ borderTop: `1px solid ${T.line}` }}>
+                    {[
+                        { label: 'Date & Time', value: formatDate(requestedDate) },
+                        { label: 'Service', value: serviceName },
+                        { label: 'Status', value: request.status || 'pending' },
+                    ].map(({ label, value }) => (
+                        <div key={label} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '14px 0', borderBottom: `1px solid ${T.line}`,
+                        }}>
+                            <span style={{ fontSize: 13, color: T.muted, fontFamily: F }}>{label}</span>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: T.ink, fontFamily: F }}>{value}</span>
+                        </div>
+                    ))}
+                    {request.notes && (
+                        <div style={{ padding: '14px 0', borderBottom: `1px solid ${T.line}` }}>
+                            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: T.faded }}>
+                                Client note
+                            </p>
+                            <div style={{ padding: '12px 14px', borderRadius: 12, background: T.callout }}>
+                                <p style={{ margin: 0, fontSize: 14, color: T.ink, lineHeight: 1.6 }}>{request.notes}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{
+                display: 'flex', gap: 10, marginTop: 28,
+                animation: 'fadeUp 0.4s ease 0.2s both',
+            }}>
+                <button
+                    onClick={() => handleUpdate('declined', 'Request declined', 'info')}
+                    disabled={isProcessing}
+                    style={{
+                        flex: 1, padding: '14px', borderRadius: 14,
+                        border: `1px solid ${T.line}`, background: 'transparent',
+                        fontFamily: F, fontSize: 15, fontWeight: 600,
+                        color: T.muted, cursor: 'pointer',
+                        opacity: isProcessing ? 0.5 : 1,
+                    }}
+                >
+                    Decline
+                </button>
+                <button
+                    onClick={() => handleUpdate('confirmed', 'Request accepted')}
+                    disabled={isProcessing}
+                    style={{
+                        flex: 2, padding: '14px', borderRadius: 14,
+                        border: 'none', background: T.ink,
+                        fontFamily: F, fontSize: 15, fontWeight: 600,
+                        color: '#fff', cursor: 'pointer',
+                        opacity: isProcessing ? 0.5 : 1,
+                    }}
+                >
+                    {isProcessing ? 'Processing…' : 'Accept Request'}
+                </button>
             </div>
         </div>
     );

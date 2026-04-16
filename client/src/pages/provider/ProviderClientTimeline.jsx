@@ -11,6 +11,7 @@ import { useSession } from '../../auth/authContext';
 import { useMessages } from '../../contexts/MessageContext';
 import { request } from '../../data/apiClient';
 import { supabase } from '../../utils/supabase';
+import { formatMoney } from '../../utils/formatMoney';
 import BackBtn from '../../components/ui/BackBtn';
 import HeroCard from '../../components/ui/HeroCard';
 import HeroPill from '../../components/ui/HeroPill';
@@ -53,10 +54,7 @@ function fmtTime(iso) {
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function fmtPrice(val) {
-    if (!val && val !== 0) return null;
-    return `$${Math.round(val / 100)}`;
-}
+const fmtPrice = (val, currency = 'cad') => (val == null ? null : formatMoney(val, currency));
 
 function fmtDuration(mins) {
     if (!mins) return null;
@@ -88,7 +86,7 @@ const TimelineEntry = ({ entry, isLast, clientName, onPress }) => {
     const isCancelled = entry.status === 'cancelled';
     const dot = timelineDotColor(entry);
     const clickable = !isConnected && entry.id && typeof onPress === 'function';
-    const price = fmtPrice(entry.price);
+    const price = fmtPrice(entry.price, entry.currency);
     const duration = fmtDuration(entry.duration);
     const dateLabel = fmtDate(entry.scheduled_at);
     const timeLabel = fmtTime(entry.scheduled_at);

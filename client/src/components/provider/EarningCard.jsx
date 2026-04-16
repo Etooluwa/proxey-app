@@ -1,8 +1,9 @@
 import "../../styles/provider/earningCard.css";
+import { formatMoney } from "../../utils/formatMoney";
 
-function EarningCard({ title, amount, supporting }) {
+function EarningCard({ title, amount, supporting, currency = 'cad' }) {
   const displayAmount =
-    typeof amount === "number" ? `$${(amount / 100).toFixed(2)}` : amount;
+    typeof amount === "number" ? formatMoney(amount, currency) : amount;
 
   return (
     <div className="provider-earning-card">

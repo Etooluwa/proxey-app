@@ -134,6 +134,11 @@ export function invalidateProviderProfileCache() {
   clearProviderProfileCache();
 }
 
+export async function fetchCurrencyLock() {
+  const data = await request("/provider/currency-lock");
+  return data.locked === true;
+}
+
 export async function updateProviderSchedule(schedule) {
   const data = await request("/provider/schedule", {
     method: "PATCH",

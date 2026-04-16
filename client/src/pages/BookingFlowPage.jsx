@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 import { clearDraft, loadDraft, saveDraft } from '../bookings/draftStore';
 import { supabase } from '../utils/supabase';
 import BookingPaymentForm, { computeDepositCents } from '../components/payment/BookingPaymentForm';
@@ -25,10 +26,7 @@ const wrapDesktop = (node) => (
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmtPrice = (cents) => {
-    if (!cents && cents !== 0) return 'POA';
-    return `$${(cents / 100).toFixed(0)}`;
-};
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? 'POA' : formatMoney(cents, currency));
 
 const fmtDuration = (mins) => {
     if (!mins) return null;
@@ -222,13 +220,13 @@ const StepServices = ({ providerId, preSelectedId, onContinue, onClose }) => {
                                                 {svc.metadata?.pricingType === 'per_hour' || svc.unit === 'hour' ? (
                                                     <>
                                                         {svc.metadata?.minHours ?? 1}–{svc.metadata?.maxHours ?? 8} hours
-                                                        {svc.base_price ? ` · ${fmtPrice(svc.base_price)}/hr` : ''}
+                                                        {svc.base_price ? ` · ${fmtPrice(svc.base_price, svc.currency)}/hr` : ''}
                                                     </>
                                                 ) : (
                                                     <>
                                                         {svc.duration ? fmtDuration(svc.duration) : null}
                                                         {svc.duration && svc.base_price ? ' · ' : ''}
-                                                        {svc.base_price ? fmtPrice(svc.base_price) : 'POA'}
+                                                        {svc.base_price ? fmtPrice(svc.base_price, svc.currency) : 'POA'}
                                                     </>
                                                 )}
                                             </p>
@@ -363,7 +361,7 @@ const StepDetail = ({ service, onContinue, onBack }) => {
                         <>
                             {/* Per-hour: hours stepper */}
                             <div className="rounded-[16px] p-5 mb-4" style={{ background: '#FFFFFF', border: '1.5px solid rgba(140,106,100,0.2)' }}>
-                                <p className="text-[13px] text-muted m-0 mb-4">{fmtPrice(hourlyRate)}/hr · Select how many hours</p>
+                                <p className="text-[13px] text-muted m-0 mb-4">{fmtPrice(hourlyRate, service?.currency)}/hr · Select how many hours</p>
                                 <div className="flex items-center justify-between">
                                     <button
                                         onClick={() => setSelectedHours((h) => Math.max(minHours, h - 1))}
@@ -395,11 +393,11 @@ const StepDetail = ({ service, onContinue, onBack }) => {
                             {/* Total price callout */}
                             <div className="flex items-center justify-between px-4 py-3 rounded-[12px] mb-4" style={{ background: '#FFF5E6' }}>
                                 <span className="text-[13px] text-muted">Total</span>
-                                <span className="text-[20px] font-semibold text-ink tracking-[-0.02em]">{fmtPrice(totalPrice)}</span>
+                                <span className="text-[20px] font-semibold text-ink tracking-[-0.02em]">{fmtPrice(totalPrice, service?.currency)}</span>
                             </div>
 
                             <PrimaryBtn onClick={handleContinue}>
-                                Continue · {fmtPrice(totalPrice)}
+                                Continue · {fmtPrice(totalPrice, service?.currency)}
                             </PrimaryBtn>
                         </>
                     ) : (
@@ -431,7 +429,7 @@ const StepDetail = ({ service, onContinue, onBack }) => {
                                             {opt.duration && <p className="text-[13px] text-muted m-0 mb-0.5">{fmtDuration(opt.duration)}</p>}
                                             {opt.price != null && (
                                                 <p className="text-[15px] font-semibold text-ink m-0">
-                                                    {fmtPrice(opt.price)}{opt.unit ? ` ${opt.unit}` : ''}
+                                                    {fmtPrice(opt.price, service?.currency)}{opt.unit ? ` ${opt.unit}` : ''}
                                                 </p>
                                             )}
                                         </div>
@@ -924,7 +922,7 @@ const StepPayment = ({ service, selectedOption, scheduledDate, scheduledTime, sc
                     <div className="rounded-[16px] bg-white overflow-hidden" style={{ border: '1px solid rgba(140,106,100,0.15)' }}>
                         <div className="flex justify-between items-center px-4 py-3.5">
                             <span className="text-[15px] font-semibold text-ink">{service?.name}</span>
-                            {effectivePrice != null && <span className="text-[15px] font-semibold text-ink">{fmtPrice(effectivePrice)}</span>}
+                            {effectivePrice != null && <span className="text-[15px] font-semibold text-ink">{fmtPrice(effectivePrice, service?.currency)}</span>}
                         </div>
                         <Divider />
                         {selectedOption?.duration && (
@@ -1029,7 +1027,7 @@ const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount
                 <div className="w-full rounded-[16px] overflow-hidden mb-6" style={{ border: '1px solid rgba(140,106,100,0.2)' }}>
                     <div className="px-4 py-3.5 flex justify-between items-center">
                         <span className="text-[14px] font-semibold text-ink">{service?.name}</span>
-                        {price != null && <span className="text-[14px] font-semibold text-ink">{fmtPrice(price)}</span>}
+                        {price != null && <span className="text-[14px] font-semibold text-ink">{fmtPrice(price, service?.currency)}</span>}
                     </div>
                     {paymentType === 'save_card' && (
                         <>
@@ -1045,12 +1043,12 @@ const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount
                             <Divider />
                             <div className="px-4 py-3 flex justify-between items-center bg-successBg">
                                 <span className="text-[13px] font-semibold text-success">Deposit paid</span>
-                                <span className="text-[13px] font-semibold text-success">{fmtPrice(depositAmount)}</span>
+                                <span className="text-[13px] font-semibold text-success">{fmtPrice(depositAmount, service?.currency)}</span>
                             </div>
                             <Divider />
                             <div className="px-4 py-3 flex justify-between items-center">
                                 <span className="text-[13px] text-muted">Due after session</span>
-                                <span className="text-[13px] text-ink">{fmtPrice(remainingAmount)}</span>
+                                <span className="text-[13px] text-ink">{fmtPrice(remainingAmount, service?.currency)}</span>
                             </div>
                         </>
                     )}
@@ -1059,7 +1057,7 @@ const StepConfirmed = ({ booking, service, price, depositAmount, remainingAmount
                             <Divider />
                             <div className="px-4 py-3 flex justify-between items-center bg-successBg">
                                 <span className="text-[13px] font-semibold text-success">Paid in full</span>
-                                <span className="text-[13px] font-semibold text-success">{fmtPrice(price)}</span>
+                                <span className="text-[13px] font-semibold text-success">{fmtPrice(price, service?.currency)}</span>
                             </div>
                         </>
                     )}
