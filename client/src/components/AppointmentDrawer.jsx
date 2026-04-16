@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -171,7 +172,7 @@ export default function AppointmentDrawer({ open, onClose, appointment, onNaviga
                             {a.scheduledDate ? `${a.scheduledDate} at ${a.time}` : a.time}
                         </p>
                         <p style={{ fontFamily: F, fontSize: '14px', color: T.muted, margin: '6px 0 0' }}>
-                            {[a.duration, a.service, a.price ? `$${a.price}` : null].filter(Boolean).join(' · ')}
+                            {[a.duration, a.service, a.price != null ? formatMoney(a.price, a.currency) : null].filter(Boolean).join(' · ')}
                         </p>
                     </div>
 

@@ -7,6 +7,7 @@ import {
   Users, User, CalendarBlank, CurrencyDollar, Scales, UserPlus, ArrowUpRight,
 } from '@phosphor-icons/react';
 import { fetchAdminStats, fetchAdminActivity } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -34,9 +35,10 @@ const MetricCard = ({ label, value, icon: Icon, sub }) => (
   </div>
 );
 
-const formatCurrency = (cents) => {
-  if (!cents) return '$0';
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+// Render grouped currency totals as "CAD $X · USD $Y"
+const formatByCurrency = (groups) => {
+  if (!groups || groups.length === 0) return formatMoney(0, 'cad');
+  return groups.map(({ currency, total }) => formatMoney(total ?? 0, currency)).join(' · ');
 };
 
 const statusStyle = (status) => {
@@ -120,9 +122,9 @@ const AdminDashboard = () => {
         />
         <MetricCard
           label="Kliques Net Revenue"
-          value={formatCurrency(stats?.kliquesNetRevenue)}
+          value={formatByCurrency(stats?.kliquesNetRevenueByCurrency)}
           icon={CurrencyDollar}
-          sub={`10% fee − Stripe costs · Gross: ${formatCurrency(stats?.grossTransactionVolume)}`}
+          sub={`10% fee − Stripe costs · Gross: ${formatByCurrency(stats?.grossTransactionVolumeByCurrency)}`}
         />
         <MetricCard
           label="Pending Disputes"

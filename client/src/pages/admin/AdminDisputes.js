@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Check } from '@phosphor-icons/react';
 import { fetchAdminDisputes, fetchDisputeStats, resolveDispute, fetchAdminDispute } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -23,10 +24,7 @@ const RESOLUTION_OPTIONS = [
   { value: 'dismissed', label: 'Dismiss Dispute' },
 ];
 
-const formatCurrency = (cents) => {
-  if (!cents) return '$0.00';
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-};
+const formatCurrency = (cents, currency) => formatMoney(cents ?? 0, currency || 'cad');
 
 const formatDate = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -221,7 +219,7 @@ const AdminDisputes = () => {
                     {dispute.bookings?.services?.name || 'Service'}
                   </p>
                   <p className="text-xs" style={{ color: MUTED }}>
-                    {formatCurrency(dispute.bookings?.price)}
+                    {formatCurrency(dispute.bookings?.price, dispute.bookings?.currency)}
                   </p>
                 </div>
                 <span className="text-sm truncate" style={{ color: MUTED }}>{dispute.client_name}</span>
@@ -316,7 +314,7 @@ const AdminDisputes = () => {
                       </div>
                       <div>
                         <p style={{ color: FADED }} className="text-xs">Amount</p>
-                        <p style={{ color: INK }} className="font-medium">{formatCurrency(selectedDispute.bookings?.price)}</p>
+                        <p style={{ color: INK }} className="font-medium">{formatCurrency(selectedDispute.bookings?.price, selectedDispute.bookings?.currency)}</p>
                       </div>
                       <div>
                         <p style={{ color: FADED }} className="text-xs">Client</p>
@@ -412,7 +410,7 @@ const AdminDisputes = () => {
                             style={inputStyle}
                           />
                           <p className="text-xs mt-1" style={{ color: FADED }}>
-                            Max: {formatCurrency(selectedDispute.bookings?.price)}
+                            Max: {formatCurrency(selectedDispute.bookings?.price, selectedDispute.bookings?.currency)}
                           </p>
                         </div>
                       )}
@@ -452,7 +450,7 @@ const AdminDisputes = () => {
                       </p>
                       {selectedDispute.resolution_amount && (
                         <p className="text-sm" style={{ color: '#3D5C40' }}>
-                          Refund: {formatCurrency(selectedDispute.resolution_amount)}
+                          Refund: {formatCurrency(selectedDispute.resolution_amount, selectedDispute.bookings?.currency)}
                         </p>
                       )}
                       {selectedDispute.resolution_notes && (

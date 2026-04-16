@@ -28,6 +28,7 @@ import { createCompleteBookingHandler } from "./lib/completeBookingHandler.js";
 import { createRequestTimeBookingHandler } from "./lib/createRequestTimeBookingHandler.js";
 import { createRescheduleBookingHandler } from "./lib/rescheduleBookingHandler.js";
 import { isAllowedImageContentType, sanitizeFilename } from "./lib/uploads.js";
+import { resolveChargeCurrency, PLATFORM_CURRENCY as _PLATFORM_CURRENCY } from "./lib/currency.js";
 
 dotenv.config();
 
@@ -44,7 +45,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-09-30.acacia",
 });
 
-const PLATFORM_CURRENCY = "cad";
+// Legacy fallback only — all active charge paths now use booking.currency
+// resolveChargeCurrency and PLATFORM_CURRENCY are imported from ./lib/currency.js
+const PLATFORM_CURRENCY = _PLATFORM_CURRENCY;
 const PLATFORM_FEE_RATE = 0.10;
 const WEB_PUSH_ENABLED = process.env.ENABLE_WEB_PUSH === "true";
 const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || "";
@@ -1675,6 +1678,7 @@ app.get("/api/provider/:providerId/services", async (req, res) => {
           deposit_type: s.deposit_type || null,
           deposit_value: s.deposit_value != null ? s.deposit_value : null,
           metadata: s.metadata || null,
+          currency: s.currency || 'cad',
         }));
         return res.status(200).json({ services });
       }
@@ -1902,9 +1906,19 @@ app.post("/api/services", async (req, res) => {
   } = req.body || {};
 
   let providerId;
+  let providerCurrency = 'cad';
   try {
     const providerIdentity = await getProviderIdentity(getProviderId(req));
     providerId = providerIdentity.authId || getProviderId(req);
+    // Inherit provider's currency for new services
+    if (supabase) {
+      const { data: provProfile } = await supabase
+        .from('provider_profiles')
+        .select('currency')
+        .eq('provider_id', providerId)
+        .maybeSingle();
+      if (provProfile?.currency) providerCurrency = provProfile.currency;
+    }
   } catch (err) {
     return res.status(400).json({ error: "Provider record not found for this user." });
   }
@@ -1935,6 +1949,7 @@ app.post("/api/services", async (req, res) => {
     client_notes_enabled: clientNotesEnabled !== undefined ? clientNotesEnabled : true,
     metadata: Object.keys(metadataFields).length > 0 ? metadataFields : undefined,
     image_url: imageUrl || null,
+    currency: providerCurrency,
   };
 
   try {
@@ -2059,7 +2074,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   const {
     name, description, category, basePrice, duration, isActive,
     paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
-    pricingType, minHours, maxHours, imageUrl, autoAccept,
+    pricingType, minHours, maxHours, imageUrl, autoAccept, currency,
   } = req.body || {};
 
   try {
@@ -2091,6 +2106,21 @@ app.put("/api/provider/services/:id", async (req, res) => {
         ...(pricingType === 'per_hour' ? { minHours: minHours ?? existingMeta.minHours ?? 1, maxHours: maxHours ?? existingMeta.maxHours ?? 8 } : { minHours: null, maxHours: null }),
         ...(autoAccept !== undefined ? { autoAccept: Boolean(autoAccept) } : {}),
       };
+    }
+
+    // Currency update: only allowed if no confirmed or completed bookings exist for this service
+    if (currency !== undefined) {
+      const { count: lockedCount } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("service_id", id)
+        .in("status", ["confirmed", "completed"]);
+      if (lockedCount > 0) {
+        return res.status(409).json({
+          error: "Currency cannot be changed — this service has confirmed or completed bookings.",
+        });
+      }
+      updates.currency = currency.toLowerCase();
     }
 
     const { data, error } = await supabase
@@ -2795,6 +2825,33 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
   if (!supabase) return null;
 
   try {
+    // Resolve currency: service → provider_profiles → 'cad'
+    let bookingCurrency = 'cad';
+    if (booking.serviceId) {
+      const { data: svc } = await supabase
+        .from('services')
+        .select('currency')
+        .eq('id', booking.serviceId)
+        .maybeSingle();
+      if (svc?.currency) {
+        bookingCurrency = svc.currency;
+      } else if (booking.providerId) {
+        const { data: provProfile } = await supabase
+          .from('provider_profiles')
+          .select('currency')
+          .eq('provider_id', booking.providerId)
+          .maybeSingle();
+        if (provProfile?.currency) bookingCurrency = provProfile.currency;
+      }
+    } else if (booking.providerId) {
+      const { data: provProfile } = await supabase
+        .from('provider_profiles')
+        .select('currency')
+        .eq('provider_id', booking.providerId)
+        .maybeSingle();
+      if (provProfile?.currency) bookingCurrency = provProfile.currency;
+    }
+
     const insertData = {
       id: booking.id,
       client_id: booking.userId,
@@ -2805,6 +2862,7 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
       notes: booking.notes,
       status: booking.status,
       price: booking.price,
+      currency: bookingCurrency,
     };
 
     if (Object.keys(metadata).length > 0) {
@@ -3240,13 +3298,15 @@ app.post("/api/payments/create-checkout", async (req, res) => {
       connectParams = buildConnectTransferParams(booking.price || 1000, providerStripe.accountId);
     }
 
+    // Legacy memoryStore checkout path — resolve currency from booking, fall back to platform default
+    const checkoutCurrency = resolveChargeCurrency(booking, 'create-checkout');
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: PLATFORM_CURRENCY,
+            currency: checkoutCurrency,
             product_data: {
               name: service?.name || "Booking Payment",
               description: service?.description,
@@ -3353,14 +3413,16 @@ app.get("/api/provider/jobs/:id", async (req, res) => {
     // Try to get client profile via booking_id → bookings.client_id
     let clientProfile = null;
     let clientId = null;
+    let bookingCurrency = 'cad';
     if (job.booking_id) {
       const { data: booking } = await supabase
         .from("bookings")
-        .select("client_id")
+        .select("client_id, currency")
         .eq("id", job.booking_id)
         .single();
       if (booking?.client_id) {
         clientId = booking.client_id;
+        if (booking.currency) bookingCurrency = booking.currency;
         const { data: profile } = await supabase
           .from("client_profiles")
           .select("name, city, updated_at")
@@ -3424,6 +3486,7 @@ app.get("/api/provider/jobs/:id", async (req, res) => {
       job: {
         ...job,
         price_dollars: (job.price || 0) / 100,
+        currency: bookingCurrency,
         client_id: clientId,
         client_city: clientProfile?.city || null,
         visit_count: visitCount,
@@ -3968,6 +4031,14 @@ app.get("/api/provider/earnings", async (req, res) => {
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const currentYear = now.getFullYear();
 
+    // Fetch provider's currency setting
+    const { data: provProfile } = await supabase
+      .from("provider_profiles")
+      .select("currency")
+      .eq("provider_id", providerAuthId)
+      .maybeSingle();
+    const providerCurrency = (provProfile?.currency || 'cad').toLowerCase();
+
     // Fetch all completed bookings for this provider
     const { data: bookings, error } = await supabase
       .from("bookings")
@@ -3981,7 +4052,9 @@ app.get("/api/provider/earnings", async (req, res) => {
     }
 
     const allBookings = bookings || [];
-    const completedBookings = allBookings.filter((booking) => booking.status === "completed");
+    // Filter to provider's currency only — never mix amounts across currencies
+    const currencyBookings = allBookings.filter(b => (b.currency || 'cad').toLowerCase() === providerCurrency);
+    const completedBookings = currencyBookings.filter((booking) => booking.status === "completed");
     const completedPaidBookings = completedBookings.filter((booking) => booking.payment_status === "paid");
 
     // Calculate available balance (completed + paid) as provider net earnings
@@ -4094,6 +4167,7 @@ app.get("/api/provider/earnings", async (req, res) => {
     nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
 
     const earnings = {
+      currency: providerCurrency,
       availableBalance: availableBalance / 100, // Convert cents to dollars
       pendingClearance: pendingClearance / 100,
       totalEarningsThisMonth: totalEarningsThisMonth / 100,
@@ -4127,8 +4201,33 @@ app.get("/api/provider/earnings", async (req, res) => {
   }
 });
 
+// GET /api/provider/currency-lock — returns whether currency is locked for this provider
+app.get("/api/provider/currency-lock", async (req, res) => {
+  const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!supabase) return res.status(200).json({ locked: false });
+
+  try {
+    // Locked only when real money has moved — completed bookings that were charged.
+    // Having active services or pending/upcoming bookings is fine to reassign.
+    const { count: paidBookingCount } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider_id', providerId)
+      .eq('status', 'completed')
+      .not('stripe_payment_intent_id', 'is', null);
+
+    const locked = (paidBookingCount || 0) > 0;
+    return res.status(200).json({ locked });
+  } catch (err) {
+    console.error('[currency-lock] error:', err);
+    return res.status(200).json({ locked: false }); // Safe default: unlocked on error
+  }
+});
+
 app.get("/api/provider/me", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: 'Authentication required.' });
 
   if (supabase) {
     try {
@@ -4360,11 +4459,51 @@ app.get("/api/provider/stats", async (req, res) => {
 
 app.patch("/api/provider/me", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: 'Authentication required.' });
   const updates = req.body || {};
 
   if (supabase) {
     try {
       const now = new Date().toISOString();
+
+      // ── Currency change guardrail ───────────────────────────────────────────
+      if (typeof updates.currency !== 'undefined') {
+        // Fetch current currency to detect a real change
+        const { data: currentProfile } = await supabase
+          .from('provider_profiles')
+          .select('currency')
+          .eq('provider_id', providerId)
+          .maybeSingle();
+
+        const currentCurrency = (currentProfile?.currency || 'cad').toLowerCase();
+        const newCurrency = (updates.currency || 'cad').toLowerCase();
+
+        if (currentCurrency !== newCurrency) {
+          // Only block when real money has moved — completed bookings that have
+          // been charged. Active services and pending/upcoming bookings are fine
+          // to reassign (no payment has settled yet).
+          const { count: paidBookingCount } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('provider_id', providerId)
+            .eq('status', 'completed')
+            .not('stripe_payment_intent_id', 'is', null);
+
+          if ((paidBookingCount || 0) > 0) {
+            return res.status(400).json({
+              error: 'Currency cannot be changed after you have completed paid bookings. Contact support if you need to change your currency.',
+            });
+          }
+
+          // Cascade currency to all services regardless of active status
+          await supabase
+            .from('services')
+            .update({ currency: newCurrency, updated_at: now })
+            .eq('provider_id', providerId);
+        }
+      }
+      // ── End currency guardrail ─────────────────────────────────────────────
+
       const normalizedCategory = updates.category ?? (Array.isArray(updates.categories) ? updates.categories[0] : undefined);
       const normalizedCategories = Array.isArray(updates.categories)
         ? updates.categories
@@ -4399,6 +4538,7 @@ app.patch("/api/provider/me", async (req, res) => {
         "stripe_last4",
         "account_status",
         "photo",
+        "currency",
       ];
 
       for (const field of providerProfileFields) {
@@ -4993,7 +5133,7 @@ app.post("/api/reviews", async (req, res) => {
   // Verify booking belongs to client and is completed
   const { data: booking, error: bookingErr } = await supabase
     .from("bookings")
-    .select("id, client_id, provider_id, status, service_name, scheduled_at, payment_intent_id, metadata")
+    .select("id, client_id, provider_id, status, service_name, scheduled_at, payment_intent_id, metadata, currency")
     .eq("id", bookingId)
     .single();
 
@@ -5052,7 +5192,7 @@ app.post("/api/reviews", async (req, res) => {
           if (customerId && paymentMethodId) {
             await stripe.paymentIntents.create({
               amount: tipAmountCents,
-              currency: PLATFORM_CURRENCY,
+              currency: resolveChargeCurrency(booking, 'reviews tip'),
               customer: customerId,
               payment_method: paymentMethodId,
               confirm: true,
@@ -5159,6 +5299,14 @@ app.post("/api/tips", async (req, res) => {
 
   try {
     const now = new Date().toISOString();
+
+    // Fetch booking currency for Stripe charge
+    const { data: tipBooking } = await supabase
+      .from("bookings")
+      .select("currency")
+      .eq("id", bookingId)
+      .maybeSingle();
+
     const { data: tipRecord } = await supabase
       .from("provider_earnings")
       .insert({
@@ -5168,6 +5316,7 @@ app.post("/api/tips", async (req, res) => {
         gross_amount: Math.round(amountCents),
         platform_fee: 0,
         net_amount: Math.round(amountCents),
+        currency: resolveChargeCurrency(tipBooking, "tips"),
         payout_status: "pending",
         created_at: now,
       })
@@ -5178,7 +5327,7 @@ app.post("/api/tips", async (req, res) => {
     if (stripe && paymentMethodId && customerId) {
       const tipIntent = await stripe.paymentIntents.create({
         amount: Math.round(amountCents),
-        currency: PLATFORM_CURRENCY,
+        currency: resolveChargeCurrency(tipBooking, 'tips endpoint'),
         customer: customerId,
         payment_method: paymentMethodId,
         confirm: true,
@@ -6237,7 +6386,7 @@ async function buildProviderClientTimeline(providerIdentifier, clientId) {
       .maybeSingle(),
     supabase
       .from("bookings")
-      .select("id, service_id, service_name, scheduled_at, duration, price, status, notes, session_notes, session_recommendation, completed_at, created_at, client_name")
+      .select("id, service_id, service_name, scheduled_at, duration, price, currency, status, notes, session_notes, session_recommendation, completed_at, created_at, client_name")
       .eq("provider_id", identity.authId)
       .eq("client_id", clientId)
       .order("scheduled_at", { ascending: false }),
@@ -8020,9 +8169,20 @@ app.post("/api/charge", async (req, res) => {
     }
     const connectParams = buildConnectTransferParams(Math.round(amount), providerStripeAccountId);
 
+    // Fetch booking currency
+    let chargeCurrency = PLATFORM_CURRENCY;
+    if (supabase && bookingId) {
+      const { data: chargeBkg } = await supabase
+        .from("bookings")
+        .select("currency")
+        .eq("id", bookingId)
+        .maybeSingle();
+      chargeCurrency = resolveChargeCurrency(chargeBkg, 'charge endpoint');
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount),
-      currency: PLATFORM_CURRENCY,
+      currency: chargeCurrency,
       customer: customerId,
       payment_method: paymentMethodId,
       off_session: true,
@@ -8072,9 +8232,20 @@ app.post("/api/tips", async (req, res) => {
   }
 
   try {
+    // Fetch booking currency for Stripe charge
+    let tipBookingCurrency = PLATFORM_CURRENCY;
+    if (supabase && bookingId) {
+      const { data: tipBkg } = await supabase
+        .from("bookings")
+        .select("currency")
+        .eq("id", bookingId)
+        .maybeSingle();
+      tipBookingCurrency = resolveChargeCurrency(tipBkg, 'tips (charge)');
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amountCents),
-      currency: "cad",
+      currency: tipBookingCurrency,
       customer: customerId,
       payment_method: paymentMethodId,
       off_session: true,
@@ -8980,8 +9151,8 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
         .gte("created_at", oneWeekAgo),
       supabase.from("client_profiles").select("*", { count: "exact", head: true })
         .gte("created_at", oneWeekAgo),
-      // Paid bookings — price is provider fee in cents
-      supabase.from("bookings").select("price")
+      // Paid bookings — price is provider fee in cents (include currency for grouping)
+      supabase.from("bookings").select("price, currency")
         .in("status", ["completed", "confirmed"])
         .not("price", "is", null)
         .gt("price", 0),
@@ -8995,16 +9166,23 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     // Client pays: price × 1.10 (Kliques adds 10% service fee)
     // Stripe fee per transaction: (price × 1.10) × 2.9% + $0.30
     // Kliques net per transaction: (price × 10%) - stripe fee
-    const grossTransactionVolume = (revenueRows || []).reduce((sum, b) => sum + (b.price || 0), 0);
-    let kliquesNetRevenue = 0;
+    // Group by currency — never mix amounts across currencies
+    const grossByCurrency = {};
+    const netByCurrency = {};
     (revenueRows || []).forEach((b) => {
+      const cur = (b.currency || 'cad').toLowerCase();
       const providerPrice = b.price || 0;
       const clientTotal = Math.round(providerPrice * 1.10);
-      const stripeFee = Math.round(clientTotal * 0.029) + 30; // cents
-      const kliquesGross = clientTotal - providerPrice; // the 10% service fee
-      const kliquesNet = kliquesGross - stripeFee;
-      kliquesNetRevenue += kliquesNet;
+      const stripeFee = Math.round(clientTotal * 0.029) + 30;
+      const kliquesNet = (clientTotal - providerPrice) - stripeFee;
+      grossByCurrency[cur] = (grossByCurrency[cur] || 0) + providerPrice;
+      netByCurrency[cur] = (netByCurrency[cur] || 0) + kliquesNet;
     });
+    const grossTransactionVolumeByCurrency = Object.entries(grossByCurrency).map(([currency, total]) => ({ currency, total }));
+    const kliquesNetRevenueByCurrency = Object.entries(netByCurrency).map(([currency, total]) => ({ currency, total }));
+    // Legacy single-value fallback for CAD (for any existing consumers)
+    const grossTransactionVolume = grossByCurrency['cad'] || 0;
+    const kliquesNetRevenue = netByCurrency['cad'] || 0;
 
     // Build monthly bookings array for the past 6 months
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -9027,6 +9205,8 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
       totalBookings: bookingCount || 0,
       grossTransactionVolume,
       kliquesNetRevenue,
+      grossTransactionVolumeByCurrency,
+      kliquesNetRevenueByCurrency,
       pendingDisputes: disputeCount || 0,
       newSignupsThisWeek: (newProviders || 0) + (newClients || 0),
       monthlyBookings: Object.values(monthlyCounts),
@@ -9322,35 +9502,59 @@ app.get("/api/admin/revenue", requireAdmin, async (req, res) => {
       .order("created_at", { ascending: false });
 
     const allTx = transactions || [];
-    const total = allTx.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-    // This month's revenue
+    // Helper: group amounts by currency
+    const groupByCurrency = (rows, amountFn = (r) => r.amount || 0) => {
+      const map = {};
+      rows.forEach((r) => {
+        const cur = (r.currency || 'cad').toLowerCase();
+        map[cur] = (map[cur] || 0) + amountFn(r);
+      });
+      return Object.entries(map).map(([currency, total]) => ({ currency, total }));
+    };
+
+    // All-time totals grouped by currency
+    const totalByCurrency = groupByCurrency(allTx);
+
+    // This month's revenue grouped by currency
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const thisMonthTx = allTx.filter(t => t.created_at >= startOfMonth);
-    const thisMonth = thisMonthTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const thisMonthByCurrency = groupByCurrency(thisMonthTx);
 
-    // Average per booking
-    const avgPerBooking = allTx.length > 0 ? Math.round(total / allTx.length) : 0;
+    // Average per booking grouped by currency
+    const avgByCurrency = totalByCurrency.map(({ currency, total }) => {
+      const count = allTx.filter(t => (t.currency || 'cad').toLowerCase() === currency).length;
+      return { currency, avg: count > 0 ? Math.round(total / count) : 0 };
+    });
 
-    // Monthly breakdown (last 6 months)
+    // Monthly breakdown (last 6 months) — one entry per month, amounts grouped by currency
     const monthly = [];
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthStart = date.toISOString();
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59).toISOString();
       const monthTx = allTx.filter(t => t.created_at >= monthStart && t.created_at <= monthEnd);
-      const monthTotal = monthTx.reduce((sum, t) => sum + (t.amount || 0), 0);
       monthly.push({
         month: date.toLocaleDateString("en-US", { month: "short" }),
-        revenue: monthTotal
+        byCurrency: groupByCurrency(monthTx),
+        // Legacy single-value CAD fallback
+        revenue: monthTx.filter(t => (t.currency || 'cad').toLowerCase() === 'cad').reduce((s, t) => s + (t.amount || 0), 0),
       });
     }
 
     res.status(200).json({
-      summary: { total, this_month: thisMonth, avg_per_booking: avgPerBooking },
+      summary: {
+        totalByCurrency,
+        thisMonthByCurrency,
+        avgByCurrency,
+        // Legacy single-value CAD fields
+        total: totalByCurrency.find(x => x.currency === 'cad')?.total || 0,
+        this_month: thisMonthByCurrency.find(x => x.currency === 'cad')?.total || 0,
+        avg_per_booking: avgByCurrency.find(x => x.currency === 'cad')?.avg || 0,
+      },
       monthly,
-      transactions: allTx.slice(0, 50) // Latest 50 transactions
+      transactions: allTx.slice(0, 50),
     });
   } catch (err) {
     console.error("[admin] Failed to load revenue", err);
@@ -9367,7 +9571,7 @@ app.get("/api/admin/promotions", requireAdmin, async (req, res) => {
   try {
     const { data: promotions, error } = await supabase
       .from("promotions")
-      .select("*, providers(name)")
+      .select("*, providers(name, provider_profiles(currency))")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -9375,7 +9579,8 @@ app.get("/api/admin/promotions", requireAdmin, async (req, res) => {
     res.status(200).json({
       promotions: (promotions || []).map(p => ({
         ...p,
-        provider_name: p.providers?.name || "Unknown"
+        provider_name: p.providers?.name || "Unknown",
+        provider_currency: (p.providers?.provider_profiles?.currency || 'cad').toLowerCase(),
       }))
     });
   } catch (err) {
@@ -9478,7 +9683,7 @@ app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
     // Bookings by status
     const { data: allBookings } = await supabase
       .from("bookings")
-      .select("id, status, price, service_name, scheduled_at")
+      .select("id, status, price, currency, service_name, scheduled_at")
       .gte("created_at", startDate.toISOString());
 
     const bookingsByStatus = { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
@@ -9502,14 +9707,25 @@ app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
     const categoryStats = {};
     (allBookings || []).forEach(b => {
       const category = serviceMap[b.service_name] || "Uncategorized";
+      const cur = (b.currency || 'cad').toLowerCase();
       if (!categoryStats[category]) {
-        categoryStats[category] = { category, bookings: 0, revenue: 0 };
+        categoryStats[category] = { category, bookings: 0, revenueByCurrency: {} };
       }
       categoryStats[category].bookings++;
-      categoryStats[category].revenue += b.price || 0;
+      categoryStats[category].revenueByCurrency[cur] = (categoryStats[category].revenueByCurrency[cur] || 0) + (b.price || 0);
     });
-    const categoryPerformance = Object.values(categoryStats).sort((a, b) => b.revenue - a.revenue);
-    const revenueByCategory = categoryPerformance.map(c => ({ category: c.category, revenue: c.revenue }));
+    const categoryPerformance = Object.values(categoryStats).map(c => ({
+      category: c.category,
+      bookings: c.bookings,
+      revenueByCurrency: Object.entries(c.revenueByCurrency).map(([currency, total]) => ({ currency, total })),
+      // Legacy: CAD total for chart rendering
+      revenue: c.revenueByCurrency['cad'] || 0,
+    })).sort((a, b) => b.bookings - a.bookings);
+    const revenueByCategory = categoryPerformance.map(c => ({
+      category: c.category,
+      revenueByCurrency: c.revenueByCurrency,
+      revenue: c.revenue,
+    }));
 
     // Top providers
     const { data: providerList } = await supabase
@@ -9521,27 +9737,33 @@ app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
 
     const { data: providerBookings } = await supabase
       .from("bookings")
-      .select("provider_id, price")
+      .select("provider_id, price, currency")
       .gte("created_at", startDate.toISOString());
 
     const providerStatsMap = {};
     (providerBookings || []).forEach(b => {
       if (!b.provider_id) return;
+      const cur = (b.currency || 'cad').toLowerCase();
       if (!providerStatsMap[b.provider_id]) {
-        providerStatsMap[b.provider_id] = { bookings: 0, revenue: 0 };
+        providerStatsMap[b.provider_id] = { bookings: 0, revenueByCurrency: {} };
       }
       providerStatsMap[b.provider_id].bookings++;
-      providerStatsMap[b.provider_id].revenue += b.price || 0;
+      providerStatsMap[b.provider_id].revenueByCurrency[cur] = (providerStatsMap[b.provider_id].revenueByCurrency[cur] || 0) + (b.price || 0);
     });
 
-    const topProviders = (providerList || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      photo: p.photo,
-      rating: p.rating || 0,
-      bookings: providerStatsMap[p.id]?.bookings || 0,
-      revenue: providerStatsMap[p.id]?.revenue || 0
-    })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    const topProviders = (providerList || []).map(p => {
+      const stats = providerStatsMap[p.id] || { bookings: 0, revenueByCurrency: {} };
+      return {
+        id: p.id,
+        name: p.name,
+        photo: p.photo,
+        rating: p.rating || 0,
+        bookings: stats.bookings,
+        revenueByCurrency: Object.entries(stats.revenueByCurrency).map(([currency, total]) => ({ currency, total })),
+        // Legacy: total CAD for sort
+        revenue: stats.revenueByCurrency['cad'] || 0,
+      };
+    }).sort((a, b) => b.bookings - a.bookings).slice(0, 5);
 
     res.status(200).json({
       userGrowth,
@@ -9868,7 +10090,7 @@ app.get("/api/disputes", async (req, res) => {
       .select(`
         *,
         bookings:booking_id (
-          id, scheduled_at, price, status,
+          id, scheduled_at, price, currency, status,
           services:service_id (name),
           client:client_id (id, raw_user_meta_data),
           provider:provider_id (id, raw_user_meta_data)
@@ -10635,6 +10857,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     city,
     bio,
     handle,
+    currency,
     services,        // [{ name, duration, price, paymentType, depositType, depositValue }]
     availability,    // { monday: { enabled, slots }, ... }
     bufferMinutes,
@@ -10681,6 +10904,7 @@ app.post("/api/provider/onboarding/complete", async (req, res) => {
     if (city)         profileFields.city = city;
     if (businessName) profileFields.business_name = businessName;
     if (photoUrl)     profileFields.photo = photoUrl;
+    if (currency)     profileFields.currency = currency.toLowerCase();
     const { error: profileFieldsErr } = await supabase
       .from("provider_profiles")
       .upsert(profileFields, { onConflict: "provider_id" });
@@ -10791,17 +11015,17 @@ app.get("/api/provider/public/:handle", async (req, res) => {
     if (error) throw error;
     if (!provider) return res.status(404).json({ error: "Provider not found." });
 
-    // Also grab booking_settings from provider_profiles
+    // Also grab booking_settings and currency from provider_profiles
     const { data: profile } = await supabase
       .from("provider_profiles")
-      .select("booking_settings")
+      .select("booking_settings, currency")
       .eq("provider_id", provider.user_id)
       .maybeSingle();
 
     const [servicesRes, groupsRes, reviewsRes, clientCountRes, portfolioRes] = await Promise.all([
       supabase
         .from("services")
-        .select("id, name, duration, base_price, unit, payment_type, deposit_type, deposit_value, description, group_id, metadata, image_url")
+        .select("id, name, duration, base_price, unit, payment_type, deposit_type, deposit_value, description, group_id, metadata, image_url, currency")
         .eq("provider_id", provider.user_id)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
@@ -10838,8 +11062,9 @@ app.get("/api/provider/public/:handle", async (req, res) => {
     const clientCount = clientCountRes.count || 0;
     const portfolio = (portfolioRes.data || []).map((item) => ({ ...item, url: item.media_url }));
 
+    const providerCurrency = profile?.currency || 'cad';
     res.json({
-      provider: { ...provider, booking_window_weeks: bookingWindow, buffer_minutes: bufferMins, client_count: clientCount },
+      provider: { ...provider, booking_window_weeks: bookingWindow, buffer_minutes: bufferMins, client_count: clientCount, currency: providerCurrency },
       services: servicesRes.data || [],
       groups: groupsRes.data || [],
       reviews: reviewsRes.data || [],
@@ -11086,6 +11311,33 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       .maybeSingle();
     const stripeAccountId = providerRow?.stripe_account_id;
 
+    // Resolve service currency: service → provider_profiles → PLATFORM_CURRENCY
+    let intentCurrency = PLATFORM_CURRENCY;
+    if (serviceId) {
+      const { data: svcRow } = await supabase
+        .from("services")
+        .select("currency")
+        .eq("id", serviceId)
+        .maybeSingle();
+      intentCurrency = resolveChargeCurrency(svcRow, 'payment-intent service');
+      if (intentCurrency === PLATFORM_CURRENCY && !svcRow?.currency) {
+        // Fall back to provider profile currency
+        const { data: ppRow } = await supabase
+          .from("provider_profiles")
+          .select("currency")
+          .eq("provider_id", providerId)
+          .maybeSingle();
+        intentCurrency = resolveChargeCurrency(ppRow, 'payment-intent provider_profile');
+      }
+    } else {
+      const { data: ppRow } = await supabase
+        .from("provider_profiles")
+        .select("currency")
+        .eq("provider_id", providerId)
+        .maybeSingle();
+      intentCurrency = resolveChargeCurrency(ppRow, 'payment-intent provider_profile');
+    }
+
     // Find or create Stripe customer for client
     let customerId;
     if (supabase) {
@@ -11127,7 +11379,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
 
     const intentParams = {
       amount: totalCharge,
-      currency: PLATFORM_CURRENCY,
+      currency: intentCurrency,
       customer: customerId,
       payment_method_types: ["card"],
       capture_method: "automatic",
@@ -11253,9 +11505,34 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
     notes,
     price,
     autoAccept,
-    platformCurrency,
   }) => {
     if (!supabase) return bookingId;
+    // Resolve currency: service → provider_profiles → 'cad'
+    let bookingCurrency = PLATFORM_CURRENCY;
+    if (serviceId) {
+      const { data: svc } = await supabase
+        .from('services')
+        .select('currency')
+        .eq('id', serviceId)
+        .maybeSingle();
+      if (svc?.currency) {
+        bookingCurrency = svc.currency;
+      } else if (providerId) {
+        const { data: provProfile } = await supabase
+          .from('provider_profiles')
+          .select('currency')
+          .eq('provider_id', providerId)
+          .maybeSingle();
+        if (provProfile?.currency) bookingCurrency = provProfile.currency;
+      }
+    } else if (providerId) {
+      const { data: provProfile } = await supabase
+        .from('provider_profiles')
+        .select('currency')
+        .eq('provider_id', providerId)
+        .maybeSingle();
+      if (provProfile?.currency) bookingCurrency = provProfile.currency;
+    }
     const { data, error } = await supabase
       .from("bookings")
       .insert({
@@ -11269,7 +11546,7 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
         notes: notes || "",
         status: autoAccept ? "confirmed" : "pending",
         price: price ?? null,
-        currency: platformCurrency.toUpperCase(),
+        currency: bookingCurrency,
       })
       .select()
       .single();
@@ -11293,10 +11570,20 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
     saveCard,
     providerStripe,
     platformCurrency,
-  }) =>
-    stripe.paymentIntents.create({
+  }) => {
+    // Use the booking's currency written by createBookingRecord (service → provider → fallback)
+    let piCurrency = platformCurrency || PLATFORM_CURRENCY;
+    if (supabase && bookingId) {
+      const { data: bkgRow } = await supabase
+        .from('bookings')
+        .select('currency')
+        .eq('id', bookingId)
+        .maybeSingle();
+      piCurrency = resolveChargeCurrency(bkgRow, 'createPaymentIntent') || piCurrency;
+    }
+    return stripe.paymentIntents.create({
       amount: amountCents,
-      currency: platformCurrency,
+      currency: piCurrency,
       customer: customerId,
       payment_method: paymentMethodId,
       confirm: true,
@@ -11306,7 +11593,8 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
       ...(providerStripe
         ? buildConnectTransferParams(amountCents, providerStripe.accountId)
         : {}),
-    }),
+    });
+  },
   afterBookingCreated: async ({
     bookingId,
     userId,
@@ -11799,7 +12087,7 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
   }) => {
     const piParams = {
       amount: totalRemainingCharge,
-      currency: PLATFORM_CURRENCY,
+      currency: resolveChargeCurrency(booking, 'chargeCompletion'),
       customer: customerId || undefined,
       payment_method: booking.stripe_payment_method_id,
       confirm: true,
@@ -11847,6 +12135,7 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
       gross_amount: grossAmountCents,
       platform_fee: platformFeeCents,
       net_amount: netAmountCents,
+      currency: resolveChargeCurrency(booking, "createEarningsRecord"),
       payout_status: "pending",
       created_at: now,
     });
@@ -12126,7 +12415,7 @@ app.post("/api/bookings/:id/charge-card", async (req, res) => {
 
     const piParams = {
       amount: totalCharge,
-      currency: PLATFORM_CURRENCY,
+      currency: resolveChargeCurrency(booking, 'charge-card'),
       customer: customerId || undefined,
       payment_method: booking.stripe_payment_method_id,
       confirm: true,
@@ -12205,7 +12494,7 @@ app.post("/api/bookings/:id/retry-payment", async (req, res) => {
 
     const piParams = {
       amount: totalCharge,
-      currency: PLATFORM_CURRENCY,
+      currency: resolveChargeCurrency(booking, 'retry-payment'),
       customer: customerId || undefined,
       ...(pmId ? { payment_method: pmId } : {}),
       metadata: { booking_id: bookingId, type: "retry_payment" },

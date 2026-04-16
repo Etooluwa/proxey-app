@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request, API_BASE } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 import { supabase } from '../utils/supabase';
 import Header from '../components/ui/Header';
 import Footer from '../components/ui/Footer';
@@ -19,11 +20,7 @@ function fmtDate(d) {
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtMoney(amount) {
-    if (!amount && amount !== 0) return '$0.00';
-    const dollars = typeof amount === 'number' ? amount / 100 : parseFloat(amount) / 100;
-    return `$${dollars.toFixed(2)}`;
-}
+const fmtMoney = (amount) => formatMoney(amount ?? 0, 'cad');
 
 function statusStyle(status) {
     const s = status?.toLowerCase();

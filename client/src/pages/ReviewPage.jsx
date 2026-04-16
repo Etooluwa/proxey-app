@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 import BackBtn from '../components/ui/BackBtn';
 import Divider from '../components/ui/Divider';
 import Lbl from '../components/ui/Lbl';
@@ -30,10 +31,7 @@ const F = "'Sora',system-ui,sans-serif";
 const getInitials = (name) =>
     (name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
-function fmtCents(cents) {
-    if (!cents && cents !== 0) return '—';
-    return `$${(cents / 100).toFixed(0)}`;
-}
+const fmtCents = (cents, currency = 'cad') => (cents == null ? '—' : formatMoney(cents, currency));
 
 function fmtDateTime(iso) {
     if (!iso) return '—';
@@ -81,7 +79,7 @@ const StarDisplay = ({ rating, size = 20 }) => (
     </div>
 );
 
-const ProviderInfo = ({ name, serviceName, date, price, avatarSize = 56 }) => {
+const ProviderInfo = ({ name, serviceName, date, price, currency, avatarSize = 56 }) => {
     const initials = getInitials(name);
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
@@ -91,7 +89,7 @@ const ProviderInfo = ({ name, serviceName, date, price, avatarSize = 56 }) => {
             <div>
                 <p style={{ fontFamily: F, fontSize: 18, fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 3px', color: T.ink }}>{name}</p>
                 <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>
-                    {serviceName}{date ? ` · ${date}` : ''}{price ? ` · ${fmtCents(price)}` : ''}
+                    {serviceName}{date ? ` · ${date}` : ''}{price ? ` · ${fmtCents(price, currency)}` : ''}
                 </p>
             </div>
         </div>
@@ -129,7 +127,7 @@ const ReviewStep = ({ booking, rating, onRate, reviewText, onTextChange, onConti
     if (existingReview) {
         return (
             <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <ProviderInfo name={providerName} serviceName={serviceName} date={fmtDateTime(date)} />
+                <ProviderInfo name={providerName} serviceName={serviceName} date={fmtDateTime(date)} currency={booking?.currency} />
                 <Divider />
                 <div style={{ padding: '28px 0', textAlign: 'center' }}>
                     <div style={{ width: 48, height: 48, borderRadius: '50%', background: T.successBg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
@@ -151,13 +149,13 @@ const ReviewStep = ({ booking, rating, onRate, reviewText, onTextChange, onConti
 
     return (
         <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <ProviderInfo name={providerName} serviceName={serviceName} date={fmtDateTime(date)} />
+            <ProviderInfo name={providerName} serviceName={serviceName} date={fmtDateTime(date)} currency={booking?.currency} />
 
             {/* Session summary card */}
             <div style={{ padding: 16, background: T.avatarBg, borderRadius: 14, marginBottom: 28 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.ink }}>{serviceName}</span>
-                    {price && <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.accent }}>{fmtCents(price)}</span>}
+                    {price && <span style={{ fontFamily: F, fontSize: 14, fontWeight: 500, color: T.accent }}>{fmtCents(price, booking?.currency)}</span>}
                 </div>
                 <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>
                     {duration ? `${duration} min` : ''}{duration && date ? ' · ' : ''}{date ? `${fmtDateTime(date)} · ${fmtTime(date)}` : ''}
@@ -239,7 +237,7 @@ const TipStep = ({ booking, tipType, onSelectTip, customTip, onCustomTip, onBack
                 <div>
                     <p style={{ fontFamily: F, fontSize: 16, fontWeight: 400, margin: '0 0 2px', color: T.ink }}>{providerName}</p>
                     <p style={{ fontFamily: F, fontSize: 13, color: T.muted, margin: 0 }}>
-                        {serviceName}{priceInCents ? ` · ${fmtCents(priceInCents)}` : ''}
+                        {serviceName}{priceInCents ? ` · ${fmtCents(priceInCents, booking?.currency)}` : ''}
                     </p>
                 </div>
             </div>

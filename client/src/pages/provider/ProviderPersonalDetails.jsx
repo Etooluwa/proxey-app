@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchProviderProfile, updateProviderProfile } from '../../data/provider';
+import { fetchProviderProfile, updateProviderProfile, fetchCurrencyLock } from '../../data/provider';
 import { useSession } from '../../auth/authContext';
 import supabase from '../../utils/supabase';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
 import PhoneInput from '../../components/ui/PhoneInput';
+import CurrencySelect from '../../components/ui/CurrencySelect';
 
 const T = {
   ink: '#3D231E',
@@ -55,6 +56,8 @@ export default function ProviderPersonalDetails() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [currency, setCurrency] = useState('cad');
+  const [currencyLocked, setCurrencyLocked] = useState(false); // Default unlocked; lock only after confirmed paid bookings
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -78,8 +81,8 @@ export default function ProviderPersonalDetails() {
   }, []);
 
   useEffect(() => {
-    fetchProviderProfile()
-      .then((profile) => {
+    Promise.all([fetchProviderProfile(), fetchCurrencyLock()])
+      .then(([profile, locked]) => {
         if (profile) {
           setName(
             profile.name ||
@@ -90,7 +93,9 @@ export default function ProviderPersonalDetails() {
           // Fall back to auth session email if profile email is blank
           setEmail(profile.email || session?.user?.email || '');
           setPhone(profile.phone || '');
+          setCurrency(profile.currency || 'cad');
         }
+        setCurrencyLocked(locked);
       })
       .catch((err) => setError(err.message || 'Failed to load profile'))
       .finally(() => setLoading(false));
@@ -109,13 +114,13 @@ export default function ProviderPersonalDetails() {
         const { error: emailErr } = await supabase.auth.updateUser({ email: email.trim() });
         if (emailErr) throw new Error(emailErr.message);
         // Save name + phone but NOT the new email yet (it isn't confirmed).
-        await updateProviderProfile({ name, business_name: name, phone });
+        await updateProviderProfile({ name, business_name: name, phone, currency });
         await updateProfile({ name, business_name: name, businessName: name });
         setEmailConfirmSent(true);
         return; // Stay on page to show the confirmation message
       }
 
-      await updateProviderProfile({ name, business_name: name, email, phone });
+      await updateProviderProfile({ name, business_name: name, email, phone, currency });
       await updateProfile({ name, business_name: name, businessName: name });
       navigate(-1);
     } catch (err) {
@@ -187,6 +192,42 @@ export default function ProviderPersonalDetails() {
               value={phone}
               onChange={(v) => setPhone(v)}
             />
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <Lbl>Currency</Lbl>
+            {currencyLocked ? (
+              <>
+                <div style={{
+                  ...inputStyle,
+                  color: T.faded,
+                  cursor: 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 0,
+                }}>
+                  <span>{currency.toUpperCase()}</span>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={T.faded} strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p style={{ fontFamily: F, fontSize: 12, color: T.faded, margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Currency is locked once you have completed paid bookings.
+                </p>
+              </>
+            ) : (
+              <>
+                <CurrencySelect
+                  value={currency}
+                  onChange={(v) => setCurrency(v)}
+                />
+                <p style={{ fontFamily: F, fontSize: 12, color: '#A07030', margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Changing currency will update all your services. Cannot be changed after you have completed paid bookings.
+                </p>
+              </>
+            )}
           </div>
 
           {error && (

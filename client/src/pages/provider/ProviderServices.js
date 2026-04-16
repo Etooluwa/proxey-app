@@ -13,6 +13,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { formatMoney } from '../../utils/formatMoney';
 import Header from '../../components/ui/Header';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
@@ -27,10 +28,7 @@ const APP_ORIGIN = process.env.REACT_APP_APP_URL || window.location.origin;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtPrice(val) {
-    if (!val && val !== 0) return null;
-    return `$${Math.round(val / 100)}`;
-}
+const fmtPrice = (val, currency = 'cad') => (val == null ? null : formatMoney(val, currency));
 
 function fmtDuration(mins) {
     if (!mins) return null;
@@ -46,7 +44,7 @@ function isPerHourService(service) {
 
 function fmtServiceMeta(service) {
     if (!service) return '—';
-    const price = fmtPrice(service.base_price || service.basePrice);
+    const price = fmtPrice(service.base_price || service.basePrice, service.currency);
     if (isPerHourService(service)) {
         const minHours = Math.max(Number(service?.metadata?.minHours ?? 1) || 1, 1);
         const maxHours = Math.max(Number(service?.metadata?.maxHours ?? minHours) || minHours, minHours);
@@ -445,7 +443,7 @@ const ProviderServices = () => {
                                         </div>
                                     ) : section.services.map((svc, i) => {
                                         const duration = fmtDuration(svc.duration);
-                                        const price = fmtPrice(svc.base_price || svc.basePrice);
+                                        const price = fmtPrice(svc.base_price || svc.basePrice, svc.currency);
                                         const booked = svc.bookings_this_month || 0;
                                         const isDraft = svc.is_active === false;
                                         const bookingUrl = profile?.handle ? `${APP_ORIGIN}/book/${profile.handle}?service=${svc.id}` : null;

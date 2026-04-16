@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { request } from '../../data/apiClient';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import SettingsPageLayout from '../../components/ui/SettingsPageLayout';
+import { formatMoney } from '../../utils/formatMoney';
 
 const T = {
     ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F', accent: '#C25E4A',
@@ -21,10 +22,7 @@ const T = {
 };
 const F = "'Sora',system-ui,sans-serif";
 
-function fmtPrice(val) {
-    if (!val && val !== 0) return null;
-    return `$${Math.round(val / 100)}`;
-}
+const fmtPrice = (val, currency = 'cad') => (val == null ? null : formatMoney(val, currency));
 function fmtDuration(mins) {
     if (!mins) return null;
     if (mins < 60) return `${mins} min`;
@@ -149,7 +147,7 @@ export default function ProviderGroupEditor() {
     };
 
     const ServiceRow = ({ svc, action }) => {
-        const meta = [fmtDuration(svc.duration), fmtPrice(svc.base_price)].filter(Boolean).join(' · ');
+        const meta = [fmtDuration(svc.duration), fmtPrice(svc.base_price, svc.currency)].filter(Boolean).join(' · ');
         return (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0' }}>
                 <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/provider/services/${svc.id}`)}>

@@ -3,6 +3,7 @@ import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { useSession } from '../auth/authContext';
 import { useMessages } from '../contexts/MessageContext';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
 import HeroCard from '../components/ui/HeroCard';
@@ -41,10 +42,7 @@ function formatDuration(minutes) {
     return m ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function formatPrice(cents) {
-    if (!cents && cents !== 0) return null;
-    return `$${(cents / 100).toFixed(0)}`;
-}
+const formatPrice = (cents, currency = 'cad') => (cents == null ? null : formatMoney(cents, currency));
 
 function getInitials(name) {
     return (name || '?')
@@ -127,7 +125,7 @@ const BookingCard = ({ booking, isFirst, isLast, onRebook, onPress }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                         {booking.price != null && (
                             <span className="text-[15px] font-semibold text-ink">
-                                {formatPrice(booking.price)}
+                                {formatPrice(booking.price, booking.currency)}
                             </span>
                         )}
                         {typeof onPress === 'function' && (

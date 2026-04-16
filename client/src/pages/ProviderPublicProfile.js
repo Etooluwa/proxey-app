@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 
 const T = {
   base: '#FBF7F2', ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F',
@@ -23,11 +24,7 @@ const formatAge = (dateStr) => {
 const initials = (name = '') =>
   name.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
 
-const fmtPrice = (cents) => {
-  if (!cents && cents !== 0) return '';
-  const dollars = cents >= 100 ? cents / 100 : cents;
-  return `$${dollars % 1 === 0 ? dollars : dollars.toFixed(2)}`;
-};
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? '' : formatMoney(cents, currency));
 
 const fmtDur = (mins) => {
   if (!mins) return '';
@@ -56,12 +53,12 @@ const fmtServiceSummary = (service) => {
       duration: minHours === maxHours
         ? `${minHours} ${minHours === 1 ? 'hour' : 'hours'}`
         : `${minHours}–${maxHours} hours`,
-      price: service.base_price != null ? `${fmtPrice(service.base_price)}/hr` : '',
+      price: service.base_price != null ? `${fmtPrice(service.base_price, service.currency)}/hr` : '',
     };
   }
   return {
     duration: service.duration_minutes ? fmtDur(service.duration_minutes) : '',
-    price: service.base_price != null ? fmtPrice(service.base_price) : '',
+    price: service.base_price != null ? fmtPrice(service.base_price, service.currency) : '',
   };
 };
 

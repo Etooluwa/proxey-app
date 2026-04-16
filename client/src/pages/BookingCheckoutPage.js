@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { initiateCheckout } from "../utils/stripe";
 
-const formatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "CAD",
-});
+function formatAmount(cents, currency) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: (currency || "CAD").toUpperCase(),
+  }).format((cents || 0) / 100);
+}
 
 function BookingCheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -140,7 +142,7 @@ function BookingCheckoutPage() {
             <div className="summary__row">
               <span className="summary__label">Amount due</span>
               <span className="summary__value">
-                {formatter.format((activeBooking.amount || 0) / 100)}
+                {formatAmount(activeBooking.amount, activeBooking.currency)}
               </span>
             </div>
             <div className="summary__row">

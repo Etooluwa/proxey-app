@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { request } from '../data/apiClient';
+import { formatMoney } from '../utils/formatMoney';
 import { useSession } from '../auth/authContext';
 import BackBtn from '../components/ui/BackBtn';
 import Avatar from '../components/ui/Avatar';
@@ -49,11 +50,7 @@ function fmtDuration(mins) {
     return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-function fmtPrice(cents) {
-    if (!cents && cents !== 0) return null;
-    const dollars = cents / 100;
-    return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
-}
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? null : formatMoney(cents, currency));
 
 const Shimmer = ({ className }) => (
     <div className={`bg-line/60 rounded animate-pulse ${className}`} />
@@ -446,7 +443,7 @@ const ClientBookingDetail = () => {
         );
     }
 
-    const price = fmtPrice(booking.price);
+    const price = fmtPrice(booking.price, booking.currency);
     const duration = fmtDuration(booking.duration || booking.duration_minutes);
     const dateLabel = fmtDate(booking.scheduled_at);
     const timeLabel = fmtTime(booking.scheduled_at);

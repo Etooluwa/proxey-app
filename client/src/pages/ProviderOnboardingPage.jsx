@@ -8,6 +8,7 @@ import { invalidateProviderProfileCache } from "../data/provider";
 import { useCitySearch } from "../hooks/useCitySearch";
 import { uploadProfilePhoto } from "../utils/photoUpload";
 import PhoneInput from "../components/ui/PhoneInput";
+import CurrencySelect from "../components/ui/CurrencySelect";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const t = {
@@ -288,6 +289,17 @@ function StepProfile({ data, onChange }) {
             value={data.phone}
             onChange={(v) => onChange("phone", v)}
           />
+        </div>
+
+        <div style={{ marginBottom: "20px" }}>
+          <Lbl style={{ marginBottom: "8px" }}>Currency</Lbl>
+          <CurrencySelect
+            value={data.currency || "cad"}
+            onChange={(v) => onChange("currency", v)}
+          />
+          <p style={{ fontFamily: f, fontSize: 12, color: t.muted, margin: "6px 0 0", lineHeight: 1.5 }}>
+            Clients will be charged in this currency for all your services.
+          </p>
         </div>
 
         <div style={{ marginBottom: "20px", position: "relative" }}>
@@ -588,7 +600,7 @@ function ProviderOnboardingPage() {
   const [category, setCategory]   = useState("");
   const [customCat, setCustomCat] = useState("");
   // Step 2
-  const [profile, setProfile]     = useState({ businessName: "", phone: "", city: "", bio: "", photoFile: null, photoPreview: null });
+  const [profile, setProfile]     = useState({ businessName: "", phone: "", city: "", bio: "", currency: "cad", photoFile: null, photoPreview: null });
   // Step 3
   const [availability, setAvailability] = useState(DEFAULT_AVAILABILITY);
   const [bufferMins, setBufferMins]     = useState(0);
@@ -727,6 +739,7 @@ function ProviderOnboardingPage() {
           phone: profile.phone,
           city: profile.city,
           bio: profile.bio,
+          currency: profile.currency || "cad",
           handle, availability,
           bufferMinutes: bufferMins,
           bookingWindowWeeks: bookingWindow,

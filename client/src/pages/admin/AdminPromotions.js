@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchAdminPromotions } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -10,7 +11,7 @@ const AVATAR_BG = '#F2EBE5';
 
 const formatDiscount = (promo) => {
   if (promo.discount_type === 'percentage') return `${promo.discount_value}%`;
-  return `$${(promo.discount_value / 100).toFixed(2)}`;
+  return formatMoney(promo.discount_value, promo.provider_currency || 'cad');
 };
 
 const isActive = (promo) => {

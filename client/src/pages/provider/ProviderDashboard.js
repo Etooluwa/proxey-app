@@ -10,6 +10,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { formatMoney } from '../../utils/formatMoney';
 import { fetchProviderProfile } from '../../data/provider';
 import Header from '../../components/ui/Header';
 import HeroCard from '../../components/ui/HeroCard';
@@ -89,15 +90,7 @@ function fmtDuration(mins) {
     return m ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function fmtEarnings(cents) {
-    if (!cents) return '$0';
-    const dollars = cents / 100;
-    const hasCents = Math.round(cents) % 100 !== 0;
-    return `$${dollars.toLocaleString('en-US', {
-        minimumFractionDigits: hasCents ? 2 : 0,
-        maximumFractionDigits: hasCents ? 2 : 0,
-    })}`;
-}
+const fmtEarnings = (cents, currency = 'cad') => formatMoney(cents ?? 0, currency);
 
 function getDashboardStatus(appt) {
     const explicitStatus = String(appt?.status || '').toLowerCase();
@@ -266,6 +259,7 @@ const ProviderDashboard = () => {
     const [weeklyEarnings, setWeeklyEarnings] = useState(0);
     const [newClients, setNewClients] = useState(0);
     const [handle, setHandle] = useState('');
+    const [providerCurrency, setProviderCurrency] = useState('cad');
     const [loading, setLoading] = useState(true);
 
     // Drawer state (desktop only)
@@ -298,6 +292,9 @@ const ProviderDashboard = () => {
 
                     if (prof?.handle) {
                         setHandle(prof.handle);
+                    }
+                    if (prof?.currency) {
+                        setProviderCurrency(prof.currency.toLowerCase());
                     }
 
                     // Sync photo/avatar from DB into authContext if missing from localStorage
@@ -334,7 +331,7 @@ const ProviderDashboard = () => {
     // Mobile-only color
     const earningsColor = isEmpty ? '#B0948F' : '#C25E4A';
     const clientsColor  = isEmpty ? '#B0948F' : '#C25E4A';
-    const weeklyEarningsLabel = fmtEarnings(weeklyEarnings);
+    const weeklyEarningsLabel = fmtEarnings(weeklyEarnings, providerCurrency);
     const statValueFontSize = weeklyEarningsLabel.length > 6
         ? 'clamp(28px, 7vw, 40px)'
         : 'clamp(40px, 11vw, 52px)';
@@ -432,7 +429,7 @@ const ProviderDashboard = () => {
                     <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: '16px' }}>
                         <DesktopStatCard
                             label="Weekly Earnings"
-                            value={fmtEarnings(weeklyEarnings)}
+                            value={fmtEarnings(weeklyEarnings, providerCurrency)}
                             onClick={() => navigate('/provider/earnings')}
                         />
                         <DesktopStatCard

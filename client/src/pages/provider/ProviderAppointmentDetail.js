@@ -14,6 +14,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { request } from '../../data/apiClient';
+import { formatMoney, formatMoneyFromDollars } from '../../utils/formatMoney';
 import { useMessages } from '../../contexts/MessageContext';
 import BackBtn from '../../components/ui/BackBtn';
 import Avatar from '../../components/ui/Avatar';
@@ -52,14 +53,8 @@ function fmtDuration(mins) {
     return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-function fmtPrice(val) {
-    if (!val && val !== 0) return null;
-    return `$${Math.round(val / 100)}`;
-}
-
-function fmt$(n) {
-    return `$${Number(n).toFixed(2)}`;
-}
+const fmtPrice = (val, currency = 'cad') => (val == null ? null : formatMoney(val, currency));
+const fmt$ = (n, currency = 'cad') => formatMoney(Math.round(Number(n) * 100), currency);
 
 function ordinal(n) {
     if (n === 1) return '1st';
@@ -342,13 +337,13 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
                                     <div className="flex justify-between">
                                         <span className="text-[14px] text-muted">Deposit collected</span>
                                         <span className="text-[14px] text-ink font-semibold">
-                                            {fmt$(payout.depositCollected)}
+                                            {fmt$(payout.depositCollected, job.currency)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-[14px] text-muted">Remaining charged</span>
                                         <span className="text-[14px] text-ink font-semibold">
-                                            {fmt$(payout.remainingCharged)}
+                                            {fmt$(payout.remainingCharged, job.currency)}
                                         </span>
                                     </div>
                                 </>
@@ -356,14 +351,14 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
                                 <div className="flex justify-between">
                                     <span className="text-[14px] text-muted">Session total</span>
                                     <span className="text-[14px] text-ink font-semibold">
-                                        {fmt$(payout.totalPrice)}
+                                        {fmt$(payout.totalPrice, job.currency)}
                                     </span>
                                 </div>
                             )}
 
                             <div className="flex justify-between">
                                 <span className="text-[14px] text-muted">Platform fee (10%)</span>
-                                <span className="text-[14px] text-muted">− {fmt$(payout.platformFee)}</span>
+                                <span className="text-[14px] text-muted">− {fmt$(payout.platformFee, job.currency)}</span>
                             </div>
 
                             <div
@@ -376,7 +371,7 @@ const CompletionScreen = ({ job, payout, onDashboard, onTimeline }) => {
                                         className="text-[22px] font-semibold tracking-[-0.02em]"
                                         style={{ color: '#C25E4A' }}
                                     >
-                                        {fmt$(payout.providerPayout)}
+                                        {fmt$(payout.providerPayout, job.currency)}
                                     </span>
                                 </div>
                             </div>
@@ -741,7 +736,7 @@ const ProviderAppointmentDetail = () => {
     const isConfirmed = statusLower === 'confirmed' || statusLower === 'accepted';
     const isAlreadyCompleted = statusLower === 'completed';
     const isCancelled = statusLower === 'cancelled' || statusLower === 'declined';
-    const price = fmtPrice(job.price);
+    const price = fmtPrice(job.price, job.currency);
     const duration = fmtDuration(job.duration);
     const dateLabel = fmtDate(job.scheduled_at);
     const timeLabel = fmtTime(job.scheduled_at);
@@ -893,11 +888,11 @@ const ProviderAppointmentDetail = () => {
                             <>
                                 <div className="flex justify-between mb-2">
                                     <span className="text-[14px] text-muted">Deposit paid</span>
-                                    <span className="text-[14px] font-semibold text-ink">${depositPaid.toFixed(2)}</span>
+                                    <span className="text-[14px] font-semibold text-ink">{formatMoneyFromDollars(depositPaid, job.currency)}</span>
                                 </div>
                                 <div className="flex justify-between mb-3">
                                     <span className="text-[14px] text-muted">Remaining balance</span>
-                                    <span className="text-[14px] font-semibold text-ink">${remaining.toFixed(2)}</span>
+                                    <span className="text-[14px] font-semibold text-ink">{formatMoneyFromDollars(remaining, job.currency)}</span>
                                 </div>
                                 {job.payment_status === 'paid' ? (
                                     <div className="flex items-center gap-2 px-4 py-3 rounded-[12px]" style={{ background: '#EBF2EC' }}>
@@ -907,7 +902,7 @@ const ProviderAppointmentDetail = () => {
                                 ) : !isCancelled ? (
                                     <div className="px-4 py-3 rounded-[12px]" style={{ background: '#FFF5E6' }}>
                                         <p className="text-[13px] m-0" style={{ color: '#92400E' }}>
-                                            Remaining ${remaining.toFixed(2)} will be charged automatically on completion.
+                                            Remaining {formatMoneyFromDollars(remaining, job.currency)} will be charged automatically on completion.
                                         </p>
                                     </div>
                                 ) : null}

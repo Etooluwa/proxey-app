@@ -11,6 +11,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { formatMoneyFromDollars } from '../../utils/formatMoney';
 import {
     BarChart, Bar, XAxis, Cell, ResponsiveContainer,
 } from 'recharts';
@@ -27,15 +28,7 @@ const F = "'Sora',system-ui,sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtMoney(val) {
-    if (!val && val !== 0) return '$0';
-    const amount = Number(val) || 0;
-    const hasCents = Math.round(amount * 100) % 100 !== 0;
-    return `$${amount.toLocaleString('en-US', {
-        minimumFractionDigits: hasCents ? 2 : 0,
-        maximumFractionDigits: hasCents ? 2 : 0,
-    })}`;
-}
+const fmtMoney = (val, currency = 'cad') => formatMoneyFromDollars(val ?? 0, currency);
 
 const MONTH_NAMES = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -134,6 +127,9 @@ const ProviderEarnings = () => {
             }));
     }, [earnings, currentMonthIdx]);
 
+    // Use currency from API response (authoritative); fall back to profile currency
+    const earningsCurrency = earnings?.currency || profile?.currency || 'cad';
+
     const totalThisMonth = earnings?.totalEarningsThisMonth || 0;
     const trend = earnings?.monthlyTrend ?? null;
     const breakdown = earnings?.breakdown || [];
@@ -167,7 +163,7 @@ const ProviderEarnings = () => {
                                     <div style={{ height: 48, width: 120, background: 'rgba(61,35,30,0.1)', borderRadius: 8 }} />
                                 ) : (
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                                        <span style={{ fontFamily: F, fontSize: 44, fontWeight: 600, color: T.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>{fmtMoney(totalThisMonth)}</span>
+                                        <span style={{ fontFamily: F, fontSize: 44, fontWeight: 600, color: T.ink, letterSpacing: '-0.03em', lineHeight: 1 }}>{fmtMoney(totalThisMonth, earningsCurrency)}</span>
                                         {trendLabel && (
                                             <span style={{ fontFamily: F, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: trendPositive ? T.successBg : '#FDEDEA', color: trendPositive ? T.success : T.accent }}>{trendLabel}</span>
                                         )}
@@ -184,7 +180,7 @@ const ProviderEarnings = () => {
                                 <div style={{ height: 48, width: 100, background: 'rgba(90,138,94,0.15)', borderRadius: 8 }} />
                             ) : (
                                 <>
-                                    <span style={{ fontFamily: F, fontSize: 40, fontWeight: 600, color: '#3D6B41', letterSpacing: '-0.03em', lineHeight: 1, display: 'block', marginBottom: 6 }}>{fmtMoney(nextPayoutAmount)}</span>
+                                    <span style={{ fontFamily: F, fontSize: 40, fontWeight: 600, color: '#3D6B41', letterSpacing: '-0.03em', lineHeight: 1, display: 'block', marginBottom: 6 }}>{fmtMoney(nextPayoutAmount, earningsCurrency)}</span>
                                     <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>
                                         {nextPayoutDate ? `Arrives via Stripe · ${nextPayoutDate}` : 'Connect Stripe to receive payouts'}
                                     </span>
@@ -233,7 +229,7 @@ const ProviderEarnings = () => {
                                         <p style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, margin: '0 0 2px' }}>{item.name}</p>
                                         <p style={{ fontFamily: F, fontSize: 12, color: T.muted, margin: 0 }}>{item.sessions} {item.sessions === 1 ? 'session' : 'sessions'}</p>
                                     </div>
-                                    <span style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent }}>{fmtMoney(item.revenue)}</span>
+                                    <span style={{ fontFamily: F, fontSize: 16, fontWeight: 600, color: T.accent }}>{fmtMoney(item.revenue, earningsCurrency)}</span>
                                 </div>
                             ))}
                         </div>
@@ -289,7 +285,7 @@ const ProviderEarnings = () => {
                                     className="font-semibold tracking-[-0.03em]"
                                     style={{ fontSize: 40, color: '#3D231E', lineHeight: 1 }}
                                 >
-                                    {fmtMoney(totalThisMonth)}
+                                    {fmtMoney(totalThisMonth, earningsCurrency)}
                                 </span>
                                 {trendLabel && (
                                     <span
@@ -377,7 +373,7 @@ const ProviderEarnings = () => {
                                         className="text-[15px] font-semibold flex-shrink-0 ml-4"
                                         style={{ color: '#C25E4A' }}
                                     >
-                                        {fmtMoney(item.revenue)}
+                                        {fmtMoney(item.revenue, earningsCurrency)}
                                     </span>
                                 </div>
                                 <Divider />
@@ -409,7 +405,7 @@ const ProviderEarnings = () => {
                             className="font-semibold flex-shrink-0 ml-4 tracking-[-0.02em]"
                             style={{ fontSize: 20, color: '#3D6B41' }}
                         >
-                            {fmtMoney(nextPayoutAmount)}
+                            {fmtMoney(nextPayoutAmount, earningsCurrency)}
                         </span>
                     </div>
                 )}

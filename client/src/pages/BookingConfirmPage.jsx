@@ -10,6 +10,7 @@ import useProviders from "../data/useProviders";
 import useServices from "../data/useServices";
 import { requestCheckout } from "../data/bookings";
 import { request } from "../data/apiClient";
+import { formatMoney } from "../utils/formatMoney";
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || "");
 const T = {
@@ -26,10 +27,7 @@ const F = "'Sora', system-ui, sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtPrice(cents) {
-  if (!cents && cents !== 0) return "—";
-  return `$${(cents / 100).toFixed(2)}`;
-}
+const fmtPrice = (cents, currency = 'cad') => (cents == null ? "—" : formatMoney(cents, currency));
 
 function fmtDuration(mins) {
   if (!mins) return null;
@@ -254,7 +252,7 @@ function BookingConfirmPage() {
         toast.push({
           title: "Payment successful!",
           description: booking.depositAmount
-            ? `Deposit of ${fmtPrice(booking.depositAmount)} confirmed.`
+            ? `Deposit of ${fmtPrice(booking.depositAmount, booking?.currency)} confirmed.`
             : "Your booking has been confirmed",
           variant: "success",
         });
@@ -388,15 +386,15 @@ function BookingConfirmPage() {
             Total
           </span>
           <span className="font-sora text-[16px] font-bold text-foreground">
-            {totalPrice ? fmtPrice(totalPrice) : "Provided after review"}
+            {totalPrice ? fmtPrice(totalPrice, booking?.currency) : "Provided after review"}
           </span>
         </div>
 
         {/* Deposit note */}
         {booking.depositAmount && (
           <p className="font-sora text-[13px] text-muted m-0 mt-2">
-            Deposit: {fmtPrice(booking.depositAmount)} ·{" "}
-            Final {fmtPrice(booking.price - booking.depositAmount)} after service
+            Deposit: {fmtPrice(booking.depositAmount, booking?.currency)} ·{" "}
+            Final {fmtPrice(booking.price - booking.depositAmount, booking?.currency)} after service
           </p>
         )}
       </Card>
@@ -453,8 +451,8 @@ function BookingConfirmPage() {
             {loadingCheckout
               ? "Processing…"
               : booking.depositAmount
-              ? `Pay deposit · ${fmtPrice(booking.depositAmount)}`
-              : `Pay · ${fmtPrice(totalPrice)}`}
+              ? `Pay deposit · ${fmtPrice(booking.depositAmount, booking?.currency)}`
+              : `Pay · ${fmtPrice(totalPrice, booking?.currency)}`}
           </button>
         ) : (
           <button

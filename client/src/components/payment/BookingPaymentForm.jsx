@@ -32,6 +32,7 @@ import {
     useElements,
 } from '@stripe/react-stripe-js';
 import { request } from '../../data/apiClient';
+import { formatMoney } from '../../utils/formatMoney';
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
@@ -89,10 +90,8 @@ export function computeDepositCents(service) {
 }
 
 /** Format cents as dollar string */
-export function fmtCents(cents) {
-    if (!cents && cents !== 0) return '';
-    const d = Number(cents) / 100;
-    return d % 1 === 0 ? `$${d}` : `$${d.toFixed(2)}`;
+export function fmtCents(cents, currency = 'cad') {
+    return formatMoney(cents ?? 0, currency);
 }
 
 function CardBrandIcon({ brand }) {
@@ -221,8 +220,8 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
 
     const btnLabel = submitLabel || {
         save_card: 'Save Card & Continue',
-        deposit: `Pay ${fmtCents(totalChargeCents)} deposit`,
-        full: `Pay ${fmtCents(totalChargeCents)}`,
+        deposit: `Pay ${fmtCents(totalChargeCents, service?.currency)} deposit`,
+        full: `Pay ${fmtCents(totalChargeCents, service?.currency)}`,
     }[paymentType] || 'Continue';
 
     const handleSubmit = async () => {
@@ -342,21 +341,21 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                         <span style={{ fontSize: 14, color: T.muted }}>
                             {paymentType === 'deposit' ? 'Deposit' : service?.name || 'Service'}
                         </span>
-                        <span style={{ fontSize: 14, color: T.ink }}>{fmtCents(amountCents)}</span>
+                        <span style={{ fontSize: 14, color: T.ink }}>{fmtCents(amountCents, service?.currency)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                         <span style={{ fontSize: 14, color: T.muted }}>Booking fee (10%)</span>
-                        <span style={{ fontSize: 14, color: T.muted }}>{fmtCents(platformFeeCents)}</span>
+                        <span style={{ fontSize: 14, color: T.muted }}>{fmtCents(platformFeeCents, service?.currency)}</span>
                     </div>
                     <div style={{ height: 1, background: T.line, marginBottom: 12 }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: 15, fontWeight: 600, color: T.ink }}>Total charged</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: T.accent }}>{fmtCents(totalChargeCents)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: T.accent }}>{fmtCents(totalChargeCents, service?.currency)}</span>
                     </div>
                     {paymentType === 'deposit' && remainingCents > 0 && (
                         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.line}`, display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ fontSize: 13, color: T.faded }}>Remaining after session</span>
-                            <span style={{ fontSize: 13, color: T.faded }}>{fmtCents(remainingCents)}</span>
+                            <span style={{ fontSize: 13, color: T.faded }}>{fmtCents(remainingCents, service?.currency)}</span>
                         </div>
                     )}
                 </div>

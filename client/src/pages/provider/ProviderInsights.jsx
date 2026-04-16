@@ -12,6 +12,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { request } from '../../data/apiClient';
+import { formatMoney } from '../../utils/formatMoney';
 import Header from '../../components/ui/Header';
 import Lbl from '../../components/ui/Lbl';
 import Footer from '../../components/ui/Footer';
@@ -47,10 +48,7 @@ function fmtDate(iso) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function fmtMoney(cents) {
-    if (!cents) return '$0';
-    return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+const fmtMoney = (cents, currency = 'cad') => formatMoney(cents ?? 0, currency);
 
 // ─── Status pill ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -176,7 +174,7 @@ function TableAvatar({ name }) {
 }
 
 // ─── Mobile card (shown instead of table on small screens) ────────────────────
-function MobileClientCard({ client, onClick }) {
+function MobileClientCard({ client, onClick, currency }) {
     const cfg = STATUS_CONFIG[client.status] || STATUS_CONFIG.inactive;
     return (
         <button
@@ -196,7 +194,7 @@ function MobileClientCard({ client, onClick }) {
                 <div style={{ fontSize: 12, color: T.muted }}>
                     {client.visits} {client.visits === 1 ? 'visit' : 'visits'}
                     {client.last_visit ? ` · Last ${fmtDate(client.last_visit)}` : ''}
-                    {' · '}<span style={{ color: T.accent, fontWeight: 500 }}>{fmtMoney(client.total_spent)}</span>
+                    {' · '}<span style={{ color: T.accent, fontWeight: 500 }}>{fmtMoney(client.total_spent, currency)}</span>
                 </div>
                 {client.top_service && (
                     <div style={{ fontSize: 11, color: T.faded, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -539,7 +537,7 @@ const ProviderInsights = () => {
                                         </td>
                                         {/* Total spent */}
                                         <td style={{ padding: '14px 18px', fontSize: 13, fontWeight: 500, color: T.accent, borderBottom: `1px solid ${T.line}`, verticalAlign: 'middle' }}>
-                                            {fmtMoney(c.total_spent)}
+                                            {fmtMoney(c.total_spent, profile?.currency)}
                                         </td>
                                         {/* Connected */}
                                         <td style={{ padding: '14px 18px', fontSize: 13, color: T.faded, borderBottom: `1px solid ${T.line}`, verticalAlign: 'middle' }}>
@@ -636,6 +634,7 @@ const ProviderInsights = () => {
                                 <MobileClientCard
                                     client={c}
                                     onClick={() => navigate(`/provider/clients/${c.client_id}`)}
+                                    currency={profile?.currency}
                                 />
                                 {i < clients.length - 1 && (
                                     <div style={{ height: 1, background: T.line }} />

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchAdminServices } from '../../data/admin';
+import { formatMoney } from '../../utils/formatMoney';
 
 const INK = '#3D231E';
 const MUTED = '#8C6A64';
@@ -8,10 +9,7 @@ const ACCENT = '#C25E4A';
 const LINE = 'rgba(140,106,100,0.2)';
 const AVATAR_BG = '#F2EBE5';
 
-const formatCurrency = (cents) => {
-  if (!cents) return '—';
-  return `$${(cents / 100).toFixed(2)}`;
-};
+const formatCurrency = (cents, currency) => (cents == null ? '—' : formatMoney(cents, currency || 'cad'));
 
 const AdminServices = () => {
   const [services, setServices] = useState([]);
@@ -99,7 +97,7 @@ const AdminServices = () => {
                 >
                   {service.category || 'Uncategorized'}
                 </span>
-                <span className="text-sm font-medium" style={{ color: INK }}>{formatCurrency(service.price)}</span>
+                <span className="text-sm font-medium" style={{ color: INK }}>{formatCurrency(service.base_price ?? service.price, service.currency)}</span>
                 <span className="text-sm" style={{ color: MUTED }}>
                   {service.duration ? `${service.duration} min` : '—'}
                 </span>
