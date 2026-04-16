@@ -12996,9 +12996,10 @@ app.delete("/api/accounts/me", async (req, res) => {
       })
       .eq("provider_id", userId);
 
-    // ── 4. Disable the Supabase Auth user (invalidates all sessions) ───────
-    // Uses admin API — requires service role key
-    await supabase.auth.admin.updateUserById(userId, { ban_duration: "876600h" }); // ~100 years
+    // ── 4. Hard-delete the Supabase Auth user ─────────────────────────────
+    // This invalidates all sessions immediately and frees the email for re-use.
+    // Data is already anonymised above so there is nothing left to protect.
+    await supabase.auth.admin.deleteUser(userId);
 
     res.status(200).json({
       ok: true,
