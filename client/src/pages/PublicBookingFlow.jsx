@@ -9,6 +9,7 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import { useSession } from "../auth/authContext";
 import { request } from "../data/apiClient";
+import { getAuthRedirectUrl } from "../utils/authRedirect";
 import { formatMoney } from "../utils/formatMoney";
 import Avatar from "../components/ui/Avatar";
 import Card from "../components/ui/Card";
@@ -563,7 +564,10 @@ function StepMagicLink({ email, onBack }) {
     try {
       await request("/auth/magic-link", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          redirectTo: getAuthRedirectUrl(),
+        }),
       });
       setSent(true);
     } catch (err) {
@@ -655,6 +659,7 @@ function StepMagicLinkNew({ email, onBack }) {
           name: ssGet(SS.pendingName) || "",
           email,
           phone: "resend",
+          redirectTo: getAuthRedirectUrl(),
         }),
       });
     } catch { /* non-fatal */ }
@@ -1207,7 +1212,12 @@ function StepCreateAccountPayment({ service, provider, slot, email, onNext, onBa
       //    The server also tries to pre-create the client_profiles row.
       await request("/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ name: name.trim(), email, phone: phone.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email,
+          phone: phone.trim(),
+          redirectTo: getAuthRedirectUrl(),
+        }),
       });
 
       // 4. Show the "check your email" screen — onNext advances to magic_link_new

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import posthog from "posthog-js";
 import supabase from "../utils/supabase";
 import { uploadProfilePhoto } from "../utils/photoUpload";
+import { getAuthRedirectUrl } from "../utils/authRedirect";
 import { request } from "../data/apiClient";
 
 const SAFE_STRING = (val) => {
@@ -570,7 +571,9 @@ export function AuthProvider({ children }) {
                 password,
                 options: {
                     data: { role },
-                    emailRedirectTo: `${window.location.origin}/auth/callback?signup_role=${encodeURIComponent(role)}`,
+                    emailRedirectTo: getAuthRedirectUrl({
+                        signup_role: role,
+                    }),
                 },
             });
             if (error) {
@@ -612,11 +615,12 @@ export function AuthProvider({ children }) {
             throw new Error("Supabase is not configured");
         }
 
+        const normalizedPendingName = typeof pendingName === "string" ? pendingName.trim() : "";
+
         // Only persist pending_role for new signups — not for returning logins.
         // AuthCallback uses pending_role to detect new signups and send the welcome email.
         if (isSignup) {
             window.localStorage.setItem('proxey.pending_role', role);
-            const normalizedPendingName = typeof pendingName === "string" ? pendingName.trim() : "";
             if (normalizedPendingName) {
                 window.localStorage.setItem('proxey.pendingName', normalizedPendingName);
             } else {
@@ -630,7 +634,10 @@ export function AuthProvider({ children }) {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: getAuthRedirectUrl({
+                    signup_role: isSignup ? role : undefined,
+                    signup_name: isSignup ? normalizedPendingName : undefined,
+                }),
                 queryParams: {
                     access_type: 'offline',
                     prompt: 'consent',

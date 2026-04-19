@@ -10646,7 +10646,7 @@ app.post("/api/provider/invites/join/:code/accept", async (req, res) => {
 
 // ─── POST /api/auth/signup — passwordless client signup for invite/booking flow
 app.post("/api/auth/signup", async (req, res) => {
-  const { name, email, phone } = req.body || {};
+  const { name, email, phone, redirectTo } = req.body || {};
   if (!name?.trim() || !email?.trim() || !phone?.trim()) {
     return res.status(400).json({ error: "name, email, and phone are required." });
   }
@@ -10661,6 +10661,7 @@ app.post("/api/auth/signup", async (req, res) => {
       options: {
         shouldCreateUser: true,
         data: { name, phone, role: "client" },
+        emailRedirectTo: redirectTo || process.env.FRONTEND_URL + "/auth/callback",
       },
     });
     if (otpErr) throw otpErr;

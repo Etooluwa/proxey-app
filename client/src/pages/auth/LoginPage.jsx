@@ -18,12 +18,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
+import { getAuthRedirectUrl } from '../../utils/authRedirect';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import klogo from '../../klogo.png';
-
-// Always redirect back to the canonical app domain, regardless of which
-// domain the user signed up from (mykliques.com or app.mykliques.com).
-const APP_ORIGIN = process.env.REACT_APP_ORIGIN || window.location.origin;
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -345,7 +342,10 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
                     data: { role, full_name: name.trim(), phone: phone.trim() || null },
                     // Encode role in the redirect URL so AuthCallback can read it
                     // even if the user opens the confirmation link on a different device.
-                    emailRedirectTo: `${APP_ORIGIN}/auth/callback?signup_role=${role}&signup_name=${encodeURIComponent(name.trim())}`,
+                    emailRedirectTo: getAuthRedirectUrl({
+                        signup_role: role,
+                        signup_name: name.trim(),
+                    }),
                 },
             });
             if (err) throw err;
@@ -425,7 +425,7 @@ function MagicLinkScreen({ onSent }) {
         try {
             await supabase.auth.signInWithOtp({
                 email: email.trim(),
-                options: { emailRedirectTo: `${APP_ORIGIN}/auth/callback` },
+                options: { emailRedirectTo: getAuthRedirectUrl() },
             });
             onSent(email.trim());
         } catch (err) {

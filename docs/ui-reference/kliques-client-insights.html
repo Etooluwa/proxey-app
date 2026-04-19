@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kliques — Client Insights</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--base:#FBF7F2;--ink:#3D231E;--muted:#8C6A64;--faded:#B0948F;--accent:#C25E4A;--hero:#FDDCC6;--abg:#F2EBE5;--line:rgba(140,106,100,0.18);--card:#FFF;--callout:#FFF5E6;--success:#5A8A5E;--sbg:#EBF2EC;--sidebar:#F5EFE8;--amber:#C27A1A;--amberbg:#FEF3E2;--danger:#B04040;--dangerbg:#FDEDEA}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',system-ui,sans-serif;background:var(--base);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex}
+button,select{font-family:inherit;cursor:pointer;border:none;background:none}button:active{transform:scale(0.98)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+
+/* Sidebar */
+.sb{width:260px;background:var(--sidebar);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;padding:28px 0;z-index:10}
+.sb-logo{padding:0 28px 8px;font-family:'Playfair Display',serif;font-size:22px;font-weight:500;color:var(--accent)}
+.sb-sub{padding:0 28px 24px;font-size:11px;color:var(--faded)}
+.sb-user{margin:0 16px 24px;padding:16px;background:var(--base);border-radius:16px;display:flex;align-items:center;gap:12px}
+.sb-av{width:40px;height:40px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--muted)}
+.ni{display:flex;align-items:center;gap:10px;padding:13px 24px;margin:1px 8px;border-radius:12px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s}.ni:hover{background:rgba(194,94,74,.04)}.ni.ac{background:rgba(194,94,74,.08);color:var(--accent);font-weight:600}
+.ni svg{width:18px;height:18px;flex-shrink:0}
+.sb-bottom{margin-top:auto;padding:0 16px}
+
+/* Main */
+.main{margin-left:260px;flex:1;min-height:100vh}
+.topbar{padding:20px 40px;display:flex;justify-content:flex-end;position:sticky;top:0;z-index:5;background:var(--base)}
+.content{padding:0 40px 60px;max-width:1100px}
+
+/* Page header */
+.pg-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:28px}
+.pg-hdr-left .lbl{font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.pg-hdr h1{font-size:30px;font-weight:400;letter-spacing:-0.03em;margin:0}
+.btn-export{padding:12px 24px;border-radius:12px;background:var(--ink);color:#fff;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;transition:opacity .15s}.btn-export:hover{opacity:.9}
+
+/* Stat cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+.stat-card{padding:20px;background:var(--card);border:1px solid var(--line);border-radius:16px}
+.stat-card-label{font-size:11px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:var(--faded);margin-bottom:8px}
+.stat-card-num{font-family:'Playfair Display',serif;font-size:32px;font-weight:500;letter-spacing:-0.03em;line-height:1}
+.stat-card-change{font-size:11px;font-weight:500;margin-top:6px;display:flex;align-items:center;gap:4px}
+.stat-up{color:var(--success)}.stat-down{color:var(--danger)}
+
+/* Filters */
+.filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filter-pill{padding:10px 18px;border-radius:14px;border:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--card);transition:all .15s;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px}.filter-pill:hover{border-color:var(--accent);color:var(--accent)}.filter-pill.ac{border-color:var(--accent);background:var(--hero);color:var(--accent);font-weight:500}
+.fp-label{font-size:13px;font-weight:500;line-height:1.2}
+.fp-desc{font-size:10px;font-weight:400;opacity:.7;line-height:1.2}
+.filter-pill.ac .fp-desc{opacity:.8}
+.filter-select{padding:8px 32px 8px 14px;border-radius:9999px;border:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--card) url("data:image/svg+xml,%3Csvg width='12' height='12' fill='none' stroke='%23B0948F' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;-webkit-appearance:none;appearance:none;cursor:pointer}.filter-select:focus{outline:none;border-color:var(--accent)}
+.filter-search{padding:8px 14px 8px 36px;border-radius:9999px;border:1px solid var(--line);font-size:12px;color:var(--ink);background:var(--card) url("data:image/svg+xml,%3Csvg width='14' height='14' fill='none' stroke='%23B0948F' stroke-width='1.5' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat left 12px center;width:200px;outline:none}.filter-search:focus{border-color:var(--accent)}
+.filter-sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+
+/* Table */
+.tbl-wrap{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{padding:14px 18px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--faded);text-align:left;border-bottom:1px solid var(--line);background:var(--card);cursor:pointer;white-space:nowrap;user-select:none;transition:color .15s}
+.tbl th:hover{color:var(--accent)}
+.tbl th svg{width:12px;height:12px;vertical-align:middle;margin-left:4px}
+.tbl td{padding:14px 18px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr{transition:background .1s}.tbl tr:hover{background:rgba(194,94,74,.02)}
+.tbl-av{width:32px;height:32px;border-radius:50%;background:var(--abg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--muted);flex-shrink:0}
+.tbl-name{display:flex;align-items:center;gap:10px}
+.tbl-name span{font-weight:500}
+.pill{padding:3px 10px;border-radius:9999px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;display:inline-block}
+.pill-new{background:var(--hero);color:var(--accent)}
+.pill-active{background:var(--sbg);color:var(--success)}
+.pill-risk{background:var(--amberbg);color:var(--amber)}
+.pill-inactive{background:var(--abg);color:var(--faded)}
+.tbl-service{font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-money{font-weight:500;color:var(--accent)}
+
+/* Pagination */
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:16px 18px}
+.pagination span{font-size:12px;color:var(--faded)}
+.pg-btns{display:flex;gap:4px}
+.pg-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);transition:all .15s;background:var(--card)}.pg-btn:hover{border-color:var(--accent);color:var(--accent)}.pg-btn.ac{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* Empty search */
+.empty-search{padding:60px 20px;text-align:center}
+.empty-search p{font-size:14px;color:var(--faded)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-1{animation:fadeUp .4s ease .05s both}
+.fade-2{animation:fadeUp .4s ease .12s both}
+.fade-3{animation:fadeUp .4s ease .19s both}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sb">
+  <div class="sb-logo">kliques</div>
+  <div class="sb-sub">Relationship OS</div>
+  <div class="sb-user"><div class="sb-av">AW</div><div><div style="font-size:14px;font-weight:500">Anny Wong</div><div style="font-size:10px;color:var(--faded);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Provider</div></div></div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round"/></svg>Dashboard</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>Bookings</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>My Kliques</div>
+  <div class="ni ac"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/></svg>Client Insights</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round"/></svg>Services</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>Calendar</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke-linecap="round" stroke-linejoin="round"/></svg>Messages</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>Earnings</div>
+  <div class="ni"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>Invoices</div>
+  <div class="sb-bottom"><button style="display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12px;color:var(--faded);width:100%;border-radius:10px"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"/></svg>Sign Out</button></div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <button style="padding:8px;border-radius:10px"><svg width="20" height="20" fill="none" stroke="var(--ink)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+
+  <div class="content">
+    <!-- Header -->
+    <div class="pg-hdr fade-1">
+      <div class="pg-hdr-left">
+        <div class="lbl">Analytics</div>
+        <h1>Client Insights</h1>
+      </div>
+      <button class="btn-export" onclick="alert('Exporting filtered data as .xlsx...')">
+        <svg width="16" height="16" fill="none" stroke="#fff" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Export
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row fade-2">
+      <div class="stat-card">
+        <div class="stat-card-label">Active Clients</div>
+        <div class="stat-card-num">24</div>
+        <div class="stat-card-change stat-up"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>12% vs last month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">New This Month</div>
+        <div class="stat-card-num">6</div>
+        <div class="stat-card-change stat-up"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>3 more than Feb</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Avg. Visits / Client</div>
+        <div class="stat-card-num">4.2</div>
+        <div class="stat-card-change" style="color:var(--faded)">across all clients</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Retention Rate</div>
+        <div class="stat-card-num">87%</div>
+        <div class="stat-card-change stat-up"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>5% vs last month</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters fade-3">
+      <input class="filter-search" placeholder="Search clients..." type="text">
+      <div class="filter-sep"></div>
+      <button class="filter-pill ac" onclick="togglePill(this)"><span class="fp-label">All</span><span class="fp-desc">Everyone</span></button>
+      <button class="filter-pill" onclick="togglePill(this)"><span class="fp-label">New</span><span class="fp-desc">Joined within 14 days</span></button>
+      <button class="filter-pill" onclick="togglePill(this)"><span class="fp-label">Active</span><span class="fp-desc">Booked in last 30 days</span></button>
+      <button class="filter-pill" onclick="togglePill(this)"><span class="fp-label">At Risk</span><span class="fp-desc">No booking in 30–90 days</span></button>
+      <button class="filter-pill" onclick="togglePill(this)"><span class="fp-label">Inactive</span><span class="fp-desc">No booking in 90+ days</span></button>
+      <div class="filter-sep"></div>
+      <select class="filter-select">
+        <option>All Services</option>
+        <option>1-on-1 Vocal Lesson</option>
+        <option>Performance Coaching</option>
+        <option>Group Class</option>
+      </select>
+      <select class="filter-select">
+        <option>Last 30 days</option>
+        <option>Last 7 days</option>
+        <option>Last 90 days</option>
+        <option>All time</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="tbl-wrap fade-3">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Client <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 11l5-5 5 5M7 17l5-5 5 5" stroke-linecap="round" stroke-linejoin="round"/></svg></th>
+            <th>Status</th>
+            <th>Visits <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></th>
+            <th>Last Visit</th>
+            <th>Total Spent <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></th>
+            <th>Top Service</th>
+            <th>Connected</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">ES</div><span>Eto Segun</span></div></td>
+            <td><span class="pill pill-active">Active</span></td>
+            <td>12</td>
+            <td>Mar 19</td>
+            <td class="tbl-money">$1,020</td>
+            <td class="tbl-service">1-on-1 Vocal Lesson</td>
+            <td style="color:var(--faded)">Jan 12</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">MC</div><span>Maya Chen</span></div></td>
+            <td><span class="pill pill-active">Active</span></td>
+            <td>8</td>
+            <td>Mar 15</td>
+            <td class="tbl-money">$680</td>
+            <td class="tbl-service">Performance Coaching</td>
+            <td style="color:var(--faded)">Feb 02</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">KT</div><span>Kenji Tanaka</span></div></td>
+            <td><span class="pill pill-new">New</span></td>
+            <td>0</td>
+            <td>—</td>
+            <td class="tbl-money">$0</td>
+            <td class="tbl-service">—</td>
+            <td style="color:var(--faded)">Mar 18</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">LR</div><span>Lisa Rodriguez</span></div></td>
+            <td><span class="pill pill-risk">At Risk</span></td>
+            <td>5</td>
+            <td>Feb 08</td>
+            <td class="tbl-money">$425</td>
+            <td class="tbl-service">Group Class</td>
+            <td style="color:var(--faded)">Nov 20</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">JW</div><span>James Wilson</span></div></td>
+            <td><span class="pill pill-active">Active</span></td>
+            <td>3</td>
+            <td>Mar 12</td>
+            <td class="tbl-money">$255</td>
+            <td class="tbl-service">1-on-1 Vocal Lesson</td>
+            <td style="color:var(--faded)">Feb 14</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">SP</div><span>Sarah Park</span></div></td>
+            <td><span class="pill pill-inactive">Inactive</span></td>
+            <td>2</td>
+            <td>Dec 03</td>
+            <td class="tbl-money">$170</td>
+            <td class="tbl-service">Performance Coaching</td>
+            <td style="color:var(--faded)">Oct 15</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">RB</div><span>Rachel Brooks</span></div></td>
+            <td><span class="pill pill-new">New</span></td>
+            <td>1</td>
+            <td>Mar 20</td>
+            <td class="tbl-money">$85</td>
+            <td class="tbl-service">1-on-1 Vocal Lesson</td>
+            <td style="color:var(--faded)">Mar 14</td>
+          </tr>
+          <tr>
+            <td><div class="tbl-name"><div class="tbl-av">DM</div><span>David Mensah</span></div></td>
+            <td><span class="pill pill-risk">At Risk</span></td>
+            <td>4</td>
+            <td>Jan 28</td>
+            <td class="tbl-money">$340</td>
+            <td class="tbl-service">Group Class</td>
+            <td style="color:var(--faded)">Sep 05</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pagination">
+        <span>Showing 1–8 of 34 clients</span>
+        <div class="pg-btns">
+          <button class="pg-btn" style="opacity:.4"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="pg-btn ac">1</button>
+          <button class="pg-btn">2</button>
+          <button class="pg-btn">3</button>
+          <button class="pg-btn">4</button>
+          <button class="pg-btn"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePill(el){
+  document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('ac')});
+  el.classList.add('ac');
+}
+</script>
+</body>
+</html>
