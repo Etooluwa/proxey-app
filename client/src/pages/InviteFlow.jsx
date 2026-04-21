@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../auth/authContext";
 import { request } from "../data/apiClient";
+import { getAuthRedirectUrl } from "../utils/authRedirect";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -301,7 +302,12 @@ function ScreenSignup({ inviteCode, provider, onSuccess }) {
     try {
       await request("/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          redirectTo: getAuthRedirectUrl(),
+        }),
       });
       onSuccess();
     } catch (err) {
@@ -423,7 +429,10 @@ function ScreenMagicLink({ inviteCode, provider, onSuccess }) {
     try {
       await request("/auth/magic-link", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({
+          email: email.trim(),
+          redirectTo: getAuthRedirectUrl(),
+        }),
       });
       setSent(true);
     } catch {

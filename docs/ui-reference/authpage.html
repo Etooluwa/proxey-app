@@ -1,0 +1,135 @@
+﻿import React from 'react';
+import { Globe, HelpCircle, User, Package, ChevronRight } from 'lucide-react';
+
+
+export default function App() {
+ return (
+   // Outer container with the soft, elegant gradient matching the new reference
+   <div className="min-h-screen w-full bg-gradient-to-tr from-[#FCD4C4] via-[#FDF1EB] to-[#FDFDFD] flex items-center justify-center p-4 sm:p-8 font-sans relative overflow-hidden">
+    
+     {/* Main Card Container */}
+     <div className="max-w-[1100px] w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[700px] border border-white/50 relative z-10 backdrop-blur-sm">
+
+
+       {/* Left Side - Forms/Selection */}
+       <div className="w-full md:w-[45%] p-8 md:p-14 flex flex-col relative bg-white">
+
+
+         {/* Main Content Area */}
+         <div className="flex-grow flex flex-col justify-center pt-4 md:pt-0">
+          
+           {/* Logo Section - Moved into main content flow and made larger */}
+           <div className="mb-10">
+             <img
+               src="https://i.imgur.com/2aeeOeG.png"
+               alt="Kliques Logo"
+               className="h-14 md:h-[68px] w-auto object-contain cursor-pointer drop-shadow-sm transition-transform hover:scale-[1.02] origin-left"
+               onError={(e) => {
+                 // Fallback text if image fails to load
+                 e.target.style.display = 'none';
+                 e.target.nextSibling.style.display = 'block';
+               }}
+             />
+             <span style={{ display: 'none' }} className="text-3xl font-bold text-orange-600 tracking-tight">Kliques</span>
+           </div>
+
+
+           <h1 className="text-[2rem] leading-tight font-semibold text-gray-900 mb-3">
+             Sign up or log in
+           </h1>
+           <p className="text-gray-500 mb-10 text-[15px]">
+             Choose how you use Kliques
+           </p>
+
+
+           <div className="space-y-4">
+             {/* Option 1: Clients */}
+             <button className="w-full text-left group p-5 border border-gray-200 rounded-2xl hover:border-orange-300 hover:shadow-[0_4px_20px_-4px_rgba(251,146,60,0.15)] transition-all duration-300 flex items-center justify-between bg-white relative overflow-hidden">
+               <div className="absolute inset-0 bg-gradient-to-r from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+               <div className="flex items-start gap-4 relative z-10">
+                 <div className="p-2.5 text-gray-400 group-hover:text-orange-600 transition-colors">
+                   <User size={24} strokeWidth={1.5} />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-gray-900 text-[15px]">Kliques for clients</h3>
+                   <p className="text-sm text-gray-500 mt-1">Book and manage your appointments</p>
+                 </div>
+               </div>
+               <ChevronRight className="text-gray-300 group-hover:text-orange-500 transition-colors relative z-10" size={20} strokeWidth={2} />
+             </button>
+
+
+             {/* Option 2: Professionals */}
+             <button className="w-full text-left group p-5 border border-gray-200 rounded-2xl hover:border-orange-300 hover:shadow-[0_4px_20px_-4px_rgba(251,146,60,0.15)] transition-all duration-300 flex items-center justify-between bg-white relative overflow-hidden">
+               <div className="absolute inset-0 bg-gradient-to-r from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+               <div className="flex items-start gap-4 relative z-10">
+                 <div className="p-2.5 text-gray-400 group-hover:text-orange-600 transition-colors">
+                   <Package size={24} strokeWidth={1.5} />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-gray-900 text-[15px]">Kliques for professionals</h3>
+                   <p className="text-sm text-gray-500 mt-1">Manage and grow your business</p>
+                 </div>
+               </div>
+               <ChevronRight className="text-gray-300 group-hover:text-orange-500 transition-colors relative z-10" size={20} strokeWidth={2} />
+             </button>
+           </div>
+         </div>
+
+
+         {/* Footer links */}
+         <div className="mt-12 flex items-center gap-6 text-[13px] text-gray-500 font-medium">
+           <button className="flex items-center gap-2 hover:text-gray-900 transition-colors">
+             <Globe size={16} strokeWidth={1.5} /> English
+           </button>
+           <button className="flex items-center gap-2 hover:text-gray-900 transition-colors">
+             <HelpCircle size={16} strokeWidth={1.5} /> Help and support
+           </button>
+         </div>
+       </div>
+
+
+       {/* Right Side - Image Cover */}
+       <div className="w-full md:w-[55%] h-64 md:h-auto relative hidden md:block">
+         <img
+           src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2850&q=80"
+           alt="Professionals working together"
+           className="w-full h-full object-cover"
+         />
+         {/* Subtle dark gradient overlay for text readability at the top and bottom */}
+         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/30 pointer-events-none"></div>
+        
+         {/* Import Sora font */}
+         <style>
+           {`@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500&display=swap');`}
+         </style>
+
+
+         {/* Top Corner Text */}
+         <div className="absolute top-10 left-10 md:top-12 md:left-12 max-w-[80%] z-20">
+           <h2
+             className="text-white text-sm md:text-base font-medium tracking-wide drop-shadow-lg leading-snug"
+             style={{ fontFamily: '"Sora", sans-serif' }}
+           >
+             Build relationships, not just bookings.
+           </h2>
+         </div>
+        
+         {/* Carousel indicators matching your original design */}
+         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2.5 z-20">
+           <div className="w-2 h-2 rounded-full bg-white shadow-sm"></div>
+           <div className="w-2 h-2 rounded-full bg-white/40 hover:bg-white/60 transition-colors cursor-pointer"></div>
+           <div className="w-2 h-2 rounded-full bg-white/40 hover:bg-white/60 transition-colors cursor-pointer"></div>
+         </div>
+       </div>
+
+
+     </div>
+    
+     {/* Subtle organic glow to enhance the soft radial feel from the reference */}
+     <div className="absolute -bottom-[20%] left-[5%] w-[60%] h-[60%] bg-[#fdbd9e] rounded-full filter blur-[120px] opacity-40 pointer-events-none z-0"></div>
+   </div>
+ );
+}

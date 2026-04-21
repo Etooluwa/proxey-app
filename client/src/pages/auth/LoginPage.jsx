@@ -18,12 +18,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
+import { getAuthRedirectUrl } from '../../utils/authRedirect';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import klogo from '../../klogo.png';
-
-// Always redirect back to the canonical app domain, regardless of which
-// domain the user signed up from (mykliques.com or app.mykliques.com).
-const APP_ORIGIN = process.env.REACT_APP_ORIGIN || window.location.origin;
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -345,7 +342,10 @@ function SignupScreen({ role, onLogin, onGoogleSignup, onSuccess }) {
                     data: { role, full_name: name.trim(), phone: phone.trim() || null },
                     // Encode role in the redirect URL so AuthCallback can read it
                     // even if the user opens the confirmation link on a different device.
-                    emailRedirectTo: `${APP_ORIGIN}/auth/callback?signup_role=${role}&signup_name=${encodeURIComponent(name.trim())}`,
+                    emailRedirectTo: getAuthRedirectUrl({
+                        signup_role: role,
+                        signup_name: name.trim(),
+                    }),
                 },
             });
             if (err) throw err;
@@ -425,7 +425,7 @@ function MagicLinkScreen({ onSent }) {
         try {
             await supabase.auth.signInWithOtp({
                 email: email.trim(),
-                options: { emailRedirectTo: `${APP_ORIGIN}/auth/callback` },
+                options: { emailRedirectTo: getAuthRedirectUrl() },
             });
             onSent(email.trim());
         } catch (err) {
@@ -691,14 +691,8 @@ export default function LoginPage() {
             {/* Footer links */}
             <div style={{ padding: isDesktop ? '0 56px 28px' : '0 28px 28px' }}>
                 <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-                    {[
-                        { label: 'English', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> },
-                        { label: 'Help and support', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg> },
-                    ].map(({ label, icon }) => (
-                        <a key={label} href="#" style={{ fontFamily: F, fontSize: 13, color: '#6B7280', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
-                            {icon}{label}
-                        </a>
-                    ))}
+                    <a href="/policy" style={{ fontFamily: F, fontSize: 13, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}>Privacy Policy</a>
+                    <a href="/terms" style={{ fontFamily: F, fontSize: 13, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}>Terms of Use</a>
                 </div>
             </div>
         </div>
