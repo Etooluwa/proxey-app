@@ -217,6 +217,9 @@ const EMPTY_FORM = {
     group_id: null,
     preAppointmentInfo: [],
     imageUrl: '',
+    noShowFeeEnabled: false,
+    noShowFeeType: 'percent',   // 'percent' | 'fixed'
+    noShowFeeValue: 50,
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -279,6 +282,9 @@ const ProviderServiceEditor = () => {
                     depositValue:       svc.deposit_value != null ? svc.deposit_value : 50,
                     clientNotesEnabled: svc.client_notes_enabled !== false,
                     autoAccept:         svc.metadata?.autoAccept === true,
+                    noShowFeeEnabled:   svc.metadata?.noShowFee?.enabled === true,
+                    noShowFeeType:      svc.metadata?.noShowFee?.type || 'percent',
+                    noShowFeeValue:     svc.metadata?.noShowFee?.value ?? 50,
                     is_active:          svc.is_active !== false,
                     group_id:           svc.group_id || null,
                     preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
@@ -420,6 +426,11 @@ const ProviderServiceEditor = () => {
                 clientNotesEnabled: form.clientNotesEnabled,
                 autoAccept:         form.autoAccept,
                 preAppointmentInfo: form.preAppointmentInfo,
+                noShowFee: form.noShowFeeEnabled ? {
+                    enabled: true,
+                    type:    form.noShowFeeType,
+                    value:   Number(form.noShowFeeValue),
+                } : { enabled: false },
                 pricingType:        form.pricingType,
                 minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
                 maxHours:           form.pricingType === 'per_hour' ? Number(form.maxHours) : null,
@@ -1029,6 +1040,81 @@ const ProviderServiceEditor = () => {
                             activeColor="#3D231E"
                         />
                     </div>
+                </Section>
+
+                <Divider />
+
+                {/* ─ No-show fee ─ */}
+                <Section>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-[16px] font-semibold text-ink m-0">No-show fee</p>
+                            <p className="text-[13px] text-muted m-0 mt-0.5">
+                                Charge clients who don't show up (card on file only)
+                            </p>
+                        </div>
+                        <Toggle
+                            on={form.noShowFeeEnabled}
+                            onChange={() => set('noShowFeeEnabled')(!form.noShowFeeEnabled)}
+                            activeColor="#3D231E"
+                        />
+                    </div>
+
+                    {form.noShowFeeEnabled && (
+                        <div className="mt-4">
+                            {/* Fee type pills */}
+                            <div className="flex gap-2 mb-3">
+                                {[
+                                    { value: 'percent', label: 'Percentage' },
+                                    { value: 'fixed',   label: 'Fixed amount' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => set('noShowFeeType')(opt.value)}
+                                        className="flex-1 py-2 rounded-[10px] text-[13px] font-semibold focus:outline-none transition-colors"
+                                        style={{
+                                            background: form.noShowFeeType === opt.value ? '#3D231E' : 'transparent',
+                                            color:      form.noShowFeeType === opt.value ? '#fff' : '#8C6A64',
+                                            border:     `1.5px solid ${form.noShowFeeType === opt.value ? '#3D231E' : 'rgba(140,106,100,0.3)'}`,
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Fee value input */}
+                            <div className="relative">
+                                {form.noShowFeeType === 'fixed' && (
+                                    <span className="absolute text-[15px] text-muted pointer-events-none" style={{ left: 16, top: '50%', transform: 'translateY(-50%)' }}>
+                                        {CURRENCIES.find(c => c.code === providerCurrency)?.symbol || '$'}
+                                    </span>
+                                )}
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={form.noShowFeeType === 'percent' ? 100 : undefined}
+                                    value={form.noShowFeeValue}
+                                    onChange={e => set('noShowFeeValue')(e.target.value)}
+                                    style={{
+                                        ...inputBase,
+                                        paddingLeft: form.noShowFeeType === 'fixed' ? 30 : 16,
+                                        paddingRight: form.noShowFeeType === 'percent' ? 36 : 16,
+                                    }}
+                                />
+                                {form.noShowFeeType === 'percent' && (
+                                    <span className="absolute text-[15px] text-muted pointer-events-none" style={{ right: 16, top: '50%', transform: 'translateY(-50%)' }}>%</span>
+                                )}
+                            </div>
+                            <p className="text-[12px] text-muted mt-2 mb-0">
+                                {form.noShowFeeType === 'percent'
+                                    ? `Client will be charged ${form.noShowFeeValue || 0}% of the service price if they don't show up.`
+                                    : `Client will be charged a flat ${CURRENCIES.find(c => c.code === providerCurrency)?.symbol || '$'}${form.noShowFeeValue || 0} fee if they don't show up.`
+                                }
+                            </p>
+                        </div>
+                    )}
                 </Section>
 
                 <Divider />

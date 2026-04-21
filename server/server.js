@@ -3678,6 +3678,195 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
   }
 });
 
+// POST /api/provider/jobs/:id/no-show — mark no-show + charge fee if card_on_file with no upfront payment
+app.post("/api/provider/jobs/:id/no-show", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured." });
+  const providerId = getProviderId(req);
+  const jobId = req.params.id;
+
+  try {
+    // Load the job
+    const { data: job, error: jobErr } = await supabase
+      .from("provider_jobs")
+      .select("*")
+      .eq("id", jobId)
+      .eq("provider_id", providerId)
+      .single();
+    if (jobErr || !job) return res.status(404).json({ error: "Job not found." });
+    if (job.status === "no_show") return res.status(409).json({ error: "Already marked no-show." });
+    if (job.status === "completed") return res.status(409).json({ error: "Cannot mark a completed job as no-show." });
+
+    const now = new Date().toISOString();
+    let stripeCharged = false;
+    let noShowFeeAmount = null;
+    let noShowFeeError = null;
+
+    // Load the linked booking to check payment type and service no-show config
+    let booking = null;
+    if (job.booking_id) {
+      const { data: bkg } = await supabase
+        .from("bookings")
+        .select("price, payment_status, payment_type, deposit_value, deposit_type, metadata, client_id, service_id, currency, stripe_payment_intent_id")
+        .eq("id", job.booking_id)
+        .single();
+      booking = bkg;
+    }
+
+    const paymentType = booking?.payment_type || job.payment_type || "full";
+    const paymentStatus = booking?.payment_status || "unpaid";
+    const clientAlreadyPaid = paymentStatus === "paid" || paymentStatus === "deposit_paid";
+
+    // Only attempt to charge if client paid nothing upfront (card_on_file or unpaid with no deposit)
+    if (!clientAlreadyPaid && (paymentType === "card_on_file" || paymentStatus === "unpaid")) {
+      // Look up no-show fee config from service metadata
+      let noShowFeeConfig = null;
+      const serviceId = booking?.service_id || job.service_id;
+      if (serviceId) {
+        const { data: svc } = await supabase
+          .from("services")
+          .select("metadata, price")
+          .eq("id", serviceId)
+          .single();
+        noShowFeeConfig = svc?.metadata?.noShowFee;
+      }
+
+      if (noShowFeeConfig?.enabled && stripe) {
+        // Resolve the fee amount in cents
+        const servicePrice = booking?.price || job.price || 0;
+        const normalizedPrice = servicePrice > 1000 ? servicePrice / 100 : servicePrice; // normalize to dollars
+        let feeDollars = 0;
+        if (noShowFeeConfig.type === "percent") {
+          feeDollars = +(normalizedPrice * (noShowFeeConfig.value / 100)).toFixed(2);
+        } else {
+          feeDollars = +noShowFeeConfig.value;
+        }
+        const feeAmountCents = Math.round(feeDollars * 100);
+
+        if (feeAmountCents > 0) {
+          // Find client's Stripe customer + saved payment method
+          const clientId = booking?.client_id || job.client_id;
+          let customerId = null;
+          let paymentMethodId = null;
+
+          if (clientId) {
+            // First try to get customer from the original payment intent (most reliable)
+            if (booking?.stripe_payment_intent_id) {
+              try {
+                const originalPi = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
+                customerId = originalPi?.customer;
+                paymentMethodId = originalPi?.payment_method;
+              } catch (_) {}
+            }
+
+            // Fall back: look up customer by client's email
+            if (!customerId) {
+              const { data: clientProfile } = await supabase
+                .from("client_profiles")
+                .select("email, stripe_customer_id")
+                .eq("user_id", clientId)
+                .single();
+              customerId = clientProfile?.stripe_customer_id;
+              if (!customerId && clientProfile?.email) {
+                const customers = await stripe.customers.list({ email: clientProfile.email, limit: 1 });
+                customerId = customers?.data?.[0]?.id;
+              }
+            }
+
+            // Get default payment method for customer
+            if (customerId && !paymentMethodId) {
+              const methods = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 1 });
+              paymentMethodId = methods?.data?.[0]?.id;
+            }
+          }
+
+          if (customerId && paymentMethodId) {
+            try {
+              const chargeCurrency = booking?.currency || "cad";
+              const piResult = await stripe.paymentIntents.create({
+                amount: feeAmountCents,
+                currency: chargeCurrency.toLowerCase(),
+                customer: customerId,
+                payment_method: paymentMethodId,
+                confirm: true,
+                off_session: true,
+                description: `No-show fee for booking ${job.booking_id || jobId}`,
+                metadata: {
+                  booking_id: String(job.booking_id || jobId),
+                  provider_id: String(providerId),
+                  type: "no_show_fee",
+                },
+              });
+              stripeCharged = true;
+              noShowFeeAmount = feeDollars;
+
+              // Record the charge on the booking
+              if (job.booking_id) {
+                await supabase
+                  .from("bookings")
+                  .update({
+                    payment_status: "no_show_charged",
+                    stripe_payment_intent_id: piResult.id,
+                    updated_at: now,
+                  })
+                  .eq("id", job.booking_id);
+              }
+            } catch (stripeErr) {
+              console.error("[jobs/:id/no-show] Stripe charge failed:", stripeErr.message);
+              noShowFeeError = stripeErr.message;
+              // Continue — still mark as no-show even if charge fails
+            }
+          }
+        }
+      }
+    }
+
+    // Update job status
+    await supabase
+      .from("provider_jobs")
+      .update({ status: "no_show", updated_at: now })
+      .eq("id", jobId)
+      .eq("provider_id", providerId);
+
+    // Update booking status (if not already updated above)
+    if (job.booking_id && !stripeCharged) {
+      await supabase
+        .from("bookings")
+        .update({ status: "no_show", updated_at: now })
+        .eq("id", job.booking_id);
+    } else if (job.booking_id && stripeCharged) {
+      await supabase
+        .from("bookings")
+        .update({ status: "no_show", updated_at: now })
+        .eq("id", job.booking_id);
+    }
+
+    // Notify client
+    const clientId = booking?.client_id || job.client_id;
+    if (clientId) {
+      const feeText = stripeCharged && noShowFeeAmount
+        ? ` A no-show fee of ${noShowFeeAmount} has been charged to your card on file.`
+        : "";
+      await createClientNotification(clientId, {
+        type: "booking_no_show",
+        title: "No-Show Recorded",
+        body: `Your provider marked you as a no-show for ${job.service_name || "your session"}.${feeText}`,
+        booking_id: job.booking_id || jobId,
+        data: { provider_id: providerId, status: "no_show" },
+      }).catch(() => {});
+    }
+
+    return res.status(200).json({
+      success: true,
+      stripeCharged,
+      noShowFeeAmount,
+      noShowFeeError: noShowFeeError || null,
+    });
+  } catch (err) {
+    console.error("[jobs/:id/no-show]", err);
+    return res.status(500).json({ error: "Failed to mark no-show." });
+  }
+});
+
 app.patch("/api/provider/jobs/:id", async (req, res) => {
   const providerId = getProviderId(req);
   const jobId = req.params.id;

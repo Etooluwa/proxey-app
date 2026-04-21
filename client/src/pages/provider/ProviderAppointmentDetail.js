@@ -580,6 +580,28 @@ const ProviderAppointmentDetail = () => {
         }
     };
 
+    const [noShowLoading, setNoShowLoading] = useState(false);
+    const [noShowError, setNoShowError] = useState(null);
+    const [noShowDone, setNoShowDone] = useState(false);
+    const [showNoShowConfirm, setShowNoShowConfirm] = useState(false);
+
+    const handleNoShow = async () => {
+        if (!job || noShowLoading) return;
+        setNoShowLoading(true);
+        setNoShowError(null);
+        try {
+            await request(`/provider/jobs/${id}/no-show`, { method: 'POST' });
+            setJob((prev) => ({ ...prev, status: 'no_show' }));
+            setNoShowDone(true);
+            setShowNoShowConfirm(false);
+        } catch (err) {
+            setNoShowError(err.message || 'Failed to mark no-show. Please try again.');
+            setShowNoShowConfirm(false);
+        } finally {
+            setNoShowLoading(false);
+        }
+    };
+
     const [accepting, setAccepting] = useState(false);
     const [declining, setDeclining] = useState(false);
     const [confirmationMsg, setConfirmationMsg] = useState('');
@@ -735,6 +757,7 @@ const ProviderAppointmentDetail = () => {
     const isPending = statusLower === 'pending';
     const isConfirmed = statusLower === 'confirmed' || statusLower === 'accepted';
     const isAlreadyCompleted = statusLower === 'completed';
+    const isNoShowStatus = statusLower === 'no_show';
     const isCancelled = statusLower === 'cancelled' || statusLower === 'declined';
     const price = fmtPrice(job.price, job.currency);
     const duration = fmtDuration(job.duration);
@@ -1186,7 +1209,15 @@ const ProviderAppointmentDetail = () => {
                         </div>
                     )}
 
-                    {/* Confirmed: Mark Complete (primary) + Message, then Reschedule + Cancel */}
+                    {/* No-show done banner */}
+                    {isNoShowStatus && (
+                        <div className="w-full rounded-[12px] p-4 mb-2" style={{ background: '#FFF5E6', border: '1px solid rgba(194,94,74,0.3)' }}>
+                            <p className="text-[14px] font-semibold text-ink m-0">Marked as no-show</p>
+                            <p className="text-[13px] text-muted m-0 mt-1">This booking has been marked as a no-show.</p>
+                        </div>
+                    )}
+
+                    {/* Confirmed: Mark Complete (primary) + No-show + Message, then Reschedule + Cancel */}
                     {isConfirmed && (
                         <>
                             <button
@@ -1205,6 +1236,29 @@ const ProviderAppointmentDetail = () => {
                                 )}
                                 {completing ? 'Completing…' : 'Mark Complete'}
                             </button>
+
+                            {/* No-show button — only shown when payment type is card_on_file or no payment taken */}
+                            {(paymentType === 'card_on_file' || !job.payment_status || job.payment_status === 'unpaid') && (
+                                <button
+                                    onClick={() => setShowNoShowConfirm(true)}
+                                    disabled={noShowLoading}
+                                    className="w-full py-3 rounded-[12px] text-[14px] font-semibold focus:outline-none mb-2"
+                                    style={{
+                                        maxWidth: isDesktop ? 360 : 'none',
+                                        background: 'transparent',
+                                        border: '1px solid rgba(176,64,64,0.4)',
+                                        color: '#B04040',
+                                        opacity: noShowLoading ? 0.7 : 1,
+                                    }}
+                                >
+                                    {noShowLoading ? 'Processing…' : 'No-show'}
+                                </button>
+                            )}
+
+                            {noShowError && (
+                                <p className="text-[13px] mb-2" style={{ color: '#B04040' }}>{noShowError}</p>
+                            )}
+
                             <div className="flex gap-2 w-full" style={{ maxWidth: isDesktop ? 520 : 'none' }}>
                                 <button
                                     onClick={handleMessage}
@@ -1228,6 +1282,38 @@ const ProviderAppointmentDetail = () => {
                                     Cancel
                                 </button>
                             </div>
+
+                            {/* No-show confirmation modal */}
+                            {showNoShowConfirm && (
+                                <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                    <div className="w-full rounded-t-[24px] p-6" style={{ background: '#FBF7F2', maxWidth: 480 }}>
+                                        <p className="text-[18px] font-semibold text-ink m-0 mb-2">Mark as no-show?</p>
+                                        <p className="text-[14px] text-muted m-0 mb-6">
+                                            {paymentType === 'card_on_file'
+                                                ? 'The client\'s saved card will be charged the no-show fee set for this service.'
+                                                : 'This booking will be marked as a no-show. No charge will be applied.'
+                                            }
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => setShowNoShowConfirm(false)}
+                                                className="flex-1 py-3.5 rounded-[12px] text-[14px] font-semibold text-ink focus:outline-none"
+                                                style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleNoShow}
+                                                disabled={noShowLoading}
+                                                className="flex-1 py-3.5 rounded-[12px] text-[14px] font-semibold text-white focus:outline-none"
+                                                style={{ background: '#B04040', border: 'none', opacity: noShowLoading ? 0.7 : 1 }}
+                                            >
+                                                {noShowLoading ? 'Processing…' : 'Confirm no-show'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                     </div>
