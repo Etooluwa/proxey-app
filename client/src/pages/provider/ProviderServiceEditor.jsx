@@ -1148,19 +1148,21 @@ const ProviderServiceEditor = () => {
                 }}
             >
                 <div className="mx-auto px-5" style={{ maxWidth: 640 }}>
-                {/* Delete row — only for existing services */}
+                <div className="flex gap-3 items-center">
+                {/* Delete — left side, only for existing services */}
                 {!isNew && (
                     <button
                         type="button"
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="w-full py-3 mb-2 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
+                        className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
                         style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1 }}
                     >
                         {deleting ? 'Deleting…' : 'Delete Service'}
                     </button>
                 )}
-                <div className="flex gap-3 justify-end">
+                {/* Spacer pushes Cancel + Save to the right */}
+                <div className="flex-1" />
                 <button
                     type="button"
                     onClick={() => navigate('/provider/services')}
