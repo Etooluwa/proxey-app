@@ -741,7 +741,7 @@ const ProviderServiceEditor = () => {
                             Prices are in <strong style={{ color: '#3D231E' }}>{(providerCurrency || 'cad').toUpperCase()}</strong> — set in your{' '}
                             <button
                                 type="button"
-                                onClick={() => navigate('/provider/settings/personal')}
+                                onClick={() => navigate('/provider/profile/personal')}
                                 className="underline focus:outline-none"
                                 style={{ color: '#C25E4A', fontFamily: 'inherit', fontSize: 'inherit', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                             >
