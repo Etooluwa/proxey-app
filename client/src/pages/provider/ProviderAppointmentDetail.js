@@ -1237,8 +1237,8 @@ const ProviderAppointmentDetail = () => {
                                 {completing ? 'Completing…' : 'Mark Complete'}
                             </button>
 
-                            {/* No-show button — only shown when payment type is card_on_file or no payment taken */}
-                            {(paymentType === 'card_on_file' || !job.payment_status || job.payment_status === 'unpaid') && (
+                            {/* No-show button — only shown when payment type is card on file */}
+                            {paymentType === 'save_card' && (
                                 <button
                                     onClick={() => setShowNoShowConfirm(true)}
                                     disabled={noShowLoading}
@@ -1289,10 +1289,7 @@ const ProviderAppointmentDetail = () => {
                                     <div className="w-full rounded-t-[24px] p-6" style={{ background: '#FBF7F2', maxWidth: 480 }}>
                                         <p className="text-[18px] font-semibold text-ink m-0 mb-2">Mark as no-show?</p>
                                         <p className="text-[14px] text-muted m-0 mb-6">
-                                            {paymentType === 'card_on_file'
-                                                ? 'The client\'s saved card will be charged the no-show fee set for this service.'
-                                                : 'This booking will be marked as a no-show. No charge will be applied.'
-                                            }
+                                            The client's saved card will be charged the no-show fee set for this service.
                                         </p>
                                         <div className="flex gap-3">
                                             <button

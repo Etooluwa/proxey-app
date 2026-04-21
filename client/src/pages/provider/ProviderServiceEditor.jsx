@@ -916,13 +916,15 @@ const ProviderServiceEditor = () => {
 
                 <Divider />
 
-                {/* ─ No-show fee ─ */}
+                {/* ─ No-show fee — only shown when Card on file is selected ─ */}
+                {form.payType === 'save_card' && (
+                <>
                 <Section>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-[16px] font-semibold text-ink m-0">No-show fee</p>
                             <p className="text-[13px] text-muted m-0 mt-0.5">
-                                Charge clients who don't show up (card on file only)
+                                Charge clients who don't show up
                             </p>
                         </div>
                         <Toggle
@@ -934,7 +936,6 @@ const ProviderServiceEditor = () => {
 
                     {form.noShowFeeEnabled && (
                         <div className="mt-4">
-                            {/* Fee type pills */}
                             <div className="flex gap-2 mb-3">
                                 {[
                                     { value: 'percent', label: 'Percentage' },
@@ -955,8 +956,6 @@ const ProviderServiceEditor = () => {
                                     </button>
                                 ))}
                             </div>
-
-                            {/* Fee value input */}
                             <div className="relative">
                                 {form.noShowFeeType === 'fixed' && (
                                     <span className="absolute text-[15px] text-muted pointer-events-none" style={{ left: 16, top: '50%', transform: 'translateY(-50%)' }}>
@@ -988,6 +987,9 @@ const ProviderServiceEditor = () => {
                         </div>
                     )}
                 </Section>
+                <Divider />
+                </>
+                )}
 
                 <Divider />
 
