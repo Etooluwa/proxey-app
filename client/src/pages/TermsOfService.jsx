@@ -94,7 +94,7 @@ function PublicLegalShell({ title, children }) {
     <div style={{ minHeight: '100vh', background: T.base, fontFamily: F, padding: '32px 20px 56px' }}>
       <div style={{ maxWidth: 860, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-          <Link to="/login" style={{ textDecoration: 'none', color: T.muted, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Link to="/welcome" style={{ textDecoration: 'none', color: T.muted, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 19l-7-7 7-7" />
             </svg>

@@ -40,7 +40,7 @@ function RoleRedirect() {
   }
 
   if (!session?.user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   const userRole = resolveUserRole(session);

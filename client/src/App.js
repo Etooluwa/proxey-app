@@ -42,6 +42,7 @@ const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
 const FAQPage = lazy(() => import('./pages/FAQPage'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 const ProviderDashboard = lazy(() => import('./pages/provider/ProviderDashboard'));
 const ProviderAppointments = lazy(() => import('./pages/provider/ProviderAppointments'));
@@ -188,6 +189,7 @@ function App() {
                     <Routes>
 
                     {/* ── Public routes (no auth) ──────────────────────────── */}
+                    <Route path="/welcome" element={<LandingPage />} />
                     <Route path="/book/:handle" element={<PublicBookingPage />} />
                     <Route path="/join/:code" element={<InviteAcceptPage />} />
                     <Route path="/terms" element={<TermsOfService publicView />} />
