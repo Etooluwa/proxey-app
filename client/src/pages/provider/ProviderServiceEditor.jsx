@@ -255,6 +255,7 @@ const ProviderServiceEditor = () => {
     const [saving, setSaving] = useState(false);
     const [savingStatus, setSavingStatus] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [photoUploading, setPhotoUploading] = useState(false);
     const photoInputRef = useRef(null);
 
@@ -514,7 +515,7 @@ const ProviderServiceEditor = () => {
 
     // ── Delete ───────────────────────────────────────────────────────────────
     const handleDelete = async () => {
-        if (!window.confirm('Delete this service? This cannot be undone.')) return;
+        setShowDeleteConfirm(false);
         setDeleting(true);
         try {
             await request(`/services/${id}`, { method: 'DELETE' });
@@ -1155,7 +1156,7 @@ const ProviderServiceEditor = () => {
                 {!isNew && (
                     <button
                         type="button"
-                        onClick={handleDelete}
+                        onClick={() => setShowDeleteConfirm(true)}
                         disabled={deleting}
                         className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
                         style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1 }}
@@ -1201,6 +1202,38 @@ const ProviderServiceEditor = () => {
 
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
+
+        {/* Delete confirmation modal */}
+        {showDeleteConfirm && (
+            <div
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(61,35,30,0.35)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: "'Sora',system-ui,sans-serif" }}
+            >
+                <div
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: '100%', maxWidth: 480, background: '#FBF7F2', borderRadius: '24px 24px 0 0', padding: '28px 24px 36px' }}
+                >
+                    <p style={{ fontSize: 18, fontWeight: 600, color: '#3D231E', margin: '0 0 8px' }}>Delete service?</p>
+                    <p style={{ fontSize: 14, color: '#8C6A64', lineHeight: 1.6, margin: '0 0 28px' }}>
+                        <strong style={{ color: '#3D231E' }}>{form.name || 'This service'}</strong> will be permanently deleted. This cannot be undone.
+                    </p>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            style={{ flex: 1, padding: '14px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer' }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: '#B04040', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}
+                        >
+                            Delete service
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     );
 };
 

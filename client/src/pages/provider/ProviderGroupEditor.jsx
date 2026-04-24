@@ -58,6 +58,7 @@ export default function ProviderGroupEditor() {
     const [deleting, setDeleting] = useState(false);
     const [saveError, setSaveError] = useState(null);
     const [showAddServices, setShowAddServices] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const savedName = useRef('');
     const savedDesc = useRef('');
@@ -135,7 +136,7 @@ export default function ProviderGroupEditor() {
 
     // ── Delete group ────────────────────────────────────────────────────────
     const handleDelete = async () => {
-        if (!window.confirm(`Delete "${name}"? All services will move to General.`)) return;
+        setShowDeleteConfirm(false);
         setDeleting(true);
         try {
             await request(`/provider/service-groups/${groupId}`, { method: 'DELETE' });
@@ -247,7 +248,7 @@ export default function ProviderGroupEditor() {
 
                     <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${T.line}` }}>
                         <button
-                            onClick={handleDelete}
+                            onClick={() => setShowDeleteConfirm(true)}
                             disabled={deleting}
                             style={{
                                 width: '100%', padding: '14px', borderRadius: 12,
@@ -265,5 +266,37 @@ export default function ProviderGroupEditor() {
                 </>
             )}
         </SettingsPageLayout>
+
+        {/* Delete confirmation modal */}
+        {showDeleteConfirm && (
+            <div
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(61,35,30,0.35)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            >
+                <div
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: '100%', maxWidth: 480, background: '#FBF7F2', borderRadius: '24px 24px 0 0', padding: '28px 24px 36px', fontFamily: F }}
+                >
+                    <p style={{ fontSize: 18, fontWeight: 600, color: T.ink, margin: '0 0 8px' }}>Delete group?</p>
+                    <p style={{ fontSize: 14, color: T.muted, lineHeight: 1.6, margin: '0 0 28px' }}>
+                        <strong style={{ color: T.ink }}>{name}</strong> will be removed. All services in this group will move to General — they won't be deleted.
+                    </p>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            style={{ flex: 1, padding: '14px', borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 14, fontWeight: 600, color: T.ink, cursor: 'pointer' }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: T.danger, fontFamily: F, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}
+                        >
+                            Delete group
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     );
 }
