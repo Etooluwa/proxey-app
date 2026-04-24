@@ -1158,8 +1158,8 @@ const ProviderServiceEditor = () => {
                         type="button"
                         onClick={() => setShowDeleteConfirm(true)}
                         disabled={deleting}
-                        className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70"
-                        style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1 }}
+                        className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70 whitespace-nowrap"
+                        style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1, flexShrink: 0 }}
                     >
                         {deleting ? 'Deleting…' : 'Delete Service'}
                     </button>
@@ -1169,8 +1169,8 @@ const ProviderServiceEditor = () => {
                 <button
                     type="button"
                     onClick={() => navigate('/provider/services')}
-                    className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70"
-                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
+                    className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70 whitespace-nowrap"
+                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', flexShrink: 0 }}
                 >
                     Cancel
                 </button>
@@ -1178,8 +1178,8 @@ const ProviderServiceEditor = () => {
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="py-3.5 px-8 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
-                    style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1 }}
+                    className="py-3.5 px-8 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 whitespace-nowrap"
+                    style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1, flexShrink: 0 }}
                 >
                     {saving && (
                         <div
