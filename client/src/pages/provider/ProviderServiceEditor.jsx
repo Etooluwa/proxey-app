@@ -1153,21 +1153,21 @@ const ProviderServiceEditor = () => {
                 }}
             >
                 <div style={{ maxWidth: 480, margin: '0 auto', width: '100%', padding: '0 20px' }}>
-                    {/* Save Service — always full width on top */}
+                    {/* Save Service — full width */}
                     <button type="button" onClick={handleSave} disabled={saving}
-                        style={{ width: '100%', maxWidth: isDesktop ? '100%' : 360, padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', color: '#fff', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '0 auto 10px' }}>
+                        style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', color: '#fff', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
                         {saving && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
                         <span style={{ fontSize: saving && savingStatus.length > 10 ? 12 : 14 }}>{saving ? (savingStatus || 'Saving…') : 'Save Service'}</span>
                     </button>
-                    {/* Cancel + Delete — centered below on mobile */}
-                    <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: isDesktop ? '100%' : 360, margin: '0 auto', justifyContent: 'center' }}>
+                    {/* Cancel always full width; Delete sits beside it when editing */}
+                    <div style={{ display: 'flex', gap: 10 }}>
                         <button type="button" onClick={() => navigate('/provider/services')}
-                            style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer' }}>
+                            style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer', textAlign: 'center' }}>
                             Cancel
                         </button>
                         {!isNew && (
                             <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
-                                style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#B04040', opacity: deleting ? 0.6 : 1, cursor: deleting ? 'default' : 'pointer' }}>
+                                style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#B04040', opacity: deleting ? 0.6 : 1, cursor: deleting ? 'default' : 'pointer', textAlign: 'center' }}>
                                 {deleting ? 'Deleting…' : 'Delete Service'}
                             </button>
                         )}
