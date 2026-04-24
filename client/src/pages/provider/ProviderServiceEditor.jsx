@@ -403,7 +403,7 @@ const ProviderServiceEditor = () => {
     const handleSave = async () => {
         const errs = {};
         if (!form.name.trim()) errs.name = 'Required';
-        if (!form.price || Number(form.price) <= 0) errs.price = 'Must be greater than 0';
+        if (form.price === '' || form.price === null || form.price === undefined || Number(form.price) < 0) errs.price = 'Price is required';
         const totalMins = Number(form.durationHr) * 60 + Number(form.durationMin);
         if (form.pricingType !== 'per_hour' && totalMins <= 0) errs.duration = 'Must be greater than 0';
         setErrors(errs);

@@ -1322,7 +1322,9 @@ export default function PublicBookingPage() {
             onBack={() => session ? setStep(hasIntake ? 3 : 2) : setStep(35)}
             onSubmit={() => {
                 const pt = selectedService?.payment_type;
-                if (pt && pt !== 'none') {
+                const price = Number(getSelectedServicePrice(selectedService, selectedHours) ?? selectedService?.base_price ?? 0);
+                // Skip payment step for free services (except save_card which still needs card on file)
+                if (pt && pt !== 'none' && !(price === 0 && pt !== 'save_card')) {
                     setStep(45);
                 } else {
                     handleSubmitBooking(null);

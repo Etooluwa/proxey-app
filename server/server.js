@@ -1896,7 +1896,7 @@ app.post("/api/services", async (req, res) => {
 
   const { id, name, description, category, basePrice, unit, duration } = req.body || {};
 
-  if (!name || !category || !basePrice) {
+  if (!name || !category || basePrice === undefined || basePrice === null || basePrice === '') {
     return res.status(400).json({ error: "name, category, and basePrice are required." });
   }
 
@@ -3295,7 +3295,12 @@ app.post("/api/payments/create-checkout", async (req, res) => {
     let connectParams = {};
     if (booking.providerId) {
       const providerStripe = await getProviderStripeConnectStatus(booking.providerId, { requireReady: true });
-      connectParams = buildConnectTransferParams(booking.price || 1000, providerStripe.accountId);
+      connectParams = buildConnectTransferParams(booking.price || 0, providerStripe.accountId);
+    }
+
+    // $0 service — skip Stripe checkout entirely
+    if (!booking.price || booking.price === 0) {
+      return res.status(200).json({ free: true, bookingId });
     }
 
     // Legacy memoryStore checkout path — resolve currency from booking, fall back to platform default
@@ -3311,7 +3316,7 @@ app.post("/api/payments/create-checkout", async (req, res) => {
               name: service?.name || "Booking Payment",
               description: service?.description,
             },
-            unit_amount: booking.price || 1000,
+            unit_amount: booking.price,
           },
           quantity: 1,
         },
@@ -12581,6 +12586,11 @@ app.post("/api/bookings/:id/charge-card", async (req, res) => {
 
     // booking.price is always in cents (base_price from services table)
     const totalCents = Math.round(Number(booking.price) || 0);
+    // $0 service — mark paid without touching Stripe
+    if (totalCents === 0) {
+      await supabase.from("bookings").update({ payment_status: "paid", updated_at: new Date().toISOString() }).eq("id", bookingId);
+      return res.status(200).json({ success: true, free: true });
+    }
     if (totalCents < 50) return res.status(400).json({ error: "Amount too small to charge." });
 
     // Fetch provider Stripe account
