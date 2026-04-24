@@ -1153,7 +1153,7 @@ const ProviderServiceEditor = () => {
                 <div className="mx-auto px-5" style={{ maxWidth: 640 }}>
                 {/* Mobile: Save on top (full width), Cancel + Delete below side by side */}
                 {/* Desktop: Delete left, spacer, Cancel + Save right — all one row */}
-                <div className="hidden sm:flex gap-3 items-center">
+                <div className="hidden sm:flex gap-3 items-center justify-center">
                     {!isNew && (
                         <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
                             className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70 whitespace-nowrap"
@@ -1161,7 +1161,6 @@ const ProviderServiceEditor = () => {
                             {deleting ? 'Deleting…' : 'Delete Service'}
                         </button>
                     )}
-                    <div className="flex-1" />
                     <button type="button" onClick={() => navigate('/provider/services')}
                         className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70 whitespace-nowrap"
                         style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', flexShrink: 0 }}>
