@@ -24,6 +24,7 @@ import Toggle from '../../components/ui/Toggle';
 import { useToast } from '../../components/ui/ToastProvider';
 import { formatMoneyFromDollars } from '../../utils/formatMoney';
 import { CURRENCIES } from '../../components/ui/CurrencySelect';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ const ProviderServiceEditor = () => {
     const isNew = !id || id === 'new';
     const toast = useToast();
     const { profile } = useSession();
+    const isDesktop = useIsDesktop();
 
     const [linkCopied, setLinkCopied] = useState(false);
     const bookingUrl = !isNew && profile?.handle ? `${APP_ORIGIN}/book/${profile.handle}?service=${id}` : null;
@@ -1153,12 +1155,12 @@ const ProviderServiceEditor = () => {
                 <div style={{ maxWidth: 480, margin: '0 auto', width: '100%', padding: '0 20px' }}>
                     {/* Save Service — always full width on top */}
                     <button type="button" onClick={handleSave} disabled={saving}
-                        style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', color: '#fff', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
+                        style={{ width: '100%', maxWidth: isDesktop ? '100%' : 360, padding: '14px', borderRadius: 12, border: 'none', background: '#3D231E', color: '#fff', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '0 auto 10px' }}>
                         {saving && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
                         <span style={{ fontSize: saving && savingStatus.length > 10 ? 12 : 14 }}>{saving ? (savingStatus || 'Saving…') : 'Save Service'}</span>
                     </button>
-                    {/* Cancel + Delete — side by side below */}
-                    <div style={{ display: 'flex', gap: 10 }}>
+                    {/* Cancel + Delete — centered below on mobile */}
+                    <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: isDesktop ? '100%' : 360, margin: '0 auto', justifyContent: 'center' }}>
                         <button type="button" onClick={() => navigate('/provider/services')}
                             style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', fontFamily: "'Sora',system-ui,sans-serif", fontSize: 14, fontWeight: 600, color: '#3D231E', cursor: 'pointer' }}>
                             Cancel

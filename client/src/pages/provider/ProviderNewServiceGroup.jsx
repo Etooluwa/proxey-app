@@ -146,12 +146,12 @@ export default function ProviderNewServiceGroup() {
   );
 
   const ActionButtons = ({ compact }) => (
-    <div style={{ display: 'flex', gap: 10, paddingTop: compact ? 24 : 32, paddingBottom: compact ? 0 : 40 }}>
-      <button onClick={() => navigate(-1)} style={{ flex: 1, padding: 16, borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, cursor: 'pointer' }}>
-        Cancel
-      </button>
-      <button onClick={handleSubmit} disabled={!name.trim() || saving} style={{ flex: 2, padding: 16, borderRadius: 12, border: 'none', background: name.trim() && !saving ? T.ink : T.faded, color: '#fff', fontFamily: F, fontSize: 13, fontWeight: 500, cursor: name.trim() && !saving ? 'pointer' : 'default' }}>
+    <div style={{ display: 'flex', flexDirection: compact ? 'row' : 'column', alignItems: 'center', gap: 10, paddingTop: compact ? 24 : 32, paddingBottom: compact ? 0 : 40 }}>
+      <button onClick={handleSubmit} disabled={!name.trim() || saving} style={{ width: '100%', maxWidth: compact ? 'none' : 360, flex: compact ? 2 : 'none', padding: 16, borderRadius: 12, border: 'none', background: name.trim() && !saving ? T.ink : T.faded, color: '#fff', fontFamily: F, fontSize: 13, fontWeight: 500, cursor: name.trim() && !saving ? 'pointer' : 'default' }}>
         {saving ? 'Creating…' : 'Create Group'}
+      </button>
+      <button onClick={() => navigate(-1)} style={{ width: '100%', maxWidth: compact ? 'none' : 220, flex: compact ? 1 : 'none', padding: 16, borderRadius: 12, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 13, fontWeight: 500, color: T.ink, cursor: 'pointer' }}>
+        Cancel
       </button>
     </div>
   );
