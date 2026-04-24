@@ -1151,51 +1151,53 @@ const ProviderServiceEditor = () => {
                 }}
             >
                 <div className="mx-auto px-5" style={{ maxWidth: 640 }}>
-                <div className="flex gap-3 items-center">
-                {/* Delete — left side, only for existing services */}
-                {!isNew && (
-                    <button
-                        type="button"
-                        onClick={() => setShowDeleteConfirm(true)}
-                        disabled={deleting}
-                        className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70 whitespace-nowrap"
-                        style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1, flexShrink: 0 }}
-                    >
-                        {deleting ? 'Deleting…' : 'Delete Service'}
-                    </button>
-                )}
-                {/* Spacer pushes Cancel + Save to the right */}
-                <div className="flex-1" />
-                <button
-                    type="button"
-                    onClick={() => navigate('/provider/services')}
-                    className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70 whitespace-nowrap"
-                    style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', flexShrink: 0 }}
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="py-3.5 px-8 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 whitespace-nowrap"
-                    style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1, flexShrink: 0 }}
-                >
-                    {saving && (
-                        <div
-                            style={{
-                                width: 14, height: 14, borderRadius: '50%',
-                                border: '2px solid rgba(255,255,255,0.3)',
-                                borderTop: '2px solid #fff',
-                                animation: 'spin 0.8s linear infinite',
-                                flexShrink: 0,
-                            }}
-                        />
+                {/* Mobile: Save on top (full width), Cancel + Delete below side by side */}
+                {/* Desktop: Delete left, spacer, Cancel + Save right — all one row */}
+                <div className="hidden sm:flex gap-3 items-center">
+                    {!isNew && (
+                        <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
+                            className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold focus:outline-none active:opacity-70 whitespace-nowrap"
+                            style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1, flexShrink: 0 }}>
+                            {deleting ? 'Deleting…' : 'Delete Service'}
+                        </button>
                     )}
-                    <span style={{ fontSize: saving && savingStatus.length > 10 ? 12 : 13 }}>
-                        {saving ? (savingStatus || 'Saving…') : 'Save Service'}
-                    </span>
-                </button>
+                    <div className="flex-1" />
+                    <button type="button" onClick={() => navigate('/provider/services')}
+                        className="py-3.5 px-6 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-70 whitespace-nowrap"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', flexShrink: 0 }}>
+                        Cancel
+                    </button>
+                    <button type="button" onClick={handleSave} disabled={saving}
+                        className="py-3.5 px-8 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2 whitespace-nowrap"
+                        style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1, flexShrink: 0 }}>
+                        {saving && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+                        <span style={{ fontSize: saving && savingStatus.length > 10 ? 12 : 13 }}>{saving ? (savingStatus || 'Saving…') : 'Save Service'}</span>
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:hidden">
+                    {/* Save — full width, top */}
+                    <button type="button" onClick={handleSave} disabled={saving}
+                        className="w-full py-3.5 rounded-[12px] text-[14px] font-semibold text-white focus:outline-none flex items-center justify-center gap-2"
+                        style={{ background: '#3D231E', border: 'none', opacity: saving ? 0.7 : 1 }}>
+                        {saving && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+                        <span style={{ fontSize: saving && savingStatus.length > 10 ? 12 : 13 }}>{saving ? (savingStatus || 'Saving…') : 'Save Service'}</span>
+                    </button>
+                    {/* Cancel + Delete — side by side below */}
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => navigate('/provider/services')}
+                            className="flex-1 py-3.5 rounded-[12px] text-[14px] font-semibold text-ink focus:outline-none active:opacity-70"
+                            style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}>
+                            Cancel
+                        </button>
+                        {!isNew && (
+                            <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
+                                className="flex-1 py-3.5 rounded-[12px] text-[14px] font-semibold focus:outline-none active:opacity-70"
+                                style={{ border: '1px solid rgba(176,64,64,0.3)', background: 'transparent', color: '#B04040', opacity: deleting ? 0.6 : 1 }}>
+                                {deleting ? 'Deleting…' : 'Delete Service'}
+                            </button>
+                        )}
+                    </div>
                 </div>
                 </div>
             </div>
