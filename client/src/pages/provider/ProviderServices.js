@@ -290,25 +290,28 @@ const AddGroupSheet = ({ onConfirm, onCancel, saving }) => {
                         boxSizing: 'border-box',
                     }}
                 />
-                <div className="flex gap-3">
-                    <button
-                        onClick={onCancel}
-                        className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none"
-                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
-                    >
-                        Cancel
-                    </button>
+                <div
+                    className="flex flex-col items-center gap-3 sm:flex-row"
+                >
                     <button
                         onClick={() => name.trim() && onConfirm(name.trim())}
                         disabled={!name.trim() || saving}
-                        className="flex-[2] py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none"
+                        className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none sm:flex-[2]"
                         style={{
                             background: '#3D231E',
                             opacity: (!name.trim() || saving) ? 0.5 : 1,
                             border: 'none',
+                            maxWidth: 360,
                         }}
                     >
                         {saving ? 'Creating…' : 'Create Group'}
+                    </button>
+                    <button
+                        onClick={onCancel}
+                        className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none sm:flex-1"
+                        style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent', maxWidth: 220 }}
+                    >
+                        Cancel
                     </button>
                 </div>
             </div>

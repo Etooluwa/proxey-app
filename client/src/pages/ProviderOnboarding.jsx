@@ -413,17 +413,17 @@ const ServiceForm = ({ service, onChange, onSave, onCancel }) => (
                 </div>
             </div>
         </div>
-        <div className="flex gap-2">
-            <button onClick={onCancel} className="flex-1 py-3 rounded-[10px] text-[13px] font-medium text-muted focus:outline-none" style={{ border: '1px solid rgba(140,106,100,0.2)', background: 'transparent' }}>
-                Cancel
-            </button>
+        <div className="flex flex-col items-center gap-2 sm:flex-row">
             <button
                 onClick={onSave}
                 disabled={!service.name.trim() || !service.price}
-                className="flex-1 py-3 rounded-[10px] text-[13px] font-semibold text-white focus:outline-none"
-                style={{ background: !service.name.trim() || !service.price ? '#B0948F' : '#3D231E', border: 'none' }}
+                className="w-full py-3 rounded-[10px] text-[13px] font-semibold text-white focus:outline-none sm:flex-1"
+                style={{ background: !service.name.trim() || !service.price ? '#B0948F' : '#3D231E', border: 'none', maxWidth: 360 }}
             >
                 Save Service
+            </button>
+            <button onClick={onCancel} className="w-full py-3 rounded-[10px] text-[13px] font-medium text-muted focus:outline-none sm:flex-1" style={{ border: '1px solid rgba(140,106,100,0.2)', background: 'transparent', maxWidth: 220 }}>
+                Cancel
             </button>
         </div>
     </div>
