@@ -10976,8 +10976,9 @@ app.get("/api/provider/check-handle", async (req, res) => {
 });
 
 // ─── POST /api/provider/stripe/connect — create Stripe Connect account link ──
-app.post("/api/provider/stripe/connect", requireProvider, async (req, res) => {
+app.post("/api/provider/stripe/connect", async (req, res) => {
   const providerId = getProviderId(req);
+  if (!providerId) return res.status(401).json({ error: "Authentication required." });
   // Never use client-supplied redirect URLs — always build from known app origin
   // to prevent open-redirect attacks via the Stripe Connect flow.
   const appOrigin = process.env.FRONTEND_URL || "https://app.mykliques.com";
