@@ -166,6 +166,7 @@ export default function ProviderGroupEditor() {
     };
 
     return (
+        <>
         <SettingsPageLayout title="Edit Group">
             {loading ? (
                 <p style={{ fontFamily: F, fontSize: 14, color: T.muted, marginTop: 24 }}>Loading…</p>
@@ -298,5 +299,6 @@ export default function ProviderGroupEditor() {
                 </div>
             </div>
         )}
+        </>
     );
 }

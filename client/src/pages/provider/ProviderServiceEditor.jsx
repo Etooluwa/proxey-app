@@ -548,6 +548,7 @@ const ProviderServiceEditor = () => {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
+        <>
         <div className="flex flex-col bg-base" style={{ minHeight: '100dvh' }}>
 
             {/* ── Back nav ── */}
@@ -1209,6 +1210,7 @@ const ProviderServiceEditor = () => {
                 </div>
             </div>
         )}
+        </>
     );
 };
 
