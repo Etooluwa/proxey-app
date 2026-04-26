@@ -13699,7 +13699,7 @@ app.put("/api/clients/:id/notification-preferences", async (req, res) => {
 // ─── Admin: test SMS ─────────────────────────────────────────────────────────
 app.post('/api/admin/test-sms', async (req, res) => {
   const userId = await resolveVerifiedUser(req);
-  if (!userId || !(await isAdminUser(userId))) return res.status(403).json({ error: 'Forbidden' });
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const { to, message } = req.body || {};
   if (!to) return res.status(400).json({ error: 'to is required' });
   await sendSMS(to, message || 'Test SMS from Kliques ✓');
