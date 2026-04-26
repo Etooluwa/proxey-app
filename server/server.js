@@ -801,6 +801,51 @@ async function sendClientPushNotification(userId, notification) {
   }));
 }
 
+// ─── SMS via Telnyx ──────────────────────────────────────────────────────────
+
+const TELNYX_API_KEY    = process.env.TELNYX_API_KEY || '';
+const TELNYX_FROM_NUMBER = process.env.TELNYX_PHONE_NUMBER || '';
+
+async function sendSMS(to, body) {
+  if (!TELNYX_API_KEY || !TELNYX_FROM_NUMBER || !to) return;
+  // Normalise: must be E.164
+  const normalised = to.replace(/\s|-|\(|\)/g, '');
+  if (!/^\+?\d{10,15}$/.test(normalised)) return;
+  const e164 = normalised.startsWith('+') ? normalised : `+1${normalised}`;
+  try {
+    await fetch('https://api.telnyx.com/v2/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${TELNYX_API_KEY}`,
+      },
+      body: JSON.stringify({ from: TELNYX_FROM_NUMBER, to: e164, text: body }),
+    });
+  } catch (err) {
+    console.warn('[sms] Failed to send:', err.message);
+  }
+}
+
+async function getClientPhone(userId) {
+  if (!supabase || !userId) return null;
+  const { data } = await supabase
+    .from('client_profiles')
+    .select('phone')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data?.phone || null;
+}
+
+async function getProviderPhone(providerId) {
+  if (!supabase || !providerId) return null;
+  const { data } = await supabase
+    .from('provider_profiles')
+    .select('phone')
+    .eq('provider_id', providerId)
+    .maybeSingle();
+  return data?.phone || null;
+}
+
 // ─── Expo Push Notifications ─────────────────────────────────────────────────
 
 async function getExpoPushTokens(userId) {
@@ -977,8 +1022,8 @@ if (IS_DIRECT_RUN) {
     if (!supabase) return;
     try {
       const now = new Date();
-      const windowStart = new Date(now.getTime() + 2.75 * 60 * 60 * 1000); // 2h45m from now
-      const windowEnd   = new Date(now.getTime() + 3.25 * 60 * 60 * 1000); // 3h15m from now
+      const windowStart = new Date(now.getTime() + 1.75 * 60 * 60 * 1000); // 1h45m from now
+      const windowEnd   = new Date(now.getTime() + 2.25 * 60 * 60 * 1000); // 2h15m from now
 
       const { data: bookings } = await supabase
         .from('bookings')
@@ -1011,11 +1056,14 @@ if (IS_DIRECT_RUN) {
 
         await createClientNotification(booking.client_id, {
           type: 'session_reminder',
-          title: 'Session in 3 hours',
+          title: 'Session in 2 hours',
           body: `Reminder: ${svcName} on ${displayDate} at ${displayTime}`,
           booking_id: booking.id,
           data: { provider_id: booking.provider_id, scheduled_at: booking.scheduled_at },
         });
+        getClientPhone(booking.client_id).then(phone => sendSMS(phone,
+          `Reminder: Your ${svcName} is today at ${displayTime}. See you soon! – Kliques`
+        )).catch(() => {});
       }
     } catch (err) {
       console.warn('[session-reminder] error:', err.message);
@@ -3188,6 +3236,9 @@ app.patch("/api/bookings/:id/cancel", createCancelBookingHandler({
           booking_id: cancelledBooking.id,
           data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
         }).catch(() => {});
+        getProviderPhone(cancelledBooking.provider_id).then(phone => sendSMS(phone,
+          `${clientName} cancelled their booking for ${scheduledDate}.${reasonText} – Kliques`
+        )).catch(() => {});
         const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
         if (provInfo?.email) {
           await sendEmail({
@@ -3213,6 +3264,9 @@ ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
         booking_id: cancelledBooking.id,
         data: { provider_id: cancelledBooking.provider_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
       }).catch(() => {});
+      getClientPhone(cancelledBooking.client_id).then(phone => sendSMS(phone,
+        `${providerName} has cancelled your booking for ${scheduledDate}.${reasonText} You can rebook via the Kliques app.`
+      )).catch(() => {});
       const { email: clientEmail, name: clientName } = await getClientNotifPrefs(cancelledBooking.client_id);
       if (clientEmail) {
         await sendEmail({
@@ -3977,9 +4031,12 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
             tag: `booking-confirmed-${data.id}`,
           }).catch(() => {});
 
-          // Email client: booking confirmed
+          // SMS + Email client: booking confirmed
           const { email: clientEmail, name: clientName } = await getClientNotifPrefs(clientId);
           const provInfo = await getProviderEmailInfo(data.provider_id);
+          getClientPhone(clientId).then(phone => sendSMS(phone,
+            `Your booking with ${provInfo?.name || 'your provider'} is confirmed for ${fmtDate(data.scheduled_at)}. See you then! – Kliques`
+          )).catch(() => {});
           if (clientEmail) {
             sendEmail({
               to: clientEmail,
@@ -11868,6 +11925,11 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
     const { name: bookingClientName, email: bookingClientEmail } = userId
       ? await getClientNotifPrefs(userId)
       : { name: "A client", email: null };
+    getProviderPhone(providerId).then(phone => sendSMS(phone,
+      autoAccept
+        ? `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. – Kliques`
+        : `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Open Kliques to accept. – Kliques`
+    )).catch(() => {});
     const { data: bookingService } =
       serviceId && supabase
         ? await supabase
@@ -12096,6 +12158,11 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         client_message: message || null,
       },
     }).catch(() => {});
+    getProviderPhone(providerId).then(phone => sendSMS(phone,
+      autoAccept
+        ? `New booking confirmed: ${notifBody} – Kliques`
+        : `New booking request: ${notifBody}. Open Kliques to accept. – Kliques`
+    )).catch(() => {});
 
     const providerEmailInfo = await getProviderEmailInfo(providerId);
     const { email: clientEmail } = await getClientNotifPrefs(clientId);
@@ -12537,6 +12604,19 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
           invoice_number: invoiceNumber,
         },
       });
+
+      // SMS post-session follow-up
+      const smsLines = [
+        `Thanks for your ${serviceName} session with ${providerDisplayName}! 🙏`,
+      ];
+      if (hasNote || hasRec || hasPhotos) {
+        const extras = [hasNote && 'a note', hasRec && 'recommendations', hasPhotos && 'photos'].filter(Boolean);
+        smsLines.push(`${providerDisplayName} left ${extras.join(' & ')} for you in the app.`);
+      }
+      if (invoiceNumber) {
+        smsLines.push(`Your invoice is ready — check your email or view it in the Kliques app.`);
+      }
+      getClientPhone(booking.client_id).then(phone => sendSMS(phone, smsLines.join(' '))).catch(() => {});
     } catch (notifErr) {
       console.warn("[bookings/complete] client notification failed:", notifErr.message);
     }
