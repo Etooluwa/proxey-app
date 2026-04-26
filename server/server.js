@@ -809,9 +809,18 @@ const TELNYX_FROM_NUMBER = process.env.TELNYX_PHONE_NUMBER || '';
 async function sendSMS(to, body) {
   if (!TELNYX_API_KEY || !TELNYX_FROM_NUMBER || !to) return;
   // Normalise: must be E.164
-  const normalised = to.replace(/\s|-|\(|\)/g, '');
+  const normalised = to.replace(/[\s\-().]/g, '');
   if (!/^\+?\d{10,15}$/.test(normalised)) return;
-  const e164 = normalised.startsWith('+') ? normalised : `+1${normalised}`;
+  let e164;
+  if (normalised.startsWith('+')) {
+    e164 = normalised;
+  } else if (normalised.length === 10) {
+    e164 = `+1${normalised}`;       // bare 10-digit North American number
+  } else if (normalised.length === 11 && normalised.startsWith('1')) {
+    e164 = `+${normalised}`;        // 1XXXXXXXXXX — already has country code
+  } else {
+    e164 = `+${normalised}`;        // international, trust it
+  }
   try {
     await fetch('https://api.telnyx.com/v2/messages', {
       method: 'POST',
