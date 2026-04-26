@@ -260,6 +260,7 @@ async function createProviderNotification(providerId, notification) {
     }
 
     console.log("[notifications] Created provider notification:", data.id);
+    sendExpoPush(providerId, { title: notification.title, body: notification.body || '', data: notification.data || {} }).catch(() => {});
     return data;
   } catch (error) {
     console.error("[notifications] Error creating provider notification:", error);
@@ -383,6 +384,7 @@ async function createClientNotification(userId, notification) {
     }
 
     console.log("[notifications] Created client notification:", data.id);
+    sendExpoPush(userId, { title: notification.title, body: notification.body || '', data: notification.data || {} }).catch(() => {});
     return data;
   } catch (error) {
     console.error("[notifications] Error creating client notification:", error);
@@ -797,6 +799,49 @@ async function sendClientPushNotification(userId, notification) {
       await deleteClientPushSubscription(subscription.endpoint);
     }
   }));
+}
+
+// ─── Expo Push Notifications ─────────────────────────────────────────────────
+
+async function getExpoPushTokens(userId) {
+  if (!supabase || !userId) return [];
+  const { data } = await supabase
+    .from('user_push_tokens')
+    .select('token')
+    .eq('user_id', userId);
+  return (data || []).map(r => r.token).filter(Boolean);
+}
+
+async function sendExpoPush(userId, { title, body, data = {} }) {
+  const tokens = await getExpoPushTokens(userId);
+  if (!tokens.length) return;
+
+  const messages = tokens.map(token => ({
+    to: token,
+    sound: 'default',
+    title,
+    body,
+    data,
+  }));
+
+  try {
+    const res = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(messages),
+    });
+    const json = await res.json();
+    // Remove tokens that have been unregistered
+    const results = Array.isArray(json.data) ? json.data : [];
+    const badTokens = results
+      .map((r, i) => (r.status === 'error' && r.details?.error === 'DeviceNotRegistered' ? tokens[i] : null))
+      .filter(Boolean);
+    if (badTokens.length && supabase) {
+      await supabase.from('user_push_tokens').delete().in('token', badTokens);
+    }
+  } catch (err) {
+    console.warn('[expo-push] Failed to send:', err.message);
+  }
 }
 
 // ─── Helper: fetch provider email + name ─────────────────────────────────────
@@ -13546,6 +13591,27 @@ app.put("/api/clients/:id/notification-preferences", async (req, res) => {
   } catch (err) {
     console.error("[PUT /clients/:id/notification-preferences]", err);
     res.status(500).json({ error: "Failed to update notification preferences." });
+  }
+});
+
+// ─── Expo push token registration ────────────────────────────────────────────
+app.post('/api/user/push-token', async (req, res) => {
+  const userId = await resolveVerifiedUser(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { token } = req.body || {};
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'token is required' });
+  }
+
+  try {
+    await supabase
+      .from('user_push_tokens')
+      .upsert({ user_id: userId, token, updated_at: new Date().toISOString() }, { onConflict: 'token' });
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('[push-token]', err);
+    res.status(500).json({ error: 'Failed to save push token' });
   }
 });
 
