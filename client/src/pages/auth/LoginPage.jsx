@@ -662,16 +662,6 @@ export default function LoginPage() {
 
     const isNative = !!(window.KliquesNative?.isNative || new URLSearchParams(window.location.search).get('native'));
     const showBack = screen !== 'role' && !isNative;
-    const legalLinks = (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', marginTop: 24 }}>
-            <Link to="/terms" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none' }}>
-                Terms of Service
-            </Link>
-            <Link to="/policy" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none' }}>
-                Privacy Policy
-            </Link>
-        </div>
-    );
 
     const formPanel = (
         <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', minHeight: isDesktop ? '100%' : '100dvh' }}>
@@ -738,7 +728,6 @@ export default function LoginPage() {
             <style>{globalStyles}</style>
             <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>{formPanel}</div>
-                <div style={{ padding: '0 24px 28px' }}>{legalLinks}</div>
             </div>
         </div>
     );
