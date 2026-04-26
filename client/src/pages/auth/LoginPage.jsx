@@ -660,7 +660,8 @@ export default function LoginPage() {
         }
     };
 
-    const showBack = screen !== 'role';
+    const isNative = !!(window.KliquesNative?.isNative || new URLSearchParams(window.location.search).get('native'));
+    const showBack = screen !== 'role' && !isNative;
     const legalLinks = (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', marginTop: 24 }}>
             <Link to="/terms" style={{ fontFamily: F, fontSize: 12, color: T.muted, textDecoration: 'none' }}>
