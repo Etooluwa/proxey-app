@@ -12238,6 +12238,9 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         scheduledAt,
         preAppointmentInfo: servicePreAppointmentInfo,
       }).catch(() => {});
+      getClientPhone(clientId).then(phone => sendSMS(phone,
+        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! – Kliques`
+      )).catch(() => {});
     }
   },
 }));
