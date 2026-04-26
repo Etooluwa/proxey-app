@@ -807,22 +807,29 @@ const TELNYX_API_KEY    = process.env.TELNYX_API_KEY || '';
 const TELNYX_FROM_NUMBER = process.env.TELNYX_PHONE_NUMBER || '';
 
 async function sendSMS(to, body) {
-  if (!TELNYX_API_KEY || !TELNYX_FROM_NUMBER || !to) return;
+  if (!TELNYX_API_KEY || !TELNYX_FROM_NUMBER || !to) {
+    console.warn('[sms] Skipped — missing credentials or to number', { hasKey: !!TELNYX_API_KEY, hasFrom: !!TELNYX_FROM_NUMBER, to });
+    return;
+  }
   // Normalise: must be E.164
   const normalised = to.replace(/[\s\-().]/g, '');
-  if (!/^\+?\d{10,15}$/.test(normalised)) return;
+  if (!/^\+?\d{10,15}$/.test(normalised)) {
+    console.warn('[sms] Skipped — invalid number after normalisation:', normalised);
+    return;
+  }
   let e164;
   if (normalised.startsWith('+')) {
     e164 = normalised;
   } else if (normalised.length === 10) {
-    e164 = `+1${normalised}`;       // bare 10-digit North American number
+    e164 = `+1${normalised}`;
   } else if (normalised.length === 11 && normalised.startsWith('1')) {
-    e164 = `+${normalised}`;        // 1XXXXXXXXXX — already has country code
+    e164 = `+${normalised}`;
   } else {
-    e164 = `+${normalised}`;        // international, trust it
+    e164 = `+${normalised}`;
   }
   try {
-    await fetch('https://api.telnyx.com/v2/messages', {
+    console.log('[sms] Sending to', e164, 'from', TELNYX_FROM_NUMBER);
+    const res = await fetch('https://api.telnyx.com/v2/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -830,6 +837,12 @@ async function sendSMS(to, body) {
       },
       body: JSON.stringify({ from: TELNYX_FROM_NUMBER, to: e164, text: body }),
     });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn('[sms] Telnyx error', res.status, JSON.stringify(json));
+    } else {
+      console.log('[sms] Sent OK to', e164);
+    }
   } catch (err) {
     console.warn('[sms] Failed to send:', err.message);
   }
@@ -13681,6 +13694,16 @@ app.put("/api/clients/:id/notification-preferences", async (req, res) => {
     console.error("[PUT /clients/:id/notification-preferences]", err);
     res.status(500).json({ error: "Failed to update notification preferences." });
   }
+});
+
+// ─── Admin: test SMS ─────────────────────────────────────────────────────────
+app.post('/api/admin/test-sms', async (req, res) => {
+  const userId = await resolveVerifiedUser(req);
+  if (!userId || !(await isAdminUser(userId))) return res.status(403).json({ error: 'Forbidden' });
+  const { to, message } = req.body || {};
+  if (!to) return res.status(400).json({ error: 'to is required' });
+  await sendSMS(to, message || 'Test SMS from Kliques ✓');
+  res.json({ ok: true, to });
 });
 
 // ─── Expo push token registration ────────────────────────────────────────────
