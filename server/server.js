@@ -13698,8 +13698,9 @@ app.put("/api/clients/:id/notification-preferences", async (req, res) => {
 
 // ─── Admin: test SMS ─────────────────────────────────────────────────────────
 app.post('/api/admin/test-sms', async (req, res) => {
-  const userId = await resolveVerifiedUser(req);
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const verified = await resolveVerifiedUser({ authHeader: req.headers['authorization'], supabase });
+  if (!verified) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = verified.userId;
   const { to, message } = req.body || {};
   if (!to) return res.status(400).json({ error: 'to is required' });
   await sendSMS(to, message || 'Test SMS from Kliques ✓');
@@ -13708,8 +13709,9 @@ app.post('/api/admin/test-sms', async (req, res) => {
 
 // ─── Expo push token registration ────────────────────────────────────────────
 app.post('/api/user/push-token', async (req, res) => {
-  const userId = await resolveVerifiedUser(req);
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const verified = await resolveVerifiedUser({ authHeader: req.headers['authorization'], supabase });
+  if (!verified) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = verified.userId;
 
   const { token } = req.body || {};
   if (!token || typeof token !== 'string') {
