@@ -12311,6 +12311,9 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
           confirmationMessage: confirmationMessage || null,
         }).catch(() => {});
       }
+      getClientPhone(booking.client_id).then(phone => sendSMS(phone,
+        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! – Kliques`
+      )).catch(() => {});
     }
   },
 }));
