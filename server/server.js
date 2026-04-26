@@ -805,6 +805,7 @@ async function sendClientPushNotification(userId, notification) {
 
 const TELNYX_API_KEY    = process.env.TELNYX_API_KEY || '';
 const TELNYX_FROM_NUMBER = process.env.TELNYX_PHONE_NUMBER || '';
+console.log('[sms] Telnyx configured:', !!TELNYX_API_KEY, 'from:', TELNYX_FROM_NUMBER || '(none)');
 
 async function sendSMS(to, body) {
   if (!TELNYX_API_KEY || !TELNYX_FROM_NUMBER || !to) {
