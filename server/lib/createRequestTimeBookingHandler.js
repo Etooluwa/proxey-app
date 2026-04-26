@@ -50,7 +50,7 @@ export function createRequestTimeBookingHandler({
     try {
       const scheduledAt = `${requested_date}T${requested_time}:00`;
       const providerBookingRules =
-        (await getProviderBookingRules(provider_id)) ||
+        (await getProviderBookingRules(provider_id, service_id)) ||
         normalizeProviderBookingRules();
 
       assertBookingLeadTime({

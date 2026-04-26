@@ -12040,8 +12040,20 @@ async function generateInvoiceNumber(supabase, providerId, providerName) {
 // Client requests a specific date/time with a provider (no payment upfront)
 app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
   getUserId,
-  getProviderBookingRules: async (providerId) =>
-    normalizeProviderBookingRules(await getProviderBookingSettings(providerId)),
+  getProviderBookingRules: async (providerId, serviceId) => {
+    const providerSettings = await getProviderBookingSettings(providerId);
+    if (serviceId && supabase) {
+      const { data: svc } = await supabase
+        .from('services')
+        .select('metadata')
+        .eq('id', serviceId)
+        .maybeSingle();
+      if (svc?.metadata?.autoAccept === true) {
+        providerSettings.auto_accept = true;
+      }
+    }
+    return normalizeProviderBookingRules(providerSettings);
+  },
   getServiceInfo: async (serviceId) => {
     if (!serviceId) {
       return {
