@@ -18,7 +18,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { supabase } from '../../utils/supabase';
-import { getAuthRedirectUrl } from '../../utils/authRedirect';
+import { getAuthRedirectUrl, isNativeApp } from '../../utils/authRedirect';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import klogo from '../../klogo.png';
 
@@ -660,8 +660,7 @@ export default function LoginPage() {
         }
     };
 
-    const isNative = !!(window.KliquesNative?.isNative || new URLSearchParams(window.location.search).get('native'));
-    const showBack = screen !== 'role' && !isNative;
+    const showBack = screen !== 'role' && !isNativeApp();
 
     const formPanel = (
         <div style={{ flex: 1, background: isDesktop ? '#fff' : 'transparent', display: 'flex', flexDirection: 'column', minHeight: isDesktop ? '100%' : '100dvh' }}>
