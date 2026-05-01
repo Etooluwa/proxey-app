@@ -559,20 +559,25 @@ export function AuthProvider({ children }) {
         return { session: fallbackSession, profile: null };
     };
 
-    const register = async ({ email, password, role = "client" }) => {
+    const register = async ({ email, password, role = "client", name = "" }) => {
         setAuthError(null);
         if (!email || !password) {
             throw new Error("Email and password are required.");
         }
 
         if (supabase) {
+            const normalizedName = typeof name === "string" ? name.trim() : "";
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
-                    data: { role },
+                    data: {
+                        role,
+                        ...(normalizedName ? { full_name: normalizedName } : {}),
+                    },
                     emailRedirectTo: getAuthRedirectUrl({
                         signup_role: role,
+                        ...(normalizedName ? { signup_name: normalizedName } : {}),
                     }),
                 },
             });

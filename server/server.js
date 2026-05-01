@@ -54,19 +54,22 @@ const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || "";
 const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY || "";
 const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || "mailto:info@mykliques.com";
 
-const supabase =
-  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-    : null;
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add them to server/.env before starting the server."
+  );
+}
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
 
 const app = express();
 
@@ -1309,6 +1312,9 @@ async function verifyAuth(req, res, next) {
   if (verifiedUser) {
     req.verifiedUserId = verifiedUser.userId;
     req.verifiedUserEmail = verifiedUser.email;
+  } else if (req.headers["authorization"]) {
+    // Token was present but invalid/expired — log for debugging
+    console.warn(`[auth] Token rejected for ${req.method} ${req.path}`);
   }
   next();
 }

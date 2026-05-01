@@ -17,7 +17,6 @@ import { supabase } from '../utils/supabase';
 import { request } from '../data/apiClient';
 import klogo from '../klogo.png';
 import BookingPaymentForm from '../components/payment/BookingPaymentForm';
-import { getAuthRedirectUrl } from '../utils/authRedirect';
 import { formatMoney } from '../utils/formatMoney';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
@@ -744,7 +743,7 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, selectedHou
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
-    const { loginWithGoogle } = useSession();
+    const { login, register, loginWithGoogle } = useSession();
     const displayName = provider?.business_name || provider?.name || 'Provider';
 
     const handleSubmit = async () => {
@@ -755,23 +754,20 @@ function Step35Auth({ provider, service, selectedDate, selectedTime, selectedHou
         setSubmitting(true);
         try {
             if (mode === 'signup') {
-                const { error: err } = await supabase.auth.signUp({
+                const { session: registeredSession } = await register({
                     email: email.trim(),
                     password,
-                    options: {
-                        data: { role: 'client', full_name: name.trim() },
-                        emailRedirectTo: getAuthRedirectUrl({
-                            signup_role: 'client',
-                            signup_name: name.trim(),
-                        }),
-                    },
+                    role: 'client',
+                    name: name.trim(),
                 });
-                if (err) throw err;
                 window.localStorage.setItem('proxey.pending_role', 'client');
                 window.localStorage.setItem('proxey.pendingName', name.trim());
+                if (!registeredSession) {
+                    setError('Check your email to confirm your account, then return here to finish payment.');
+                    return;
+                }
             } else {
-                const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-                if (err) throw err;
+                await login({ email: email.trim(), password, role: 'client' });
             }
             onAuth();
         } catch (err) { setError(err.message || 'Something went wrong.'); }

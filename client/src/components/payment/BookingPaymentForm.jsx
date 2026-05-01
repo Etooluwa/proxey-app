@@ -181,7 +181,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
     useEffect(() => { onProcessingChange?.(processing); }, [processing, onProcessingChange]);
     const [cardError, setCardError] = useState(null);
     const [cardholderName, setCardholderName] = useState(
-        session?.user?.user_metadata?.full_name || ''
+        session?.user?.metadata?.full_name || session?.user?.user_metadata?.full_name || ''
     );
 
     // Saved cards
@@ -231,11 +231,16 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
         setProcessing(true);
         setCardError(null);
         let succeeded = false;
+
+        // Pin the auth token from the React session so we don't race against
+        // supabase.auth.getSession() returning stale/null state in apiClient.
+        const sessionToken = session?.accessToken || session?.access_token || null;
+        const authHeaders = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {};
+
         try {
             // ── Path A: client has a saved card selected ──────────────────────
             if (!usingNewCard && selectedSavedId) {
                 const providerId = provider?.user_id || provider?.id;
-                console.log('[PaymentForm] Path A: saved card', { paymentType, providerId, totalChargeCents, selectedSavedId });
 
                 if (paymentType === 'save_card') {
                     // No charge — just return the saved pm so the booking records it
@@ -248,16 +253,15 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                 }
 
                 // full or deposit — charge via /api/charge (off-session)
-                console.log('[PaymentForm] Calling /charge...');
                 const data = await request('/charge', {
                     method: 'POST',
+                    headers: authHeaders,
                     body: JSON.stringify({
                         amount: totalChargeCents,
                         paymentMethodId: selectedSavedId,
                         providerId,
                     }),
                 });
-                console.log('[PaymentForm] /charge response:', data);
                 succeeded = true;
                 onSuccess({
                     payment_type: paymentType,
@@ -275,6 +279,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
             if (paymentType === 'save_card') {
                 const { clientSecret } = await request('/payments/setup-intent', {
                     method: 'POST',
+                    headers: authHeaders,
                     body: JSON.stringify({ email, name }),
                 });
                 const { error, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
@@ -294,6 +299,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                 const providerId = provider?.user_id || provider?.id;
                 const { clientSecret } = await request('/payments/payment-intent', {
                     method: 'POST',
+                    headers: authHeaders,
                     body: JSON.stringify({
                         serviceId: service?.id,
                         providerId,
@@ -322,7 +328,10 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
             }
         } catch (err) {
             console.error('[PaymentForm] handleSubmit error:', err);
-            const msg = err.message || 'Payment failed. Please try again.';
+            const isAuthError = err.status === 401 || err.message?.toLowerCase().includes('unauthorized');
+            const msg = isAuthError
+                ? 'Your session has expired. Please refresh the page and try again.'
+                : (err.message || 'Payment failed. Please try again.');
             setCardError(msg);
             onError?.(msg);
         } finally {
