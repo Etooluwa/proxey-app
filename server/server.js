@@ -11676,12 +11676,6 @@ app.post("/api/payments/payment-intent", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
   const { serviceId, providerId, amountCents, email, name, isDeposit } = req.body || {};
-  if (!amountCents) {
-    return res.status(400).json({ error: "amountCents is required." });
-  }
-  if (amountCents < 50) {
-    return res.status(400).json({ error: "Amount must be at least $0.50." });
-  }
 
   try {
     let resolvedProviderId = providerId || null;
@@ -11689,7 +11683,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
     if (serviceId) {
       const { data: svcRow } = await supabase
         .from("services")
-        .select("provider_id, currency")
+        .select("provider_id, currency, base_price, deposit_type, deposit_value")
         .eq("id", serviceId)
         .maybeSingle();
       serviceRow = svcRow || null;
@@ -11699,6 +11693,30 @@ app.post("/api/payments/payment-intent", async (req, res) => {
     }
     if (!resolvedProviderId) {
       return res.status(400).json({ error: "providerId is required." });
+    }
+
+    let resolvedAmountCents = Math.round(Number(amountCents) || 0);
+    if (!resolvedAmountCents && serviceRow) {
+      const basePriceCents = Math.round(Number(serviceRow.base_price) || 0);
+      if (isDeposit) {
+        const depositType = serviceRow.deposit_type;
+        const depositValue = Number(serviceRow.deposit_value) || 0;
+        if (depositType === "percent") {
+          resolvedAmountCents = Math.round(basePriceCents * depositValue / 100);
+        } else if (depositType === "fixed") {
+          resolvedAmountCents = Math.round(depositValue * 100);
+        } else {
+          resolvedAmountCents = Math.round(basePriceCents * 0.3);
+        }
+      } else {
+        resolvedAmountCents = basePriceCents;
+      }
+    }
+    if (!resolvedAmountCents) {
+      return res.status(400).json({ error: "amountCents is required." });
+    }
+    if (resolvedAmountCents < 50) {
+      return res.status(400).json({ error: "Amount must be at least $0.50." });
     }
 
     // Resolve provider's Stripe account
@@ -11767,8 +11785,8 @@ app.post("/api/payments/payment-intent", async (req, res) => {
 
     // Client pays service amount + platform fee on top.
     // Provider receives the full service amount. Platform keeps the fee and absorbs Stripe's cut.
-    const platformFee = Math.round(amountCents * PLATFORM_FEE_RATE);
-    const totalCharge = amountCents + platformFee; // what client actually pays
+    const platformFee = Math.round(resolvedAmountCents * PLATFORM_FEE_RATE);
+    const totalCharge = resolvedAmountCents + platformFee; // what client actually pays
 
     const intentParams = {
       amount: totalCharge,
@@ -11778,7 +11796,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       capture_method: "automatic",
       // For deposit payments, save the card for the remaining off-session charge later
       setup_future_usage: isDeposit ? "off_session" : undefined,
-      metadata: { userId, serviceId: serviceId || "", providerId: resolvedProviderId, serviceCents: amountCents },
+      metadata: { userId, serviceId: serviceId || "", providerId: resolvedProviderId, serviceCents: resolvedAmountCents },
     };
 
     // Route service amount to provider's Stripe account; platform keeps the fee
