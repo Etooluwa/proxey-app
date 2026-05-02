@@ -19,6 +19,33 @@ import klogo from '../klogo.png';
 import BookingPaymentForm from '../components/payment/BookingPaymentForm';
 import { formatMoney } from '../utils/formatMoney';
 
+const SS_PREFIX = "kliques.pub_booking.";
+const SS_PROVIDER = SS_PREFIX + "provider";
+const SS_SELECTED_SVC = SS_PREFIX + "selectedSvc";
+const SS_SELECTED_SLOT = SS_PREFIX + "selectedSlot";
+
+function ssSet(key, value) {
+    try {
+        sessionStorage.setItem(key, JSON.stringify(value));
+    } catch { }
+}
+
+function ssGet(key) {
+    try {
+        return JSON.parse(sessionStorage.getItem(key));
+    } catch {
+        return null;
+    }
+}
+
+function clearPendingBookingResume() {
+    try {
+        sessionStorage.removeItem(SS_PROVIDER);
+        sessionStorage.removeItem(SS_SELECTED_SVC);
+        sessionStorage.removeItem(SS_SELECTED_SLOT);
+    } catch { }
+}
+
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
     base: '#FBF7F2', ink: '#3D231E', muted: '#8C6A64', faded: '#B0948F',
@@ -1142,6 +1169,53 @@ export default function PublicBookingPage() {
 
     const [bookingError, setBookingError] = useState(null);
 
+    const persistPendingBookingResume = useCallback((nextService = selectedService, overrides = {}) => {
+        if (!provider?.handle || !nextService || !selectedDate || !selectedTime) return;
+        ssSet(SS_PROVIDER, provider);
+        ssSet(SS_SELECTED_SVC, nextService);
+        ssSet(SS_SELECTED_SLOT, {
+            date: overrides.date ?? selectedDate,
+            time: overrides.time ?? selectedTime,
+            hours: overrides.hours ?? selectedHours,
+            hasIntake: overrides.hasIntake ?? hasIntake,
+            intakeAnswers: overrides.intakeAnswers ?? intakeAnswers,
+            intakeFreeform: overrides.intakeFreeform ?? intakeFreeform,
+        });
+    }, [provider, selectedService, selectedDate, selectedTime, selectedHours, hasIntake, intakeAnswers, intakeFreeform]);
+
+    useEffect(() => {
+        if (!provider?.handle || !selectedService || !selectedDate || !selectedTime) return;
+        persistPendingBookingResume(selectedService);
+    }, [provider, selectedService, selectedDate, selectedTime, persistPendingBookingResume]);
+
+    useEffect(() => {
+        const isResume = searchParams.get('resume') === 'true';
+        if (!isResume || !session || !provider || services.length === 0) return;
+
+        const savedService = ssGet(SS_SELECTED_SVC);
+        const savedSlot = ssGet(SS_SELECTED_SLOT);
+        if (!savedService || !savedSlot?.date || !savedSlot?.time) return;
+
+        const restoredService = services.find((svc) => svc.id === savedService.id) || savedService;
+        setSelectedService(restoredService);
+        setSelectedDate(savedSlot.date);
+        setSelectedTime(savedSlot.time);
+        if (savedSlot.hours) {
+            setSelectedHours(savedSlot.hours);
+        }
+        setHasIntake(Boolean(savedSlot.hasIntake));
+        setIntakeAnswers(savedSlot.intakeAnswers || {});
+        setIntakeFreeform(savedSlot.intakeFreeform || '');
+
+        const paymentType = restoredService?.payment_type;
+        const restoredPrice = Number(getSelectedServicePrice(restoredService, savedSlot.hours) ?? restoredService?.base_price ?? 0);
+        if (paymentType && paymentType !== 'none' && !(restoredPrice === 0 && paymentType !== 'save_card')) {
+            setStep(45);
+        } else {
+            setStep(4);
+        }
+    }, [searchParams, session, provider, services]);
+
     const handleSubmitBooking = async (pmtData) => {
         if (!session) return;
         setSubmitting(true);
@@ -1189,6 +1263,7 @@ export default function PublicBookingPage() {
             }
 
             setBookingId(data.booking.id);
+            clearPendingBookingResume();
             setStep(5);
         } catch (err) {
             console.error('[PublicBookingPage] submit error:', err);
@@ -1284,12 +1359,22 @@ export default function PublicBookingPage() {
             onContinue={({ freeform }) => {
                 setIntakeFreeform(freeform);
                 setHasIntake(true);
+                persistPendingBookingResume(selectedService, {
+                    hasIntake: true,
+                    intakeAnswers,
+                    intakeFreeform: freeform,
+                });
                 // Skip auth gate if logged in
                 if (session) setStep(4);
                 else setStep(35);
             }}
             onSkip={() => {
                 setIntakeFreeform('');
+                persistPendingBookingResume(selectedService, {
+                    hasIntake: false,
+                    intakeAnswers,
+                    intakeFreeform: '',
+                });
                 if (session) setStep(4);
                 else setStep(35);
             }}
