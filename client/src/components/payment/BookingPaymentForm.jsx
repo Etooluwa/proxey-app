@@ -252,38 +252,30 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     return;
                 }
 
-                // full or deposit — charge via /api/charge (off-session)
-                const data = await request('/charge', {
+                // full or deposit — create a PaymentIntent and confirm it client-side
+                // so saved cards can complete SCA/3DS when required.
+                const email = session?.user?.email || '';
+                const name = cardholderName || email;
+                const { clientSecret } = await request('/payments/payment-intent', {
                     method: 'POST',
                     headers: authHeaders,
                     body: JSON.stringify({
-                        amount: totalChargeCents,
-                        totalChargeCents,
-                        serviceAmountCents: amountCents,
-                        allowClientConfirmation: true,
-                        paymentMethodId: selectedSavedId,
-                        providerId,
                         serviceId: service?.id,
+                        providerId,
+                        amountCents,
+                        email,
+                        name,
+                        isDeposit: paymentType === 'deposit',
                     }),
                 });
-                if (data.requires_action && data.client_secret) {
-                    const result = await stripe.confirmCardPayment(data.client_secret, {
-                        payment_method: selectedSavedId,
-                    });
-                    if (result.error) { setCardError(result.error.message); return; }
-                    succeeded = true;
-                    onSuccess({
-                        payment_type: paymentType,
-                        stripe_payment_intent_id: result.paymentIntent.id,
-                        stripe_payment_method_id: selectedSavedId,
-                        deposit_paid_cents: paymentType === 'deposit' ? amountCents : 0,
-                    });
-                    return;
-                }
+                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: selectedSavedId,
+                });
+                if (error) { setCardError(error.message); return; }
                 succeeded = true;
                 onSuccess({
                     payment_type: paymentType,
-                    stripe_payment_intent_id: data.chargeId,
+                    stripe_payment_intent_id: paymentIntent.id,
                     stripe_payment_method_id: selectedSavedId,
                     deposit_paid_cents: paymentType === 'deposit' ? amountCents : 0,
                 });
