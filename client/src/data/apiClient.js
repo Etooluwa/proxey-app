@@ -54,16 +54,17 @@ async function request(path, options = {}) {
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const userHeaders = await resolveUserHeaders();
+    const mergedHeaders = {
+      "Content-Type": "application/json",
+      ...userHeaders,
+      ...options.headers,
+    };
 
     const response = await fetch(`${API_BASE}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...userHeaders,
-        ...options.headers,
-      },
+      ...options,
+      headers: mergedHeaders,
       credentials: "include",
       signal: controller.signal,
-      ...options,
     });
     const contentType = response.headers.get("content-type");
     const isJson = contentType?.includes("application/json");
