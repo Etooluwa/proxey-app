@@ -380,6 +380,8 @@ export function BookingCard({
             tabIndex={0}
             onClick={onClick}
             onKeyDown={(event) => {
+                const tag = event.target?.tagName?.toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || tag === 'button' || tag === 'select') return;
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     onClick?.(event);
