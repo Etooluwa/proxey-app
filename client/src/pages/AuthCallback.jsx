@@ -11,9 +11,17 @@ const SS_PREFIX = "kliques.pub_booking.";
 const SS_PROVIDER = SS_PREFIX + "provider";
 const SS_SELECTED_SVC = SS_PREFIX + "selectedSvc";
 const SS_SELECTED_SLOT = SS_PREFIX + "selectedSlot";
+const LS_PREFIX = "proxey.pub_booking.";
 
 function ssGet(key) {
-  try { return JSON.parse(sessionStorage.getItem(key)); } catch { return null; }
+  try {
+    const raw =
+      sessionStorage.getItem(key) ||
+      window.localStorage.getItem(key.replace(SS_PREFIX, LS_PREFIX));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 function setLocalRole(email, role) {

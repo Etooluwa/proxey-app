@@ -23,16 +23,22 @@ const SS_PREFIX = "kliques.pub_booking.";
 const SS_PROVIDER = SS_PREFIX + "provider";
 const SS_SELECTED_SVC = SS_PREFIX + "selectedSvc";
 const SS_SELECTED_SLOT = SS_PREFIX + "selectedSlot";
+const LS_PREFIX = "proxey.pub_booking.";
 
 function ssSet(key, value) {
     try {
-        sessionStorage.setItem(key, JSON.stringify(value));
+        const raw = JSON.stringify(value);
+        sessionStorage.setItem(key, raw);
+        window.localStorage.setItem(key.replace(SS_PREFIX, LS_PREFIX), raw);
     } catch { }
 }
 
 function ssGet(key) {
     try {
-        return JSON.parse(sessionStorage.getItem(key));
+        const raw =
+            sessionStorage.getItem(key) ||
+            window.localStorage.getItem(key.replace(SS_PREFIX, LS_PREFIX));
+        return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
     }
@@ -43,6 +49,9 @@ function clearPendingBookingResume() {
         sessionStorage.removeItem(SS_PROVIDER);
         sessionStorage.removeItem(SS_SELECTED_SVC);
         sessionStorage.removeItem(SS_SELECTED_SLOT);
+        window.localStorage.removeItem(SS_PROVIDER.replace(SS_PREFIX, LS_PREFIX));
+        window.localStorage.removeItem(SS_SELECTED_SVC.replace(SS_PREFIX, LS_PREFIX));
+        window.localStorage.removeItem(SS_SELECTED_SLOT.replace(SS_PREFIX, LS_PREFIX));
     } catch { }
 }
 

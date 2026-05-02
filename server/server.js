@@ -13044,13 +13044,14 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
     if (booking.client_id) {
       const providerLabel = booking.provider_name || "Your provider";
       const sessionLabel = booking.service_name || "your session";
-      const body = reason
+      const notifBody = reason
         ? `${providerLabel} declined your booking request. Reason: ${reason}`
         : `${providerLabel} declined your booking request`;
+
       await createClientNotification(booking.client_id, {
         type: "rejected",
         title: "Booking declined",
-        body,
+        body: notifBody,
         booking_id: bookingId,
         data: {
           provider_id: requestingUserId,
@@ -13062,6 +13063,115 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
           decline_reason: reason || null,
         },
       }).catch(() => {});
+
+      await sendClientPushNotification(booking.client_id, {
+        type: "rejected",
+        title: "Booking declined",
+        body: notifBody,
+        url: "/app/bookings",
+        tag: `booking-declined-${bookingId}`,
+      }).catch(() => {});
+
+      const [{ email: clientEmail }, providerInfo] = await Promise.all([
+        getClientNotifPrefs(booking.client_id),
+        getProviderEmailInfo(requestingUserId),
+      ]);
+
+      if (clientEmail) {
+        const declineReason = reason || null;
+        sendEmail({
+          to: clientEmail,
+          subject: `Your booking request was not accepted`,
+          html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Declined - Kliques</title>
+    <style>
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; background-color: #FAF7F2; }
+        .hero-card { background-color: #FBE4D5 !important; border-radius: 24px !important; }
+        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
+        .data-table { background-color: #F3ECE7 !important; border-radius: 16px !important; }
+        .reason-box { background-color: #FDEDEA !important; border-radius: 16px !important; }
+    </style>
+</head>
+<body style="background-color: #FAF7F2; margin: 0 !important; padding: 0 !important;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAF7F2;">
+        <tr>
+            <td align="center" style="padding: 40px 10px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px;">
+                    <tr>
+                        <td align="center" class="hero-card" style="padding: 48px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 24px;">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <h1 style="font-size: 28px; font-weight: 600; color: #331D19; margin: 0 0 12px 0; letter-spacing: -0.02em;">Booking request declined</h1>
+                                        <p style="color: #8E7A75; font-size: 15px; line-height: 1.6; margin: 0;">Unfortunately, your booking request with ${providerInfo.name || providerLabel} was not accepted.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                ${declineReason ? `
+                                <tr><td height="32"></td></tr>
+                                <tr>
+                                    <td align="left" class="reason-box" style="padding: 24px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Reason</td></tr>
+                                            <tr><td style="font-size: 14px; color: #331D19; line-height: 1.6;">${declineReason}</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                ` : ''}
+                                <tr><td height="32"></td></tr>
+                                <tr>
+                                    <td align="left" class="data-table" style="padding: 32px;">
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Service</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19; padding-bottom: 20px;">${sessionLabel}</td></tr>
+                                            <tr><td style="font-size: 12px; color: #B0948F; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 4px;">Requested time</td></tr>
+                                            <tr><td style="font-size: 16px; font-weight: 600; color: #331D19;">${fmtDate(booking.scheduled_at)}</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding: 40px 0 24px 0;">
+                            <a href="https://mykliques.com/app" class="cta-button">View my kliques →</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 40px;">
+                            <p style="color: #331D19; font-weight: 500; font-size: 15px; margin: 0;">- The Kliques Team</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
+        }).catch(() => {});
+      }
+
+      getClientPhone(booking.client_id).then(phone => sendSMS(phone,
+        reason
+          ? `Your booking request with ${providerInfo?.name || providerLabel} was declined. Reason: ${reason} – Kliques`
+          : `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. You can rebook at mykliques.com – Kliques`
+      )).catch(() => {});
     }
 
     return res.status(200).json({ booking: updatedBooking });
