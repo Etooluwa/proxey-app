@@ -240,7 +240,9 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
         try {
             // ── Path A: client has a saved card selected ──────────────────────
             if (!usingNewCard && selectedSavedId) {
-                const providerId = provider?.user_id || provider?.id;
+                const providerId = provider?.user_id || provider?.id || provider?.providerId;
+                console.log('[PaymentForm] provider shape:', JSON.stringify(provider));
+                console.log('[PaymentForm] resolved providerId:', providerId);
 
                 if (paymentType === 'save_card') {
                     // No charge — just return the saved pm so the booking records it
@@ -306,7 +308,7 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     stripe_payment_method_id: setupIntent.payment_method,
                 });
             } else {
-                const providerId = provider?.user_id || provider?.id;
+                const providerId = provider?.user_id || provider?.id || provider?.providerId;
                 const { clientSecret } = await request('/payments/payment-intent', {
                     method: 'POST',
                     headers: authHeaders,
