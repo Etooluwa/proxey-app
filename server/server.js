@@ -11676,37 +11676,49 @@ app.post("/api/payments/payment-intent", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
   const { serviceId, providerId, amountCents, email, name, isDeposit } = req.body || {};
-  if (!amountCents || !providerId) {
-    return res.status(400).json({ error: "amountCents and providerId are required." });
+  if (!amountCents) {
+    return res.status(400).json({ error: "amountCents is required." });
   }
   if (amountCents < 50) {
     return res.status(400).json({ error: "Amount must be at least $0.50." });
   }
 
   try {
+    let resolvedProviderId = providerId || null;
+    let serviceRow = null;
+    if (serviceId) {
+      const { data: svcRow } = await supabase
+        .from("services")
+        .select("provider_id, currency")
+        .eq("id", serviceId)
+        .maybeSingle();
+      serviceRow = svcRow || null;
+      if (!resolvedProviderId) {
+        resolvedProviderId = svcRow?.provider_id || null;
+      }
+    }
+    if (!resolvedProviderId) {
+      return res.status(400).json({ error: "providerId is required." });
+    }
+
     // Resolve provider's Stripe account
     const { data: providerRow } = await supabase
       .from("providers")
       .select("stripe_account_id")
-      .eq("user_id", providerId)
+      .eq("user_id", resolvedProviderId)
       .maybeSingle();
     const stripeAccountId = providerRow?.stripe_account_id;
 
     // Resolve service currency: service → provider_profiles → PLATFORM_CURRENCY
     let intentCurrency = PLATFORM_CURRENCY;
     if (serviceId) {
-      const { data: svcRow } = await supabase
-        .from("services")
-        .select("currency")
-        .eq("id", serviceId)
-        .maybeSingle();
-      intentCurrency = resolveChargeCurrency(svcRow, 'payment-intent service');
-      if (intentCurrency === PLATFORM_CURRENCY && !svcRow?.currency) {
+      intentCurrency = resolveChargeCurrency(serviceRow, 'payment-intent service');
+      if (intentCurrency === PLATFORM_CURRENCY && !serviceRow?.currency) {
         // Fall back to provider profile currency
         const { data: ppRow } = await supabase
           .from("provider_profiles")
           .select("currency")
-          .eq("provider_id", providerId)
+          .eq("provider_id", resolvedProviderId)
           .maybeSingle();
         intentCurrency = resolveChargeCurrency(ppRow, 'payment-intent provider_profile');
       }
@@ -11714,7 +11726,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       const { data: ppRow } = await supabase
         .from("provider_profiles")
         .select("currency")
-        .eq("provider_id", providerId)
+        .eq("provider_id", resolvedProviderId)
         .maybeSingle();
       intentCurrency = resolveChargeCurrency(ppRow, 'payment-intent provider_profile');
     }
@@ -11766,7 +11778,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       capture_method: "automatic",
       // For deposit payments, save the card for the remaining off-session charge later
       setup_future_usage: isDeposit ? "off_session" : undefined,
-      metadata: { userId, serviceId: serviceId || "", providerId, serviceCents: amountCents },
+      metadata: { userId, serviceId: serviceId || "", providerId: resolvedProviderId, serviceCents: amountCents },
     };
 
     // Route service amount to provider's Stripe account; platform keeps the fee
