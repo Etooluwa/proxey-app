@@ -3259,7 +3259,7 @@ app.patch("/api/bookings/:id/cancel", createCancelBookingHandler({
           data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
         }).catch(() => {});
         getProviderPhone(cancelledBooking.provider_id).then(phone => sendSMS(phone,
-          `${clientName} cancelled their booking for ${scheduledDate}.${reasonText} – Kliques`
+          `${clientName} cancelled their booking for ${scheduledDate}.${reasonText} View your schedule at mykliques.com/provider/appointments – Kliques`
         )).catch(() => {});
         const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
         if (provInfo?.email) {
@@ -4057,7 +4057,7 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
           const { email: clientEmail, name: clientName } = await getClientNotifPrefs(clientId);
           const provInfo = await getProviderEmailInfo(data.provider_id);
           getClientPhone(clientId).then(phone => sendSMS(phone,
-            `Your booking with ${provInfo?.name || 'your provider'} is confirmed for ${fmtDate(data.scheduled_at)}. See you then! – Kliques`
+            `Your booking with ${provInfo?.name || 'your provider'} is confirmed for ${fmtDate(data.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
           )).catch(() => {});
           if (clientEmail) {
             sendEmail({
@@ -12042,8 +12042,8 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
       : { name: "A client", email: null };
     getProviderPhone(providerId).then(phone => sendSMS(phone,
       autoAccept
-        ? `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. – Kliques`
-        : `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Open Kliques to accept. – Kliques`
+        ? `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. View it at mykliques.com/provider/appointments – Kliques`
+        : `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Accept or decline here: mykliques.com/provider/appointments – Kliques`
     )).catch(() => {});
     const { data: bookingService } =
       serviceId && supabase
@@ -12287,8 +12287,8 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
     }).catch(() => {});
     getProviderPhone(providerId).then(phone => sendSMS(phone,
       autoAccept
-        ? `New booking confirmed: ${notifBody} – Kliques`
-        : `New booking request: ${notifBody}. Open Kliques to accept. – Kliques`
+        ? `New booking confirmed: ${notifBody} View it at mykliques.com/provider/appointments – Kliques`
+        : `New booking request: ${notifBody}. Accept or decline here: mykliques.com/provider/appointments – Kliques`
     )).catch(() => {});
 
     const providerEmailInfo = await getProviderEmailInfo(providerId);
@@ -12331,7 +12331,7 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         preAppointmentInfo: servicePreAppointmentInfo,
       }).catch(() => {});
       getClientPhone(clientId).then(phone => sendSMS(phone,
-        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! – Kliques`
+        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! View details at mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -12419,7 +12419,7 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
         }).catch(() => {});
       }
       getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! – Kliques`
+        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -12747,7 +12747,7 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
         smsLines.push(`${providerDisplayName} left ${extras.join(' & ')} for you in the app.`);
       }
       if (invoiceNumber) {
-        smsLines.push(`Your invoice is ready — check your email or view it in the Kliques app.`);
+        smsLines.push(`Your invoice is ready — view it at mykliques.com/app/invoices`);
       }
       getClientPhone(booking.client_id).then(phone => sendSMS(phone, smsLines.join(' '))).catch(() => {});
     } catch (notifErr) {
@@ -13169,8 +13169,8 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
 
       getClientPhone(booking.client_id).then(phone => sendSMS(phone,
         reason
-          ? `Your booking request with ${providerInfo?.name || providerLabel} was declined. Reason: ${reason} – Kliques`
-          : `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. You can rebook at mykliques.com – Kliques`
+          ? `Your booking request with ${providerInfo?.name || providerLabel} was declined. Reason: ${reason} Rebook at mykliques.com/app – Kliques`
+          : `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at mykliques.com/app – Kliques`
       )).catch(() => {});
     }
 
