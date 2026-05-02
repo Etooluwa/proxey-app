@@ -82,6 +82,35 @@ app.use(helmet({
   contentSecurityPolicy: false, // CSP handled by frontend (React)
 }));
 
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// Must be before rate limiters so 429 responses also carry CORS headers.
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://mykliques.com',
+  'https://www.mykliques.com',
+  'https://app.mykliques.com',
+  'https://proxey-app-git-feature-prototype-migration-eto-seguns-projects.vercel.app',
+  'https://proxey-app.vercel.app',
+  /\.vercel\.app$/,
+  /\.onrender\.com$/,
+  /\.mykliques\.com$/,
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const isAllowed = allowedOrigins.some(allowed =>
+      typeof allowed === 'string' ? origin === allowed : allowed.test(origin)
+    );
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 const LOADTEST_BYPASS_HEADER = "x-loadtest-bypass";
 const RATE_LIMIT_BYPASS_ENABLED =
@@ -146,42 +175,6 @@ const bookingLimiter = rateLimit({
   message: { error: 'Too many booking attempts. Please try again later.' },
   skip: shouldBypassRateLimit,
 });
-
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://mykliques.com',
-  'https://www.mykliques.com',
-  'https://proxey-app-git-feature-prototype-migration-eto-seguns-projects.vercel.app',
-  'https://proxey-app.vercel.app',
-  /\.vercel\.app$/,      // Allow all Vercel preview deployments
-  /\.onrender\.com$/,    // Allow all Render deployments
-  /\.mykliques\.com$/,   // Allow all mykliques subdomains
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    // Check if origin is in allowed list or matches regex
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (typeof allowed === 'string') {
-        return origin === allowed;
-      } else if (allowed instanceof RegExp) {
-        return allowed.test(origin);
-      }
-      return false;
-    });
-
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
 
 const jsonMiddleware = express.json();
 app.use((req, res, next) => {

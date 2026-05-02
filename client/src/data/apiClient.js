@@ -70,7 +70,15 @@ async function request(path, options = {}) {
     const payload = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const error = new Error(payload?.error || "Request failed");
+      console.warn(`[api] ${response.status} ${response.url}`, payload);
+      const message =
+        (typeof payload === "object" ? payload?.error : null) ||
+        (response.status === 503 || response.status === 502
+          ? "Server is starting up, please try again in a moment."
+          : response.status === 401
+          ? "Unauthorized."
+          : "Request failed");
+      const error = new Error(message);
       error.status = response.status;
       error.payload = payload;
       throw error;
