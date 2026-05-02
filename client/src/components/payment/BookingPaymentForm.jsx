@@ -258,10 +258,28 @@ function InnerForm({ service, provider, session, onSuccess, onError, submitLabel
                     headers: authHeaders,
                     body: JSON.stringify({
                         amount: totalChargeCents,
+                        totalChargeCents,
+                        serviceAmountCents: amountCents,
+                        allowClientConfirmation: true,
                         paymentMethodId: selectedSavedId,
                         providerId,
+                        serviceId: service?.id,
                     }),
                 });
+                if (data.requires_action && data.client_secret) {
+                    const result = await stripe.confirmCardPayment(data.client_secret, {
+                        payment_method: selectedSavedId,
+                    });
+                    if (result.error) { setCardError(result.error.message); return; }
+                    succeeded = true;
+                    onSuccess({
+                        payment_type: paymentType,
+                        stripe_payment_intent_id: result.paymentIntent.id,
+                        stripe_payment_method_id: selectedSavedId,
+                        deposit_paid_cents: paymentType === 'deposit' ? amountCents : 0,
+                    });
+                    return;
+                }
                 succeeded = true;
                 onSuccess({
                     payment_type: paymentType,

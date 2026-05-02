@@ -8451,13 +8451,32 @@ app.post("/api/charge", async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
-  const { amount, paymentMethodId, bookingId, providerId } = req.body;
+  const {
+    amount,
+    paymentMethodId,
+    bookingId,
+    providerId,
+    serviceId,
+    serviceAmountCents,
+    totalChargeCents,
+    allowClientConfirmation,
+  } = req.body;
 
   if (!amount || !paymentMethodId) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
+    const requestedAmount = Math.round(Number(amount) || 0);
+    const normalizedServiceAmount = Math.round(Number(serviceAmountCents) || 0);
+    const normalizedTotalCharge = Math.round(Number(totalChargeCents) || 0);
+    const chargeServiceAmount = normalizedServiceAmount > 0 ? normalizedServiceAmount : requestedAmount;
+    const chargeTotalAmount = normalizedTotalCharge > 0 ? normalizedTotalCharge : requestedAmount;
+
+    if (chargeTotalAmount < 50) {
+      return res.status(400).json({ error: "Amount must be at least $0.50." });
+    }
+
     // Look up Stripe customer ID server-side — never trust client-supplied customerId
     const { data: clientProfile } = await supabase
       .from("client_profiles")
@@ -8485,7 +8504,7 @@ app.post("/api/charge", async (req, res) => {
     if (!providerStripeAccountId) {
       return res.status(400).json({ error: "Provider has not connected Stripe yet." });
     }
-    const connectParams = buildConnectTransferParams(Math.round(amount), providerStripeAccountId);
+    const connectParams = buildConnectTransferParams(chargeServiceAmount, providerStripeAccountId);
 
     // Fetch booking currency
     let chargeCurrency = PLATFORM_CURRENCY;
@@ -8496,21 +8515,57 @@ app.post("/api/charge", async (req, res) => {
         .eq("id", bookingId)
         .maybeSingle();
       chargeCurrency = resolveChargeCurrency(chargeBkg, 'charge endpoint');
+    } else if (supabase && serviceId) {
+      const { data: svcRow } = await supabase
+        .from("services")
+        .select("currency")
+        .eq("id", serviceId)
+        .maybeSingle();
+      chargeCurrency = resolveChargeCurrency(svcRow, 'charge endpoint service');
+      if (chargeCurrency === PLATFORM_CURRENCY && !svcRow?.currency && providerId) {
+        const { data: ppRow } = await supabase
+          .from("provider_profiles")
+          .select("currency")
+          .eq("provider_id", providerId)
+          .maybeSingle();
+        chargeCurrency = resolveChargeCurrency(ppRow, 'charge endpoint provider_profile');
+      }
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount),
+    const paymentIntentParams = {
+      amount: chargeTotalAmount,
       currency: chargeCurrency,
       customer: customerId,
       payment_method: paymentMethodId,
-      off_session: true,
-      confirm: true,
       metadata: {
         bookingId: bookingId || "unknown",
         providerId: providerId || "unknown",
+        serviceId: serviceId || "unknown",
       },
       ...connectParams,
-    });
+    };
+
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        ...paymentIntentParams,
+        off_session: true,
+        confirm: true,
+      });
+    } catch (stripeErr) {
+      if (allowClientConfirmation && (stripeErr.code === "authentication_required" || stripeErr.raw?.payment_intent)) {
+        const actionIntent = await stripe.paymentIntents.create({
+          ...paymentIntentParams,
+          off_session: false,
+          confirm: false,
+        });
+        return res.json({
+          requires_action: true,
+          client_secret: actionIntent.client_secret,
+        });
+      }
+      throw stripeErr;
+    }
 
     // Update booking payment status
     if (bookingId && supabase) {
@@ -8532,6 +8587,12 @@ app.post("/api/charge", async (req, res) => {
     });
   } catch (error) {
     console.error("Charge error:", error);
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message || safeErrorMessage(error) });
+    }
+    if (error?.type === "StripeCardError" || error?.code) {
+      return res.status(402).json({ error: safeErrorMessage(error) });
+    }
     res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
