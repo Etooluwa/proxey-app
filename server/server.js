@@ -11676,6 +11676,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized." });
 
   const { serviceId, providerId, amountCents, email, name, isDeposit } = req.body || {};
+  console.log("[payment-intent] body:", { serviceId, providerId, amountCents, isDeposit });
 
   try {
     let resolvedProviderId = providerId || null;
@@ -11692,6 +11693,7 @@ app.post("/api/payments/payment-intent", async (req, res) => {
       }
     }
     if (!resolvedProviderId) {
+      console.warn("[payment-intent] could not resolve providerId from body or service", { serviceId, providerId });
       return res.status(400).json({ error: "providerId is required." });
     }
 
