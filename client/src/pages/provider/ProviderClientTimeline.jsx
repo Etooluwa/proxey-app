@@ -224,6 +224,8 @@ const ProviderClientTimeline = () => {
     const [followUps, setFollowUps] = useState([]);
     const [showFollowUpSheet, setShowFollowUpSheet] = useState(false);
     const [fuDelayDays, setFuDelayDays] = useState(42);
+    const [fuCustomValue, setFuCustomValue] = useState('');
+    const [fuCustomUnit, setFuCustomUnit] = useState('days');
     const [fuSubject, setFuSubject] = useState('');
     const [fuMessage, setFuMessage] = useState('');
     const [fuSaving, setFuSaving] = useState(false);
@@ -330,6 +332,8 @@ const ProviderClientTimeline = () => {
             setFuSubject('');
             setFuMessage('');
             setFuDelayDays(42);
+            setFuCustomValue('');
+            setFuCustomUnit('days');
             await loadFollowUps();
         } catch (err) {
             setFuError(err.message || 'Failed to schedule follow-up.');
@@ -634,22 +638,53 @@ const ProviderClientTimeline = () => {
                         </button>
                     </div>
                     {!FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, marginBottom: 20 }}>
                             <input
                                 type="number"
                                 min={1}
-                                value={fuDelayDays}
-                                onChange={(e) => setFuDelayDays(Number(e.target.value) || '')}
-                                placeholder="e.g. 30"
+                                value={fuCustomValue}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setFuCustomValue(v);
+                                    setFuDelayDays(v ? (fuCustomUnit === 'months' ? Math.round(Number(v) * 30) : Number(v)) : '');
+                                }}
+                                placeholder="e.g. 6"
                                 style={{
-                                    width: 90, padding: '11px 12px', borderRadius: 10,
+                                    width: 80, padding: '11px 12px', borderRadius: 10,
                                     border: '1.5px solid rgba(140,106,100,0.3)',
                                     background: '#fff', fontSize: 14, color: '#3D231E',
                                     fontFamily: 'inherit', outline: 'none', textAlign: 'center',
                                     boxSizing: 'border-box',
                                 }}
                             />
-                            <span style={{ fontSize: 14, color: '#8C6A64' }}>days from now</span>
+                            <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(140,106,100,0.3)' }}>
+                                {['days', 'months'].map((unit) => (
+                                    <button
+                                        key={unit}
+                                        type="button"
+                                        onClick={() => {
+                                            setFuCustomUnit(unit);
+                                            if (fuCustomValue) {
+                                                setFuDelayDays(unit === 'months' ? Math.round(Number(fuCustomValue) * 30) : Number(fuCustomValue));
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '10px 14px',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            fontFamily: 'inherit',
+                                            cursor: 'pointer',
+                                            background: fuCustomUnit === unit ? '#3D231E' : 'transparent',
+                                            color:      fuCustomUnit === unit ? '#fff' : '#8C6A64',
+                                            border: 'none',
+                                            textTransform: 'capitalize',
+                                        }}
+                                    >
+                                        {unit}
+                                    </button>
+                                ))}
+                            </div>
+                            <span style={{ fontSize: 13, color: '#8C6A64' }}>from now</span>
                         </div>
                     )}
                     {FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) && <div style={{ marginBottom: 20 }} />}

@@ -233,6 +233,8 @@ const EMPTY_FORM = {
     noShowFeeValue: 50,
     followUpEnabled: false,
     followUpDelayDays: 42,
+    followUpCustomValue: '',
+    followUpCustomUnit: 'days',
     followUpSubject: '',
     followUpMessage: '',
 };
@@ -1224,12 +1226,42 @@ const ProviderServiceEditor = () => {
                                         <input
                                             type="number"
                                             min={1}
-                                            value={form.followUpDelayDays}
-                                            onChange={(e) => set('followUpDelayDays')(e.target.value)}
-                                            placeholder="e.g. 30"
-                                            style={{ ...inputBase, width: 100, textAlign: 'center', padding: '11px 12px' }}
+                                            value={form.followUpCustomValue}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                setForm((p) => {
+                                                    const days = v ? (p.followUpCustomUnit === 'months' ? Math.round(Number(v) * 30) : Number(v)) : '';
+                                                    return { ...p, followUpCustomValue: v, followUpDelayDays: days };
+                                                });
+                                            }}
+                                            placeholder="e.g. 6"
+                                            style={{ ...inputBase, width: 90, textAlign: 'center', padding: '11px 12px' }}
                                         />
-                                        <span className="text-[14px] text-muted">days after the session</span>
+                                        <div className="flex rounded-[10px] overflow-hidden" style={{ border: '1.5px solid rgba(140,106,100,0.3)' }}>
+                                            {['days', 'months'].map((unit) => (
+                                                <button
+                                                    key={unit}
+                                                    type="button"
+                                                    onClick={() => setForm((p) => {
+                                                        const days = p.followUpCustomValue
+                                                            ? (unit === 'months' ? Math.round(Number(p.followUpCustomValue) * 30) : Number(p.followUpCustomValue))
+                                                            : p.followUpDelayDays;
+                                                        return { ...p, followUpCustomUnit: unit, followUpDelayDays: days };
+                                                    })}
+                                                    className="px-3.5 py-2.5 text-[13px] font-semibold focus:outline-none transition-colors capitalize"
+                                                    style={{
+                                                        background: form.followUpCustomUnit === unit ? '#3D231E' : 'transparent',
+                                                        color:      form.followUpCustomUnit === unit ? '#fff' : '#8C6A64',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontFamily: 'inherit',
+                                                    }}
+                                                >
+                                                    {unit}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <span className="text-[13px] text-muted">after the session</span>
                                     </div>
                                 )}
                             </div>
