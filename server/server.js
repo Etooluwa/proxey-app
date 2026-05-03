@@ -1090,6 +1090,256 @@ if (IS_DIRECT_RUN) {
   }, 5 * 60 * 1000);
 }
 
+// ─── Client-level follow-up scheduler (runs every 6 hours) ──────────────────
+// Sends scheduled follow-up emails that providers manually queued for a client.
+if (IS_DIRECT_RUN) {
+  const runClientFollowUps = async () => {
+    if (!supabase) return;
+    try {
+      const { data: followUps } = await supabase
+        .from("provider_follow_ups")
+        .select("*")
+        .lte("send_at", new Date().toISOString())
+        .is("sent_at", null)
+        .is("cancelled_at", null);
+
+      if (!followUps?.length) return;
+
+      for (const fu of followUps) {
+        try {
+          const [{ email: clientEmail, name: clientName }, providerInfo] = await Promise.all([
+            getClientNotifPrefs(fu.client_id),
+            getProviderEmailInfo(fu.provider_id),
+          ]);
+
+          if (!clientEmail) {
+            await supabase
+              .from("provider_follow_ups")
+              .update({ sent_at: new Date().toISOString() })
+              .eq("id", fu.id);
+            continue;
+          }
+
+          const providerName = providerInfo?.name || "Your provider";
+          const subject = fu.subject || `Checking in — ${providerName}`;
+          const rawMessage = fu.message || `Hi ${clientName || "there"}, just checking in! It's been a while since we last connected. I'd love to see you again — feel free to book your next session whenever you're ready.`;
+          const messageHtml = rawMessage
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\n/g, "<br>");
+
+          await sendEmail({
+            to: clientEmail,
+            subject,
+            html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+    <style>
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; background-color: #FAF7F2; }
+        .hero-card { background-color: #FDDCC6 !important; border-radius: 24px !important; }
+        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
+        .message-box { background-color: #F3ECE7 !important; border-radius: 16px !important; }
+    </style>
+</head>
+<body style="background-color: #FAF7F2; margin: 0 !important; padding: 0 !important;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAF7F2;">
+        <tr>
+            <td align="center" style="padding: 40px 10px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px;">
+                    <tr>
+                        <td align="center" class="hero-card" style="padding: 48px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 24px;">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <h1 style="font-size: 26px; font-weight: 600; color: #331D19; margin: 0 0 8px 0; letter-spacing: -0.02em;">A note from ${providerName}</h1>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="left" class="message-box" style="padding: 28px 32px;">
+                            <p style="font-size: 15px; color: #3D231E; line-height: 1.7; margin: 0;">${messageHtml}</p>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 8px;">
+                            <a href="https://mykliques.com/app" class="cta-button">Book your next session →</a>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 40px;">
+                            <p style="color: #8C6A64; font-size: 13px; margin: 0;">Sent via <a href="https://mykliques.com" style="color: #C25E4A; text-decoration: none;">Kliques</a></p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
+          });
+
+          await supabase
+            .from("provider_follow_ups")
+            .update({ sent_at: new Date().toISOString() })
+            .eq("id", fu.id);
+
+          console.log(`[client-follow-up] Sent to ${clientEmail} for provider ${fu.provider_id}`);
+        } catch (innerErr) {
+          console.warn(`[client-follow-up] Failed for follow-up ${fu.id}:`, innerErr.message);
+        }
+      }
+    } catch (err) {
+      console.warn("[client-follow-up] error:", err.message);
+    }
+  };
+
+  setInterval(runClientFollowUps, 6 * 60 * 60 * 1000);
+  runClientFollowUps(); // also run on startup to catch any missed sends
+}
+
+// ─── Service-level follow-up scheduler (runs every 6 hours) ─────────────────
+// Sends automated follow-ups configured on a service after booking completion.
+if (IS_DIRECT_RUN) {
+  const runServiceFollowUps = async () => {
+    if (!supabase) return;
+    try {
+      // Single join query: only returns bookings where:
+      // - completed, has a service with follow-up enabled
+      // - completed_at is past the configured delay
+      // - follow-up not already sent (no followUpSentAt in booking metadata)
+      const { data: bookings } = await supabase.rpc("get_service_followup_candidates");
+
+      // Fallback: if the RPC doesn't exist yet, use a JS-side filter
+      if (!bookings) return;
+
+      for (const row of bookings) {
+        try {
+          const [{ email: clientEmail, name: clientName }, providerInfo] = await Promise.all([
+            getClientNotifPrefs(row.client_id),
+            getProviderEmailInfo(row.provider_id),
+          ]);
+
+          if (!clientEmail) {
+            await supabase
+              .from("bookings")
+              .update({ metadata: { ...(row.booking_meta || {}), followUpSentAt: new Date().toISOString() } })
+              .eq("id", row.id);
+            continue;
+          }
+
+          const followUp = row.service_meta?.followUp || {};
+          const providerName = providerInfo?.name || "Your provider";
+          const serviceName = row.service_name || "your session";
+          const rawSubject = followUp.subject || `Time for your next session?`;
+          const rawMessage = (followUp.message || `Hi {clientName}, it's been a while since your last {serviceName} with me! I'd love to see you again — book your next session whenever you're ready.`)
+            .replace(/\{clientName\}/g, clientName || "there")
+            .replace(/\{providerName\}/g, providerName)
+            .replace(/\{serviceName\}/g, serviceName);
+          const messageHtml = rawMessage
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\n/g, "<br>");
+
+          await sendEmail({
+            to: clientEmail,
+            subject: rawSubject,
+            html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${rawSubject}</title>
+    <style>
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', sans-serif; background-color: #FAF7F2; }
+        .hero-card { background-color: #FDDCC6 !important; border-radius: 24px !important; }
+        .cta-button { background-color: #331D19 !important; color: #ffffff !important; border-radius: 9999px !important; display: inline-block; padding: 16px 40px; text-decoration: none; font-weight: 600; font-size: 15px; }
+        .message-box { background-color: #F3ECE7 !important; border-radius: 16px !important; }
+    </style>
+</head>
+<body style="background-color: #FAF7F2; margin: 0 !important; padding: 0 !important;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FAF7F2;">
+        <tr>
+            <td align="center" style="padding: 40px 10px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 540px;">
+                    <tr>
+                        <td align="center" class="hero-card" style="padding: 48px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 24px;">
+                                        <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width: 160px; max-width: 160px; height: auto; display: block;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <h1 style="font-size: 26px; font-weight: 600; color: #331D19; margin: 0 0 8px 0; letter-spacing: -0.02em;">A note from ${providerName}</h1>
+                                        <p style="color: #8E7A75; font-size: 14px; line-height: 1.5; margin: 0;">${serviceName}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="left" class="message-box" style="padding: 28px 32px;">
+                            <p style="font-size: 15px; color: #3D231E; line-height: 1.7; margin: 0;">${messageHtml}</p>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 8px;">
+                            <a href="https://mykliques.com/app" class="cta-button">Book your next session →</a>
+                        </td>
+                    </tr>
+                    <tr><td height="32"></td></tr>
+                    <tr>
+                        <td align="center" style="padding-bottom: 40px;">
+                            <p style="color: #8C6A64; font-size: 13px; margin: 0;">Sent via <a href="https://mykliques.com" style="color: #C25E4A; text-decoration: none;">Kliques</a></p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
+          });
+
+          const updatedMeta = { ...(row.booking_meta || {}), followUpSentAt: new Date().toISOString() };
+          await supabase.from("bookings").update({ metadata: updatedMeta }).eq("id", row.id);
+
+          console.log(`[service-follow-up] Sent to ${clientEmail} for booking ${row.id}`);
+        } catch (innerErr) {
+          console.warn(`[service-follow-up] Failed for booking ${row.id}:`, innerErr.message);
+        }
+      }
+    } catch (err) {
+      console.warn("[service-follow-up] error:", err.message);
+    }
+  };
+
+  setInterval(runServiceFollowUps, 6 * 60 * 60 * 1000);
+  runServiceFollowUps();
+}
+
 // ============================================
 
 // Service categories endpoint
@@ -7114,6 +7364,97 @@ app.post("/api/provider/clients/:clientId/conversation", async (req, res) => {
     }
     console.error("[provider/client conversation]", err);
     return res.status(500).json({ error: "Failed to start conversation." });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOLLOW-UP ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/provider/clients/:clientId/follow-ups
+// Schedule a client-level follow-up email
+app.post("/api/provider/clients/:clientId/follow-ups", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  const { clientId } = req.params;
+  const { delayDays, subject, message } = req.body || {};
+
+  if (!delayDays || Number(delayDays) < 1) {
+    return res.status(400).json({ error: "delayDays must be at least 1." });
+  }
+
+  try {
+    const sendAt = new Date(Date.now() + Number(delayDays) * 24 * 60 * 60 * 1000);
+    const { data, error } = await supabase
+      .from("provider_follow_ups")
+      .insert({
+        provider_id: providerId,
+        client_id: clientId,
+        subject: subject || null,
+        message: message || null,
+        send_at: sendAt.toISOString(),
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return res.status(201).json({ followUp: data });
+  } catch (err) {
+    console.error("[provider/follow-ups POST]", err);
+    return res.status(500).json({ error: "Failed to schedule follow-up." });
+  }
+});
+
+// GET /api/provider/clients/:clientId/follow-ups
+// List pending and sent follow-ups for a specific client
+app.get("/api/provider/clients/:clientId/follow-ups", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  const { clientId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("provider_follow_ups")
+      .select("*")
+      .eq("provider_id", providerId)
+      .eq("client_id", clientId)
+      .order("send_at", { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ followUps: data || [] });
+  } catch (err) {
+    console.error("[provider/follow-ups GET]", err);
+    return res.status(500).json({ error: "Failed to load follow-ups." });
+  }
+});
+
+// DELETE /api/provider/follow-ups/:id
+// Cancel a pending follow-up
+app.delete("/api/provider/follow-ups/:id", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const providerId = getUserId(req);
+  if (!providerId) return res.status(401).json({ error: "Not authenticated." });
+  const { id } = req.params;
+
+  try {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("provider_follow_ups")
+      .select("id, sent_at, provider_id")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !existing) return res.status(404).json({ error: "Follow-up not found." });
+    if (existing.provider_id !== providerId) return res.status(403).json({ error: "Not authorized." });
+    if (existing.sent_at) return res.status(409).json({ error: "Already sent — cannot cancel." });
+
+    const { error } = await supabase
+      .from("provider_follow_ups")
+      .update({ cancelled_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("[provider/follow-ups DELETE]", err);
+    return res.status(500).json({ error: "Failed to cancel follow-up." });
   }
 });
 

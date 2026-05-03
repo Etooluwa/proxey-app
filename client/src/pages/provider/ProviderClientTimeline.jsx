@@ -5,7 +5,7 @@
  * API: GET /api/provider/clients/:clientId
  *   → { client, connection, stats, timeline, bookings }
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSession } from '../../auth/authContext';
 import { useMessages } from '../../contexts/MessageContext';
@@ -18,6 +18,16 @@ import HeroPill from '../../components/ui/HeroPill';
 import Lbl from '../../components/ui/Lbl';
 import Divider from '../../components/ui/Divider';
 import Footer from '../../components/ui/Footer';
+
+const FOLLOW_UP_DELAY_OPTIONS = [
+    { label: '1 week',   days: 7 },
+    { label: '2 weeks',  days: 14 },
+    { label: '4 weeks',  days: 28 },
+    { label: '6 weeks',  days: 42 },
+    { label: '8 weeks',  days: 56 },
+    { label: '3 months', days: 91 },
+    { label: '6 months', days: 182 },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,6 +220,16 @@ const ProviderClientTimeline = () => {
     const [error, setError] = useState(null);
     const providerId = session?.user?.id;
 
+    // Follow-up state
+    const [followUps, setFollowUps] = useState([]);
+    const [showFollowUpSheet, setShowFollowUpSheet] = useState(false);
+    const [fuDelayDays, setFuDelayDays] = useState(42);
+    const [fuSubject, setFuSubject] = useState('');
+    const [fuMessage, setFuMessage] = useState('');
+    const [fuSaving, setFuSaving] = useState(false);
+    const [fuError, setFuError] = useState('');
+    const [fuCancelling, setFuCancelling] = useState(null);
+
     useEffect(() => {
         if (!clientId) return;
         let cancelled = false;
@@ -282,12 +302,64 @@ const ProviderClientTimeline = () => {
         }
     };
 
+    const loadFollowUps = useCallback(async () => {
+        if (!clientId) return;
+        try {
+            const data = await request(`/provider/clients/${clientId}/follow-ups`);
+            setFollowUps(data.followUps || []);
+        } catch (err) {
+            console.error('[follow-ups load]', err);
+        }
+    }, [clientId]);
+
+    useEffect(() => { loadFollowUps(); }, [loadFollowUps]);
+
+    const handleScheduleFollowUp = async () => {
+        setFuError('');
+        setFuSaving(true);
+        try {
+            await request(`/provider/clients/${clientId}/follow-ups`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    delayDays: fuDelayDays,
+                    subject: fuSubject.trim() || null,
+                    message: fuMessage.trim() || null,
+                }),
+            });
+            setShowFollowUpSheet(false);
+            setFuSubject('');
+            setFuMessage('');
+            setFuDelayDays(42);
+            await loadFollowUps();
+        } catch (err) {
+            setFuError(err.message || 'Failed to schedule follow-up.');
+        } finally {
+            setFuSaving(false);
+        }
+    };
+
+    const handleCancelFollowUp = async (fuId) => {
+        setFuCancelling(fuId);
+        try {
+            await request(`/provider/follow-ups/${fuId}`, { method: 'DELETE' });
+            await loadFollowUps();
+        } catch (err) {
+            console.error('[cancel follow-up]', err);
+        } finally {
+            setFuCancelling(null);
+        }
+    };
+
+    const pendingFollowUps = followUps.filter((fu) => !fu.sent_at && !fu.cancelled_at);
+    const sentFollowUps   = followUps.filter((fu) => fu.sent_at);
+
     const initials = getInitials(client?.name);
     const connectedSince = fmtShortDate(connection?.connected_at || stats?.connected_at);
     const lastVisit = stats?.last_visit;
     const hasBookingEvents = timeline.some((entry) => entry.type === 'booking');
 
     return (
+        <>
         <div className="flex flex-col min-h-screen bg-base">
             {/* ── Back nav ── */}
             <div className="flex items-center px-5 pt-10 pb-2">
@@ -340,13 +412,20 @@ const ProviderClientTimeline = () => {
             </div>
 
             {/* ── CTA buttons ── */}
-            <div className="px-5 mb-7">
+            <div className="px-5 mb-7 flex gap-3">
                 <button
                     onClick={handleMessage}
-                    className="w-full py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-80 transition-opacity"
+                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-ink focus:outline-none active:opacity-80 transition-opacity"
                     style={{ border: '1px solid rgba(140,106,100,0.35)', background: 'transparent' }}
                 >
                     Message
+                </button>
+                <button
+                    onClick={() => setShowFollowUpSheet(true)}
+                    className="flex-1 py-3.5 rounded-[12px] text-[13px] font-semibold text-white focus:outline-none active:opacity-80 transition-opacity"
+                    style={{ background: '#3D231E', border: 'none' }}
+                >
+                    Schedule follow-up
                 </button>
             </div>
 
@@ -408,9 +487,188 @@ const ProviderClientTimeline = () => {
                     </>
                 )}
 
+                {/* ── Scheduled follow-ups ── */}
+                {(pendingFollowUps.length > 0 || sentFollowUps.length > 0) && (
+                    <>
+                        <Divider />
+                        <Lbl className="block mb-3 mt-5">Follow-ups</Lbl>
+
+                        {pendingFollowUps.map((fu) => (
+                            <div
+                                key={fu.id}
+                                className="flex items-start justify-between gap-3 py-4"
+                                style={{ borderBottom: '1px solid rgba(140,106,100,0.12)' }}
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] text-ink font-semibold m-0 leading-snug">
+                                        {fu.subject || 'Follow-up email'}
+                                    </p>
+                                    <p className="text-[12px] text-muted m-0 mt-0.5">
+                                        Scheduled for {new Date(fu.send_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </p>
+                                    {fu.message && (
+                                        <p className="text-[12px] text-faded m-0 mt-1 italic leading-relaxed">
+                                            "{fu.message.slice(0, 80)}{fu.message.length > 80 ? '…' : ''}"
+                                        </p>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => handleCancelFollowUp(fu.id)}
+                                    disabled={fuCancelling === fu.id}
+                                    className="flex-shrink-0 text-[12px] font-semibold focus:outline-none active:opacity-60"
+                                    style={{ color: '#B04040', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+                                >
+                                    {fuCancelling === fu.id ? 'Cancelling…' : 'Cancel'}
+                                </button>
+                            </div>
+                        ))}
+
+                        {sentFollowUps.slice(0, 3).map((fu) => (
+                            <div
+                                key={fu.id}
+                                className="flex items-start gap-3 py-4"
+                                style={{ borderBottom: '1px solid rgba(140,106,100,0.12)' }}
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] text-muted m-0 leading-snug">
+                                        {fu.subject || 'Follow-up email'}
+                                    </p>
+                                    <p className="text-[12px] text-faded m-0 mt-0.5">
+                                        Sent {new Date(fu.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </p>
+                                </div>
+                                <span
+                                    className="flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.05em]"
+                                    style={{ background: '#EBF2EC', color: '#5A8A5E' }}
+                                >
+                                    Sent
+                                </span>
+                            </div>
+                        ))}
+                    </>
+                )}
+
                 <Footer />
             </div>
         </div>
+
+        {/* ── Schedule follow-up bottom sheet ── */}
+        {showFollowUpSheet && (
+            <div
+                onClick={() => setShowFollowUpSheet(false)}
+                style={{
+                    position: 'fixed', inset: 0, zIndex: 50,
+                    background: 'rgba(61,35,30,0.4)',
+                    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                    fontFamily: "'Sora',system-ui,sans-serif",
+                }}
+            >
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        width: '100%', maxWidth: 540,
+                        background: '#FBF7F2',
+                        borderRadius: '24px 24px 0 0',
+                        padding: '28px 24px 40px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                    }}
+                >
+                    <div className="flex items-center justify-between mb-6">
+                        <p style={{ fontSize: 18, fontWeight: 600, color: '#3D231E', margin: 0 }}>
+                            Schedule follow-up
+                        </p>
+                        <button
+                            onClick={() => setShowFollowUpSheet(false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                        >
+                            <svg width="18" height="18" fill="none" stroke="#8C6A64" strokeWidth="1.8" viewBox="0 0 24 24">
+                                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <p style={{ fontSize: 13, color: '#8C6A64', margin: '0 0 20px', lineHeight: 1.6 }}>
+                        An email will be sent to <strong style={{ color: '#3D231E' }}>{client?.name || 'this client'}</strong> after the selected delay.
+                    </p>
+
+                    {/* Delay picker */}
+                    <p style={{ fontSize: 11, color: '#8C6A64', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, margin: '0 0 10px' }}>Send after</p>
+                    <div className="flex flex-wrap gap-2 mb-5">
+                        {FOLLOW_UP_DELAY_OPTIONS.map((opt) => (
+                            <button
+                                key={opt.days}
+                                type="button"
+                                onClick={() => setFuDelayDays(opt.days)}
+                                style={{
+                                    padding: '8px 14px',
+                                    borderRadius: 10,
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    fontFamily: 'inherit',
+                                    cursor: 'pointer',
+                                    background: fuDelayDays === opt.days ? '#3D231E' : 'transparent',
+                                    color:      fuDelayDays === opt.days ? '#fff' : '#8C6A64',
+                                    border:     `1.5px solid ${fuDelayDays === opt.days ? '#3D231E' : 'rgba(140,106,100,0.3)'}`,
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Subject */}
+                    <p style={{ fontSize: 11, color: '#8C6A64', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, margin: '0 0 8px' }}>Subject (optional)</p>
+                    <input
+                        value={fuSubject}
+                        onChange={(e) => setFuSubject(e.target.value)}
+                        placeholder="Time for your next session?"
+                        style={{
+                            width: '100%', padding: '13px 16px', borderRadius: 12,
+                            border: '1.5px solid rgba(140,106,100,0.3)',
+                            background: '#fff', fontSize: 14, color: '#3D231E',
+                            fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                            marginBottom: 16,
+                        }}
+                    />
+
+                    {/* Message */}
+                    <p style={{ fontSize: 11, color: '#8C6A64', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, margin: '0 0 8px' }}>Personal message (optional)</p>
+                    <textarea
+                        value={fuMessage}
+                        onChange={(e) => setFuMessage(e.target.value)}
+                        rows={4}
+                        placeholder={`Hi ${client?.name?.split(' ')[0] || 'there'}, just checking in! It's been a while — I'd love to see you again whenever you're ready.`}
+                        style={{
+                            width: '100%', padding: '13px 16px', borderRadius: 12,
+                            border: '1.5px solid rgba(140,106,100,0.3)',
+                            background: '#fff', fontSize: 14, color: '#3D231E',
+                            fontFamily: 'inherit', outline: 'none', resize: 'vertical',
+                            boxSizing: 'border-box', marginBottom: 6,
+                        }}
+                    />
+                    <p style={{ fontSize: 12, color: '#B0948F', margin: '0 0 20px' }}>Leave blank to use the default message.</p>
+
+                    {fuError && (
+                        <p style={{ fontSize: 13, color: '#B04040', margin: '0 0 12px' }}>{fuError}</p>
+                    )}
+
+                    <button
+                        onClick={handleScheduleFollowUp}
+                        disabled={fuSaving}
+                        style={{
+                            width: '100%', padding: '14px', borderRadius: 12,
+                            border: 'none', background: '#3D231E', color: '#fff',
+                            fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+                            opacity: fuSaving ? 0.7 : 1, cursor: fuSaving ? 'default' : 'pointer',
+                        }}
+                    >
+                        {fuSaving ? 'Scheduling…' : `Schedule for ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === fuDelayDays)?.label || `${fuDelayDays} days`} from now`}
+                    </button>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 

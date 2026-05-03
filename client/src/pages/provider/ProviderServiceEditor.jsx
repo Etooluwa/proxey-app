@@ -200,6 +200,16 @@ const QuestionCard = ({ q, qi, onTextChange, onAddOption, onRemoveOption, onRemo
 
 // ─── Default form ─────────────────────────────────────────────────────────────
 
+const FOLLOW_UP_DELAY_OPTIONS = [
+    { label: '1 week',   days: 7 },
+    { label: '2 weeks',  days: 14 },
+    { label: '4 weeks',  days: 28 },
+    { label: '6 weeks',  days: 42 },
+    { label: '8 weeks',  days: 56 },
+    { label: '3 months', days: 91 },
+    { label: '6 months', days: 182 },
+];
+
 const EMPTY_FORM = {
     name: '',
     pricingType: 'fixed', // 'fixed' | 'per_hour'
@@ -221,6 +231,10 @@ const EMPTY_FORM = {
     noShowFeeEnabled: false,
     noShowFeeType: 'percent',   // 'percent' | 'fixed'
     noShowFeeValue: 50,
+    followUpEnabled: false,
+    followUpDelayDays: 42,
+    followUpSubject: '',
+    followUpMessage: '',
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -292,6 +306,10 @@ const ProviderServiceEditor = () => {
                     group_id:           svc.group_id || null,
                     preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
                     imageUrl:           svc.image_url || '',
+                    followUpEnabled:    svc.metadata?.followUp?.enabled === true,
+                    followUpDelayDays:  svc.metadata?.followUp?.delayDays ?? 42,
+                    followUpSubject:    svc.metadata?.followUp?.subject || '',
+                    followUpMessage:    svc.metadata?.followUp?.message || '',
                 });
             }
             setQuestions(data.questions || []);
@@ -433,6 +451,12 @@ const ProviderServiceEditor = () => {
                     enabled: true,
                     type:    form.noShowFeeType,
                     value:   Number(form.noShowFeeValue),
+                } : { enabled: false },
+                followUp: form.followUpEnabled ? {
+                    enabled:    true,
+                    delayDays:  Number(form.followUpDelayDays),
+                    subject:    form.followUpSubject.trim() || null,
+                    message:    form.followUpMessage.trim() || null,
                 } : { enabled: false },
                 pricingType:        form.pricingType,
                 minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
@@ -1140,6 +1164,77 @@ const ProviderServiceEditor = () => {
                             activeColor="#3D231E"
                         />
                     </div>
+                </Section>
+
+                <Divider />
+
+                {/* ─ Automated follow-up ─ */}
+                <Section>
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex-1 pr-4">
+                            <p className="text-[16px] font-semibold text-ink m-0">Automated follow-up</p>
+                            <p className="text-[13px] text-muted m-0 mt-0.5">
+                                {form.followUpEnabled
+                                    ? `Email clients ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === Number(form.followUpDelayDays))?.label || `${form.followUpDelayDays} days`} after their session`
+                                    : 'Send a follow-up email after this service'}
+                            </p>
+                        </div>
+                        <Toggle
+                            on={form.followUpEnabled}
+                            onChange={() => set('followUpEnabled')(!form.followUpEnabled)}
+                            activeColor="#3D231E"
+                        />
+                    </div>
+
+                    {form.followUpEnabled && (
+                        <div className="mt-5">
+                            <div className="mb-4">
+                                <FieldLabel>Send follow-up after</FieldLabel>
+                                <div className="flex flex-wrap gap-2">
+                                    {FOLLOW_UP_DELAY_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.days}
+                                            type="button"
+                                            onClick={() => set('followUpDelayDays')(opt.days)}
+                                            className="px-3.5 py-2 rounded-[10px] text-[13px] font-semibold focus:outline-none transition-colors"
+                                            style={{
+                                                background: Number(form.followUpDelayDays) === opt.days ? '#3D231E' : 'transparent',
+                                                color:      Number(form.followUpDelayDays) === opt.days ? '#fff' : '#8C6A64',
+                                                border:     `1.5px solid ${Number(form.followUpDelayDays) === opt.days ? '#3D231E' : 'rgba(140,106,100,0.3)'}`,
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <FieldLabel>Email subject</FieldLabel>
+                                <input
+                                    value={form.followUpSubject}
+                                    onChange={set('followUpSubject')}
+                                    placeholder="Time for your next session?"
+                                    style={inputBase}
+                                />
+                                <p className="text-[12px] text-muted mt-1.5 m-0">Leave blank to use the default subject.</p>
+                            </div>
+
+                            <div>
+                                <FieldLabel>Message</FieldLabel>
+                                <textarea
+                                    value={form.followUpMessage}
+                                    onChange={set('followUpMessage')}
+                                    rows={5}
+                                    placeholder={`Hi {clientName}, it's been a while since your last {serviceName} with me! I'd love to see you again — book your next session whenever you're ready.`}
+                                    style={{ ...inputBase, resize: 'vertical' }}
+                                />
+                                <p className="text-[12px] text-muted mt-1.5 m-0">
+                                    Use <strong>{'{clientName}'}</strong>, <strong>{'{providerName}'}</strong>, <strong>{'{serviceName}'}</strong> as placeholders. Leave blank to use the default message.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </Section>
 
             </div>
