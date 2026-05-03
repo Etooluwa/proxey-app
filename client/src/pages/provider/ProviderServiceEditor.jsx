@@ -1175,7 +1175,7 @@ const ProviderServiceEditor = () => {
                             <p className="text-[16px] font-semibold text-ink m-0">Automated follow-up</p>
                             <p className="text-[13px] text-muted m-0 mt-0.5">
                                 {form.followUpEnabled
-                                    ? `Email clients ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === Number(form.followUpDelayDays))?.label || `${form.followUpDelayDays} days`} after their session`
+                                    ? `Email clients ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === Number(form.followUpDelayDays))?.label || (form.followUpDelayDays ? `${form.followUpDelayDays} days` : 'after their session')} after their session`
                                     : 'Send a follow-up email after this service'}
                             </p>
                         </div>
@@ -1206,7 +1206,32 @@ const ProviderServiceEditor = () => {
                                             {opt.label}
                                         </button>
                                     ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => set('followUpDelayDays')('')}
+                                        className="px-3.5 py-2 rounded-[10px] text-[13px] font-semibold focus:outline-none transition-colors"
+                                        style={{
+                                            background: !FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === Number(form.followUpDelayDays)) ? '#3D231E' : 'transparent',
+                                            color:      !FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === Number(form.followUpDelayDays)) ? '#fff' : '#8C6A64',
+                                            border:     `1.5px solid ${!FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === Number(form.followUpDelayDays)) ? '#3D231E' : 'rgba(140,106,100,0.3)'}`,
+                                        }}
+                                    >
+                                        Custom
+                                    </button>
                                 </div>
+                                {!FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === Number(form.followUpDelayDays)) && (
+                                    <div className="flex items-center gap-2 mt-3">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={form.followUpDelayDays}
+                                            onChange={(e) => set('followUpDelayDays')(e.target.value)}
+                                            placeholder="e.g. 30"
+                                            style={{ ...inputBase, width: 100, textAlign: 'center', padding: '11px 12px' }}
+                                        />
+                                        <span className="text-[14px] text-muted">days after the session</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mb-4">

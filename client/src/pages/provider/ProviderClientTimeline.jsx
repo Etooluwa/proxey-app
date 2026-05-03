@@ -594,7 +594,7 @@ const ProviderClientTimeline = () => {
 
                     {/* Delay picker */}
                     <p style={{ fontSize: 11, color: '#8C6A64', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, margin: '0 0 10px' }}>Send after</p>
-                    <div className="flex flex-wrap gap-2 mb-5">
+                    <div className="flex flex-wrap gap-2" style={{ marginBottom: 8 }}>
                         {FOLLOW_UP_DELAY_OPTIONS.map((opt) => (
                             <button
                                 key={opt.days}
@@ -615,7 +615,44 @@ const ProviderClientTimeline = () => {
                                 {opt.label}
                             </button>
                         ))}
+                        <button
+                            type="button"
+                            onClick={() => setFuDelayDays('')}
+                            style={{
+                                padding: '8px 14px',
+                                borderRadius: 10,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                fontFamily: 'inherit',
+                                cursor: 'pointer',
+                                background: !FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) ? '#3D231E' : 'transparent',
+                                color:      !FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) ? '#fff' : '#8C6A64',
+                                border:     `1.5px solid ${!FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) ? '#3D231E' : 'rgba(140,106,100,0.3)'}`,
+                            }}
+                        >
+                            Custom
+                        </button>
                     </div>
+                    {!FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                            <input
+                                type="number"
+                                min={1}
+                                value={fuDelayDays}
+                                onChange={(e) => setFuDelayDays(Number(e.target.value) || '')}
+                                placeholder="e.g. 30"
+                                style={{
+                                    width: 90, padding: '11px 12px', borderRadius: 10,
+                                    border: '1.5px solid rgba(140,106,100,0.3)',
+                                    background: '#fff', fontSize: 14, color: '#3D231E',
+                                    fontFamily: 'inherit', outline: 'none', textAlign: 'center',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
+                            <span style={{ fontSize: 14, color: '#8C6A64' }}>days from now</span>
+                        </div>
+                    )}
+                    {FOLLOW_UP_DELAY_OPTIONS.some(o => o.days === fuDelayDays) && <div style={{ marginBottom: 20 }} />}
 
                     {/* Subject */}
                     <p style={{ fontSize: 11, color: '#8C6A64', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500, margin: '0 0 8px' }}>Subject (optional)</p>
@@ -663,7 +700,7 @@ const ProviderClientTimeline = () => {
                             opacity: fuSaving ? 0.7 : 1, cursor: fuSaving ? 'default' : 'pointer',
                         }}
                     >
-                        {fuSaving ? 'Scheduling…' : `Schedule for ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === fuDelayDays)?.label || `${fuDelayDays} days`} from now`}
+                        {fuSaving ? 'Scheduling…' : `Schedule for ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === fuDelayDays)?.label || (fuDelayDays ? `${fuDelayDays} days` : '…')} from now`}
                     </button>
                 </div>
             </div>
