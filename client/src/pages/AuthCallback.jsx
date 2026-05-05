@@ -157,14 +157,17 @@ export default function AuthCallback() {
         }).catch(() => {});
       }
 
+      const redirectAfterLogin = !isNewSignup
+        ? window.localStorage.getItem('kliques.redirect_after_login')
+        : null;
+      window.localStorage.removeItem('kliques.redirect_after_login');
+
       if (role === "provider") {
-        // New signup → go to onboarding. Returning provider → go to dashboard.
-        navigate(isNewSignup ? "/provider/onboarding" : "/provider", { replace: true });
+        navigate(isNewSignup ? "/provider/onboarding" : (redirectAfterLogin || "/provider"), { replace: true });
       } else if (role === "admin") {
         navigate("/admin", { replace: true });
       } else {
-        // New client signup → go to app. Returning client → go to app.
-        navigate("/app", { replace: true });
+        navigate(isNewSignup ? "/app" : (redirectAfterLogin || "/app"), { replace: true });
       }
     }
 

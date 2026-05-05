@@ -600,8 +600,9 @@ export default function LoginPage() {
     };
 
     const handleAuthSuccess = () => {
-        // AuthContext / onAuthStateChange will redirect; just push to default
-        navigate('/');
+        const redirectTo = window.localStorage.getItem('kliques.redirect_after_login');
+        window.localStorage.removeItem('kliques.redirect_after_login');
+        navigate(redirectTo || '/');
     };
 
     const handleGoogle = async (pendingName = '', isSignup = false) => {

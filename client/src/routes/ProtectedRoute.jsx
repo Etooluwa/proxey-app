@@ -42,13 +42,11 @@ function ProtectedRoute({ children, allowedRoles, requireProfile = true }) {
   }
 
   if (!session?.user) {
-    return (
-      <Navigate
-        to="/"
-        replace
-        state={{ from: location.pathname + location.search }}
-      />
-    );
+    const intended = location.pathname + location.search;
+    if (intended !== '/' && intended !== '/login') {
+      window.localStorage.setItem('kliques.redirect_after_login', intended);
+    }
+    return <Navigate to="/" replace state={{ from: intended }} />;
   }
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
