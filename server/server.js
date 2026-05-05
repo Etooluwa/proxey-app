@@ -4054,8 +4054,9 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
         if (!phone) return;
         const svcName = job.service_name || 'your last service';
         const provName = job.provider_name || 'your provider';
+        const rebookUrl = `app.mykliques.com/app/relationship/${providerId}`;
         await sendSMS(phone,
-          `Great session with ${provName}! Want to rebook ${svcName}? Continue at app.mykliques.com/app/bookings – Kliques`
+          `Great session with ${provName}! Want to rebook ${svcName}? Continue at ${rebookUrl} – Kliques`
         );
       }).catch(() => {});
     }
