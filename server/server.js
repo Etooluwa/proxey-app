@@ -604,7 +604,7 @@ async function notifyProviderCompletionChargeResult(booking, {
           </div>
           <p style="margin:0 0 20px;color:#8C6A64">Open the booking, ask the client to update their payment method, then try Mark Complete again.</p>
           <div style="text-align:center;margin-bottom:24px">
-            <a href="https://mykliques.com/provider/appointments/${booking.id}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">View booking →</a>
+            <a href="https://app.mykliques.com/provider/appointments/${booking.id}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">View booking →</a>
           </div>
           <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
         </div>
@@ -3371,7 +3371,7 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
                     </tr>
                     <tr>
                         <td align="center" style="padding: 40px 0 24px 0;">
-                            <a href="https://mykliques.com/provider/appointments" class="cta-button">Review request →</a>
+                            <a href="https://app.mykliques.com/provider/appointments" class="cta-button">Review request →</a>
                         </td>
                     </tr>
                     <tr>
@@ -3522,7 +3522,7 @@ app.patch("/api/bookings/:id/cancel", createCancelBookingHandler({
           data: { client_id: cancelledBooking.client_id, scheduled_at: cancelledBooking.scheduled_at, status: 'cancelled' }
         }).catch(() => {});
         getProviderPhone(cancelledBooking.provider_id).then(phone => sendSMS(phone,
-          `${clientName} cancelled their booking for ${scheduledDate}.${reasonText} View your schedule at mykliques.com/provider/appointments – Kliques`
+          `${clientName} cancelled their booking for ${scheduledDate}.${reasonText} View your schedule at app.mykliques.com/provider/appointments – Kliques`
         )).catch(() => {});
         const provInfo = await getProviderEmailInfo(cancelledBooking.provider_id);
         if (provInfo?.email) {
@@ -4048,6 +4048,16 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
         booking_id: job.booking_id || jobId,
         data: { provider_id: providerId, status: "completed" },
       }).catch(() => {});
+
+      // Rebook SMS to client
+      getClientPhone(clientId).then(async phone => {
+        if (!phone) return;
+        const svcName = job.service_name || 'your last service';
+        const provName = job.provider_name || 'your provider';
+        await sendSMS(phone,
+          `Great session with ${provName}! Want to rebook ${svcName}? Continue at app.mykliques.com/app/bookings – Kliques`
+        );
+      }).catch(() => {});
     }
 
     return res.status(200).json({
@@ -4320,7 +4330,7 @@ app.patch("/api/provider/jobs/:id", async (req, res) => {
           const { email: clientEmail, name: clientName } = await getClientNotifPrefs(clientId);
           const provInfo = await getProviderEmailInfo(data.provider_id);
           getClientPhone(clientId).then(phone => sendSMS(phone,
-            `Your booking with ${provInfo?.name || 'your provider'} is confirmed for ${fmtDate(data.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
+            `Your booking with ${provInfo?.name || 'your provider'} is confirmed for ${fmtDate(data.scheduled_at)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
           )).catch(() => {});
           if (clientEmail) {
             sendEmail({
@@ -12398,11 +12408,11 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
       if (!phone) return;
       if (autoAccept) {
         await sendSMS(phone,
-          `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. View it at mykliques.com/provider/appointments – Kliques`
+          `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. View it at app.mykliques.com/provider/appointments – Kliques`
         );
       } else {
         await sendSMS(phone,
-          `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Review at mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
+          `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Review at app.mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
         );
         await recordSmsPendingAction(phone, bookingId);
       }
@@ -12651,11 +12661,11 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
       if (!phone) return;
       if (autoAccept) {
         await sendSMS(phone,
-          `New booking confirmed: ${notifBody} View it at mykliques.com/provider/appointments – Kliques`
+          `New booking confirmed: ${notifBody} View it at app.mykliques.com/provider/appointments – Kliques`
         );
       } else {
         await sendSMS(phone,
-          `New booking request: ${notifBody}. Review at mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
+          `New booking request: ${notifBody}. Review at app.mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
         );
         await recordSmsPendingAction(phone, booking.id);
       }
@@ -12701,7 +12711,7 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         preAppointmentInfo: servicePreAppointmentInfo,
       }).catch(() => {});
       getClientPhone(clientId).then(phone => sendSMS(phone,
-        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! View details at mykliques.com/app/bookings – Kliques`
+        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -12789,7 +12799,7 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
         }).catch(() => {});
       }
       getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
+        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -12865,7 +12875,7 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
               </div>
               <p style="margin:0 0 20px;color:#8C6A64">Please open your booking in the Kliques app to retry payment with the same card or a new one.</p>
               <div style="text-align:center;margin-bottom:24px">
-                <a href="https://mykliques.com/app/bookings/${bookingId}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">Retry payment →</a>
+                <a href="https://app.mykliques.com/app/bookings/${bookingId}" style="display:inline-block;background:#3D231E;color:#fff;padding:14px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px">Retry payment →</a>
               </div>
               <p style="margin:0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
             </div>
@@ -13117,7 +13127,7 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
         smsLines.push(`${providerDisplayName} left ${extras.join(' & ')} for you in the app.`);
       }
       if (invoiceNumber) {
-        smsLines.push(`Your invoice is ready — view it at mykliques.com/app/invoices`);
+        smsLines.push(`Your invoice is ready — view it at app.mykliques.com/app/invoices`);
       }
       getClientPhone(booking.client_id).then(phone => sendSMS(phone, smsLines.join(' '))).catch(() => {});
     } catch (notifErr) {
@@ -13539,8 +13549,8 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
 
       getClientPhone(booking.client_id).then(phone => sendSMS(phone,
         reason
-          ? `Your booking request with ${providerInfo?.name || providerLabel} was declined. Reason: ${reason} Rebook at mykliques.com/app – Kliques`
-          : `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at mykliques.com/app – Kliques`
+          ? `Your booking request with ${providerInfo?.name || providerLabel} was declined. Reason: ${reason} Rebook at app.app.mykliques.com/app – Kliques`
+          : `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at app.app.mykliques.com/app – Kliques`
       )).catch(() => {});
     }
 
@@ -13587,7 +13597,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
     // ── Unknown sender or no pending action
     if (!pending) {
       await sendSMS(fromPhone,
-        "Hi! We didn't find a pending booking request linked to your number. Visit mykliques.com to manage your bookings. – Kliques"
+        "Hi! We didn't find a pending booking request linked to your number. Visit app.mykliques.com to manage your bookings. – Kliques"
       );
       return;
     }
@@ -13600,14 +13610,14 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
       .single();
 
     if (bookingErr || !booking) {
-      await sendSMS(fromPhone, "We couldn't find that booking. Visit mykliques.com/provider/appointments to manage your bookings. – Kliques");
+      await sendSMS(fromPhone, "We couldn't find that booking. Visit app.mykliques.com/provider/appointments to manage your bookings. – Kliques");
       return;
     }
 
     // ── Already handled
     if (booking.status !== "pending") {
       await sendSMS(fromPhone,
-        `This booking has already been ${booking.status === "confirmed" ? "accepted" : "updated"}. Visit mykliques.com/provider/appointments to see your schedule. – Kliques`
+        `This booking has already been ${booking.status === "confirmed" ? "accepted" : "updated"}. Visit app.mykliques.com/provider/appointments to see your schedule. – Kliques`
       );
       await supabase.from("sms_pending_actions").update({ used_at: new Date().toISOString() }).eq("id", pending.id);
       return;
@@ -13628,7 +13638,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
         .eq("id", booking.id);
 
       if (updateErr) {
-        await sendSMS(fromPhone, "Something went wrong. Please accept the booking at mykliques.com/provider/appointments. – Kliques");
+        await sendSMS(fromPhone, "Something went wrong. Please accept the booking at app.mykliques.com/provider/appointments. – Kliques");
         return;
       }
 
@@ -13637,7 +13647,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
 
       // Confirm to provider
       await sendSMS(fromPhone,
-        `✓ Booking accepted — ${sessionLabel} on ${displayDate}. View details at mykliques.com/provider/appointments – Kliques`
+        `✓ Booking accepted — ${sessionLabel} on ${displayDate}. View details at app.mykliques.com/provider/appointments – Kliques`
       );
 
       // Notify client
@@ -13676,7 +13686,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
           }).catch(() => {});
         }
         getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-          `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
+          `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
         )).catch(() => {});
       }
 
@@ -13697,7 +13707,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
         .eq("id", booking.id);
 
       if (updateErr) {
-        await sendSMS(fromPhone, "Something went wrong. Please decline the booking at mykliques.com/provider/appointments. – Kliques");
+        await sendSMS(fromPhone, "Something went wrong. Please decline the booking at app.mykliques.com/provider/appointments. – Kliques");
         return;
       }
 
@@ -13706,7 +13716,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
 
       // Confirm to provider
       await sendSMS(fromPhone,
-        `✓ Booking declined — ${sessionLabel} on ${displayDate}. View your schedule at mykliques.com/provider/appointments – Kliques`
+        `✓ Booking declined — ${sessionLabel} on ${displayDate}. View your schedule at app.mykliques.com/provider/appointments – Kliques`
       );
 
       // Notify client
@@ -13797,7 +13807,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
         }
 
         getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-          `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at mykliques.com/app – Kliques`
+          `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at app.app.mykliques.com/app – Kliques`
         )).catch(() => {});
       }
 
@@ -13807,7 +13817,7 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
 
     // ── Unrecognized reply
     await sendSMS(fromPhone,
-      `Reply YES to accept or NO to decline the booking for ${sessionLabel} on ${displayDate}. Or visit mykliques.com/provider/appointments to review it there. – Kliques`
+      `Reply YES to accept or NO to decline the booking for ${sessionLabel} on ${displayDate}. Or visit app.mykliques.com/provider/appointments to review it there. – Kliques`
     );
 
   } catch (err) {
