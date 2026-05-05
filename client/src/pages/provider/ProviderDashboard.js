@@ -261,6 +261,10 @@ const ProviderDashboard = () => {
     const [handle, setHandle] = useState('');
     const [providerCurrency, setProviderCurrency] = useState('cad');
     const [loading, setLoading] = useState(true);
+    const [hasPhone, setHasPhone] = useState(true);
+    const [phoneNudgeDismissed, setPhoneNudgeDismissed] = useState(
+        () => sessionStorage.getItem('kliques.nudge.phone') === '1'
+    );
 
     // Drawer state (desktop only)
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -296,6 +300,7 @@ const ProviderDashboard = () => {
                     if (prof?.currency) {
                         setProviderCurrency(prof.currency.toLowerCase());
                     }
+                    setHasPhone(!!(prof?.phone));
 
                     // Sync photo/avatar from DB into authContext if missing from localStorage
                     const dbPhoto = prof?.photo || prof?.avatar;
@@ -341,6 +346,51 @@ const ProviderDashboard = () => {
         letterSpacing: '-0.05em',
         lineHeight: 1,
     };
+
+    const showPhoneNudge = !loading && !hasPhone && !phoneNudgeDismissed;
+
+    const dismissPhoneNudge = () => {
+        sessionStorage.setItem('kliques.nudge.phone', '1');
+        setPhoneNudgeDismissed(true);
+    };
+
+    const PhoneNudgeBanner = () => (
+        <div
+            style={{
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+                background: '#FFF5E6', borderRadius: 14, padding: '14px 16px',
+                border: '1px solid rgba(194,94,74,0.2)',
+            }}
+        >
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: F, fontSize: 13, fontWeight: 600, color: '#3D231E', margin: '0 0 3px' }}>
+                    Add your phone number
+                </p>
+                <p style={{ fontFamily: F, fontSize: 12, color: '#8C6A64', margin: '0 0 10px', lineHeight: 1.5 }}>
+                    Accept or decline bookings by replying to a text — no app needed.
+                </p>
+                <button
+                    onClick={() => navigate('/provider/profile/personal')}
+                    style={{
+                        fontFamily: F, fontSize: 12, fontWeight: 600, color: '#C25E4A',
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        textDecoration: 'underline',
+                    }}
+                >
+                    Add phone number →
+                </button>
+            </div>
+            <button
+                onClick={dismissPhoneNudge}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, lineHeight: 1 }}
+                aria-label="Dismiss"
+            >
+                <svg width="14" height="14" fill="none" stroke="#B0948F" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                </svg>
+            </button>
+        </div>
+    );
 
     const openDrawer = (appt) => {
         setDrawerAppt({
@@ -444,6 +494,12 @@ const ProviderDashboard = () => {
                     <ProviderStripeReadinessBanner />
                 </div>
 
+                {showPhoneNudge && (
+                    <div style={{ marginBottom: '24px' }}>
+                        <PhoneNudgeBanner />
+                    </div>
+                )}
+
                 {/* ── Schedule card ── */}
                 <div style={{ background: T.card, borderRadius: '20px', border: `1px solid ${T.line}`, padding: '28px', marginBottom: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -542,6 +598,13 @@ const ProviderDashboard = () => {
                 <div className="mb-5">
                     <ProviderStripeReadinessBanner compact />
                 </div>
+
+                {showPhoneNudge && (
+                    <div className="mb-5">
+                        <PhoneNudgeBanner />
+                    </div>
+                )}
+
                 <Divider />
                 <div className="flex pt-5 pb-5 relative">
                     <div className="absolute inset-y-5 left-1/2 w-px" style={{ background: 'rgba(140,106,100,0.2)' }} />
