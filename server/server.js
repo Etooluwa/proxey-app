@@ -4059,7 +4059,7 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
           ? `app.mykliques.com/book/${provRow.handle}`
           : `app.mykliques.com/book`;
         await sendSMS(phone,
-          `Great session with ${provName}! Want to rebook ${svcName}? Continue at ${rebookUrl} – Kliques`
+          `Great session with ${provName}! Want to book again? Continue at ${rebookUrl} – Kliques`
         );
       }).catch(() => {});
     }
