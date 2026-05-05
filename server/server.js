@@ -865,6 +865,19 @@ async function getProviderPhone(providerId) {
   return data?.phone || null;
 }
 
+// ─── SMS pending actions ──────────────────────────────────────────────────────
+// Records a pending YES/NO action so the inbound webhook can match replies.
+async function recordSmsPendingAction(phone, bookingId, actionType = 'booking_decision') {
+  if (!supabase || !phone || !bookingId) return;
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48-hour window
+  await supabase.from('sms_pending_actions').insert({
+    phone,
+    booking_id: bookingId,
+    action_type: actionType,
+    expires_at: expiresAt.toISOString(),
+  }).catch(() => {});
+}
+
 // ─── Expo Push Notifications ─────────────────────────────────────────────────
 
 async function getExpoPushTokens(userId) {
@@ -12381,11 +12394,19 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
     const { name: bookingClientName, email: bookingClientEmail } = userId
       ? await getClientNotifPrefs(userId)
       : { name: "A client", email: null };
-    getProviderPhone(providerId).then(phone => sendSMS(phone,
-      autoAccept
-        ? `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. View it at mykliques.com/provider/appointments – Kliques`
-        : `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Accept or decline here: mykliques.com/provider/appointments – Kliques`
-    )).catch(() => {});
+    getProviderPhone(providerId).then(async phone => {
+      if (!phone) return;
+      if (autoAccept) {
+        await sendSMS(phone,
+          `New booking confirmed: ${bookingClientName || 'A client'} booked ${scheduledAt ? `for ${fmtDate(scheduledAt)}` : 'a session'}. View it at mykliques.com/provider/appointments – Kliques`
+        );
+      } else {
+        await sendSMS(phone,
+          `New booking request from ${bookingClientName || 'a client'}${scheduledAt ? ` for ${fmtDate(scheduledAt)}` : ''}. Review at mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
+        );
+        await recordSmsPendingAction(phone, bookingId);
+      }
+    }).catch(() => {});
     const { data: bookingService } =
       serviceId && supabase
         ? await supabase
@@ -12626,11 +12647,19 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         client_message: message || null,
       },
     }).catch(() => {});
-    getProviderPhone(providerId).then(phone => sendSMS(phone,
-      autoAccept
-        ? `New booking confirmed: ${notifBody} View it at mykliques.com/provider/appointments – Kliques`
-        : `New booking request: ${notifBody}. Accept or decline here: mykliques.com/provider/appointments – Kliques`
-    )).catch(() => {});
+    getProviderPhone(providerId).then(async phone => {
+      if (!phone) return;
+      if (autoAccept) {
+        await sendSMS(phone,
+          `New booking confirmed: ${notifBody} View it at mykliques.com/provider/appointments – Kliques`
+        );
+      } else {
+        await sendSMS(phone,
+          `New booking request: ${notifBody}. Review at mykliques.com/provider/appointments – Reply YES to accept or NO to decline.`
+        );
+        await recordSmsPendingAction(phone, booking.id);
+      }
+    }).catch(() => {});
 
     const providerEmailInfo = await getProviderEmailInfo(providerId);
     const { email: clientEmail } = await getClientNotifPrefs(clientId);
