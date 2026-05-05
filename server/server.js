@@ -13552,6 +13552,270 @@ app.post("/api/bookings/:id/decline", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TELNYX INBOUND SMS WEBHOOK
+// ─────────────────────────────────────────────────────────────────────────────
+// Configure in Telnyx portal → your number → Messaging → Inbound webhook URL:
+//   https://proxeybooking-app.onrender.com/api/webhooks/telnyx-sms
+
+app.post("/api/webhooks/telnyx-sms", async (req, res) => {
+  // Acknowledge immediately — Telnyx expects a fast 200
+  res.status(200).json({ ok: true });
+
+  if (!supabase) return;
+
+  try {
+    const payload = req.body?.data?.payload;
+    if (!payload) return;
+    if (req.body?.data?.event_type !== "message.received") return;
+
+    const fromPhone = payload?.from?.phone_number;
+    const rawText   = (payload?.text || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    if (!fromPhone) return;
+
+    // ── Look up the most recent unused, non-expired pending action for this phone
+    const { data: pending } = await supabase
+      .from("sms_pending_actions")
+      .select("id, booking_id")
+      .eq("phone", fromPhone)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // ── Unknown sender or no pending action
+    if (!pending) {
+      await sendSMS(fromPhone,
+        "Hi! We didn't find a pending booking request linked to your number. Visit mykliques.com to manage your bookings. – Kliques"
+      );
+      return;
+    }
+
+    // ── Fetch the booking
+    const { data: booking, error: bookingErr } = await supabase
+      .from("bookings")
+      .select("id, status, provider_id, provider_name, client_id, service_id, service_name, scheduled_at, price, metadata")
+      .eq("id", pending.booking_id)
+      .single();
+
+    if (bookingErr || !booking) {
+      await sendSMS(fromPhone, "We couldn't find that booking. Visit mykliques.com/provider/appointments to manage your bookings. – Kliques");
+      return;
+    }
+
+    // ── Already handled
+    if (booking.status !== "pending") {
+      await sendSMS(fromPhone,
+        `This booking has already been ${booking.status === "confirmed" ? "accepted" : "updated"}. Visit mykliques.com/provider/appointments to see your schedule. – Kliques`
+      );
+      await supabase.from("sms_pending_actions").update({ used_at: new Date().toISOString() }).eq("id", pending.id);
+      return;
+    }
+
+    const providerId   = booking.provider_id;
+    const providerLabel = booking.provider_name || "Your provider";
+    const sessionLabel  = booking.service_name  || "the session";
+    const displayDate   = new Date(booking.scheduled_at).toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+    });
+
+    // ── YES — accept
+    if (rawText === "YES" || rawText === "Y") {
+      const { error: updateErr } = await supabase
+        .from("bookings")
+        .update({ status: "confirmed", updated_at: new Date().toISOString() })
+        .eq("id", booking.id);
+
+      if (updateErr) {
+        await sendSMS(fromPhone, "Something went wrong. Please accept the booking at mykliques.com/provider/appointments. – Kliques");
+        return;
+      }
+
+      // Mark action used
+      await supabase.from("sms_pending_actions").update({ used_at: new Date().toISOString() }).eq("id", pending.id);
+
+      // Confirm to provider
+      await sendSMS(fromPhone,
+        `✓ Booking accepted — ${sessionLabel} on ${displayDate}. View details at mykliques.com/provider/appointments – Kliques`
+      );
+
+      // Notify client
+      if (booking.client_id) {
+        await createClientNotification(booking.client_id, {
+          type: "accepted",
+          title: "Booking accepted",
+          body: `${providerLabel} confirmed your booking for ${sessionLabel} on ${displayDate}`,
+          booking_id: booking.id,
+          data: { provider_id: providerId, booking_id: booking.id, scheduled_at: booking.scheduled_at, status: "confirmed" },
+        }).catch(() => {});
+
+        await sendClientPushNotification(booking.client_id, {
+          type: "accepted",
+          title: "Booking confirmed",
+          body: "Your appointment has been confirmed in Kliques.",
+          url: "/app/bookings",
+          tag: `booking-confirmed-${booking.id}`,
+        }).catch(() => {});
+
+        const { email: clientEmail } = await getClientNotifPrefs(booking.client_id);
+        const providerInfo = await getProviderEmailInfo(providerId);
+        let svcMeta = null;
+        if (booking.service_id) {
+          const { data: s } = await supabase.from("services").select("metadata").eq("id", booking.service_id).maybeSingle();
+          svcMeta = s?.metadata || null;
+        }
+        if (clientEmail) {
+          await sendClientBookingConfirmedEmail({
+            to: clientEmail,
+            providerName: providerInfo?.name || providerLabel,
+            serviceName: sessionLabel,
+            scheduledAt: booking.scheduled_at,
+            preAppointmentInfo: svcMeta?.preAppointmentInfo || null,
+            confirmationMessage: null,
+          }).catch(() => {});
+        }
+        getClientPhone(booking.client_id).then(phone => sendSMS(phone,
+          `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at mykliques.com/app/bookings – Kliques`
+        )).catch(() => {});
+      }
+
+      console.log(`[telnyx-sms] Booking ${booking.id} accepted via SMS from ${fromPhone}`);
+      return;
+    }
+
+    // ── NO — decline
+    if (rawText === "NO" || rawText === "N") {
+      const existingMeta = booking.metadata || {};
+      const { error: updateErr } = await supabase
+        .from("bookings")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+          metadata: { ...existingMeta, decline_reason: "Declined via SMS" },
+        })
+        .eq("id", booking.id);
+
+      if (updateErr) {
+        await sendSMS(fromPhone, "Something went wrong. Please decline the booking at mykliques.com/provider/appointments. – Kliques");
+        return;
+      }
+
+      // Mark action used
+      await supabase.from("sms_pending_actions").update({ used_at: new Date().toISOString() }).eq("id", pending.id);
+
+      // Confirm to provider
+      await sendSMS(fromPhone,
+        `✓ Booking declined — ${sessionLabel} on ${displayDate}. View your schedule at mykliques.com/provider/appointments – Kliques`
+      );
+
+      // Notify client
+      if (booking.client_id) {
+        const notifBody = `${providerLabel} declined your booking request`;
+        await createClientNotification(booking.client_id, {
+          type: "rejected",
+          title: "Booking declined",
+          body: notifBody,
+          booking_id: booking.id,
+          data: {
+            provider_id: providerId,
+            booking_id: booking.id,
+            scheduled_at: booking.scheduled_at,
+            service_name: sessionLabel,
+            status: "cancelled",
+            decline_reason: "Declined via SMS",
+          },
+        }).catch(() => {});
+
+        await sendClientPushNotification(booking.client_id, {
+          type: "rejected",
+          title: "Booking declined",
+          body: notifBody,
+          url: "/app/bookings",
+          tag: `booking-declined-${booking.id}`,
+        }).catch(() => {});
+
+        const [{ email: clientEmail }, providerInfo] = await Promise.all([
+          getClientNotifPrefs(booking.client_id),
+          getProviderEmailInfo(providerId),
+        ]);
+
+        if (clientEmail) {
+          sendEmail({
+            to: clientEmail,
+            subject: `Your booking request was not accepted`,
+            html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Declined - Kliques</title>
+    <style>
+        body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+        table{border-collapse:collapse!important}
+        body{height:100%!important;margin:0!important;padding:0!important;width:100%!important;font-family:'Inter',sans-serif;background-color:#FAF7F2}
+        .hero-card{background-color:#FBE4D5!important;border-radius:24px!important}
+        .cta-button{background-color:#331D19!important;color:#ffffff!important;border-radius:9999px!important;display:inline-block;padding:16px 40px;text-decoration:none;font-weight:600;font-size:15px}
+        .data-table{background-color:#F3ECE7!important;border-radius:16px!important}
+    </style>
+</head>
+<body style="background-color:#FAF7F2;margin:0!important;padding:0!important;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#FAF7F2;">
+        <tr><td align="center" style="padding:40px 10px;">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:540px;">
+                <tr><td align="center" class="hero-card" style="padding:48px 32px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr><td align="center" style="padding-bottom:24px;">
+                            <img src="https://imgur.com/2aeeOeG.png" alt="Kliques" width="160" style="width:160px;max-width:160px;height:auto;display:block;">
+                        </td></tr>
+                        <tr><td align="center">
+                            <h1 style="font-size:28px;font-weight:600;color:#331D19;margin:0 0 12px 0;letter-spacing:-0.02em;">Booking request declined</h1>
+                            <p style="color:#8E7A75;font-size:15px;line-height:1.6;margin:0;">Unfortunately, your booking request with ${providerInfo?.name || providerLabel} was not accepted.</p>
+                        </td></tr>
+                    </table>
+                </td></tr>
+                <tr><td height="32"></td></tr>
+                <tr><td align="left" class="data-table" style="padding:32px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Service</td></tr>
+                        <tr><td style="font-size:16px;font-weight:600;color:#331D19;padding-bottom:20px;">${sessionLabel}</td></tr>
+                        <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Requested time</td></tr>
+                        <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(booking.scheduled_at)}</td></tr>
+                    </table>
+                </td></tr>
+                <tr><td align="center" style="padding:40px 0 24px 0;">
+                    <a href="https://mykliques.com/app" class="cta-button">View my kliques →</a>
+                </td></tr>
+                <tr><td align="center" style="padding-bottom:40px;">
+                    <p style="color:#331D19;font-weight:500;font-size:15px;margin:0;">- The Kliques Team</p>
+                </td></tr>
+            </table>
+        </td></tr>
+    </table>
+</body>
+</html>`,
+          }).catch(() => {});
+        }
+
+        getClientPhone(booking.client_id).then(phone => sendSMS(phone,
+          `Your booking request with ${providerInfo?.name || providerLabel} was not accepted. Rebook at mykliques.com/app – Kliques`
+        )).catch(() => {});
+      }
+
+      console.log(`[telnyx-sms] Booking ${booking.id} declined via SMS from ${fromPhone}`);
+      return;
+    }
+
+    // ── Unrecognized reply
+    await sendSMS(fromPhone,
+      `Reply YES to accept or NO to decline the booking for ${sessionLabel} on ${displayDate}. Or visit mykliques.com/provider/appointments to review it there. – Kliques`
+    );
+
+  } catch (err) {
+    console.error("[telnyx-sms webhook]", err.message);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // INVOICE ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
