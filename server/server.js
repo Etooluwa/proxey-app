@@ -4054,7 +4054,10 @@ app.post("/api/provider/jobs/:id/complete", async (req, res) => {
         if (!phone) return;
         const svcName = job.service_name || 'your last service';
         const provName = job.provider_name || 'your provider';
-        const rebookUrl = `app.mykliques.com/app/relationship/${providerId}`;
+        const { data: provRow } = await supabase.from('providers').select('handle').eq('id', providerId).maybeSingle();
+        const rebookUrl = provRow?.handle
+          ? `app.mykliques.com/book/${provRow.handle}`
+          : `app.mykliques.com/book`;
         await sendSMS(phone,
           `Great session with ${provName}! Want to rebook ${svcName}? Continue at ${rebookUrl} – Kliques`
         );
