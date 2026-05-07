@@ -520,6 +520,13 @@ async function sendEmail({ to, subject, html, attachments }) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // ─── Helper: fetch client notification preferences ────────────────────────────
 async function getClientNotifPrefs(userId) {
   if (!supabase || !userId) return {};
@@ -13117,15 +13124,20 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
     ).catch(() => ({}));
     const providerDisplayName =
       fallbackProviderName || booking.provider_name || "Provider";
+    let hasNote = false;
+    let hasRec = false;
+    let hasPhotos = false;
+    let sessionPhotos = [];
 
     try {
-      const hasNote = !!(booking.session_notes || "").trim();
-      const hasRec = !!(booking.session_recommendation || "").trim();
-      const { count: photoCount } = await supabase
+      hasNote = !!(booking.session_notes || "").trim();
+      hasRec = !!(booking.session_recommendation || "").trim();
+      const { data: photoRows, count: photoCount } = await supabase
         .from("booking_photos")
-        .select("id", { count: "exact", head: true })
+        .select("id, photo_url, caption", { count: "exact" })
         .eq("booking_id", bookingId);
-      const hasPhotos = (photoCount || 0) > 0;
+      hasPhotos = (photoCount || 0) > 0;
+      sessionPhotos = photoRows || [];
 
       const leftItems = [
         hasNote && "a session note",
@@ -13185,13 +13197,47 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
     try {
       const { prefs, email: clientEmail, name: clientName } =
         await getClientNotifPrefs(booking.client_id);
-      if (prefs?.email_invoices !== false && clientEmail && invoiceNumber) {
+      const isFreeService =
+        booking.payment_type === "free" || Math.round(Number(totalCents) || 0) === 0;
+      if (prefs?.email_invoices !== false && clientEmail && invoiceNumber && !isFreeService) {
         const totalStr = `$${(totalCents / 100).toFixed(2)}`;
         const depositPaidCents = booking.deposit_paid_cents || 0;
         const depositStr =
           depositPaidCents > 0
             ? `$${(depositPaidCents / 100).toFixed(2)}`
             : null;
+        const notesHtml = hasNote
+          ? `
+              <div style="margin-top:20px;background:#F2EBE5;border-radius:14px;padding:16px 20px;border:1px solid rgba(140,106,100,0.2);">
+                <div style="font-size:12px;color:#8C6A64;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:8px;">Session notes</div>
+                <div style="font-size:14px;color:#3D231E;line-height:1.6;white-space:pre-wrap;">${escapeHtml(booking.session_notes)}</div>
+              </div>`
+          : "";
+        const recommendationHtml = hasRec
+          ? `
+              <div style="margin-top:20px;background:#FFF5E6;border-radius:14px;padding:16px 20px;border:1px solid rgba(194,94,74,0.15);">
+                <div style="font-size:12px;color:#C25E4A;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:8px;">Recommendations</div>
+                <div style="font-size:14px;color:#3D231E;line-height:1.6;white-space:pre-wrap;">${escapeHtml(booking.session_recommendation)}</div>
+              </div>`
+          : "";
+        const photosHtml = hasPhotos
+          ? `
+              <div style="margin-top:20px;background:#EBF2EC;border-radius:14px;padding:16px 20px;border:1px solid rgba(90,138,94,0.2);">
+                <div style="font-size:12px;color:#5A8A5E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:12px;">Session photos</div>
+                ${sessionPhotos
+                  .map(
+                    (photo) => `
+                      <div style="margin-bottom:14px;">
+                        <a href="${photo.photo_url}" style="color:#C25E4A;text-decoration:underline;word-break:break-all;">View photo</a>
+                        ${photo.caption ? `<div style="margin-top:6px;font-size:13px;color:#3D231E;line-height:1.5;">${escapeHtml(photo.caption)}</div>` : ""}
+                      </div>`
+                  )
+                  .join("")}
+              </div>`
+          : "";
+        const feedbackIntro = hasNote || hasRec || hasPhotos
+          ? `<p style="margin:20px 0 0;color:#8C6A64">Your provider also included feedback from the session below.</p>`
+          : "";
 
         let attachments;
         if (invoiceId) {
@@ -13236,6 +13282,10 @@ app.post("/api/bookings/:id/complete", createCompleteBookingHandler({
                   ${depositStr ? `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);color:#8C6A64;font-size:14px">Deposit paid</td><td style="padding:10px 0;border-bottom:1px solid rgba(140,106,100,0.2);text-align:right">${depositStr}</td></tr>` : ""}
                   <tr><td style="padding:10px 0;color:#8C6A64;font-size:14px;font-weight:700">Total</td><td style="padding:10px 0;text-align:right;font-weight:700;font-size:16px">${totalStr}</td></tr>
                 </table>
+                ${feedbackIntro}
+                ${notesHtml}
+                ${recommendationHtml}
+                ${photosHtml}
                 <p style="margin:24px 0 0;font-size:12px;color:#B0948F;text-align:center">Kliques · mykliques.com</p>
               </div>
             </div>`,
