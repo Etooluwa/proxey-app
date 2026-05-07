@@ -474,7 +474,7 @@ const StepIntake = ({ questions, clientNotesEnabled, onContinue, onBack, onClose
                     <div key={q.id} className="mb-7">
                         <p className="text-[15px] font-semibold text-ink m-0 mb-3">{q.question_text}</p>
 
-                        {q.question_type === 'select' && (
+                        {q.question_type === 'select' && q.options?.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {q.options.map((opt) => {
                                     const isSel = answers[q.id] === opt.option_text;
@@ -496,7 +496,7 @@ const StepIntake = ({ questions, clientNotesEnabled, onContinue, onBack, onClose
                             </div>
                         )}
 
-                        {q.question_type === 'text' && (
+                        {(q.question_type === 'text' || (q.question_type === 'select' && (!q.options || q.options.length === 0))) && (
                             <textarea
                                 rows={3}
                                 value={answers[q.id] || ''}
