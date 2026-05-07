@@ -1136,11 +1136,48 @@ function BookingFlowPage() {
         setStepKey('time');
     };
 
-    const handleTimeNext = ({ scheduledDate: sd, scheduledTime: st, scheduledLabel: sl }) => {
+    const handleTimeNext = async ({ scheduledDate: sd, scheduledTime: st, scheduledLabel: sl }) => {
         setScheduledDate(sd);
         setScheduledTime(st);
         setScheduledLabel(sl);
-        setStepKey('payment');
+
+        const effectivePrice = selectedOption?.price ?? service?.base_price ?? null;
+        const isFree = effectivePrice === 0;
+
+        if (isFree) {
+            // Submit booking directly — no card needed for free services
+            try {
+                const body = {
+                    service_id: service.id,
+                    provider_id: providerId,
+                    requested_date: sd,
+                    requested_time: st,
+                    requested_duration_minutes: selectedOption?.duration ?? service?.duration ?? null,
+                    requested_price_cents: 0,
+                    message: clientNote || undefined,
+                    payment_type: 'free',
+                    intake_responses: intakeResponses,
+                };
+                const data = await request('/bookings/request-time', {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                });
+                if (intakeResponses?.length > 0 && data.booking?.id) {
+                    const intakeRows = intakeResponses.map(r => ({
+                        booking_id: data.booking.id,
+                        question_id: r.questionId,
+                        response_text: r.responseText,
+                    }));
+                    supabase.from('booking_intake_responses').insert(intakeRows).catch(() => {});
+                }
+                setConfirmResult({ booking: data.booking, price: 0, paymentType: 'free' });
+                setStepKey('confirmed');
+            } catch (err) {
+                console.error('[BookingFlow] free booking error:', err);
+            }
+        } else {
+            setStepKey('payment');
+        }
     };
 
     const handleConfirmed = ({ booking, price: p, depositAmount, remainingAmount, paymentType: pt, service: svc, providerId: pid }) => {
@@ -1150,15 +1187,17 @@ function BookingFlowPage() {
     };
 
     const handleBack = () => {
+        const effectivePrice = selectedOption?.price ?? service?.base_price ?? null;
+        const isFree = effectivePrice === 0;
         const order = ['services', 'detail', 'intake', 'time', 'payment'];
         const i = order.indexOf(stepKey);
         if (i > 0) {
+            let prev = order[i - 1];
+            // Skip payment step for free services
+            if (prev === 'payment' && isFree) prev = order[i - 2] || 'services';
             // Skip intake if there are no questions
-            if (order[i - 1] === 'intake' && intakeQuestions.length === 0 && !clientNotesEnabled) {
-                setStepKey(order[i - 2] || 'services');
-            } else {
-                setStepKey(order[i - 1]);
-            }
+            if (prev === 'intake' && intakeQuestions.length === 0 && !clientNotesEnabled) prev = order[order.indexOf(prev) - 1] || 'services';
+            setStepKey(prev);
         } else {
             navigate(-1);
         }
