@@ -1230,7 +1230,13 @@ const ProviderServiceEditor = () => {
                                             onChange={(e) => {
                                                 const v = e.target.value;
                                                 setForm((p) => {
-                                                    const days = v ? (p.followUpCustomUnit === 'months' ? Math.round(Number(v) * 30) : Number(v)) : '';
+                                                    const n = Number(v);
+                                                    const days = v ? (
+                                                        p.followUpCustomUnit === 'months' ? Math.round(n * 30) :
+                                                        p.followUpCustomUnit === 'hours'  ? n / 24 :
+                                                        p.followUpCustomUnit === 'minutes' ? n / 1440 :
+                                                        n
+                                                    ) : '';
                                                     return { ...p, followUpCustomValue: v, followUpDelayDays: days };
                                                 });
                                             }}
@@ -1238,17 +1244,21 @@ const ProviderServiceEditor = () => {
                                             style={{ ...inputBase, width: 90, textAlign: 'center', padding: '11px 12px' }}
                                         />
                                         <div className="flex rounded-[10px] overflow-hidden" style={{ border: '1.5px solid rgba(140,106,100,0.3)' }}>
-                                            {['days', 'months'].map((unit) => (
+                                            {['minutes', 'hours', 'days', 'months'].map((unit) => (
                                                 <button
                                                     key={unit}
                                                     type="button"
                                                     onClick={() => setForm((p) => {
-                                                        const days = p.followUpCustomValue
-                                                            ? (unit === 'months' ? Math.round(Number(p.followUpCustomValue) * 30) : Number(p.followUpCustomValue))
-                                                            : p.followUpDelayDays;
+                                                        const n = Number(p.followUpCustomValue);
+                                                        const days = p.followUpCustomValue ? (
+                                                            unit === 'months'  ? Math.round(n * 30) :
+                                                            unit === 'hours'   ? n / 24 :
+                                                            unit === 'minutes' ? n / 1440 :
+                                                            n
+                                                        ) : p.followUpDelayDays;
                                                         return { ...p, followUpCustomUnit: unit, followUpDelayDays: days };
                                                     })}
-                                                    className="px-3.5 py-2.5 text-[13px] font-semibold focus:outline-none transition-colors capitalize"
+                                                    className="px-3 py-2.5 text-[13px] font-semibold focus:outline-none transition-colors capitalize"
                                                     style={{
                                                         background: form.followUpCustomUnit === unit ? '#3D231E' : 'transparent',
                                                         color:      form.followUpCustomUnit === unit ? '#fff' : '#8C6A64',
