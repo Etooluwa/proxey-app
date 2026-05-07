@@ -971,7 +971,7 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt, preAppointmentInfo, confirmationMessage }) {
+async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, scheduledAt, preAppointmentInfo, confirmationMessage, virtualLink }) {
   if (!to) return;
 
   const resolvedProvider = providerName || "Your provider";
@@ -995,6 +995,16 @@ async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, 
       </table>`
     : '';
 
+  const virtualLinkHtml = virtualLink
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#EBF2EC;border-radius:14px;padding:16px 20px;margin-top:20px;border:1px solid rgba(90,138,94,0.2);">
+        <tr><td style="font-size:12px;color:#5A8A5E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding-bottom:8px;">Virtual appointment link</td></tr>
+        <tr><td style="font-size:14px;color:#3D231E;line-height:1.6;">
+          <a href="${virtualLink}" style="color:#C25E4A;text-decoration:underline;word-break:break-all;">${virtualLink}</a>
+        </td></tr>
+      </table>`
+    : '';
+
   return sendEmail({
     to,
     subject: `Your booking is confirmed — ${fmtDate(scheduledAt)}`,
@@ -1009,6 +1019,7 @@ async function sendClientBookingConfirmedEmail({ to, providerName, serviceName, 
         <tr><td style="font-size:12px;color:#B0948F;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;">Date &amp; Time</td></tr>
         <tr><td style="font-size:16px;font-weight:600;color:#331D19;">${fmtDate(scheduledAt)}</td></tr>
       </table>
+      ${virtualLinkHtml}
       ${confirmationMsgHtml}
       ${mustKnowsHtml}
       <p style="margin:24px 0 0;color:#8C6A64;font-size:14px;">You can view your appointment details anytime in Kliques.</p>
@@ -3453,6 +3464,7 @@ async function createPersistedPublicBooking({ booking, metadata, intakeResponses
         serviceName: data.service_name,
         scheduledAt: data.scheduled_at,
         preAppointmentInfo: autoAcceptSvcMeta?.preAppointmentInfo || null,
+        virtualLink: autoAcceptSvcMeta?.virtualLink || null,
       }).catch(() => {});
     }
 
@@ -12484,6 +12496,7 @@ app.post("/api/bookings/create", bookingLimiter, createChargedBookingHandler({
         serviceName: bookingService?.name || null,
         scheduledAt,
         preAppointmentInfo: bookingService?.metadata?.preAppointmentInfo || null,
+        virtualLink: bookingService?.metadata?.virtualLink || null,
       }).catch(() => {});
     }
   },
@@ -12547,6 +12560,7 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         servicePrice: null,
         serviceDuration: 60,
         servicePreAppointmentInfo: null,
+        serviceVirtualLink: null,
         pricingType: "fixed",
         minHours: null,
         maxHours: null,
@@ -12562,6 +12576,8 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
       servicePrice: svc?.base_price || null,
       serviceDuration: parseInt(svc?.duration, 10) || 60,
       servicePreAppointmentInfo: svc?.metadata?.preAppointmentInfo || null,
+      serviceVirtualLink: svc?.metadata?.virtualLink || null,
+      serviceVirtualLink: svc?.metadata?.virtualLink || null,
       pricingType: svc?.metadata?.pricingType || "fixed",
       minHours: svc?.metadata?.minHours ?? null,
       maxHours: svc?.metadata?.maxHours ?? null,
@@ -12651,6 +12667,7 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
     message,
     autoAccept,
     servicePreAppointmentInfo,
+    serviceVirtualLink,
     now,
   }) => {
     await ensureProviderClientConnection({
@@ -12731,9 +12748,10 @@ app.post("/api/bookings/request-time", createRequestTimeBookingHandler({
         serviceName,
         scheduledAt,
         preAppointmentInfo: servicePreAppointmentInfo,
+        virtualLink: serviceVirtualLink || null,
       }).catch(() => {});
       getClientPhone(clientId).then(phone => sendSMS(phone,
-        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
+        `Your booking with ${providerEmailInfo?.name || providerName} is confirmed for ${fmtDate(scheduledAt)}. See you then!${serviceVirtualLink ? ` Join here: ${serviceVirtualLink}` : ''} View details at app.mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -12817,11 +12835,12 @@ app.post("/api/bookings/:id/accept", createAcceptBookingHandler({
           serviceName: sessionLabel,
           scheduledAt: booking.scheduled_at,
           preAppointmentInfo: acceptSvcMeta?.preAppointmentInfo || null,
+          virtualLink: acceptSvcMeta?.virtualLink || null,
           confirmationMessage: confirmationMessage || null,
         }).catch(() => {});
       }
       getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
+        `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then!${acceptSvcMeta?.virtualLink ? ` Join here: ${acceptSvcMeta.virtualLink}` : ''} View details at app.mykliques.com/app/bookings – Kliques`
       )).catch(() => {});
     }
   },
@@ -13704,11 +13723,12 @@ app.post("/api/webhooks/telnyx-sms", async (req, res) => {
             serviceName: sessionLabel,
             scheduledAt: booking.scheduled_at,
             preAppointmentInfo: svcMeta?.preAppointmentInfo || null,
+            virtualLink: svcMeta?.virtualLink || null,
             confirmationMessage: null,
           }).catch(() => {});
         }
         getClientPhone(booking.client_id).then(phone => sendSMS(phone,
-          `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then! View details at app.mykliques.com/app/bookings – Kliques`
+          `Your booking with ${providerInfo?.name || providerLabel} is confirmed for ${fmtDate(booking.scheduled_at)}. See you then!${svcMeta?.virtualLink ? ` Join here: ${svcMeta.virtualLink}` : ''} View details at app.mykliques.com/app/bookings – Kliques`
         )).catch(() => {});
       }
 

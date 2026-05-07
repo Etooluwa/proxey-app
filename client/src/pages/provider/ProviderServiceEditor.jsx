@@ -231,6 +231,8 @@ const EMPTY_FORM = {
     noShowFeeEnabled: false,
     noShowFeeType: 'percent',   // 'percent' | 'fixed'
     noShowFeeValue: 50,
+    appointmentType: 'in-person', // 'in-person' | 'virtual'
+    virtualLink: '',
     followUpEnabled: false,
     followUpDelayDays: 42,
     followUpCustomValue: '',
@@ -308,6 +310,8 @@ const ProviderServiceEditor = () => {
                     group_id:           svc.group_id || null,
                     preAppointmentInfo: svc.metadata?.preAppointmentInfo || [],
                     imageUrl:           svc.image_url || '',
+                    appointmentType:    svc.metadata?.appointmentType || 'in-person',
+                    virtualLink:        svc.metadata?.virtualLink || '',
                     followUpEnabled:    svc.metadata?.followUp?.enabled === true,
                     followUpDelayDays:  svc.metadata?.followUp?.delayDays ?? 42,
                     followUpSubject:    svc.metadata?.followUp?.subject || '',
@@ -464,6 +468,8 @@ const ProviderServiceEditor = () => {
                 minHours:           form.pricingType === 'per_hour' ? Number(form.minHours) : null,
                 maxHours:           form.pricingType === 'per_hour' ? Number(form.maxHours) : null,
                 imageUrl:           form.imageUrl || null,
+                appointmentType:    form.appointmentType,
+                virtualLink:        form.appointmentType === 'virtual' ? form.virtualLink.trim() : null,
             };
 
             let serviceId = id;
@@ -944,6 +950,36 @@ const ProviderServiceEditor = () => {
                                 </div>
                             )}
                         </>
+                    )}
+                </Section>
+
+                <Divider />
+
+                {/* ─ Appointment type ─ */}
+                <Section>
+                    <SectionLabel>Appointment type</SectionLabel>
+                    <Segment
+                        options={[
+                            { id: 'in-person', label: 'In person' },
+                            { id: 'virtual',   label: 'Virtual' },
+                        ]}
+                        value={form.appointmentType}
+                        onChange={set('appointmentType')}
+                    />
+                    {form.appointmentType === 'virtual' && (
+                        <div className="mt-4">
+                            <FieldLabel>Meeting link</FieldLabel>
+                            <input
+                                type="url"
+                                value={form.virtualLink}
+                                onChange={set('virtualLink')}
+                                placeholder="https://zoom.us/j/..."
+                                style={inputBase}
+                            />
+                            <p className="text-[12px] text-muted mt-1.5 m-0">
+                                This link will be shared with clients in their booking confirmation.
+                            </p>
+                        </div>
                     )}
                 </Section>
 
