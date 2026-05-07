@@ -1270,7 +1270,7 @@ const ProviderServiceEditor = () => {
                                                 const v = e.target.value;
                                                 setForm((p) => {
                                                     const n = Number(v);
-                                                    const days = v ? (p.followUpCustomUnit === 'weeks' ? n * 7 : n) : '';
+                                                    const days = v ? (p.followUpCustomUnit === 'months' ? Math.round(n * 30) : p.followUpCustomUnit === 'weeks' ? n * 7 : n) : '';
                                                     return { ...p, followUpCustomValue: v, followUpDelayDays: days };
                                                 });
                                             }}
@@ -1278,13 +1278,13 @@ const ProviderServiceEditor = () => {
                                             style={{ ...inputBase, width: 90, textAlign: 'center', padding: '11px 12px' }}
                                         />
                                         <div className="flex rounded-[10px] overflow-hidden" style={{ border: '1.5px solid rgba(140,106,100,0.3)' }}>
-                                            {['days', 'weeks'].map((unit) => (
+                                            {['days', 'weeks', 'months'].map((unit) => (
                                                 <button
                                                     key={unit}
                                                     type="button"
                                                     onClick={() => setForm((p) => {
                                                         const n = Number(p.followUpCustomValue);
-                                                        const days = p.followUpCustomValue ? (unit === 'weeks' ? n * 7 : n) : p.followUpDelayDays;
+                                                        const days = p.followUpCustomValue ? (unit === 'months' ? Math.round(n * 30) : unit === 'weeks' ? n * 7 : n) : p.followUpDelayDays;
                                                         return { ...p, followUpCustomUnit: unit, followUpDelayDays: days };
                                                     })}
                                                     className="px-3 py-2.5 text-[13px] font-semibold focus:outline-none transition-colors capitalize"
