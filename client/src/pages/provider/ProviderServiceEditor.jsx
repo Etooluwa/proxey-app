@@ -666,6 +666,9 @@ const ProviderServiceEditor = () => {
 
                     <div>
                         <FieldLabel>Group</FieldLabel>
+                        <p className="text-[13px] text-muted m-0 mb-3 leading-relaxed">
+                            Organize related services into groups so clients can browse them more easily on your booking page. Optional.
+                        </p>
                         <select
                             value={form.group_id || ''}
                             onChange={(e) => set('group_id')(e.target.value || null)}
