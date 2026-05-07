@@ -1216,7 +1216,7 @@ const ProviderServiceEditor = () => {
                             <p className="text-[16px] font-semibold text-ink m-0">Automated follow-up</p>
                             <p className="text-[13px] text-muted m-0 mt-0.5">
                                 {form.followUpEnabled
-                                    ? `Email clients ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === Number(form.followUpDelayDays))?.label || (form.followUpDelayDays ? `${form.followUpDelayDays} days` : 'after their session')} after their session`
+                                    ? `Email clients ${FOLLOW_UP_DELAY_OPTIONS.find(o => o.days === Number(form.followUpDelayDays))?.label || (form.followUpDelayDays ? `${form.followUpDelayDays} days` : '')} after their session`
                                     : 'Send a follow-up email after this service'}
                             </p>
                         </div>
@@ -1270,12 +1270,7 @@ const ProviderServiceEditor = () => {
                                                 const v = e.target.value;
                                                 setForm((p) => {
                                                     const n = Number(v);
-                                                    const days = v ? (
-                                                        p.followUpCustomUnit === 'months' ? Math.round(n * 30) :
-                                                        p.followUpCustomUnit === 'hours'  ? n / 24 :
-                                                        p.followUpCustomUnit === 'minutes' ? n / 1440 :
-                                                        n
-                                                    ) : '';
+                                                    const days = v ? (p.followUpCustomUnit === 'weeks' ? n * 7 : n) : '';
                                                     return { ...p, followUpCustomValue: v, followUpDelayDays: days };
                                                 });
                                             }}
@@ -1283,18 +1278,13 @@ const ProviderServiceEditor = () => {
                                             style={{ ...inputBase, width: 90, textAlign: 'center', padding: '11px 12px' }}
                                         />
                                         <div className="flex rounded-[10px] overflow-hidden" style={{ border: '1.5px solid rgba(140,106,100,0.3)' }}>
-                                            {['minutes', 'hours', 'days', 'months'].map((unit) => (
+                                            {['days', 'weeks'].map((unit) => (
                                                 <button
                                                     key={unit}
                                                     type="button"
                                                     onClick={() => setForm((p) => {
                                                         const n = Number(p.followUpCustomValue);
-                                                        const days = p.followUpCustomValue ? (
-                                                            unit === 'months'  ? Math.round(n * 30) :
-                                                            unit === 'hours'   ? n / 24 :
-                                                            unit === 'minutes' ? n / 1440 :
-                                                            n
-                                                        ) : p.followUpDelayDays;
+                                                        const days = p.followUpCustomValue ? (unit === 'weeks' ? n * 7 : n) : p.followUpDelayDays;
                                                         return { ...p, followUpCustomUnit: unit, followUpDelayDays: days };
                                                     })}
                                                     className="px-3 py-2.5 text-[13px] font-semibold focus:outline-none transition-colors capitalize"
