@@ -2281,6 +2281,7 @@ app.post("/api/services", async (req, res) => {
   const {
     paymentType, depositType, depositValue, clientNotesEnabled,
     isActive, photos, preAppointmentInfo, pricingType, minHours, maxHours, imageUrl, autoAccept,
+    noShowFee, followUp,
   } = req.body || {};
 
   let providerId;
@@ -2310,6 +2311,8 @@ app.post("/api/services", async (req, res) => {
     metadataFields.maxHours = maxHours ?? 8;
   }
   metadataFields.autoAccept = Boolean(autoAccept);
+  if (noShowFee !== undefined) metadataFields.noShowFee = noShowFee;
+  if (followUp !== undefined) metadataFields.followUp = followUp;
 
   const payload = {
     id: id || crypto.randomUUID(),
@@ -2452,7 +2455,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
   const {
     name, description, category, basePrice, duration, isActive,
     paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
-    pricingType, minHours, maxHours, imageUrl, autoAccept, currency,
+    pricingType, minHours, maxHours, imageUrl, autoAccept, currency, noShowFee, followUp,
   } = req.body || {};
 
   try {
@@ -2473,7 +2476,14 @@ app.put("/api/provider/services/:id", async (req, res) => {
     if (clientNotesEnabled !== undefined)   updates.client_notes_enabled = clientNotesEnabled;
     if (imageUrl !== undefined)             updates.image_url = imageUrl;
     if (pricingType !== undefined)          updates.unit = pricingType === 'per_hour' ? 'hour' : 'visit';
-    if (photos !== undefined || preAppointmentInfo !== undefined || pricingType !== undefined || autoAccept !== undefined) {
+    if (
+      photos !== undefined ||
+      preAppointmentInfo !== undefined ||
+      pricingType !== undefined ||
+      autoAccept !== undefined ||
+      noShowFee !== undefined ||
+      followUp !== undefined
+    ) {
       const { data: existing } = await supabase.from("services").select("metadata").eq("id", id).single();
       const existingMeta = existing?.metadata || {};
       updates.metadata = {
@@ -2483,6 +2493,8 @@ app.put("/api/provider/services/:id", async (req, res) => {
         ...(pricingType !== undefined ? { pricingType } : {}),
         ...(pricingType === 'per_hour' ? { minHours: minHours ?? existingMeta.minHours ?? 1, maxHours: maxHours ?? existingMeta.maxHours ?? 8 } : { minHours: null, maxHours: null }),
         ...(autoAccept !== undefined ? { autoAccept: Boolean(autoAccept) } : {}),
+        ...(noShowFee !== undefined ? { noShowFee } : {}),
+        ...(followUp !== undefined ? { followUp } : {}),
       };
     }
 
