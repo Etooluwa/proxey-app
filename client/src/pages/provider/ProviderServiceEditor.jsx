@@ -973,7 +973,7 @@ const ProviderServiceEditor = () => {
                                 type="url"
                                 value={form.virtualLink}
                                 onChange={set('virtualLink')}
-                                placeholder="https://..."
+                                placeholder="Paste your link here"
                                 style={inputBase}
                             />
                             <p className="text-[12px] text-muted mt-1.5 m-0">
