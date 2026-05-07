@@ -377,7 +377,7 @@ const ProviderServices = () => {
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button
                                 onClick={() => navigate('/provider/services/groups/new')}
-                                style={{ padding: '8px 16px', borderRadius: 10, border: `1px solid ${T.line}`, background: 'transparent', fontFamily: F, fontSize: 12, fontWeight: 500, color: T.muted, cursor: 'pointer' }}
+                                style={{ padding: '8px 16px', borderRadius: 10, border: `1.5px solid ${T.ink}`, background: 'transparent', fontFamily: F, fontSize: 12, fontWeight: 500, color: T.ink, cursor: 'pointer' }}
                             >
                                 + Group
                             </button>
