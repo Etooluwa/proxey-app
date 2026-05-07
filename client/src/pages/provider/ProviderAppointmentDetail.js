@@ -104,6 +104,16 @@ function buildPayoutSummary(job, payoutPayload = null) {
 function paymentStatusMeta(status, paymentType = 'full') {
     const normalized = String(status || '').toLowerCase();
 
+    if (paymentType === 'free') {
+        return {
+            status: 'paid',
+            label: 'Free',
+            bg: '#EBF2EC',
+            color: '#5A8A5E',
+            message: 'This booking did not require payment.',
+        };
+    }
+
     if (normalized === 'paid') {
         return {
             status: normalized,

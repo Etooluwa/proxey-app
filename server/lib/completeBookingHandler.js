@@ -102,6 +102,7 @@ export function createCompleteBookingHandler({
           });
         }
       } else if (
+        booking.payment_type === "free" ||
         booking.payment_type === "full" ||
         (booking.payment_type === "deposit" &&
           remainingCents === 0 &&

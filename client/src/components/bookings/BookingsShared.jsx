@@ -111,6 +111,14 @@ export function getStatusTheme(status) {
 export function getPaymentStatusTheme(paymentStatus, paymentType = 'full') {
     const normalized = String(paymentStatus || '').toLowerCase();
 
+    if (paymentType === 'free') {
+        return {
+            pillBackground: BOOKING_TOKENS.successBg,
+            pillColor: BOOKING_TOKENS.success,
+            pillLabel: 'Free',
+        };
+    }
+
     if (normalized === 'paid') {
         return {
             pillBackground: BOOKING_TOKENS.successBg,

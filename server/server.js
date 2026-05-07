@@ -4117,10 +4117,16 @@ app.post("/api/provider/jobs/:id/no-show", async (req, res) => {
 
     const paymentType = booking?.payment_type || job.payment_type || "full";
     const paymentStatus = booking?.payment_status || "unpaid";
-    const clientAlreadyPaid = paymentStatus === "paid" || paymentStatus === "deposit_paid";
+    const clientAlreadyPaid =
+      paymentStatus === "paid" ||
+      paymentStatus === "deposit_paid" ||
+      paymentType === "free";
 
     // Only attempt to charge if client paid nothing upfront (card_on_file or unpaid with no deposit)
-    if (!clientAlreadyPaid && (paymentType === "card_on_file" || paymentStatus === "unpaid")) {
+    if (
+      !clientAlreadyPaid &&
+      (paymentType === "card_on_file" || paymentStatus === "unpaid")
+    ) {
       // Look up no-show fee config from service metadata
       let noShowFeeConfig = null;
       const serviceId = booking?.service_id || job.service_id;

@@ -146,12 +146,14 @@ export function createRequestTimeBookingHandler({
         minute: "2-digit",
       });
 
-      let resolvedPaymentStatus = "unpaid";
-      if (payment_type === "save_card" && stripe_payment_method_id) {
+      const normalizedPaymentType = payment_type || "none";
+      let resolvedPaymentStatus =
+        normalizedPaymentType === "free" ? "paid" : "unpaid";
+      if (normalizedPaymentType === "save_card" && stripe_payment_method_id) {
         resolvedPaymentStatus = "card_saved";
-      } else if (payment_type === "deposit" && deposit_paid_cents > 0) {
+      } else if (normalizedPaymentType === "deposit" && deposit_paid_cents > 0) {
         resolvedPaymentStatus = "deposit_paid";
-      } else if (payment_type === "full" && stripe_payment_intent_id) {
+      } else if (normalizedPaymentType === "full" && stripe_payment_intent_id) {
         resolvedPaymentStatus = "paid";
       }
 
@@ -166,7 +168,7 @@ export function createRequestTimeBookingHandler({
         serviceDuration: resolvedServiceDuration,
         autoAccept: providerBookingRules.autoAccept,
         paymentStatus: resolvedPaymentStatus,
-        paymentType: payment_type || "none",
+        paymentType: normalizedPaymentType,
         stripeSetupIntentId: stripe_setup_intent_id || null,
         stripePaymentMethodId: stripe_payment_method_id || null,
         stripePaymentIntentId: stripe_payment_intent_id || null,
