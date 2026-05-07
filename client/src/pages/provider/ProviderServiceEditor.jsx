@@ -973,7 +973,7 @@ const ProviderServiceEditor = () => {
                                 type="url"
                                 value={form.virtualLink}
                                 onChange={set('virtualLink')}
-                                placeholder="https://zoom.us/j/..."
+                                placeholder="https://..."
                                 style={inputBase}
                             />
                             <p className="text-[12px] text-muted mt-1.5 m-0">
