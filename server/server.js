@@ -2292,7 +2292,7 @@ app.post("/api/services", async (req, res) => {
   const {
     paymentType, depositType, depositValue, clientNotesEnabled,
     isActive, photos, preAppointmentInfo, pricingType, minHours, maxHours, imageUrl, autoAccept,
-    noShowFee, followUp,
+    noShowFee, followUp, appointmentType, virtualLink,
   } = req.body || {};
 
   let providerId;
@@ -2324,6 +2324,8 @@ app.post("/api/services", async (req, res) => {
   metadataFields.autoAccept = Boolean(autoAccept);
   if (noShowFee !== undefined) metadataFields.noShowFee = noShowFee;
   if (followUp !== undefined) metadataFields.followUp = followUp;
+  if (appointmentType !== undefined) metadataFields.appointmentType = appointmentType;
+  if (virtualLink !== undefined) metadataFields.virtualLink = virtualLink;
 
   const payload = {
     id: id || crypto.randomUUID(),
@@ -2467,6 +2469,7 @@ app.put("/api/provider/services/:id", async (req, res) => {
     name, description, category, basePrice, duration, isActive,
     paymentType, depositType, depositValue, clientNotesEnabled, photos, preAppointmentInfo,
     pricingType, minHours, maxHours, imageUrl, autoAccept, currency, noShowFee, followUp,
+    appointmentType, virtualLink,
   } = req.body || {};
 
   try {
@@ -2493,7 +2496,9 @@ app.put("/api/provider/services/:id", async (req, res) => {
       pricingType !== undefined ||
       autoAccept !== undefined ||
       noShowFee !== undefined ||
-      followUp !== undefined
+      followUp !== undefined ||
+      appointmentType !== undefined ||
+      virtualLink !== undefined
     ) {
       const { data: existing } = await supabase.from("services").select("metadata").eq("id", id).single();
       const existingMeta = existing?.metadata || {};
@@ -2506,6 +2511,8 @@ app.put("/api/provider/services/:id", async (req, res) => {
         ...(autoAccept !== undefined ? { autoAccept: Boolean(autoAccept) } : {}),
         ...(noShowFee !== undefined ? { noShowFee } : {}),
         ...(followUp !== undefined ? { followUp } : {}),
+        ...(appointmentType !== undefined ? { appointmentType } : {}),
+        ...(virtualLink !== undefined ? { virtualLink } : {}),
       };
     }
 
