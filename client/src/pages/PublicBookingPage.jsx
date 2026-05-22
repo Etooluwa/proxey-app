@@ -379,7 +379,7 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                     {/* Bio */}
                     {provider?.bio && (
                         <div style={{ position: 'relative', zIndex: 1, marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(61,35,30,0.08)' }}>
-                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, lineHeight: 1.7, margin: 0 }}>{provider.bio}</p>
+                            <p style={{ fontFamily: F, fontSize: 14, color: T.muted, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{provider.bio}</p>
                         </div>
                     )}
                 </div>
@@ -446,7 +446,7 @@ function Step1Profile({ provider, services, groups, reviews, portfolio, selected
                                                         <span style={{ fontFamily: F, fontSize: 12, color: T.muted }}>{fmtServiceDurationSummary(svc, selected ? selectedHours : null)}</span>
                                                     </div>
                                                 )}
-                                                {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0 }}>{svc.description}</p>}
+                                                {svc.description && <p style={{ fontFamily: F, fontSize: 13, color: T.faded, lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap' }}>{svc.description}</p>}
                                             </div>
                                             <div className="svc-check">
                                                 <svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
