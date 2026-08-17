@@ -9787,6 +9787,30 @@ app.get("/api/public/provider/:providerId/slots", async (req, res) => {
   }
 });
 
+// GET /api/public/provider/:providerId/available-days
+// Returns which days of the week (0=Mon…6=Sun) the provider has marked available.
+// Used by the client date picker to grey out unavailable days before selecting a slot.
+app.get("/api/public/provider/:providerId/available-days", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured." });
+  const { providerId } = req.params;
+  try {
+    const providerIdentity = await getProviderIdentity(providerId);
+    const providerIds = providerIdentity.ids.length > 0 ? providerIdentity.ids : [providerId];
+    const { data: rows, error } = await supabase
+      .from("provider_time_blocks")
+      .select("day_index, is_available")
+      .in("provider_id", providerIds);
+    if (error) throw error;
+    const availableDays = (rows || [])
+      .filter((r) => r.is_available)
+      .map((r) => Number(r.day_index));
+    res.json({ availableDays: [...new Set(availableDays)] });
+  } catch (err) {
+    console.error("[public/provider/available-days]", err);
+    res.status(500).json({ error: "Failed to load available days." });
+  }
+});
+
 // POST /api/provider/availability
 // Provider creates/updates their availability
 app.post("/api/provider/availability", async (req, res) => {

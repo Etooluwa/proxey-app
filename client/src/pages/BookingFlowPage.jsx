@@ -553,13 +553,45 @@ const StepTime = ({ providerId, service, onContinue, onBack, onClose, onTimeRequ
     const dates = useMemo(() => buildDateList(14), []);
     const [dateIdx, setDateIdx] = useState(0);
     const [slot, setSlot] = useState(null);
+    const [availableDayIndexes, setAvailableDayIndexes] = useState(null);
+    const [slots, setSlots] = useState(null); // null = not yet fetched
+    const [loadingSlots, setLoadingSlots] = useState(false);
 
-    // Default time slots — in future: fetch from provider_availability
-    const timeSlots = [
-        '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
-        '11:00 AM', '11:30 AM', '2:00 PM', '2:30 PM',
-        '3:00 PM', '3:30 PM', '4:00 PM', '5:00 PM',
-    ];
+    // Convert JS getDay() (0=Sun) to Monday-first index (0=Mon)
+    const toMondayFirst = (jsDay) => (jsDay + 6) % 7;
+
+    // Fetch which days of the week the provider is available
+    useEffect(() => {
+        if (!providerId) return;
+        request(`/public/provider/${providerId}/available-days`)
+            .then((data) => setAvailableDayIndexes(data?.availableDays || []))
+            .catch(() => setAvailableDayIndexes([]));
+    }, [providerId]);
+
+    const isDayAvailable = (d) => {
+        if (!availableDayIndexes || availableDayIndexes.length === 0) return true;
+        return availableDayIndexes.includes(toMondayFirst(d.getDay()));
+    };
+
+    // Fetch real time slots for the selected date
+    useEffect(() => {
+        if (!providerId) return;
+        const d = dates[dateIdx];
+        if (!isDayAvailable(d)) { setSlots([]); return; }
+        setLoadingSlots(true);
+        setSlot(null);
+        const dateStr = d.toISOString().slice(0, 10);
+        request(`/public/provider/${providerId}/slots?date=${dateStr}&duration=${service?.duration || 60}`)
+            .then((data) => setSlots((data?.slots || []).map((t) => {
+                const hhmm = String(t).slice(0, 5);
+                const [h, m] = hhmm.split(':').map(Number);
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                const h12 = h % 12 || 12;
+                return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+            })))
+            .catch(() => setSlots([]))
+            .finally(() => setLoadingSlots(false));
+    }, [providerId, dateIdx, service?.duration, availableDayIndexes]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleContinue = () => {
         if (!slot) return;
@@ -587,11 +619,14 @@ const StepTime = ({ providerId, service, onContinue, onBack, onClose, onTimeRequ
                 >
                     {dates.slice(0, 7).map((d, i) => {
                         const isActive = dateIdx === i;
+                        const isAvail = isDayAvailable(d);
                         return (
                             <button
                                 key={i}
-                                onClick={() => { setDateIdx(i); setSlot(null); }}
+                                onClick={() => { if (isAvail) { setDateIdx(i); setSlot(null); } }}
+                                disabled={!isAvail}
                                 className="flex flex-col items-center gap-1 flex-shrink-0 focus:outline-none"
+                                style={{ opacity: isAvail ? 1 : 0.35, cursor: isAvail ? 'pointer' : 'not-allowed' }}
                             >
                                 <div
                                     className="w-12 h-12 rounded-full flex items-center justify-center transition-colors"
@@ -623,7 +658,13 @@ const StepTime = ({ providerId, service, onContinue, onBack, onClose, onTimeRequ
 
                 {/* Time slot list */}
                 <div className="flex flex-col gap-1">
-                    {timeSlots.map((time) => {
+                    {loadingSlots ? (
+                        <p className="text-[14px] text-muted">Loading…</p>
+                    ) : !isDayAvailable(selDate) ? (
+                        <p className="text-[14px] text-muted">Not available on this day.</p>
+                    ) : slots !== null && slots.length === 0 ? (
+                        <p className="text-[14px] text-muted">No availability on this day.</p>
+                    ) : (slots || []).map((time) => {
                         const isActive = slot === time;
                         return (
                             <button

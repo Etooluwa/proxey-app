@@ -329,16 +329,39 @@ function StepTime({ provider, service, onNext, onBack }) {
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [availableDayIndexes, setAvailableDayIndexes] = useState(null); // null = loading
 
-  // Build the next 7 days
+  // Build the next 14 days
   const today = new Date();
-  const dates = Array.from({ length: 7 }, (_, i) => {
+  today.setHours(0, 0, 0, 0);
+  const dates = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     return d;
   });
+
+  // Convert JS getDay() (0=Sun) to Monday-first index (0=Mon, 6=Sun)
+  const toMondayFirst = (jsDay) => (jsDay + 6) % 7;
+
+  // Fetch which days of the week the provider is available
+  useEffect(() => {
+    if (!provider?.id) return;
+    request(`/public/provider/${provider.id}/available-days`)
+      .then((data) => setAvailableDayIndexes(data?.availableDays || []))
+      .catch(() => setAvailableDayIndexes([]));
+  }, [provider?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isDayAvailable = (d) => {
+    if (availableDayIndexes === null) return true; // still loading — don't block
+    if (availableDayIndexes.length === 0) return true; // no schedule set — allow all
+    return availableDayIndexes.includes(toMondayFirst(d.getDay()));
+  };
+
+  // Default selected index to first available day
+  const firstAvailableIdx = dates.findIndex((d) => isDayAvailable(d));
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
-  const selectedDate = dates[selectedDateIdx];
+  const effectiveIdx = isDayAvailable(dates[selectedDateIdx]) ? selectedDateIdx : (firstAvailableIdx >= 0 ? firstAvailableIdx : 0);
+  const selectedDate = dates[effectiveIdx];
 
   useEffect(() => {
     if (!provider?.id) return;
@@ -348,7 +371,6 @@ function StepTime({ provider, service, onNext, onBack }) {
     request(`/public/provider/${provider.id}/slots?date=${dateStr}&duration=${service?.duration || 60}&buffer=${provider?.buffer_minutes || 0}`)
       .then((data) => {
         const mappedSlots = (data?.slots || []).map((time) => {
-          // Normalise to HH:MM — the API may return "HH:MM" or "HH:MM:SS"
           const hhmm = String(time).slice(0, 5);
           return {
             id: `${dateStr}-${hhmm}`,
@@ -360,7 +382,7 @@ function StepTime({ provider, service, onNext, onBack }) {
       })
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false));
-  }, [provider?.id, provider?.buffer_minutes, selectedDateIdx, service?.duration]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [provider?.id, provider?.buffer_minutes, effectiveIdx, service?.duration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleContinue() {
     ssSet(SS.selectedSlot, selectedSlot);
@@ -372,13 +394,15 @@ function StepTime({ provider, service, onNext, onBack }) {
   return (
     <PageShell onBack={onBack} title="Select time">
       {/* Date row */}
-      <Card style={{ display: "flex", gap: 8, justifyContent: "center", padding: "20px 8px", marginTop: 12 }}>
-        {dates.map((d, i) => {
-          const isSel = i === selectedDateIdx;
+      <Card style={{ display: "flex", gap: 8, justifyContent: "center", padding: "20px 8px", marginTop: 12, overflowX: "auto" }}>
+        {dates.slice(0, 7).map((d, i) => {
+          const isSel = i === effectiveIdx;
+          const isAvail = isDayAvailable(d);
           return (
             <button
               key={i}
-              onClick={() => setSelectedDateIdx(i)}
+              onClick={() => isAvail && setSelectedDateIdx(i)}
+              disabled={!isAvail}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -386,8 +410,9 @@ function StepTime({ provider, service, onNext, onBack }) {
                 gap: 6,
                 background: "none",
                 border: "none",
-                cursor: "pointer",
+                cursor: isAvail ? "pointer" : "not-allowed",
                 padding: 0,
+                opacity: isAvail ? 1 : 0.35,
               }}
             >
               <div
